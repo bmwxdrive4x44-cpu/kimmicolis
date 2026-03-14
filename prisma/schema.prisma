@@ -1,0 +1,158 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  CLIENT
+  TRANSPORTEUR
+  RELAIS
+  ADMIN
+}
+
+enum ParcelSize {
+  PETIT
+  MOYEN
+  GROS
+}
+
+enum ReservationStatus {
+  EN_ATTENTE
+  PAYE
+  EN_COURS
+  RECU_RELAIS
+  LIVRE
+  ANNULE
+}
+
+enum RelayStatus {
+  EN_ATTENTE
+  VALIDE
+  REFUSE
+}
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  password      String
+  nom           String
+  prenom        String
+  telephone     String
+  role          UserRole
+  
+  // Pour transporteur
+  siret         String?
+  entreprise    String?
+  
+  // Pour relais
+  commerceNom   String?
+  adresse       String?
+  wilaya        String?
+  
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  // Relations
+  reservationsClient    Reservation[] @relation("ClientReservations")
+  reservationsTransporteur Reservation[] @relation("TransporteurReservations")
+  relais                Relais?
+}
+
+model Line {
+  id            String    @id @default(uuid())
+  villeDepart   String
+  villeArrivee  String
+  tarifPetit    Float
+  tarifMoyen    Float
+  tarifGros     Float
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  reservations  Reservation[]
+}
+
+model CommissionPlatform {
+  id            String    @id @default(uuid())
+  pourcentage   Float     @default(10.0)
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model Relais {
+  id                String      @id @default(uuid())
+  userId            String      @unique
+  nom               String
+  adresse           String
+  wilaya            String
+  telephone         String
+  
+  commissionPetit   Float       @default(80)
+  commissionMoyen   Float       @default(120)
+  commissionGros    Float       @default(200)
+  
+  statutValidation  RelayStatus @default(EN_ATTENTE)
+  
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  
+  // Relations
+  user              User        @relation(fields: [userId], references: [id])
+  reservations      Reservation[]
+}
+
+model Reservation {
+  id                    String            @id @default(uuid())
+  
+  // Relations
+  clientId              String
+  transporteurId        String?
+  relaisId              String?
+  ligneId               String
+  
+  // Détails colis
+  formatColis           ParcelSize
+  poids                 Float?
+  description           String?
+  
+  // Destinataire
+  nomDestinataire       String
+  telephoneDestinataire String
+  
+  // Calculs financiers
+  prixClient            Float
+  commissionPlatform    Float
+  commissionRelais      Float
+  netTransporteur       Float
+  
+  // Statut et dates
+  statutColis           ReservationStatus @default(EN_ATTENTE)
+  dateCreation          DateTime          @default(now())
+  datePaiement          DateTime?
+  dateRecuRelais        DateTime?
+  dateLivraison         DateTime?
+  
+  // Relations Prisma
+  client                User              @relation("ClientReservations", fields: [clientId], references: [id])
+  transporteur          User?             @relation("TransporteurReservations", fields: [transporteurId], references: [id])
+  relais                Relais?           @relation(fields: [relaisId], references: [id])
+  ligne                 Line              @relation(fields: [ligneId], references: [id])
+  
+  trackingHistory       TrackingHistory[]
+}
+
+model TrackingHistory {
+  id              String            @id @default(uuid())
+  reservationId   String
+  statut          ReservationStatus
+  commentaire     String?
+  date            DateTime          @default(now())
+  
+  reservation     Reservation       @relation(fields: [reservationId], references: [id])
+}
