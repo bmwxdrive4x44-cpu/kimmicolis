@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SwiftColis - Plateforme Logistique Algérie</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .card-hover:hover { transform: translateY(-2px); box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+        .animate-fade { animation: fadeIn 0.5s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div id="root"></div>
+    
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+        
+        // Données de démonstration
+        const wilayas = [
+            "Alger", "Oran", "Constantine", "Annaba", "Blida", "Béjaïa", "Sétif", "Tlemcen", "Batna", "Tizi Ouzou"
+        ];
+        
+        const formats = [
+            { nom: "Petit", prix: 400, desc: "< 5kg" },
+            { nom: "Moyen", prix: 700, desc: "5-15kg" },
+            { nom: "Gros", prix: 1200, desc: "> 15kg" }
+        ];
+        
+        const trajetsDemo = [
+            { id: 1, transporteur: "Ahmed Transport", depart: "Alger", arrivee: "Oran", date: "2024-01-15", places: 5, prix: 450 },
+            { id: 2, transporteur: "Express Logistics", depart: "Alger", arrivee: "Constantine", date: "2024-01-16", places: 3, prix: 500 },
+            { id: 3, transporteur: "Rapide Colis", depart: "Oran", arrivee: "Tlemcen", date: "2024-01-15", places: 8, prix: 300 }
+        ];
+        
+        const colisDemo = [
+            { id: "COL001", depart: "Alger", arrivee: "Oran", format: "Moyen", statut: "en_transport", date: "2024-01-14", client: "Mohamed B." },
+            { id: "COL002", depart: "Constantine", arrivee: "Annaba", format: "Petit", statut: "livré", date: "2024-01-13", client: "Fatima Z." },
+            { id: "COL003", depart: "Blida", arrivee: "Alger", format: "Gros", statut: "reçu_relais", date: "2024-01-14", client: "Karim M." }
+        ];
+        
+        const relaisDemo = [
+            { id: 1, nom: "Épicerie Central", ville: "Alger", adresse: "12 Rue Didouche", statut: "validé", colis: 5 },
+            { id: 2, nom: "Café des Amis", ville: "Oran", adresse: "Place du 1er Novembre", statut: "validé", colis: 3 },
+            { id: 3, nom: "Librairie Moderne", ville: "Constantine", adresse: "Boulevard Zighoud", statut: "en_attente", colis: 0 }
+        ];
+        
+        // Composant Principal
+        function App() {
+            const [page, setPage] = useState('accueil');
+            const [role, setRole] = useState(null);
+            const [lang, setLang] = useState('fr');
+            
+            const translations = {
+                fr: { titre: "SwiftColis", slogan: "Transport de colis inter-wilayas rapide et sécurisé", cta: "Créer un colis", connexion: "Connexion", inscription: "Devenir Relais" },
+                ar: { titre: "سويفت كوليس", slogan: "نقل الطرود بين الولايات سريع وآمن", cta: "إنشاء طرد", connexion: "تسجيل الدخول", inscription: "كن نقطة انطلاق" },
+                en: { titre: "SwiftColis", slogan: "Fast and secure inter-wilaya parcel delivery", cta: "Create Parcel", connexion: "Login", inscription: "Become a Relay" },
+                es: { titre: "SwiftColis", slogan: "Entrega rápida y segura de paquetes interprovincial", cta: "Crear Paquete", connexion: "Acceso", inscription: "Ser Punto de Entrega" }
+            };
+            
+            const t = translations[lang];
+            
+            return (
+                <div className="min-h-screen">
+                    {/* Navigation */}
+                    <nav className="bg-white shadow-lg sticky top-0 z-50">
+                        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                            <div className="flex justify-between items-center h-16">
+                                <div className="flex items-center space-x-2 cursor-pointer" onClick={() => setPage('accueil')}>
+                                    <div className="w-10 h-10 gradient-bg rounded-lg flex items-center justify-center">
+                                        <span className="text-white font-bold text-xl">S</span>
+                                    </div>
+                                    <span className="text-2xl font-bold text-purple-600">{t.titre}</span>
+                                </div>
+                                
+                                <div className="flex items-center space-x-4">
+                                    <select 
+                                        value={lang} 
+                                        onChange={(e) => setLang(e.target.value)}
+                                        className="border rounded px-2 py-1 text-sm"
+                                    >
+                                        <option value="fr">🇫🇷 FR</option>
+                                        <option value="ar">🇩🇿 AR</option>
+                                        <option value="en">🇬🇧 EN</option>
+                                        <option value="es">🇪🇸 ES</option>
+                                    </select>
+                                    
+                                    {!role ? (
+                                        <>
+                                            <button onClick={() => setPage('connexion')} className="text-gray-600 hover:text-purple-600">{t.connexion}</button>
+                                            <button onClick={() => setPage('inscription')} className="gradient-bg text-white px-4 py-2 rounded-lg hover:opacity-90">{t.inscription}</button>
+                                        </>
+                                    ) : (
+                                        <button onClick={() => { setRole(null); setPage('accueil'); }} className="text-red-500">Déconnexion</button>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </nav>
+                    
+                    {/* Contenu principal */}
+                    {page === 'accueil' && <Accueil t={t} setPage={setPage} setRole={setRole} />}
+                    {page === 'connexion' && <Connexion setPage={setPage} setRole={setRole} />}
+                    {page === 'inscription' && <Inscription setPage={setPage} />}
+                    {page === 'creer-colis' && <CreerColis setPage={setPage} />}
+                    {page === 'dashboard-client' && <DashboardClient setPage={setPage} />}
+                    {page === 'dashboard-transporteur' && <DashboardTransporteur setPage={setPage} />}
+                    {page === 'dashboard-relais' && <DashboardRelais setPage={setPage} />}
+                    {page === 'dashboard-admin' && <DashboardAdmin setPage={setPage} />}
+                </div>
+            );
+        }
+        
+        function Accueil({ t, setPage, setRole }) {
+            return (
+                <div>
+                    {/* Hero Section */}
+                    <section className="gradient-bg text-white py-20">
+                        <div className="max-w-7xl mx-auto px-4 text-center">
+                            <h1 className="text-5xl font-bold mb-6 animate-fade">{t.slogan}</h1>
+                            <p className="text-xl mb-8 opacity-90">48 wilayas couvertes • Suivi en temps réel • Prix transparents</p>
+                            <button onClick={() => setPage('creer-colis')} className="bg-white text-purple-600 px-8 py-4 rounded-full text-lg font-semibold hover:shadow-xl transition-all">
+                                {t.cta} →
+                            </button>
+                        </div>
+                    </section>
+                    
+                    {/* Services */}
+                    <section className="py-16 bg-white">
+                        <div className="max-w-7xl mx-auto px-4">
+                            <h2 className="text-3xl font-bold text-center mb-12 text-gray-800">Nos Services</h2>
+                            <div className="grid md:grid-cols-3 gap-8">
+                                <ServiceCard 
+                                    icon="📦" 
+                                    titre="Création de colis" 
+                                    desc="Choisissez vos points relais départ et arrivée en quelques clics"
+                                />
+                                <ServiceCard 
+                                    icon="🚚" 
+                                    titre="Transporteurs vérifiés" 
+                                    desc="Des professionnels et particuliers certifiés pour vos livraisons"
+                                />
+                                <ServiceCard 
+                                    icon="📍" 
+                                    titre="Points relais" 
+                                    desc="Plus de 500 points de dépôt et retrait dans toute l'Algérie"
+                                />
+                            </div>
+                        </div>
+                    </section>
+                    
+                    {/* Stats */}
+                    <section className="py-16 bg-gray-100">
+                        <div className="max-w-7xl mx-auto px-4">
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
+                                <StatBox nombre="10,000+" label="Colis livrés" />
+                                <StatBox nombre="500+" label="Points relais" />
+                                <StatBox nombre="1,200+" label="Transporteurs" />
+                                <StatBox nombre="48" label="Wilayas couvertes" />
+                            </div>
+                        </div>
+                    </section>
+                    
+                    {/* Comment ça marche */}
+                    <section className="py-16 bg-white">
+                        <div className="max-w-7xl mx-auto px-4">
+                            <h2 className="text-3xl font-bold text-center mb-12 text-gray-800">Comment ça marche ?</h2>
+                            <div className="grid md:grid-cols-5 gap-4">
+                                <Etape numero="1" titre="Créez" desc="Votre colis en ligne" />
+                                <Etape numero="2" titre="Déposez" desc="Au point relais" />
+                                <Etape numero="3" titre="Transport" desc="Suivi en temps réel" />
+                                <Etape numero="4" titre="Arrivée" desc="Au relais destination" />
+                                <Etape numero="5" titre="Récupérez" desc="Votre colis" />
+                            </div>
+                        </div>
+                    </section>
+                    
+                    {/* Devenir partenaire */}
+                    <section className="py-16 gradient-bg text-white">
+                        <div className="max-w-7xl mx-auto px-4 text-center">
+                            <h2 className="text-3xl font-bold mb-6">Rejoignez SwiftColis</h2>
+                            <div className="grid md:grid-cols-3 gap-8 mt-8">
+                                <button onClick={() => { setRole('client'); setPage('dashboard-client'); }} className="bg-white text-purple-600 p-6 rounded-xl hover:shadow-xl transition-all">
+                                    <div className="text-4xl mb-4">👤</div>
+                                    <h3 className="text-xl font-bold">Client</h3>
+                                    <p className="mt-2 opacity-80">Envoyez et recevez des colis</p>
+                                </button>
+                                <button onClick={() => { setRole('transporteur'); setPage('dashboard-transporteur'); }} className="bg-white text-purple-600 p-6 rounded-xl hover:shadow-xl transition-all">
+                                    <div className="text-4xl mb-4">🚛</div>
+                                    <h3 className="text-xl font-bold">Transporteur</h3>
+                                    <p className="mt-2 opacity-80">Gagnez avec vos trajets</p>
+                                </button>
+                                <button onClick={() => { setRole('relais'); setPage('dashboard-relais'); }} className="bg-white text-purple-600 p-6 rounded-xl hover:shadow-xl transition-all">
+                                    <div className="text-4xl mb-4">🏪</div>
+                                    <h3 className="text-xl font-bold">Point Relais</h3>
+                                    <p className="mt-2 opacity-80">Générez des revenus</p>
+                                </button>
+                            </div>
+                            <button onClick={() => { setRole('admin'); setPage('dashboard-admin'); }} className="mt-8 bg-transparent border-2 border-white text-white px-6 py-2 rounded-lg hover:bg-white hover:text-purple-600 transition-all">
+                                👨‍💼 Espace Admin (Démo)
+                            </button>
+                        </div>
+                    </section>
+                    
+                    {/* Footer */}
+                    <footer className="bg-gray-800 text-white py-8">
+                        <div className="max-w-7xl mx-auto px-4 text-center">
+                            <p>© 2024 SwiftColis Algérie. Tous droits réservés.</p>
+                        </div>
+                    </footer>
+                </div>
+            );
+        }
+        
+        function ServiceCard({ icon, titre, desc }) {
+            return (
+                <div className="text-center p-6 card-hover transition-all duration-300">
+                    <div className="text-5xl mb-4">{icon}</div>
+                    <h3 className="text-xl font-bold mb-2 text-gray-800">{titre}</h3>
+                    <p className="text-gray-600">{desc}</p>
+                </div>
+            );
+        }
+        
+        function StatBox({ nombre, label }) {
+            return (
+                <div>
+                    <div className="text-4xl font-bold text-purple-600 mb-2">{nombre}</div>
+                    <div className="text-gray-600">{label}</div>
+                </div>
+            );
+        }
+        
+        function Etape({ numero, titre, desc }) {
+            return (
+                <div className="text-center">
+                    <div className="w-12 h-12 gradient-bg rounded-full flex items-center justify-center text-white font-bold mx-auto mb-4">{numero}</div>
+                    <h3 className="font-bold text-gray-800">{titre}</h3>
+                    <p className="text-sm text-gray-600">{desc}</p>
+                </div>
+            );
+        }
+        
+        function Connexion({ setPage, setRole }) {
+            const [email, setEmail] = useState('');
+            const [password, setPassword] = useState('');
+            
+            const handleLogin = (selectedRole) => {
+                setRole(selectedRole);
+                setPage(`dashboard-${selectedRole}`);
+            };
+            
+            return (
+                <div className="min-h-screen flex items-center justify-center bg-gray-100 py-12 px-4">
+                    <div className="bg-white p-8 rounded-xl shadow-xl w-full max-w-md">
+                        <h2 className="text-2xl font-bold text-center mb-6 text-gray-800">Connexion</h2>
+                        
+                        <div className="space-y-4">
+                            <input 
+                                type="email" 
+                                placeholder="Email" 
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
+                                className="w-full border rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                            />
+                            <input 
+                                type="password" 
+                                placeholder="Mot de passe" 
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                className="w-full border rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                            />
+                            
+                            <div className="grid grid-cols-2 gap-4 mt-6">
+                                <button onClick={() => handleLogin('client')} className="gradient-bg text-white py-3 rounded-lg hover:opacity-90">Client</button>
+                                <button onClick={() => handleLogin('transporteur')} className="gradient-bg text-white py-3 rounded-lg hover:opacity-90">Transporteur</button>
+                                <button onClick={() => handleLogin('relais')} className="gradient-bg text-white py-3 rounded-lg hover:opacity-90">Relais</button>
+                                <button onClick={() => handleLogin('admin')} className="gradient-bg text-white py-3 rounded-lg hover:opacity-90">Admin</button>
+                            </div>
+                            
+                            <p className="text-center text-sm text-gray-600 mt-4">
+                                Ou connectez-vous avec 
+                                <button className="text-blue-600 ml-1">Google</button>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+        
+        function Inscription({ setPage }) {
+            const [formData, setFormData] = useState({ nom: '', email: '', telephone: '', ville: '', typeCommerce: '' });
+            
+            return (
+                <div className="min-h-screen flex items-center justify-center bg-gray-100 py-12 px-4">
+                    <div className="bg-white p-8 rounded-xl shadow-xl w-full max-w-lg">
+                        <h2 className="text-2xl font-bold text-center mb-6 text-gray-800">Devenir Point Relais</h2>
+                        
+                        <div className="space-y-4">
+                            <input type="text" placeholder="Nom du commerce" className="w-full border rounded-lg px-4 py-3" />
+                            <input type="text" placeholder="Adresse complète" className="w-full border rounded-lg px-4 py-3" />
+                            <input type="text" placeholder="Ville" className="w-full border rounded-lg px-4 py-3" />
+                            <input type="tel" placeholder="Téléphone" className="w-full border rounded-lg px-4 py-3" />
+                            <input type="email" placeholder="Email" className="w-full border rounded-lg px-4 py-3" />
+                            <select className="w-full border rounded-lg px-4 py-3">
+                                <option>Type de commerce</option>
+                                <option>Épicerie</option>
+                                <option>Café</option>
+                                <option>Librairie</option>
+                                <option>Pharmacie</option>
+                                <option>Autre</option>
+                            </select>
+                            
+                            <button onClick={() => setPage('accueil')} className="w-full gradient-bg text-white py-3 rounded-lg hover:opacity-90 mt-4">
+                                Soumettre la demande
+                            </button>
+                            
+                            <p className="text-center text-sm text-gray-600">
+                                Votre demande sera validée par notre équipe sous 48h
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+        
+        function CreerColis({ setPage }) {
+            const [depart, setDepart] = useState('');
+            const [arrivee, setArrivee] = useState('');
+            const [format, setFormat] = useState('');
+            const [prix, setPrix] = useState(0);
+            
+            useEffect(() => {
+                if (depart && arrivee && format) {
+                    const basePrice = formats.find(f => f.nom === format)?.prix || 0;
+                    const isLongDistance = depart !== arrivee;
+                    setPrix(basePrice * (isLongDistance ? 1.2 : 1));
+                }
+            }, [depart, arrivee, format]);
+            
+            return (
+                <div className="min-h-screen bg-gray-100 py-12 px-4">
+                    <div className="max-w-2xl mx-auto bg-white p-8 rounded-xl shadow-xl">
+                        <h2 className="text-2xl font-bold mb-6 text-gray-800">Créer un nouveau colis</h2>
+                        
+                        <div className="space-y-6">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Wilaya de départ</label>
+                                <select 
+                                    value={depart} 
+                                    onChange={(e) => setDepart(e.target.value)}
+                                    className="w-full border rounded-lg px-4 py-3"
+                                >
+                                    <option value="">Sélectionner...</option>
+                                    {wilayas.map(w => <option key={w} value={w}>{w}</option>)}
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Wilaya d'arrivée</label>
+                                <select 
+                                    value={arrivee} 
+                                    onChange={(e) => setArrivee(e.target.value)}
+                                    className="w-full border rounded-lg px-4 py-3"
+                                >
+                                    <option value="">Sélectionner...</option>
+                                    {wilayas.map(w => <option key={w} value={w}>{w}</option>)}
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Format du colis</label>
+                                <div className="grid grid-cols-3 gap-4">
+                                    {formats.map(f => (
+                                        <button 
+                                            key={f.nom}
+                                            onClick={() => setFormat(f.nom)}
+                                            className={`p-4 border rounded-lg text-center ${format === f.nom ? 'border-purple-500 bg-purple-50' : ''}`}
+                                        >
+                                            <div className="font-bold">{f.nom}</div>
+                                            <div className="text-sm text-gray-600">{f.desc}</div>
+                                            <div className="text-purple-600 font-bold mt-2">{f.prix} DA</div>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                            
+                            {prix > 0 && (
+                                <div className="bg-green-50 p-4 rounded-lg">
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-gray-700">Prix total:</span>
+                                        <span className="text-2xl font-bold text-green-600">{Math.round(prix)} DA</span>
+                                    </div>
+                                    <div className="text-sm text-gray-500 mt-2">
+                                        Commission plateforme (15%): {Math.round(prix * 0.15)} DA | 
+                                        Net transporteur: {Math.round(prix * 0.85)} DA
+                                    </div>
+                                </div>
+                            )}
+                            
+                            <button 
+                                onClick={() => setPage('dashboard-client')}
+                                className="w-full gradient-bg text-white py-4 rounded-lg text-lg font-semibold hover:opacity-90"
+                            >
+                                Payer et créer le colis
+                            </button>
+                            
+                            <button onClick={() => setPage('accueil')} className="w-full text-gray-600 py-2">
+                                Annuler
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+        
+        function DashboardClient({ setPage }) {
+            return (
+                <div className="min-h-screen bg-gray-100">
+                    <div className="max-w-7xl mx-auto px-4 py-8">
+                        <div className="flex justify-between items-center mb-8">
+                            <h1 className="text-3xl font-bold text-gray-800">Dashboard Client</h1>
+                            <button onClick={() => setPage('creer-colis')} className="gradient-bg text-white px-6 py-3 rounded-lg">
+                                + Nouveau colis
+                            </button>
+                        </div>
+                        
+                        <div className="grid md:grid-cols-4 gap-6 mb-8">
+                            <div className="bg-white p-6 rounded-xl shadow">
+                                <div className="text-3xl font-bold text-purple-600">{colisDemo.length}</div>
+                                <div className="text-gray-600">Total colis</div>
+                            </div>
+                            <div className="bg-white p-6 rounded-xl shadow">
+                                <div className="text-3xl font-bold text-blue-600">1</div>
+                                <div className="text-gray-600">En transit</div>
+                            </div>
+                            <div className="bg-white p-6 rounded-xl shadow">
+                                <div className="text-3xl font-bold text-green-600">1</div>
+                                <div className="text-gray-600">Livrés</div>
+                            </div>
+                            <div className="bg-white p-6 rounded-xl shadow">
+                                <div className="text-3xl font-bold text-orange-600">1</div>
+                                <div className="text-gray-600">En attente</div>
+                            </div>
+                        </div>
+                        
+                        <div className="bg-white rounded-xl shadow overflow-hidden">
+                            <div className="px-6 py-4 border-b">
+                                <h2 className="text-xl font-bold">Mes colis</h2>
+                            </div>
+                            <table className="w-full">
+                                <thead className="bg-gray-50">
+                                    <tr>
+                                        <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">ID</th>
+                                        <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">Trajet</th>
+                                        <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">Format</th>
+                                        <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">Statut</th>
+                                        <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">Date</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {colisDemo.map(colis => (
+                                        <tr key={colis.id} className="border-t hover:bg-gray-50">
+                                            <td className="px-6 py-4 font-mono text-sm">{colis.id}</td>
+                                            <td className="px-6 py-4">{colis.depart} → {colis.arrivee}</td>
+                                            <td className="px-6 py-4">{colis.format}</td>
+                                            <td className="px-6 py-4">
+                                                <StatutBadge statut={colis.statut} />
+                                            </td>
+                                            <td className="px-6 py-4 text-sm text-gray-600">{colis.date}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+        
+        function DashboardTransporteur({ setPage }) {
+            return (
+                <div className="min-h-screen bg-gray-100">
+                    <div className="max-w-7xl mx-auto px-4 py-8">
+                        <div className="flex justify-between items-center mb-8">
+                            <h1 className="text-3xl font-bold text-gray-800">Dashboard Transporteur</h1>
+                            <button className="gradient-bg text-white px-6 py-3 rounded-lg">
+                                + Publier un trajet
+                            </button>
+                        </div>
+                        
+                        <div className="grid md:grid-cols-3 gap-6 mb-8">
+                            <div className="bg-white p-6 rounded-xl shadow">
+                                <div className="text-3xl font-bold text-purple-600">12</div>
+                                <div className="text-gray-600">Trajets publiés</div>
+                            </div>
+                            <div className="bg-white p-6 rounded-xl shadow">
+                                <div className="text-3xl font-bold text-green-600">8,500 DA</div>
+                                <div className="text-gray-600">Gains ce mois</div>
+                            </div>
+                            <div className="bg-white p-6 rounded-xl shadow">
+                                <div className="text-3xl font-bold text-blue-600">4.8</div>
+                                <div className="text-gray-600">Note moyenne</div>
+                            </div>
+                        </div>
+                        
+                        <div className="grid md:grid-cols-2 gap-6">
+                            <div className="bg-white rounded-xl shadow">
+                                <div className="px-6 py-4 border-b">
+                                    <h2 className="text-xl font-bold">Mes trajets</h2>
+                                </div>
+                                <div className="p-4 space-y-4">
+                                    {trajetsDemo.map(trajet => (
+                                        <div key={trajet.id} className="border rounded-lg p-4">
+                                            <div className="flex justify-between">
+                                                <div>
+                                                    <div className="font-bold">{trajet.depart} → {trajet.arrivee}</div>
+                                                    <div className="text-sm text-gray-600">{trajet.date} • {trajet.places} places</div>
+                                                </div>
+                                                <div className="text-purple-600 font-bold">{trajet.prix} DA</div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                            
+                            <div className="bg-white rounded-xl shadow">
+                                <div className="px-6 py-4 border-b">
+                                    <h2 className="text-xl font-bold">Colis disponibles</h2>
+                                </div>
+                                <div className="p-4 space-y-4">
+                                    {colisDemo.slice(0, 2).map(colis => (
+                                        <div key={colis.id} className="border rounded-lg p-4">
+                                            <div className="flex justify-between items-center">
+                                                <div>
+                                                    <div className="font-bold">{colis.depart} → {colis.arrivee}</div>
+                                                    <div className="text-sm text-gray-600">{colis.format}</div>
+                                                </div>
+                                                <button className="gradient-bg text-white px-4 py-2 rounded text-sm">
+                                                    Accepter
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+        
+        function DashboardRelais({ setPage }) {
+            return (
+                <div className="min-h-screen bg-gray-100">
+                    <div className="max-w-7xl mx-auto px-4 py-8">
+                        <h1 className="text-3xl font-bold text-gray-800 mb-8">Dashboard Point Relais</h1>
+                        
+                        <div className="grid md:grid-cols-3 gap-6 mb-8">
+                            <div className="bg-white p-6 rounded-xl shadow">
+                                <div className="text-3xl font-bold text-purple-600">8</div>
+                                <div className="text-gray-600">Colis en stock</div>
+                            </div>
+                            <div className="bg-white p-6 rounded-xl shadow">
+                                <div className="text-3xl font-bold text-green-600">1,200 DA</div>
+                                <div className="text-gray-600">Commissions</div>
+                            </div>
+                            <div className="bg-white p-6 rounded-xl shadow">
+                                <div className="text-3xl font-bold text-blue-600">95%</div>
+                                <div className="text-gray-600">Taux de réussite</div>
+                            </div>
+                        </div>
+                        
+                        <div className="bg-white rounded-xl shadow p-6 mb-6">
+                            <h2 className="text-xl font-bold mb-4">Scanner QR Code</h2>
+                            <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+                                <div className="text-6xl mb-4">📷</div>
+                                <p className="text-gray-600">Cliquez pour scanner un QR code</p>
+                                <button className="mt-4 gradient-bg text-white px-6 py-2 rounded-lg">
+                                    Ouvrir le scanner
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div className="bg-white rounded-xl shadow">
+                            <div className="px-6 py-4 border-b">
+                                <h2 className="text-xl font-bold">Colis en attente</h2>
+                            </div>
+                            <table className="w-full">
+                                <thead className="bg-gray-50">
+                                    <tr>
+                                        <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">ID Colis</th>
+                                        <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">Client</th>
+                                        <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">Statut</th>
+                                        <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {colisDemo.slice(0, 2).map(colis => (
+                                        <tr key={colis.id} className="border-t">
+                                            <td className="px-6 py-4 font-mono">{colis.id}</td>
+                                            <td className="px-6 py-4">{colis.client}</td>
+                                            <td className="px-6 py-4"><StatutBadge statut={colis.statut} /></td>
+                                            <td className="px-6 py-4">
+                                                <button className="text-purple-600 hover:underline">Valider</button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+        
+        function DashboardAdmin({ setPage }) {
+            return (
+                <div className="min-h-screen bg-gray-100">
+                    <div className="max-w-7xl mx-auto px-4 py-8">
+                        <h1 className="text-3xl font-bold text-gray-800 mb-8">Dashboard Administrateur</h1>
+                        
+                        <div className="grid md:grid-cols-4 gap-6 mb-8">
+                            <div className="bg-white p-6 rounded-xl shadow">
+                                <div className="text-3xl font-bold text-purple-600">2,450</div>
+                                <div className="text-gray-600">Utilisateurs</div>
+                            </div>
+                            <div className="bg-white p-6 rounded-xl shadow">
+                                <div className="text-3xl font-bold text-blue-600">10,234</div>
+                                <div className="text-gray-600">Colis totaux</div>
+                            </div>
+                            <div className="bg-white p-6 rounded-xl shadow">
+                                <div className="text-3xl font-bold text-green-600">523</div>
+                                <div className="text-gray-600">Points relais</div>
+                            </div>
+                            <div className="bg-white p-6 rounded-xl shadow">
+                                <div className="text-3xl font-bold text-orange-600">1,245</div>
+                                <div className="text-gray-600">Transporteurs</div>
+                            </div>
+                        </div>
+                        
+                        <div className="grid md:grid-cols-2 gap-6 mb-8">
+                            <div className="bg-white rounded-xl shadow p-6">
+                                <h2 className="text-xl font-bold mb-4">Demandes de relais en attente</h2>
+                                {relaisDemo.filter(r => r.statut === 'en_attente').map(relais => (
+                                    <div key={relais.id} className="border rounded-lg p-4 mb-4">
+                                        <div className="font-bold">{relais.nom}</div>
+                                        <div className="text-sm text-gray-600">{relais.ville} - {relais.adresse}</div>
+                                        <div className="mt-2 space-x-2">
+                                            <button className="bg-green-500 text-white px-3 py-1 rounded text-sm">Valider</button>
+                                            <button className="bg-red-500 text-white px-3 py-1 rounded text-sm">Refuser</button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                            
+                            <div className="bg-white rounded-xl shadow p-6">
+                                <h2 className="text-xl font-bold mb-4">Lignes de transport</h2>
+                                <div className="space-y-2">
+                                    {trajetsDemo.map((trajet, i) => (
+                                        <div key={i} className="flex justify-between items-center border-b pb-2">
+                                            <span>{trajet.depart} ↔ {trajet.arrivee}</span>
+                                            <span className="text-purple-600 font-bold">{trajet.prix} DA</span>
+                                        </div>
+                                    ))}
+                                </div>
+                                <button className="mt-4 w-full border-2 border-dashed border-gray-300 rounded-lg py-2 text-gray-600">
+                                    + Ajouter une ligne
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div className="bg-white rounded-xl shadow p-6">
+                            <h2 className="text-xl font-bold mb-4">Tous les points relais</h2>
+                            <table className="w-full">
+                                <thead className="bg-gray-50">
+                                    <tr>
+                                        <th className="px-4 py-2 text-left">Nom</th>
+                                        <th className="px-4 py-2 text-left">Ville</th>
+                                        <th className="px-4 py-2 text-left">Statut</th>
+                                        <th className="px-4 py-2 text-left">Colis</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {relaisDemo.map(relais => (
+                                        <tr key={relais.id} className="border-t">
+                                            <td className="px-4 py-2">{relais.nom}</td>
+                                            <td className="px-4 py-2">{relais.ville}</td>
+                                            <td className="px-4 py-2">
+                                                <span className={`px-2 py-1 rounded text-xs ${relais.statut === 'validé' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                                                    {relais.statut}
+                                                </span>
+                                            </td>
+                                            <td className="px-4 py-2">{relais.colis}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+        
+        function StatutBadge({ statut }) {
+            const styles = {
+                'en_transport': 'bg-blue-100 text-blue-800',
+                'livré': 'bg-green-100 text-green-800',
+                'reçu_relais': 'bg-orange-100 text-orange-800',
+                'en_attente': 'bg-gray-100 text-gray-800'
+            };
+            
+            const labels = {
+                'en_transport': '🚚 En transport',
+                'livré': '✅ Livré',
+                'reçu_relais': '📦 Reçu au relais',
+                'en_attente': '⏳ En attente'
+            };
+            
+            return (
+                <span className={`px-3 py-1 rounded-full text-sm font-medium ${styles[statut] || styles['en_attente']}`}>
+                    {labels[statut] || statut}
+                </span>
+            );
+        }
+        
+        // Rendu de l'application
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
