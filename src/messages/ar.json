@@ -1,0 +1,338 @@
+{
+  "common": {
+    "appName": "SwiftColis",
+    "tagline": "طرودك، أولويتنا",
+    "loading": "جاري التحميل...",
+    "error": "حدث خطأ",
+    "success": "تمت العملية بنجاح",
+    "save": "حفظ",
+    "cancel": "إلغاء",
+    "delete": "حذف",
+    "edit": "تعديل",
+    "view": "عرض",
+    "search": "بحث",
+    "filter": "تصفية",
+    "all": "الكل",
+    "none": "لا شيء",
+    "yes": "نعم",
+    "no": "لا",
+    "confirm": "تأكيد",
+    "back": "رجوع",
+    "next": "التالي",
+    "submit": "إرسال",
+    "close": "إغلاق",
+    "logout": "تسجيل الخروج",
+    "dashboard": "لوحة التحكم",
+    "profile": "الملف الشخصي",
+    "settings": "الإعدادات"
+  },
+  "nav": {
+    "home": "الرئيسية",
+    "createParcel": "إنشاء طرد",
+    "trackParcel": "تتبع الطرد",
+    "becomeRelay": "كن نقطة توصيل",
+    "becomeTransporter": "كن ناقلاً",
+    "login": "تسجيل الدخول",
+    "register": "إنشاء حساب"
+  },
+  "landing": {
+    "hero": {
+      "title": "SwiftColis",
+      "subtitle": "منصة التوصيل بين الولايات في الجزائر",
+      "description": "أرسل طرودك بسهولة عبر جميع ولايات الجزائر. شبكتنا من نقاط التوصيل والناقلين المعتمدين تضمن تسريعاً وأماناً.",
+      "cta": {
+        "send": "إرسال طرد",
+        "track": "تتبع طرد",
+        "partner": "كن شريكاً"
+      }
+    },
+    "features": {
+      "title": "لماذا SwiftColis؟",
+      "subtitle": "حل متكامل لجميع احتياجات التوصيل",
+      "items": {
+        "network": {
+          "title": "شبكة واسعة من نقاط التوصيل",
+          "description": "نقاط توصيل في جميع المدن الكبرى لإيداع واستلام طرودك بسهولة."
+        },
+        "tracking": {
+          "title": "تتبع في الوقت الفعلي",
+          "description": "تتبع طردك في كل مرحلة مع نظام التتبع الفوري والإشعارات."
+        },
+        "price": {
+          "title": "أسعار شفافة",
+          "description": "أسعار واضحة ومنافسة، تُحسب تلقائياً حسب المسافة والحجم."
+        },
+        "secure": {
+          "title": "دفع آمن",
+          "description": "ادفع بثقة مع نظام الدفع الآمن وضمان التوصيل."
+        }
+      }
+    },
+    "howItWorks": {
+      "title": "كيف يعمل؟",
+      "subtitle": "ثلاث خطوات بسيطة لإرسال طردك",
+      "steps": {
+        "create": {
+          "title": "١. أنشئ طردك",
+          "description": "أدخل معلومات طردك: مدينة المغادرة، الوصول، الحجم ونقطة التوصيل."
+        },
+        "deposit": {
+          "title": "٢. أودعه في نقطة التوصيل",
+          "description": "أودع طردك في أقرب نقطة توصيل. سيتولاه ناقل معتمد."
+        },
+        "track": {
+          "title": "٣. تتبع واستلم",
+          "description": "تتبع طردك في الوقت الفعلي واستلمه في نقطة التوصيل الهدف."
+        }
+      }
+    },
+    "stats": {
+      "parcels": "طرد تم توصيله",
+      "cities": "ولاية مغطاة",
+      "relays": "نقطة توصيل",
+      "transporters": "ناقل نشط"
+    }
+  },
+  "auth": {
+    "login": {
+      "title": "تسجيل الدخول",
+      "subtitle": "الوصول إلى مساحة SwiftColis",
+      "email": "البريد الإلكتروني",
+      "password": "كلمة المرور",
+      "rememberMe": "تذكرني",
+      "forgotPassword": "نسيت كلمة المرور؟",
+      "submit": "دخول",
+      "orWith": "أو تابع عبر",
+      "googleLogin": "Google",
+      "noAccount": "ليس لديك حساب؟",
+      "registerLink": "إنشاء حساب"
+    },
+    "register": {
+      "title": "إنشاء حساب",
+      "subtitle": "انضم إلى SwiftColis في بضع نقرات",
+      "name": "الاسم الكامل",
+      "email": "البريد الإلكتروني",
+      "phone": "رقم الهاتف",
+      "password": "كلمة المرور",
+      "confirmPassword": "تأكيد كلمة المرور",
+      "role": {
+        "label": "نوع الحساب",
+        "client": "عميل - أرسل طروداً",
+        "transporter": "ناقل - أوصل طروداً",
+        "relais": "نقطة توصيل - أنا تاجر"
+      },
+      "siret": "رقم SIRET (للناقلين)",
+      "acceptTerms": "أوافق على شروط الاستخدام",
+      "submit": "إنشاء حسابي",
+      "orWith": "أو سجل عبر",
+      "haveAccount": "لديك حساب؟",
+      "loginLink": "تسجيل الدخول"
+    }
+  },
+  "parcel": {
+    "create": {
+      "title": "إنشاء طرد جديد",
+      "subtitle": "أدخل معلومات شحنتك",
+      "departure": {
+        "title": "مدينة المغادرة",
+        "placeholder": "اختر مدينة المغادرة"
+      },
+      "arrival": {
+        "title": "مدينة الوصول",
+        "placeholder": "اختر مدينة الوصول"
+      },
+      "relayDepart": {
+        "title": "نقطة إيداع",
+        "placeholder": "اختر نقطة توصيل"
+      },
+      "relayArrival": {
+        "title": "نقطة استلام",
+        "placeholder": "اختر نقطة توصيل"
+      },
+      "format": {
+        "title": "حجم الطرد",
+        "petit": "صغير (30×20×10 سم)",
+        "moyen": "متوسط (50×30×20 سم)",
+        "gros": "كبير (70×50×30 سم)"
+      },
+      "weight": "الوزن المقدر (كغ)",
+      "description": "وصف المحتوى",
+      "price": {
+        "title": "السعر المقدر",
+        "tariff": "السعر الأساسي",
+        "platformFee": "رسوم المنصة",
+        "relayFee": "رسوم نقطة التوصيل",
+        "total": "المجموع للدفع"
+      },
+      "submit": "إنشاء ودفع"
+    },
+    "status": {
+      "CREATED": "تم الإنشاء",
+      "PAID": "مدفوع",
+      "RECU_RELAIS": "استُلم في نقطة التوصيل",
+      "EN_TRANSPORT": "قيد النقل",
+      "ARRIVE_RELAIS_DESTINATION": "وصل لنقطة التوصيل",
+      "LIVRE": "تم التوصيل"
+    },
+    "tracking": {
+      "title": "تتبع الطرد",
+      "placeholder": "أدخل رقم التتبع",
+      "search": "بحث",
+      "notFound": "الطرد غير موجود",
+      "history": "السجل",
+      "currentStatus": "الحالة الحالية"
+    },
+    "history": {
+      "title": "طرودي",
+      "noParcels": "لا توجد طرود حالياً",
+      "createFirst": "أنشئ طردك الأول"
+    }
+  },
+  "transporter": {
+    "dashboard": {
+      "title": "لوحة تحكم الناقل",
+      "welcome": "مرحباً",
+      "stats": {
+        "missions": "المهام المنجزة",
+        "earnings": "الأرباح الكلية",
+        "rating": "التقييم المتوسط"
+      }
+    },
+    "trips": {
+      "title": "رحلاتي",
+      "create": "نشر رحلة",
+      "departure": "مدينة المغادرة",
+      "arrival": "مدينة الوصول",
+      "stops": "المدن المتوسطة",
+      "date": "تاريخ المغادرة",
+      "capacity": "الأماكن المتوفرة",
+      "status": {
+        "PROGRAMME": "مجدول",
+        "EN_COURS": "جارٍ",
+        "TERMINE": "منتهٍ",
+        "ANNULE": "ملغى"
+      }
+    },
+    "missions": {
+      "title": "المهام المتاحة",
+      "accept": "قبول",
+      "decline": "رفض",
+      "details": "التفاصيل",
+      "noMissions": "لا توجد مهام متاحة"
+    },
+    "earnings": {
+      "title": "أرباحي",
+      "thisMonth": "هذا الشهر",
+      "total": "المجموع",
+      "withdraw": "سحب"
+    }
+  },
+  "relais": {
+    "dashboard": {
+      "title": "لوحة تحكم نقطة التوصيل",
+      "welcome": "مرحباً",
+      "stats": {
+        "received": "الطرود المستلمة",
+        "delivered": "الطرود المسلَّمة",
+        "pending": "في الانتظار",
+        "earnings": "العمولات"
+      }
+    },
+    "scanner": {
+      "title": "ماسح QR Code",
+      "instructions": "امسح رمز QR للطرد لاستلامه أو تسليمه",
+      "manual": "أو أدخل الرمز يدوياً",
+      "received": "تم استلام الطرد بنجاح",
+      "delivered": "تم تسليم الطرد بنجاح"
+    },
+    "parcels": {
+      "title": "الطرود في الانتظار",
+      "pending": "بانتظار الاستلام",
+      "received": "مستلمة اليوم",
+      "noParcels": "لا توجد طرود في الانتظار"
+    },
+    "register": {
+      "title": "كن نقطة توصيل",
+      "subtitle": "انضم إلى شبكة شركائنا",
+      "commerceName": "اسم المحل",
+      "address": "العنوان الكامل",
+      "city": "المدينة",
+      "photos": "صور المحل",
+      "submit": "إرسال الطلب",
+      "success": "تم إرسال الطلب بنجاح",
+      "pending": "بانتظار التحقق"
+    }
+  },
+  "admin": {
+    "dashboard": {
+      "title": "الإدارة",
+      "welcome": "مرحباً، أيها المدير",
+      "stats": {
+        "users": "المستخدمون",
+        "parcels": "الطرود",
+        "transporters": "الناقلون",
+        "relays": "نقاط التوصيل",
+        "revenue": "الإيرادات"
+      }
+    },
+    "users": {
+      "title": "إدارة المستخدمين",
+      "all": "جميع المستخدمين",
+      "clients": "العملاء",
+      "transporters": "الناقلون",
+      "relays": "نقاط التوصيل",
+      "actions": {
+        "view": "عرض",
+        "edit": "تعديل",
+        "deactivate": "تعطيل",
+        "activate": "تفعيل"
+      }
+    },
+    "relays": {
+      "title": "التحقق من نقاط التوصيل",
+      "pending": "في الانتظار",
+      "approved": "موافق عليه",
+      "rejected": "مرفوض",
+      "approve": "موافقة",
+      "reject": "رفض"
+    },
+    "lines": {
+      "title": "خطوط النقل",
+      "create": "إنشاء خط",
+      "departure": "مدينة المغادرة",
+      "arrival": "مدينة الوصول",
+      "tariffs": "الأسعار",
+      "petit": "الحجم الصغير",
+      "moyen": "الحجم المتوسط",
+      "gros": "الحجم الكبير"
+    },
+    "settings": {
+      "title": "الإعدادات",
+      "platformCommission": "عمولة المنصة (%)",
+      "relayCommission": "عمولات نقاط التوصيل",
+      "notifications": "الإشعارات"
+    }
+  },
+  "wilayas": {
+    "alger": "الجزائر",
+    "oran": "وهران",
+    "constantine": "قسنطينة",
+    "annaba": "عنابة",
+    "blida": "البليدة",
+    "setif": "سطيف",
+    "tizi_ouzou": "تيزي وزو",
+    "bejaia": "بجاية",
+    "chlef": "الشلف",
+    "tlemcen": "تلمسان",
+    "ouargla": "ورقلة",
+    "ghardaia": "غرداية",
+    "biskra": "بسكرة",
+    "djelfa": "الجلفة",
+    "medea": "المدية",
+    "tiaret": "تيارت",
+    "sidi_bel_abbes": "سيدي بلعباس",
+    "batna": "باتنة",
+    "skikda": "سكيكدة",
+    "mostaganem": "مستغانم"
+  }
+}

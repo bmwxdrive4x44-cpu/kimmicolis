@@ -1,0 +1,338 @@
+{
+  "common": {
+    "appName": "SwiftColis",
+    "tagline": "Tu paquete, nuestra prioridad",
+    "loading": "Cargando...",
+    "error": "Se produjo un error",
+    "success": "Operación exitosa",
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "delete": "Eliminar",
+    "edit": "Editar",
+    "view": "Ver",
+    "search": "Buscar",
+    "filter": "Filtrar",
+    "all": "Todos",
+    "none": "Ninguno",
+    "yes": "Sí",
+    "no": "No",
+    "confirm": "Confirmar",
+    "back": "Volver",
+    "next": "Siguiente",
+    "submit": "Enviar",
+    "close": "Cerrar",
+    "logout": "Cerrar sesión",
+    "dashboard": "Panel de control",
+    "profile": "Perfil",
+    "settings": "Configuración"
+  },
+  "nav": {
+    "home": "Inicio",
+    "createParcel": "Crear Paquete",
+    "trackParcel": "Rastrear Paquete",
+    "becomeRelay": "Ser Punto de Retiro",
+    "becomeTransporter": "Ser Transportista",
+    "login": "Iniciar Sesión",
+    "register": "Registrarse"
+  },
+  "landing": {
+    "hero": {
+      "title": "SwiftColis",
+      "subtitle": "Plataforma de entrega inter-wilaya en Argelia",
+      "description": "Envía tus paquetes fácilmente a todas las wilayas de Argelia. Nuestra red de puntos de retiro y transportistas verificados garantiza una entrega rápida y segura.",
+      "cta": {
+        "send": "Enviar un Paquete",
+        "track": "Rastrear mi Paquete",
+        "partner": "Ser Socio"
+      }
+    },
+    "features": {
+      "title": "¿Por qué elegir SwiftColis?",
+      "subtitle": "Una solución completa para todas tus necesidades de entrega",
+      "items": {
+        "network": {
+          "title": "Amplia Red de Puntos",
+          "description": "Puntos de retiro en todas las principales ciudades de Argelia para dejar y recoger paquetes fácilmente."
+        },
+        "tracking": {
+          "title": "Seguimiento en Tiempo Real",
+          "description": "Rastrea tu paquete en cada etapa con nuestro sistema de seguimiento en tiempo real y notificaciones."
+        },
+        "price": {
+          "title": "Precios Transparentes",
+          "description": "Tarifas claras y competitivas, calculadas automáticamente según distancia y tamaño."
+        },
+        "secure": {
+          "title": "Pago Seguro",
+          "description": "Paga con confianza con nuestro sistema de pago seguro y garantía de entrega."
+        }
+      }
+    },
+    "howItWorks": {
+      "title": "¿Cómo Funciona?",
+      "subtitle": "Tres simples pasos para enviar tu paquete",
+      "steps": {
+        "create": {
+          "title": "1. Crea tu Paquete",
+          "description": "Ingresa la información de tu paquete: ciudad de salida, llegada, tamaño y punto de retiro."
+        },
+        "deposit": {
+          "title": "2. Deposítalo en el Punto",
+          "description": "Deja tu paquete en el punto de retiro más cercano. Será manejado por un transportista."
+        },
+        "track": {
+          "title": "3. Rastrea y Recoge",
+          "description": "Rastrea tu paquete en tiempo real y recógelo en el punto de retiro de destino."
+        }
+      }
+    },
+    "stats": {
+      "parcels": "Paquetes Entregados",
+      "cities": "Wilayas Cubiertas",
+      "relays": "Puntos de Retiro",
+      "transporters": "Transportistas Activos"
+    }
+  },
+  "auth": {
+    "login": {
+      "title": "Iniciar Sesión",
+      "subtitle": "Accede a tu espacio SwiftColis",
+      "email": "Correo Electrónico",
+      "password": "Contraseña",
+      "rememberMe": "Recordarme",
+      "forgotPassword": "¿Olvidaste tu contraseña?",
+      "submit": "Iniciar Sesión",
+      "orWith": "o continuar con",
+      "googleLogin": "Google",
+      "noAccount": "¿No tienes cuenta?",
+      "registerLink": "Crear Cuenta"
+    },
+    "register": {
+      "title": "Crear Cuenta",
+      "subtitle": "Únete a SwiftColis en unos clics",
+      "name": "Nombre Completo",
+      "email": "Correo Electrónico",
+      "phone": "Número de Teléfono",
+      "password": "Contraseña",
+      "confirmPassword": "Confirmar Contraseña",
+      "role": {
+        "label": "Tipo de Cuenta",
+        "client": "Cliente - Envío paquetes",
+        "transporter": "Transportista - Entrego paquetes",
+        "relais": "Punto de Retiro - Soy comerciante"
+      },
+      "siret": "Número SIRET (transportistas)",
+      "acceptTerms": "Acepto los términos de uso",
+      "submit": "Crear Mi Cuenta",
+      "orWith": "o registrarse con",
+      "haveAccount": "¿Ya tienes cuenta?",
+      "loginLink": "Iniciar Sesión"
+    }
+  },
+  "parcel": {
+    "create": {
+      "title": "Crear Nuevo Paquete",
+      "subtitle": "Completa la información de tu envío",
+      "departure": {
+        "title": "Ciudad de Salida",
+        "placeholder": "Selecciona ciudad de salida"
+      },
+      "arrival": {
+        "title": "Ciudad de Llegada",
+        "placeholder": "Selecciona ciudad de llegada"
+      },
+      "relayDepart": {
+        "title": "Punto de Depósito",
+        "placeholder": "Selecciona un punto de retiro"
+      },
+      "relayArrival": {
+        "title": "Punto de Destino",
+        "placeholder": "Selecciona un punto de retiro"
+      },
+      "format": {
+        "title": "Tamaño del Paquete",
+        "petit": "Pequeño (30x20x10 cm)",
+        "moyen": "Mediano (50x30x20 cm)",
+        "gros": "Grande (70x50x30 cm)"
+      },
+      "weight": "Peso Estimado (kg)",
+      "description": "Descripción del Contenido",
+      "price": {
+        "title": "Precio Estimado",
+        "tariff": "Tarifa Base",
+        "platformFee": "Comisión de Plataforma",
+        "relayFee": "Comisión del Punto",
+        "total": "Total a Pagar"
+      },
+      "submit": "Crear y Pagar"
+    },
+    "status": {
+      "CREATED": "Creado",
+      "PAID": "Pagado",
+      "RECU_RELAIS": "Recibido en Punto",
+      "EN_TRANSPORT": "En Tránsito",
+      "ARRIVE_RELAIS_DESTINATION": "Llegó al Punto",
+      "LIVRE": "Entregado"
+    },
+    "tracking": {
+      "title": "Rastreo de Paquete",
+      "placeholder": "Ingresa tu número de rastreo",
+      "search": "Buscar",
+      "notFound": "Paquete no encontrado",
+      "history": "Historial",
+      "currentStatus": "Estado Actual"
+    },
+    "history": {
+      "title": "Mis Paquetes",
+      "noParcels": "No hay paquetes aún",
+      "createFirst": "Crea tu primer paquete"
+    }
+  },
+  "transporter": {
+    "dashboard": {
+      "title": "Panel de Transportista",
+      "welcome": "Bienvenido",
+      "stats": {
+        "missions": "Misiones Completadas",
+        "earnings": "Ganancias Totales",
+        "rating": "Calificación Promedio"
+      }
+    },
+    "trips": {
+      "title": "Mis Viajes",
+      "create": "Publicar Viaje",
+      "departure": "Ciudad de Salida",
+      "arrival": "Ciudad de Llegada",
+      "stops": "Ciudades Intermedias",
+      "date": "Fecha de Salida",
+      "capacity": "Espacios Disponibles",
+      "status": {
+        "PROGRAMME": "Programado",
+        "EN_COURS": "En Progreso",
+        "TERMINE": "Completado",
+        "ANNULE": "Cancelado"
+      }
+    },
+    "missions": {
+      "title": "Misiones Disponibles",
+      "accept": "Aceptar",
+      "decline": "Rechazar",
+      "details": "Detalles",
+      "noMissions": "No hay misiones disponibles"
+    },
+    "earnings": {
+      "title": "Mis Ganancias",
+      "thisMonth": "Este Mes",
+      "total": "Total",
+      "withdraw": "Retirar"
+    }
+  },
+  "relais": {
+    "dashboard": {
+      "title": "Panel de Punto de Retiro",
+      "welcome": "Bienvenido",
+      "stats": {
+        "received": "Paquetes Recibidos",
+        "delivered": "Paquetes Entregados",
+        "pending": "Pendientes",
+        "earnings": "Comisiones"
+      }
+    },
+    "scanner": {
+      "title": "Escáner QR Code",
+      "instructions": "Escanea el código QR del paquete para recibirlo o entregarlo",
+      "manual": "O ingresa el código manualmente",
+      "received": "Paquete recibido exitosamente",
+      "delivered": "Paquete entregado exitosamente"
+    },
+    "parcels": {
+      "title": "Paquetes Pendientes",
+      "pending": "Esperando Recogida",
+      "received": "Recibidos Hoy",
+      "noParcels": "No hay paquetes pendientes"
+    },
+    "register": {
+      "title": "Ser Punto de Retiro",
+      "subtitle": "Únete a nuestra red de socios",
+      "commerceName": "Nombre del Negocio",
+      "address": "Dirección Completa",
+      "city": "Ciudad",
+      "photos": "Fotos del Local",
+      "submit": "Enviar Solicitud",
+      "success": "Solicitud enviada exitosamente",
+      "pending": "Pendiente de Validación"
+    }
+  },
+  "admin": {
+    "dashboard": {
+      "title": "Administración",
+      "welcome": "Bienvenido, Administrador",
+      "stats": {
+        "users": "Usuarios",
+        "parcels": "Paquetes",
+        "transporters": "Transportistas",
+        "relays": "Puntos de Retiro",
+        "revenue": "Ingresos"
+      }
+    },
+    "users": {
+      "title": "Gestión de Usuarios",
+      "all": "Todos los Usuarios",
+      "clients": "Clientes",
+      "transporters": "Transportistas",
+      "relays": "Puntos de Retiro",
+      "actions": {
+        "view": "Ver",
+        "edit": "Editar",
+        "deactivate": "Desactivar",
+        "activate": "Activar"
+      }
+    },
+    "relays": {
+      "title": "Validación de Puntos",
+      "pending": "Pendientes",
+      "approved": "Aprobados",
+      "rejected": "Rechazados",
+      "approve": "Aprobar",
+      "reject": "Rechazar"
+    },
+    "lines": {
+      "title": "Líneas de Transporte",
+      "create": "Crear Línea",
+      "departure": "Ciudad de Salida",
+      "arrival": "Ciudad de Llegada",
+      "tariffs": "Tarifas",
+      "petit": "Formato Pequeño",
+      "moyen": "Formato Mediano",
+      "gros": "Formato Grande"
+    },
+    "settings": {
+      "title": "Configuración",
+      "platformCommission": "Comisión de Plataforma (%)",
+      "relayCommission": "Comisiones de Puntos",
+      "notifications": "Notificaciones"
+    }
+  },
+  "wilayas": {
+    "alger": "Argel",
+    "oran": "Orán",
+    "constantine": "Constantina",
+    "annaba": "Annaba",
+    "blida": "Blida",
+    "setif": "Setif",
+    "tizi_ouzou": "Tizi Ouzou",
+    "bejaia": "Béjaïa",
+    "chlef": "Chlef",
+    "tlemcen": "Tremecén",
+    "ouargla": "Ouargla",
+    "ghardaia": "Gardaia",
+    "biskra": "Biskra",
+    "djelfa": "Djelfa",
+    "medea": "Médéa",
+    "tiaret": "Tiaret",
+    "sidi_bel_abbes": "Sidi Bel Abbès",
+    "batna": "Batna",
+    "skikda": "Skikda",
+    "mostaganem": "Mostaganem"
+  }
+}

@@ -1,0 +1,22 @@
+import { PrismaClient } from '@prisma/client'
+
+const globalForPrisma = globalThis as unknown as {
+  prisma: PrismaClient | undefined
+}
+
+// For Supabase: MUST use direct connection (port 5432) to avoid "prepared statement" errors
+// The pooler (port 6543) doesn't support prepared statements which Prisma uses
+const databaseUrl = process.env.DATABASE_URL
+
+export const db =
+  globalForPrisma.prisma ??
+  new PrismaClient({
+    log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
+    datasources: {
+      db: {
+        url: databaseUrl,
+      },
+    },
+  })
+
+if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = db

@@ -1,0 +1,338 @@
+{
+  "common": {
+    "appName": "SwiftColis",
+    "tagline": "Votre colis, notre priorité",
+    "loading": "Chargement...",
+    "error": "Une erreur est survenue",
+    "success": "Opération réussie",
+    "save": "Enregistrer",
+    "cancel": "Annuler",
+    "delete": "Supprimer",
+    "edit": "Modifier",
+    "view": "Voir",
+    "search": "Rechercher",
+    "filter": "Filtrer",
+    "all": "Tous",
+    "none": "Aucun",
+    "yes": "Oui",
+    "no": "Non",
+    "confirm": "Confirmer",
+    "back": "Retour",
+    "next": "Suivant",
+    "submit": "Soumettre",
+    "close": "Fermer",
+    "logout": "Déconnexion",
+    "dashboard": "Tableau de bord",
+    "profile": "Profil",
+    "settings": "Paramètres"
+  },
+  "nav": {
+    "home": "Accueil",
+    "createParcel": "Créer un colis",
+    "trackParcel": "Suivre un colis",
+    "becomeRelay": "Devenir relais",
+    "becomeTransporter": "Devenir transporteur",
+    "login": "Connexion",
+    "register": "Inscription"
+  },
+  "landing": {
+    "hero": {
+      "title": "SwiftColis",
+      "subtitle": "La plateforme de livraison inter-wilayas en Algérie",
+      "description": "Envoyez vos colis en toute simplicité à travers toutes les wilayas d'Algérie. Notre réseau de points relais et de transporteurs vérifiés garantit une livraison rapide et sécurisée.",
+      "cta": {
+        "send": "Envoyer un colis",
+        "track": "Suivre mon colis",
+        "partner": "Devenir partenaire"
+      }
+    },
+    "features": {
+      "title": "Pourquoi choisir SwiftColis ?",
+      "subtitle": "Une solution complète pour tous vos besoins de livraison",
+      "items": {
+        "network": {
+          "title": "Large réseau de relais",
+          "description": "Des points relais dans toutes les grandes villes d'Algérie pour déposer et récupérer vos colis facilement."
+        },
+        "tracking": {
+          "title": "Suivi en temps réel",
+          "description": "Suivez votre colis à chaque étape avec notre système de suivi en temps réel et notifications."
+        },
+        "price": {
+          "title": "Prix transparents",
+          "description": "Des tarifs clairs et compétitifs, calculés automatiquement selon la distance et le format."
+        },
+        "secure": {
+          "title": "Paiement sécurisé",
+          "description": "Payez en toute confiance avec notre système de paiement sécurisé et garantie de livraison."
+        }
+      }
+    },
+    "howItWorks": {
+      "title": "Comment ça marche ?",
+      "subtitle": "Trois étapes simples pour envoyer votre colis",
+      "steps": {
+        "create": {
+          "title": "1. Créez votre colis",
+          "description": "Renseignez les informations de votre colis : ville de départ, d'arrivée, format et point relais."
+        },
+        "deposit": {
+          "title": "2. Déposez-le au relais",
+          "description": "Déposez votre colis au point relais le plus proche. Il sera pris en charge par un transporteur."
+        },
+        "track": {
+          "title": "3. Suivez et récupérez",
+          "description": "Suivez votre colis en temps réel et récupérez-le au point relais de destination."
+        }
+      }
+    },
+    "stats": {
+      "parcels": "Colis livrés",
+      "cities": "Wilayas couvertes",
+      "relays": "Points relais",
+      "transporters": "Transporteurs actifs"
+    }
+  },
+  "auth": {
+    "login": {
+      "title": "Connexion",
+      "subtitle": "Accédez à votre espace SwiftColis",
+      "email": "Adresse email",
+      "password": "Mot de passe",
+      "rememberMe": "Se souvenir de moi",
+      "forgotPassword": "Mot de passe oublié ?",
+      "submit": "Se connecter",
+      "orWith": "ou continuer avec",
+      "googleLogin": "Google",
+      "noAccount": "Pas encore de compte ?",
+      "registerLink": "Créer un compte"
+    },
+    "register": {
+      "title": "Créer un compte",
+      "subtitle": "Rejoignez SwiftColis en quelques clics",
+      "name": "Nom complet",
+      "email": "Adresse email",
+      "phone": "Numéro de téléphone",
+      "password": "Mot de passe",
+      "confirmPassword": "Confirmer le mot de passe",
+      "role": {
+        "label": "Type de compte",
+        "client": "Client - J'envoie des colis",
+        "transporter": "Transporteur - Je livre des colis",
+        "relais": "Point relais - Je suis commerçant"
+      },
+      "siret": "Numéro SIRET (transporteurs)",
+      "acceptTerms": "J'accepte les conditions d'utilisation",
+      "submit": "Créer mon compte",
+      "orWith": "ou s'inscrire avec",
+      "haveAccount": "Déjà un compte ?",
+      "loginLink": "Se connecter"
+    }
+  },
+  "parcel": {
+    "create": {
+      "title": "Créer un nouveau colis",
+      "subtitle": "Remplissez les informations de votre envoi",
+      "departure": {
+        "title": "Ville de départ",
+        "placeholder": "Sélectionnez la ville de départ"
+      },
+      "arrival": {
+        "title": "Ville d'arrivée",
+        "placeholder": "Sélectionnez la ville d'arrivée"
+      },
+      "relayDepart": {
+        "title": "Point relais de dépôt",
+        "placeholder": "Sélectionnez un point relais"
+      },
+      "relayArrival": {
+        "title": "Point relais de destination",
+        "placeholder": "Sélectionnez un point relais"
+      },
+      "format": {
+        "title": "Format du colis",
+        "petit": "Petit (30x20x10 cm)",
+        "moyen": "Moyen (50x30x20 cm)",
+        "gros": "Gros (70x50x30 cm)"
+      },
+      "weight": "Poids estimé (kg)",
+      "description": "Description du contenu",
+      "price": {
+        "title": "Prix estimé",
+        "tariff": "Tarif de base",
+        "platformFee": "Frais de plateforme",
+        "relayFee": "Frais relais",
+        "total": "Total à payer"
+      },
+      "submit": "Créer et payer"
+    },
+    "status": {
+      "CREATED": "Créé",
+      "PAID": "Payé",
+      "RECU_RELAIS": "Reçu au relais",
+      "EN_TRANSPORT": "En transport",
+      "ARRIVE_RELAIS_DESTINATION": "Arrivé au relais",
+      "LIVRE": "Livré"
+    },
+    "tracking": {
+      "title": "Suivi de colis",
+      "placeholder": "Entrez votre numéro de suivi",
+      "search": "Rechercher",
+      "notFound": "Colis non trouvé",
+      "history": "Historique",
+      "currentStatus": "Statut actuel"
+    },
+    "history": {
+      "title": "Mes colis",
+      "noParcels": "Aucun colis pour le moment",
+      "createFirst": "Créer votre premier colis"
+    }
+  },
+  "transporter": {
+    "dashboard": {
+      "title": "Tableau de bord transporteur",
+      "welcome": "Bienvenue",
+      "stats": {
+        "missions": "Missions effectuées",
+        "earnings": "Gains totaux",
+        "rating": "Note moyenne"
+      }
+    },
+    "trips": {
+      "title": "Mes trajets",
+      "create": "Publier un trajet",
+      "departure": "Ville de départ",
+      "arrival": "Ville d'arrivée",
+      "stops": "Villes étapes",
+      "date": "Date de départ",
+      "capacity": "Places disponibles",
+      "status": {
+        "PROGRAMME": "Programmé",
+        "EN_COURS": "En cours",
+        "TERMINE": "Terminé",
+        "ANNULE": "Annulé"
+      }
+    },
+    "missions": {
+      "title": "Missions disponibles",
+      "accept": "Accepter",
+      "decline": "Refuser",
+      "details": "Détails",
+      "noMissions": "Aucune mission disponible"
+    },
+    "earnings": {
+      "title": "Mes gains",
+      "thisMonth": "Ce mois",
+      "total": "Total",
+      "withdraw": "Retirer"
+    }
+  },
+  "relais": {
+    "dashboard": {
+      "title": "Tableau de bord relais",
+      "welcome": "Bienvenue",
+      "stats": {
+        "received": "Colis reçus",
+        "delivered": "Colis remis",
+        "pending": "En attente",
+        "earnings": "Commissions"
+      }
+    },
+    "scanner": {
+      "title": "Scanner QR Code",
+      "instructions": "Scannez le QR code du colis pour le recevoir ou le remettre",
+      "manual": "Ou entrez le code manuellement",
+      "received": "Colis reçu avec succès",
+      "delivered": "Colis remis avec succès"
+    },
+    "parcels": {
+      "title": "Colis en attente",
+      "pending": "En attente de récupération",
+      "received": "Reçus aujourd'hui",
+      "noParcels": "Aucun colis en attente"
+    },
+    "register": {
+      "title": "Devenir point relais",
+      "subtitle": "Rejoignez notre réseau de partenaires",
+      "commerceName": "Nom du commerce",
+      "address": "Adresse complète",
+      "city": "Ville",
+      "photos": "Photos du local",
+      "submit": "Soumettre la demande",
+      "success": "Demande soumise avec succès",
+      "pending": "En attente de validation"
+    }
+  },
+  "admin": {
+    "dashboard": {
+      "title": "Administration",
+      "welcome": "Bienvenue, Administrateur",
+      "stats": {
+        "users": "Utilisateurs",
+        "parcels": "Colis",
+        "transporters": "Transporteurs",
+        "relays": "Points relais",
+        "revenue": "Revenus"
+      }
+    },
+    "users": {
+      "title": "Gestion des utilisateurs",
+      "all": "Tous les utilisateurs",
+      "clients": "Clients",
+      "transporters": "Transporteurs",
+      "relays": "Points relais",
+      "actions": {
+        "view": "Voir",
+        "edit": "Modifier",
+        "deactivate": "Désactiver",
+        "activate": "Activer"
+      }
+    },
+    "relays": {
+      "title": "Validation des relais",
+      "pending": "En attente",
+      "approved": "Approuvés",
+      "rejected": "Rejetés",
+      "approve": "Approuver",
+      "reject": "Rejeter"
+    },
+    "lines": {
+      "title": "Lignes de transport",
+      "create": "Créer une ligne",
+      "departure": "Ville de départ",
+      "arrival": "Ville d'arrivée",
+      "tariffs": "Tarifs",
+      "petit": "Petit format",
+      "moyen": "Moyen format",
+      "gros": "Grand format"
+    },
+    "settings": {
+      "title": "Paramètres",
+      "platformCommission": "Commission plateforme (%)",
+      "relayCommission": "Commissions relais",
+      "notifications": "Notifications"
+    }
+  },
+  "wilayas": {
+    "alger": "Alger",
+    "oran": "Oran",
+    "constantine": "Constantine",
+    "annaba": "Annaba",
+    "blida": "Blida",
+    "setif": "Sétif",
+    "tizi_ouzou": "Tizi Ouzou",
+    "bejaia": "Béjaïa",
+    "chlef": "Chlef",
+    "tlemcen": "Tlemcen",
+    "ouargla": "Ouargla",
+    "ghardaia": "Ghardaïa",
+    "biskra": "Biskra",
+    "djelfa": "Djelfa",
+    "medea": "Médéa",
+    "tiaret": "Tiaret",
+    "sidi_bel_abbes": "Sidi Bel Abbès",
+    "batna": "Batna",
+    "skikda": "Skikda",
+    "mostaganem": "Mostaganem"
+  }
+}

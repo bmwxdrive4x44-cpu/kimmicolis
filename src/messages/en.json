@@ -1,0 +1,338 @@
+{
+  "common": {
+    "appName": "SwiftColis",
+    "tagline": "Your parcel, our priority",
+    "loading": "Loading...",
+    "error": "An error occurred",
+    "success": "Operation successful",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "view": "View",
+    "search": "Search",
+    "filter": "Filter",
+    "all": "All",
+    "none": "None",
+    "yes": "Yes",
+    "no": "No",
+    "confirm": "Confirm",
+    "back": "Back",
+    "next": "Next",
+    "submit": "Submit",
+    "close": "Close",
+    "logout": "Logout",
+    "dashboard": "Dashboard",
+    "profile": "Profile",
+    "settings": "Settings"
+  },
+  "nav": {
+    "home": "Home",
+    "createParcel": "Create Parcel",
+    "trackParcel": "Track Parcel",
+    "becomeRelay": "Become a Relay",
+    "becomeTransporter": "Become a Transporter",
+    "login": "Login",
+    "register": "Register"
+  },
+  "landing": {
+    "hero": {
+      "title": "SwiftColis",
+      "subtitle": "Inter-wilaya delivery platform in Algeria",
+      "description": "Send your parcels easily across all Algerian wilayas. Our network of relay points and verified carriers ensures fast and secure delivery.",
+      "cta": {
+        "send": "Send a Parcel",
+        "track": "Track My Parcel",
+        "partner": "Become a Partner"
+      }
+    },
+    "features": {
+      "title": "Why Choose SwiftColis?",
+      "subtitle": "A complete solution for all your delivery needs",
+      "items": {
+        "network": {
+          "title": "Wide Relay Network",
+          "description": "Relay points in all major Algerian cities for easy parcel drop-off and pickup."
+        },
+        "tracking": {
+          "title": "Real-time Tracking",
+          "description": "Track your parcel at every stage with our real-time tracking system and notifications."
+        },
+        "price": {
+          "title": "Transparent Pricing",
+          "description": "Clear and competitive rates, automatically calculated based on distance and size."
+        },
+        "secure": {
+          "title": "Secure Payment",
+          "description": "Pay with confidence with our secure payment system and delivery guarantee."
+        }
+      }
+    },
+    "howItWorks": {
+      "title": "How It Works?",
+      "subtitle": "Three simple steps to send your parcel",
+      "steps": {
+        "create": {
+          "title": "1. Create Your Parcel",
+          "description": "Enter your parcel information: departure city, arrival, size and relay point."
+        },
+        "deposit": {
+          "title": "2. Drop at Relay",
+          "description": "Drop your parcel at the nearest relay point. It will be handled by a carrier."
+        },
+        "track": {
+          "title": "3. Track & Collect",
+          "description": "Track your parcel in real-time and collect it at the destination relay point."
+        }
+      }
+    },
+    "stats": {
+      "parcels": "Parcels Delivered",
+      "cities": "Wilayas Covered",
+      "relays": "Relay Points",
+      "transporters": "Active Transporters"
+    }
+  },
+  "auth": {
+    "login": {
+      "title": "Login",
+      "subtitle": "Access your SwiftColis space",
+      "email": "Email Address",
+      "password": "Password",
+      "rememberMe": "Remember me",
+      "forgotPassword": "Forgot password?",
+      "submit": "Sign In",
+      "orWith": "or continue with",
+      "googleLogin": "Google",
+      "noAccount": "No account yet?",
+      "registerLink": "Create Account"
+    },
+    "register": {
+      "title": "Create Account",
+      "subtitle": "Join SwiftColis in a few clicks",
+      "name": "Full Name",
+      "email": "Email Address",
+      "phone": "Phone Number",
+      "password": "Password",
+      "confirmPassword": "Confirm Password",
+      "role": {
+        "label": "Account Type",
+        "client": "Client - I send parcels",
+        "transporter": "Transporter - I deliver parcels",
+        "relais": "Relay Point - I am a merchant"
+      },
+      "siret": "SIRET Number (transporters)",
+      "acceptTerms": "I accept the terms of use",
+      "submit": "Create My Account",
+      "orWith": "or sign up with",
+      "haveAccount": "Already have an account?",
+      "loginLink": "Sign In"
+    }
+  },
+  "parcel": {
+    "create": {
+      "title": "Create New Parcel",
+      "subtitle": "Fill in your shipment information",
+      "departure": {
+        "title": "Departure City",
+        "placeholder": "Select departure city"
+      },
+      "arrival": {
+        "title": "Arrival City",
+        "placeholder": "Select arrival city"
+      },
+      "relayDepart": {
+        "title": "Drop-off Relay Point",
+        "placeholder": "Select a relay point"
+      },
+      "relayArrival": {
+        "title": "Destination Relay Point",
+        "placeholder": "Select a relay point"
+      },
+      "format": {
+        "title": "Parcel Size",
+        "petit": "Small (30x20x10 cm)",
+        "moyen": "Medium (50x30x20 cm)",
+        "gros": "Large (70x50x30 cm)"
+      },
+      "weight": "Estimated Weight (kg)",
+      "description": "Content Description",
+      "price": {
+        "title": "Estimated Price",
+        "tariff": "Base Tariff",
+        "platformFee": "Platform Fee",
+        "relayFee": "Relay Fee",
+        "total": "Total to Pay"
+      },
+      "submit": "Create & Pay"
+    },
+    "status": {
+      "CREATED": "Created",
+      "PAID": "Paid",
+      "RECU_RELAIS": "Received at Relay",
+      "EN_TRANSPORT": "In Transit",
+      "ARRIVE_RELAIS_DESTINATION": "Arrived at Relay",
+      "LIVRE": "Delivered"
+    },
+    "tracking": {
+      "title": "Parcel Tracking",
+      "placeholder": "Enter your tracking number",
+      "search": "Search",
+      "notFound": "Parcel not found",
+      "history": "History",
+      "currentStatus": "Current Status"
+    },
+    "history": {
+      "title": "My Parcels",
+      "noParcels": "No parcels yet",
+      "createFirst": "Create your first parcel"
+    }
+  },
+  "transporter": {
+    "dashboard": {
+      "title": "Transporter Dashboard",
+      "welcome": "Welcome",
+      "stats": {
+        "missions": "Completed Missions",
+        "earnings": "Total Earnings",
+        "rating": "Average Rating"
+      }
+    },
+    "trips": {
+      "title": "My Trips",
+      "create": "Publish Trip",
+      "departure": "Departure City",
+      "arrival": "Arrival City",
+      "stops": "Intermediate Cities",
+      "date": "Departure Date",
+      "capacity": "Available Slots",
+      "status": {
+        "PROGRAMME": "Scheduled",
+        "EN_COURS": "In Progress",
+        "TERMINE": "Completed",
+        "ANNULE": "Cancelled"
+      }
+    },
+    "missions": {
+      "title": "Available Missions",
+      "accept": "Accept",
+      "decline": "Decline",
+      "details": "Details",
+      "noMissions": "No missions available"
+    },
+    "earnings": {
+      "title": "My Earnings",
+      "thisMonth": "This Month",
+      "total": "Total",
+      "withdraw": "Withdraw"
+    }
+  },
+  "relais": {
+    "dashboard": {
+      "title": "Relay Dashboard",
+      "welcome": "Welcome",
+      "stats": {
+        "received": "Parcels Received",
+        "delivered": "Parcels Handed Over",
+        "pending": "Pending",
+        "earnings": "Commissions"
+      }
+    },
+    "scanner": {
+      "title": "QR Code Scanner",
+      "instructions": "Scan the parcel's QR code to receive or hand over",
+      "manual": "Or enter the code manually",
+      "received": "Parcel received successfully",
+      "delivered": "Parcel handed over successfully"
+    },
+    "parcels": {
+      "title": "Pending Parcels",
+      "pending": "Awaiting Pickup",
+      "received": "Received Today",
+      "noParcels": "No pending parcels"
+    },
+    "register": {
+      "title": "Become a Relay Point",
+      "subtitle": "Join our partner network",
+      "commerceName": "Business Name",
+      "address": "Full Address",
+      "city": "City",
+      "photos": "Location Photos",
+      "submit": "Submit Application",
+      "success": "Application submitted successfully",
+      "pending": "Pending Validation"
+    }
+  },
+  "admin": {
+    "dashboard": {
+      "title": "Administration",
+      "welcome": "Welcome, Administrator",
+      "stats": {
+        "users": "Users",
+        "parcels": "Parcels",
+        "transporters": "Transporters",
+        "relays": "Relay Points",
+        "revenue": "Revenue"
+      }
+    },
+    "users": {
+      "title": "User Management",
+      "all": "All Users",
+      "clients": "Clients",
+      "transporters": "Transporters",
+      "relays": "Relay Points",
+      "actions": {
+        "view": "View",
+        "edit": "Edit",
+        "deactivate": "Deactivate",
+        "activate": "Activate"
+      }
+    },
+    "relays": {
+      "title": "Relay Validation",
+      "pending": "Pending",
+      "approved": "Approved",
+      "rejected": "Rejected",
+      "approve": "Approve",
+      "reject": "Reject"
+    },
+    "lines": {
+      "title": "Transport Lines",
+      "create": "Create Line",
+      "departure": "Departure City",
+      "arrival": "Arrival City",
+      "tariffs": "Tariffs",
+      "petit": "Small Format",
+      "moyen": "Medium Format",
+      "gros": "Large Format"
+    },
+    "settings": {
+      "title": "Settings",
+      "platformCommission": "Platform Commission (%)",
+      "relayCommission": "Relay Commissions",
+      "notifications": "Notifications"
+    }
+  },
+  "wilayas": {
+    "alger": "Algiers",
+    "oran": "Oran",
+    "constantine": "Constantine",
+    "annaba": "Annaba",
+    "blida": "Blida",
+    "setif": "Setif",
+    "tizi_ouzou": "Tizi Ouzou",
+    "bejaia": "Bejaia",
+    "chlef": "Chlef",
+    "tlemcen": "Tlemcen",
+    "ouargla": "Ouargla",
+    "ghardaia": "Ghardaia",
+    "biskra": "Biskra",
+    "djelfa": "Djelfa",
+    "medea": "Medea",
+    "tiaret": "Tiaret",
+    "sidi_bel_abbes": "Sidi Bel Abbes",
+    "batna": "Batna",
+    "skikda": "Skikda",
+    "mostaganem": "Mostaganem"
+  }
+}
