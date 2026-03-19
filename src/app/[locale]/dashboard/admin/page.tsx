@@ -556,6 +556,9 @@ function RelaysTab() {
   const [relais, setRelais] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState('PENDING');
+  const [editRelais, setEditRelais] = useState<any>(null);
+  const [deleteRelaisId, setDeleteRelaisId] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => { fetchRelais(); }, []);
 
@@ -591,66 +594,207 @@ function RelaysTab() {
     fetchRelais();
   };
 
+  const handleEditRelais = async () => {
+    if (!editRelais) return;
+    setIsSaving(true);
+    try {
+      const response = await fetch(`/api/relais/${editRelais.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          commerceName: editRelais.commerceName,
+          address: editRelais.address,
+          ville: editRelais.ville,
+          commissionPetit: parseFloat(editRelais.commissionPetit),
+          commissionMoyen: parseFloat(editRelais.commissionMoyen),
+          commissionGros: parseFloat(editRelais.commissionGros),
+          status: editRelais.status,
+        }),
+      });
+      if (response.ok) {
+        toast({ title: 'Relais modifié' });
+        setEditRelais(null);
+        fetchRelais();
+      } else {
+        throw new Error('Failed');
+      }
+    } catch {
+      toast({ title: 'Erreur', description: 'Impossible de modifier le relais', variant: 'destructive' });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDeleteRelais = async () => {
+    if (!deleteRelaisId) return;
+    setIsSaving(true);
+    try {
+      const response = await fetch(`/api/relais/${deleteRelaisId}`, {
+        method: 'DELETE',
+      });
+      if (response.ok) {
+        toast({ title: 'Relais supprimé' });
+        setDeleteRelaisId(null);
+        fetchRelais();
+      } else {
+        throw new Error('Failed');
+      }
+    } catch {
+      toast({ title: 'Erreur', description: 'Impossible de supprimer le relais', variant: 'destructive' });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const filteredRelais = filter === 'all' ? relais : relais.filter(r => r.status === filter);
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle>Validation des points relais</CardTitle>
-            <CardDescription>{relais.filter(r => r.status === 'PENDING').length} demandes en attente</CardDescription>
+    <>
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Validation des points relais</CardTitle>
+              <CardDescription>{relais.filter(r => r.status === 'PENDING').length} demandes en attente</CardDescription>
+            </div>
+            <Select value={filter} onValueChange={setFilter}>
+              <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="PENDING">En attente</SelectItem>
+                <SelectItem value="APPROVED">Approuvés</SelectItem>
+                <SelectItem value="REJECTED">Rejetés</SelectItem>
+                <SelectItem value="all">Tous</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-          <Select value={filter} onValueChange={setFilter}>
-            <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="PENDING">En attente</SelectItem>
-              <SelectItem value="APPROVED">Approuvés</SelectItem>
-              <SelectItem value="REJECTED">Rejetés</SelectItem>
-              <SelectItem value="all">Tous</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </CardHeader>
-      <CardContent>
-        {isLoading ? (
-          <div className="flex justify-center py-8"><Loader2 className="h-8 w-8 animate-spin text-emerald-600" /></div>
-        ) : (
-          <div className="space-y-4">
-            {filteredRelais.map((r) => (
-              <div key={r.id} className="flex items-center justify-between p-4 border rounded-lg">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
-                    <Store className="h-6 w-6 text-slate-600" />
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="flex justify-center py-8"><Loader2 className="h-8 w-8 animate-spin text-emerald-600" /></div>
+          ) : (
+            <div className="space-y-4">
+              {filteredRelais.map((r) => (
+                <div key={r.id} className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+                      <Store className="h-6 w-6 text-slate-600" />
+                    </div>
+                    <div>
+                      <p className="font-semibold">{r.commerceName}</p>
+                      <p className="text-sm text-slate-600 dark:text-slate-400">{r.address}, {WILAYAS.find(w => w.id === r.ville)?.name}</p>
+                      <p className="text-xs text-slate-500">{r.user?.name} - {r.user?.email}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-semibold">{r.commerceName}</p>
-                    <p className="text-sm text-slate-600 dark:text-slate-400">{r.address}, {WILAYAS.find(w => w.id === r.ville)?.name}</p>
-                    <p className="text-xs text-slate-500">{r.user?.name} - {r.user?.email}</p>
+                  <div className="flex items-center gap-2">
+                    <Badge className={`${RELAIS_STATUS.find(s => s.id === r.status)?.color} text-white`}>
+                      {RELAIS_STATUS.find(s => s.id === r.status)?.label}
+                    </Badge>
+                    {r.status === 'PENDING' && (
+                      <>
+                        <Button size="sm" onClick={() => handleApprove(r.id)} className="bg-green-600 hover:bg-green-700">
+                          <CheckCircle className="h-4 w-4 mr-1" />Approuver
+                        </Button>
+                        <Button size="sm" variant="destructive" onClick={() => handleReject(r.id)}>
+                          <XCircle className="h-4 w-4 mr-1" />Rejeter
+                        </Button>
+                      </>
+                    )}
+                    <Button size="sm" variant="outline" onClick={() => setEditRelais(r)}>
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button size="sm" variant="destructive" onClick={() => setDeleteRelaisId(r.id)}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Badge className={`${RELAIS_STATUS.find(s => s.id === r.status)?.color} text-white`}>
-                    {RELAIS_STATUS.find(s => s.id === r.status)?.label}
-                  </Badge>
-                  {r.status === 'PENDING' && (
-                    <>
-                      <Button size="sm" onClick={() => handleApprove(r.id)} className="bg-green-600 hover:bg-green-700">
-                        <CheckCircle className="h-4 w-4 mr-1" />Approuver
-                      </Button>
-                      <Button size="sm" variant="destructive" onClick={() => handleReject(r.id)}>
-                        <XCircle className="h-4 w-4 mr-1" />Rejeter
-                      </Button>
-                    </>
-                  )}
+              ))}
+              {filteredRelais.length === 0 && <p className="text-center text-slate-500 py-8">Aucun relais</p>}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Edit Relais Dialog */}
+      <Dialog open={!!editRelais} onOpenChange={() => setEditRelais(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Modifier le relais</DialogTitle>
+          </DialogHeader>
+          {editRelais && (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Nom du commerce</Label>
+                <Input value={editRelais.commerceName} onChange={(e) => setEditRelais({ ...editRelais, commerceName: e.target.value })} />
+              </div>
+              <div className="space-y-2">
+                <Label>Adresse</Label>
+                <Input value={editRelais.address} onChange={(e) => setEditRelais({ ...editRelais, address: e.target.value })} />
+              </div>
+              <div className="space-y-2">
+                <Label>Ville</Label>
+                <Select value={editRelais.ville} onValueChange={(v) => setEditRelais({ ...editRelais, ville: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {WILAYAS.map(w => <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-4 md:grid-cols-3">
+                <div className="space-y-2">
+                  <Label>Commission Petit (DA)</Label>
+                  <Input type="number" value={editRelais.commissionPetit} onChange={(e) => setEditRelais({ ...editRelais, commissionPetit: e.target.value })} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Commission Moyen (DA)</Label>
+                  <Input type="number" value={editRelais.commissionMoyen} onChange={(e) => setEditRelais({ ...editRelais, commissionMoyen: e.target.value })} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Commission Gros (DA)</Label>
+                  <Input type="number" value={editRelais.commissionGros} onChange={(e) => setEditRelais({ ...editRelais, commissionGros: e.target.value })} />
                 </div>
               </div>
-            ))}
-            {filteredRelais.length === 0 && <p className="text-center text-slate-500 py-8">Aucun relais</p>}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+              <div className="space-y-2">
+                <Label>Statut</Label>
+                <Select value={editRelais.status} onValueChange={(v) => setEditRelais({ ...editRelais, status: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="PENDING">En attente</SelectItem>
+                    <SelectItem value="APPROVED">Approuvé</SelectItem>
+                    <SelectItem value="REJECTED">Rejeté</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditRelais(null)}>Annuler</Button>
+            <Button onClick={handleEditRelais} disabled={isSaving} className="bg-emerald-600 hover:bg-emerald-700">
+              {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Sauvegarder
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={!!deleteRelaisId} onOpenChange={() => setDeleteRelaisId(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirmer la suppression</DialogTitle>
+            <DialogDescription>
+              Êtes-vous sûr de vouloir supprimer ce point relais ? Cette action est irréversible.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteRelaisId(null)}>Annuler</Button>
+            <Button variant="destructive" onClick={handleDeleteRelais} disabled={isSaving}>
+              {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Supprimer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
