@@ -41,11 +41,24 @@ export default function RegisterPage() {
       return;
     }
 
+    if (formData.password.length < 6) {
+      toast({
+        title: 'Erreur',
+        description: 'Le mot de passe doit contenir au moins 6 caractères',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setIsLoading(true);
 
     try {
       // First sign out any existing session
-      await signOut({ redirect: false });
+      try {
+        await signOut({ redirect: false });
+      } catch {
+        // Ignore signOut errors
+      }
       
       // Create user via API
       const response = await fetch('/api/users', {
@@ -54,9 +67,10 @@ export default function RegisterPage() {
         body: JSON.stringify(formData),
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Registration failed');
+        throw new Error(data.details || data.error || 'Erreur lors de l\'inscription');
       }
 
       // Small delay to ensure signOut is complete
@@ -85,7 +99,12 @@ export default function RegisterPage() {
         // Force a full page reload to refresh session
         window.location.href = dashboardPath;
       } else {
-        throw new Error('Login failed after registration');
+        // Registration succeeded but login failed - redirect to login page
+        toast({
+          title: 'Compte créé',
+          description: 'Vous pouvez maintenant vous connecter',
+        });
+        router.push(`/${locale}/auth/login`);
       }
     } catch (error) {
       toast({

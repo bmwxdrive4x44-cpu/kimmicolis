@@ -37,13 +37,40 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { name, email, password, phone, role, siret } = body;
 
+    // Validate required fields
+    if (!name || !email || !password) {
+      return NextResponse.json({ 
+        error: 'Missing required fields',
+        details: 'Name, email and password are required' 
+      }, { status: 400 });
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return NextResponse.json({ 
+        error: 'Invalid email format' 
+      }, { status: 400 });
+    }
+
+    // Validate password length
+    if (password.length < 6) {
+      return NextResponse.json({ 
+        error: 'Password too short',
+        details: 'Password must be at least 6 characters' 
+      }, { status: 400 });
+    }
+
     // Check if user exists
     const existingUser = await db.user.findUnique({
-      where: { email },
+      where: { email: email.toLowerCase() },
     });
 
     if (existingUser) {
-      return NextResponse.json({ error: 'Email already exists' }, { status: 400 });
+      return NextResponse.json({ 
+        error: 'Email already exists',
+        details: 'An account with this email already exists' 
+      }, { status: 400 });
     }
 
     // Hash password
@@ -53,9 +80,9 @@ export async function POST(request: NextRequest) {
     const user = await db.user.create({
       data: {
         name,
-        email,
+        email: email.toLowerCase(),
         password: hashedPassword,
-        phone,
+        phone: phone || null,
         role: role || 'CLIENT',
         siret: role === 'TRANSPORTER' ? siret : null,
       },
@@ -82,6 +109,9 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error('Error creating user:', error);
-    return NextResponse.json({ error: 'Failed to create user' }, { status: 500 });
+    return NextResponse.json({ 
+      error: 'Failed to create user',
+      details: error instanceof Error ? error.message : 'Unknown error' 
+    }, { status: 500 });
   }
 }
