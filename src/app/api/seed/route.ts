@@ -51,13 +51,13 @@ export async function GET() {
     `;
     
     if (relaisUser.length > 0) {
-      // Create or update relais
+      // Create or update relais with PENDING status - admin must validate
       await db.$executeRawUnsafe(`
         INSERT INTO "Relais" (id, "userId", "commerceName", address, ville, status, "commissionPetit", "commissionMoyen", "commissionGros", "createdAt", "updatedAt")
-        VALUES (gen_random_uuid(), '${relaisUser[0].id}', 'Épicerie du Centre', '123 Rue Didouche Mourad', 'alger', 'APPROVED', 100, 200, 300, NOW(), NOW())
+        VALUES (gen_random_uuid(), '${relaisUser[0].id}', 'Épicerie du Centre', '123 Rue Didouche Mourad', 'alger', 'PENDING', 100, 200, 300, NOW(), NOW())
         ON CONFLICT ("userId") DO UPDATE SET "commerceName" = 'Épicerie du Centre', "updatedAt" = NOW()
       `);
-      console.log('Relais created');
+      console.log('Relais created with PENDING status - admin must validate');
     }
 
     // Create transport lines
