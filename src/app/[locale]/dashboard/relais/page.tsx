@@ -443,7 +443,8 @@ function SettingsTab({ relaisInfo, onUpdate }: { relaisInfo: any; onUpdate: () =
 
     setIsSaving(true);
     try {
-      const response = await fetch(`/api/relais/${relaisInfo.id}`, {
+      // Update relais info
+      const relaisResponse = await fetch(`/api/relais/${relaisInfo.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -453,13 +454,28 @@ function SettingsTab({ relaisInfo, onUpdate }: { relaisInfo: any; onUpdate: () =
         }),
       });
 
-      if (response.ok) {
-        toast({ title: 'Succès', description: 'Paramètres sauvegardés' });
-        onUpdate();
-      } else {
-        const error = await response.json();
-        throw new Error(error.details || 'Failed to save');
+      if (!relaisResponse.ok) {
+        const error = await relaisResponse.json();
+        throw new Error(error.details || 'Failed to save relais');
       }
+
+      // Update user phone if changed
+      if (relaisInfo.user?.id && formData.phone !== relaisInfo.user?.phone) {
+        const userResponse = await fetch(`/api/users/${relaisInfo.user.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            phone: formData.phone,
+          }),
+        });
+
+        if (!userResponse.ok) {
+          console.error('Failed to update phone');
+        }
+      }
+
+      toast({ title: 'Succès', description: 'Paramètres sauvegardés' });
+      onUpdate();
     } catch (err) {
       toast({ 
         title: 'Erreur', 

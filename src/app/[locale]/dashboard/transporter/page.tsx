@@ -162,8 +162,10 @@ export default function TransporterDashboard() {
 
 // Overview Tab
 function OverviewTab({ userId, setActiveTab }: { userId: string; setActiveTab: (tab: string) => void }) {
+  const { toast } = useToast();
   const [availableMissions, setAvailableMissions] = useState<any[]>([]);
   const [myTrajets, setMyTrajets] = useState<any[]>([]);
+  const [acceptingId, setAcceptingId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -171,14 +173,47 @@ function OverviewTab({ userId, setActiveTab }: { userId: string; setActiveTab: (
 
   const fetchData = async () => {
     try {
-      const [missionsRes, trajetsRes] = await Promise.all([
-        fetch('/api/missions?status=AVAILABLE'),
-        fetch(`/api/trajets?transporteurId=${userId}`),
-      ]);
-      setAvailableMissions(await missionsRes.json());
+      // Get parcels with status RECU_RELAIS (waiting for transport)
+      const parcelsRes = await fetch('/api/parcels?status=RECU_RELAIS');
+      const parcels = await parcelsRes.json();
+      
+      // Convert to mission-like format for display
+      const missions = parcels.map((p: any) => ({
+        id: p.id,
+        colis: p,
+        colisId: p.id,
+      }));
+      setAvailableMissions(missions);
+      
+      const trajetsRes = await fetch(`/api/trajets?transporteurId=${userId}`);
       setMyTrajets(await trajetsRes.json());
     } catch (error) {
       console.error('Error fetching data:', error);
+    }
+  };
+
+  const handleAcceptMission = async (parcelId: string) => {
+    setAcceptingId(parcelId);
+    try {
+      const response = await fetch('/api/missions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          colisId: parcelId,
+          transporteurId: userId,
+        }),
+      });
+      
+      if (response.ok) {
+        toast({ title: 'Mission acceptée', description: 'Le colis vous a été assigné' });
+        fetchData();
+      } else {
+        throw new Error('Failed');
+      }
+    } catch {
+      toast({ title: 'Erreur', description: 'Impossible d\'accepter la mission', variant: 'destructive' });
+    } finally {
+      setAcceptingId(null);
     }
   };
 
@@ -200,7 +235,14 @@ function OverviewTab({ userId, setActiveTab }: { userId: string; setActiveTab: (
                     <p className="font-mono text-sm">{m.colis?.trackingNumber}</p>
                     <p className="text-xs text-slate-500">{m.colis?.villeDepart} → {m.colis?.villeArrivee}</p>
                   </div>
-                  <Button size="sm">Accepter</Button>
+                  <Button 
+                    size="sm" 
+                    onClick={() => handleAcceptMission(m.colisId)}
+                    disabled={acceptingId === m.id}
+                    className="bg-emerald-600 hover:bg-emerald-700"
+                  >
+                    {acceptingId === m.id ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Accepter'}
+                  </Button>
                 </div>
               ))}
             </div>
@@ -475,15 +517,48 @@ function ScanTab() {
   const { toast } = useToast();
   const [scanResult, setScanResult] = useState<string>('');
   const [parcel, setParcel] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
 
   const handleScan = async () => {
     if (!scanResult) return;
+    setIsLoading(true);
     try {
       const response = await fetch(`/api/parcels?tracking=${scanResult}`);
       const data = await response.json();
-      setParcel(data);
+      if (data.error) {
+        toast({ title: 'Erreur', description: 'Colis non trouvé', variant: 'destructive' });
+        setParcel(null);
+      } else {
+        setParcel(data);
+      }
     } catch {
       toast({ title: 'Erreur', description: 'Colis non trouvé', variant: 'destructive' });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleUpdateStatus = async (status: string) => {
+    if (!parcel) return;
+    setIsUpdating(true);
+    try {
+      const response = await fetch(`/api/parcels/${parcel.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      });
+      
+      if (response.ok) {
+        toast({ title: 'Statut mis à jour', description: `Le colis est maintenant: ${PARCEL_STATUS.find(s => s.id === status)?.label}` });
+        setParcel({ ...parcel, status });
+      } else {
+        throw new Error('Failed');
+      }
+    } catch {
+      toast({ title: 'Erreur', description: 'Impossible de mettre à jour le statut', variant: 'destructive' });
+    } finally {
+      setIsUpdating(false);
     }
   };
 
@@ -496,12 +571,15 @@ function ScanTab() {
       <CardContent className="space-y-6">
         <div className="flex gap-2">
           <Input
-            placeholder="Entrez le numéro de suivi ou scannez"
+            placeholder="Entrez le numéro de suivi (ex: SCXXXXXXXXX)"
             value={scanResult}
-            onChange={(e) => setScanResult(e.target.value)}
+            onChange={(e) => setScanResult(e.target.value.toUpperCase())}
             className="font-mono"
           />
-          <Button onClick={handleScan}><QrCode className="h-4 w-4 mr-2" />Rechercher</Button>
+          <Button onClick={handleScan} disabled={isLoading}>
+            {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <QrCode className="h-4 w-4 mr-2" />}
+            Rechercher
+          </Button>
         </div>
 
         {parcel && !parcel.error && (
@@ -510,13 +588,42 @@ function ScanTab() {
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <p className="font-mono font-bold">{parcel.trackingNumber}</p>
-                  <p className="text-sm text-slate-500">{parcel.villeDepart} → {parcel.villeArrivee}</p>
+                  <p className="text-sm text-slate-500">
+                    {WILAYAS.find(w => w.id === parcel.villeDepart)?.name || parcel.villeDepart} → {WILAYAS.find(w => w.id === parcel.villeArrivee)?.name || parcel.villeArrivee}
+                  </p>
+                  <p className="text-xs text-slate-400">Format: {parcel.format}</p>
                 </div>
-                <Badge>{parcel.status}</Badge>
+                <Badge className={`${PARCEL_STATUS.find(s => s.id === parcel.status)?.color} text-white`}>
+                  {PARCEL_STATUS.find(s => s.id === parcel.status)?.label}
+                </Badge>
               </div>
-              <div className="flex gap-2">
-                <Button size="sm" className="bg-emerald-600">Confirmer réception</Button>
-                <Button size="sm" className="bg-green-600">Marquer livré</Button>
+              
+              <div className="flex flex-wrap gap-2">
+                {['RECU_RELAIS'].includes(parcel.status) && (
+                  <Button 
+                    size="sm" 
+                    className="bg-emerald-600 hover:bg-emerald-700"
+                    onClick={() => handleUpdateStatus('EN_TRANSPORT')}
+                    disabled={isUpdating}
+                  >
+                    {isUpdating ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Truck className="h-4 w-4 mr-1" />}
+                    Prendre en charge
+                  </Button>
+                )}
+                {['EN_TRANSPORT'].includes(parcel.status) && (
+                  <Button 
+                    size="sm" 
+                    className="bg-green-600 hover:bg-green-700"
+                    onClick={() => handleUpdateStatus('ARRIVE_RELAIS_DESTINATION')}
+                    disabled={isUpdating}
+                  >
+                    {isUpdating ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <CheckCircle className="h-4 w-4 mr-1" />}
+                    Arrivé au relais
+                  </Button>
+                )}
+                {['ARRIVE_RELAIS_DESTINATION', 'LIVRE'].includes(parcel.status) && (
+                  <Badge className="bg-green-100 text-green-700 px-4 py-2">Colis déjà livré ou au relais</Badge>
+                )}
               </div>
             </CardContent>
           </Card>
