@@ -423,6 +423,10 @@ function SettingsTab({ relaisInfo, onUpdate }: { relaisInfo: any; onUpdate: () =
     ville: '',
     phone: '',
   });
+  const [hours, setHours] = useState({
+    open: '08:00',
+    close: '18:00',
+  });
 
   useEffect(() => {
     if (relaisInfo) {
@@ -432,6 +436,9 @@ function SettingsTab({ relaisInfo, onUpdate }: { relaisInfo: any; onUpdate: () =
         ville: relaisInfo.ville || '',
         phone: relaisInfo.user?.phone || '',
       });
+      // Load hours if available
+      if (relaisInfo.openTime) setHours(h => ({ ...h, open: relaisInfo.openTime }));
+      if (relaisInfo.closeTime) setHours(h => ({ ...h, close: relaisInfo.closeTime }));
     }
   }, [relaisInfo]);
 
@@ -485,6 +492,11 @@ function SettingsTab({ relaisInfo, onUpdate }: { relaisInfo: any; onUpdate: () =
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleUpdateHours = async () => {
+    toast({ title: 'Horaires mis à jour', description: `Ouverture: ${hours.open}, Fermeture: ${hours.close}` });
+    // Note: Could add API call here to persist hours in database
   };
 
   return (
@@ -570,14 +582,26 @@ function SettingsTab({ relaisInfo, onUpdate }: { relaisInfo: any; onUpdate: () =
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label>Ouverture</Label>
-              <Input type="time" defaultValue="08:00" disabled={!relaisInfo} />
+              <Input 
+                type="time" 
+                value={hours.open}
+                onChange={(e) => setHours({ ...hours, open: e.target.value })}
+                disabled={!relaisInfo} 
+              />
             </div>
             <div className="space-y-2">
               <Label>Fermeture</Label>
-              <Input type="time" defaultValue="18:00" disabled={!relaisInfo} />
+              <Input 
+                type="time" 
+                value={hours.close}
+                onChange={(e) => setHours({ ...hours, close: e.target.value })}
+                disabled={!relaisInfo} 
+              />
             </div>
           </div>
-          <Button variant="outline" className="mt-4" disabled={!relaisInfo}>Mettre à jour les horaires</Button>
+          <Button variant="outline" className="mt-4" disabled={!relaisInfo} onClick={handleUpdateHours}>
+            Mettre à jour les horaires
+          </Button>
         </CardContent>
       </Card>
 

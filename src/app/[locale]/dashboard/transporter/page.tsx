@@ -238,10 +238,10 @@ function OverviewTab({ userId, setActiveTab }: { userId: string; setActiveTab: (
                   <Button 
                     size="sm" 
                     onClick={() => handleAcceptMission(m.colisId)}
-                    disabled={acceptingId === m.id}
+                    disabled={acceptingId === m.colisId}
                     className="bg-emerald-600 hover:bg-emerald-700"
                   >
-                    {acceptingId === m.id ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Accepter'}
+                    {acceptingId === m.colisId ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Accepter'}
                   </Button>
                 </div>
               ))}
