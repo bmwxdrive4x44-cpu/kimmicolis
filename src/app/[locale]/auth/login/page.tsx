@@ -64,9 +64,9 @@ function LoginForm() {
           description: 'Bienvenue sur SwiftColis!',
         });
         
-        // Redirect based on role
+        // Redirect based on role - force full page reload
         const dashboardPath = getDashboardPath(userRole);
-        router.push(dashboardPath);
+        window.location.href = dashboardPath;
       }
     } catch {
       toast({

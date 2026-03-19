@@ -1,9 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { useTranslations } from 'next-intl';
+import { useTranslations, useLocale } from 'next-intl';
 import { useRouter } from 'next/navigation';
-import { signIn } from 'next-auth/react';
+import { signIn, signOut } from 'next-auth/react';
 import { Link } from '@/i18n/routing';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,11 +12,10 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Package, Loader2, Mail, Lock, User, Phone, Building } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { hashPassword } from '@/lib/auth';
-import { db } from '@/lib/db';
 
 export default function RegisterPage() {
   const t = useTranslations('auth.register');
+  const locale = useLocale();
   const router = useRouter();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
@@ -45,6 +44,9 @@ export default function RegisterPage() {
     setIsLoading(true);
 
     try {
+      // First sign out any existing session
+      await signOut({ redirect: false });
+      
       // Create user via API
       const response = await fetch('/api/users', {
         method: 'POST',
@@ -53,8 +55,12 @@ export default function RegisterPage() {
       });
 
       if (!response.ok) {
-        throw new Error('Registration failed');
+        const error = await response.json();
+        throw new Error(error.error || 'Registration failed');
       }
+
+      // Small delay to ensure signOut is complete
+      await new Promise(resolve => setTimeout(resolve, 500));
 
       // Auto login after registration
       const result = await signIn('credentials', {
@@ -69,18 +75,22 @@ export default function RegisterPage() {
           description: 'Bienvenue sur SwiftColis!',
         });
         
-        const dashboardPath = formData.role === 'TRANSPORTER' 
-          ? '/dashboard/transporter'
-          : formData.role === 'RELAIS'
-          ? '/dashboard/relais'
-          : '/dashboard/client';
+        // Use locale in the path
+        const dashboardPath = `/${locale}/dashboard/${formData.role === 'TRANSPORTER' 
+          ? 'transporter' 
+          : formData.role === 'RELAIS' 
+          ? 'relais' 
+          : 'client'}`;
         
-        router.push(dashboardPath);
+        // Force a full page reload to refresh session
+        window.location.href = dashboardPath;
+      } else {
+        throw new Error('Login failed after registration');
       }
-    } catch {
+    } catch (error) {
       toast({
         title: 'Erreur',
-        description: 'Impossible de créer le compte',
+        description: error instanceof Error ? error.message : 'Impossible de créer le compte',
         variant: 'destructive',
       });
     } finally {
