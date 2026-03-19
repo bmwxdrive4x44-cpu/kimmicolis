@@ -1209,18 +1209,6 @@ function SettingsTab() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Initialiser les données</CardTitle>
-          <CardDescription>Créer les utilisateurs de test et les lignes de transport</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button asChild className="bg-blue-600 hover:bg-blue-700">
-            <a href="/api/seed" target="_blank">Initialiser les données de démo</a>
-          </Button>
-        </CardContent>
-      </Card>
-      
-      <Card>
-        <CardHeader>
           <CardTitle>Réinitialiser le statut des relais</CardTitle>
           <CardDescription>Remettre tous les relais en attente de validation</CardDescription>
         </CardHeader>
