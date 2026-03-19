@@ -13,9 +13,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { WILAYAS, PARCEL_STATUS, RELAIS_STATUS, DEFAULT_RELAY_COMMISSION } from '@/lib/constants';
-import { Store, Package, QrCode, DollarSign, Loader2, CheckCircle, Clock, Scan, ArrowDownToLine, ArrowUpFromLine, Settings, BarChart3, AlertCircle } from 'lucide-react';
+import { Store, Package, QrCode, DollarSign, Loader2, CheckCircle, Clock, Scan, ArrowDownToLine, ArrowUpFromLine, Settings, BarChart3, AlertCircle, Save } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 function getRoleBasedDashboardPath(role: string, locale: string): string {
@@ -55,7 +54,6 @@ export default function RelaisDashboard() {
     setIsLoading(true);
     setError(null);
     try {
-      // Get relais info for this user
       const response = await fetch(`/api/relais?userId=${session?.user?.id}`);
       const data = await response.json();
       
@@ -200,7 +198,7 @@ export default function RelaisDashboard() {
             <ScanTab relaisId={relaisInfo?.id} />
           </TabsContent>
           <TabsContent value="settings">
-            <SettingsTab relaisInfo={relaisInfo} />
+            <SettingsTab relaisInfo={relaisInfo} onUpdate={fetchRelaisInfo} />
           </TabsContent>
         </Tabs>
       </main>
@@ -252,15 +250,15 @@ function OverviewTab({ relaisInfo, setActiveTab }: { relaisInfo: any; setActiveT
         <CardContent>
           <div className="grid gap-4 md:grid-cols-3">
             <div className="p-4 border rounded-lg text-center">
-              <p className="text-2xl font-bold">{DEFAULT_RELAY_COMMISSION.PETIT} DA</p>
+              <p className="text-2xl font-bold">{relaisInfo?.commissionPetit || DEFAULT_RELAY_COMMISSION.PETIT} DA</p>
               <p className="text-sm text-slate-500">Petit colis</p>
             </div>
             <div className="p-4 border rounded-lg text-center">
-              <p className="text-2xl font-bold">{DEFAULT_RELAY_COMMISSION.MOYEN} DA</p>
+              <p className="text-2xl font-bold">{relaisInfo?.commissionMoyen || DEFAULT_RELAY_COMMISSION.MOYEN} DA</p>
               <p className="text-sm text-slate-500">Moyen colis</p>
             </div>
             <div className="p-4 border rounded-lg text-center">
-              <p className="text-2xl font-bold">{DEFAULT_RELAY_COMMISSION.GROS} DA</p>
+              <p className="text-2xl font-bold">{relaisInfo?.commissionGros || DEFAULT_RELAY_COMMISSION.GROS} DA</p>
               <p className="text-sm text-slate-500">Gros colis</p>
             </div>
           </div>
@@ -323,13 +321,18 @@ function ScanTab({ relaisId }: { relaisId: string | undefined }) {
   const handleStatusChange = async (status: string) => {
     if (!parcel) return;
     try {
-      await fetch(`/api/parcels/${parcel.id}`, {
+      const response = await fetch(`/api/parcels/${parcel.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status }),
       });
-      toast({ title: 'Statut mis à jour', description: 'Le statut du colis a été modifié' });
-      setParcel({ ...parcel, status });
+      
+      if (response.ok) {
+        toast({ title: 'Statut mis à jour', description: 'Le statut du colis a été modifié' });
+        setParcel({ ...parcel, status });
+      } else {
+        throw new Error('Failed');
+      }
     } catch {
       toast({ title: 'Erreur', description: 'Impossible de mettre à jour le statut', variant: 'destructive' });
     }
@@ -411,8 +414,9 @@ function ScanTab({ relaisId }: { relaisId: string | undefined }) {
 }
 
 // Settings Tab
-function SettingsTab({ relaisInfo }: { relaisInfo: any }) {
+function SettingsTab({ relaisInfo, onUpdate }: { relaisInfo: any; onUpdate: () => void }) {
   const { toast } = useToast();
+  const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState({
     commerceName: '',
     address: '',
@@ -431,8 +435,40 @@ function SettingsTab({ relaisInfo }: { relaisInfo: any }) {
     }
   }, [relaisInfo]);
 
-  const handleSave = () => {
-    toast({ title: 'Paramètres sauvegardés' });
+  const handleSave = async () => {
+    if (!relaisInfo?.id) {
+      toast({ title: 'Erreur', description: 'Relais non trouvé', variant: 'destructive' });
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const response = await fetch(`/api/relais/${relaisInfo.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          commerceName: formData.commerceName,
+          address: formData.address,
+          ville: formData.ville,
+        }),
+      });
+
+      if (response.ok) {
+        toast({ title: 'Succès', description: 'Paramètres sauvegardés' });
+        onUpdate();
+      } else {
+        const error = await response.json();
+        throw new Error(error.details || 'Failed to save');
+      }
+    } catch (err) {
+      toast({ 
+        title: 'Erreur', 
+        description: err instanceof Error ? err.message : 'Impossible de sauvegarder', 
+        variant: 'destructive' 
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -440,34 +476,71 @@ function SettingsTab({ relaisInfo }: { relaisInfo: any }) {
       <Card>
         <CardHeader>
           <CardTitle>Informations du commerce</CardTitle>
-          <CardDescription>Les modifications doivent être validées par l'administrateur</CardDescription>
+          <CardDescription>Modifiez les informations de votre point relais</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label>Nom du commerce</Label>
-            <Input value={formData.commerceName} onChange={(e) => setFormData({ ...formData, commerceName: e.target.value })} disabled={!relaisInfo} />
+            <Label htmlFor="commerceName">Nom du commerce</Label>
+            <Input 
+              id="commerceName"
+              value={formData.commerceName} 
+              onChange={(e) => setFormData({ ...formData, commerceName: e.target.value })} 
+              disabled={!relaisInfo || isSaving}
+              placeholder="Ex: Épicerie du Centre"
+            />
           </div>
           <div className="space-y-2">
-            <Label>Adresse</Label>
-            <Input value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} disabled={!relaisInfo} />
+            <Label htmlFor="address">Adresse</Label>
+            <Input 
+              id="address"
+              value={formData.address} 
+              onChange={(e) => setFormData({ ...formData, address: e.target.value })} 
+              disabled={!relaisInfo || isSaving}
+              placeholder="Ex: 123 Rue Didouche Mourad"
+            />
           </div>
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <Label>Ville</Label>
-              <Select value={formData.ville} onValueChange={(v) => setFormData({ ...formData, ville: v })} disabled={!relaisInfo}>
-                <SelectTrigger><SelectValue placeholder="Sélectionner" /></SelectTrigger>
-                <SelectContent>
-                  {WILAYAS.map(w => <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Téléphone</Label>
-              <Input value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} disabled={!relaisInfo} />
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="ville">Ville</Label>
+            <Select 
+              value={formData.ville} 
+              onValueChange={(v) => setFormData({ ...formData, ville: v })} 
+              disabled={!relaisInfo || isSaving}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Sélectionner une ville" />
+              </SelectTrigger>
+              <SelectContent>
+                {WILAYAS.map(w => <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
           </div>
-          <Button onClick={handleSave} className="bg-emerald-600 hover:bg-emerald-700" disabled={!relaisInfo}>
-            Sauvegarder
+          <div className="space-y-2">
+            <Label htmlFor="phone">Téléphone</Label>
+            <Input 
+              id="phone"
+              value={formData.phone} 
+              onChange={(e) => setFormData({ ...formData, phone: e.target.value })} 
+              disabled={!relaisInfo || isSaving}
+              placeholder="+213 XX XX XX XX"
+            />
+          </div>
+          
+          <Button 
+            onClick={handleSave} 
+            className="bg-emerald-600 hover:bg-emerald-700" 
+            disabled={!relaisInfo || isSaving}
+          >
+            {isSaving ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                Sauvegarde en cours...
+              </>
+            ) : (
+              <>
+                <Save className="h-4 w-4 mr-2" />
+                Sauvegarder les modifications
+              </>
+            )}
           </Button>
         </CardContent>
       </Card>
@@ -507,7 +580,7 @@ function SettingsTab({ relaisInfo }: { relaisInfo: any }) {
                   <p className="text-sm text-orange-600">Votre demande est en cours de validation</p>
                 )}
                 {relaisInfo.status === 'APPROVED' && (
-                  <p className="text-sm text-green-600">Votre relais est actif</p>
+                  <p className="text-sm text-green-600">Votre relais est actif et visible sur la plateforme</p>
                 )}
               </>
             ) : (
