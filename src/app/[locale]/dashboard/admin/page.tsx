@@ -14,9 +14,9 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { WILAYAS, USER_ROLES, PARCEL_STATUS, RELAIS_STATUS, PARCEL_FORMATS } from '@/lib/constants';
-import { Users, Package, Truck, Store, DollarSign, CheckCircle, XCircle, Loader2, Plus, Settings, BarChart3, MapPin, TrendingUp } from 'lucide-react';
+import { Users, Package, Truck, Store, DollarSign, CheckCircle, XCircle, Loader2, Plus, Settings, BarChart3, MapPin, Trash2, Pencil, Eye, EyeOff } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 // Helper function to get the correct dashboard path based on role
@@ -277,9 +277,13 @@ function OverviewTab({ stats, setActiveTab }: { stats: any; setActiveTab: (tab: 
 
 // Users Tab
 function UsersTab() {
+  const { toast } = useToast();
   const [users, setUsers] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState('all');
+  const [editUser, setEditUser] = useState<any>(null);
+  const [deleteUserId, setDeleteUserId] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => { fetchUsers(); }, []);
 
@@ -295,60 +299,177 @@ function UsersTab() {
     }
   };
 
+  const handleEditUser = async () => {
+    if (!editUser) return;
+    setIsSaving(true);
+    try {
+      const response = await fetch(`/api/users/${editUser.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: editUser.name,
+          phone: editUser.phone,
+          email: editUser.email,
+          isActive: editUser.isActive,
+        }),
+      });
+      if (response.ok) {
+        toast({ title: 'Utilisateur modifié' });
+        setEditUser(null);
+        fetchUsers();
+      } else {
+        throw new Error('Failed');
+      }
+    } catch {
+      toast({ title: 'Erreur', description: 'Impossible de modifier l\'utilisateur', variant: 'destructive' });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDeleteUser = async () => {
+    if (!deleteUserId) return;
+    setIsSaving(true);
+    try {
+      const response = await fetch(`/api/users/${deleteUserId}`, {
+        method: 'DELETE',
+      });
+      if (response.ok) {
+        toast({ title: 'Utilisateur supprimé' });
+        setDeleteUserId(null);
+        fetchUsers();
+      } else {
+        throw new Error('Failed');
+      }
+    } catch {
+      toast({ title: 'Erreur', description: 'Impossible de supprimer l\'utilisateur', variant: 'destructive' });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const filteredUsers = filter === 'all' ? users : users.filter(u => u.role === filter);
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle>Gestion des utilisateurs</CardTitle>
-            <CardDescription>{users.length} utilisateurs inscrits</CardDescription>
+    <>
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Gestion des utilisateurs</CardTitle>
+              <CardDescription>{users.length} utilisateurs inscrits</CardDescription>
+            </div>
+            <Select value={filter} onValueChange={setFilter}>
+              <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tous</SelectItem>
+                {USER_ROLES.map(r => <SelectItem key={r.id} value={r.id}>{r.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
           </div>
-          <Select value={filter} onValueChange={setFilter}>
-            <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Tous</SelectItem>
-              {USER_ROLES.map(r => <SelectItem key={r.id} value={r.id}>{r.label}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        </div>
-      </CardHeader>
-      <CardContent>
-        {isLoading ? (
-          <div className="flex justify-center py-8"><Loader2 className="h-8 w-8 animate-spin text-emerald-600" /></div>
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Nom</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Rôle</TableHead>
-                <TableHead>Téléphone</TableHead>
-                <TableHead>Statut</TableHead>
-                <TableHead>Inscription</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredUsers.map((user) => (
-                <TableRow key={user.id}>
-                  <TableCell className="font-medium">{user.name}</TableCell>
-                  <TableCell>{user.email}</TableCell>
-                  <TableCell><Badge variant="outline">{USER_ROLES.find(r => r.id === user.role)?.label}</Badge></TableCell>
-                  <TableCell>{user.phone || '-'}</TableCell>
-                  <TableCell>
-                    <Badge className={user.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}>
-                      {user.isActive ? 'Actif' : 'Inactif'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>{new Date(user.createdAt).toLocaleDateString('fr-FR')}</TableCell>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="flex justify-center py-8"><Loader2 className="h-8 w-8 animate-spin text-emerald-600" /></div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Nom</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Rôle</TableHead>
+                  <TableHead>Téléphone</TableHead>
+                  <TableHead>Statut</TableHead>
+                  <TableHead>Inscription</TableHead>
+                  <TableHead>Actions</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
-      </CardContent>
-    </Card>
+              </TableHeader>
+              <TableBody>
+                {filteredUsers.map((user) => (
+                  <TableRow key={user.id}>
+                    <TableCell className="font-medium">{user.name}</TableCell>
+                    <TableCell>{user.email}</TableCell>
+                    <TableCell><Badge variant="outline">{USER_ROLES.find(r => r.id === user.role)?.label}</Badge></TableCell>
+                    <TableCell>{user.phone || '-'}</TableCell>
+                    <TableCell>
+                      <Badge className={user.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}>
+                        {user.isActive ? 'Actif' : 'Inactif'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>{new Date(user.createdAt).toLocaleDateString('fr-FR')}</TableCell>
+                    <TableCell>
+                      <div className="flex gap-2">
+                        <Button size="sm" variant="outline" onClick={() => setEditUser(user)}>
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button size="sm" variant="destructive" onClick={() => setDeleteUserId(user.id)} disabled={user.role === 'ADMIN'}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Edit User Dialog */}
+      <Dialog open={!!editUser} onOpenChange={() => setEditUser(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Modifier l'utilisateur</DialogTitle>
+          </DialogHeader>
+          {editUser && (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Nom</Label>
+                <Input value={editUser.name} onChange={(e) => setEditUser({ ...editUser, name: e.target.value })} />
+              </div>
+              <div className="space-y-2">
+                <Label>Email</Label>
+                <Input value={editUser.email} onChange={(e) => setEditUser({ ...editUser, email: e.target.value })} />
+              </div>
+              <div className="space-y-2">
+                <Label>Téléphone</Label>
+                <Input value={editUser.phone || ''} onChange={(e) => setEditUser({ ...editUser, phone: e.target.value })} />
+              </div>
+              <div className="flex items-center gap-2">
+                <input type="checkbox" id="isActive" checked={editUser.isActive} onChange={(e) => setEditUser({ ...editUser, isActive: e.target.checked })} />
+                <Label htmlFor="isActive">Compte actif</Label>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditUser(null)}>Annuler</Button>
+            <Button onClick={handleEditUser} disabled={isSaving} className="bg-emerald-600 hover:bg-emerald-700">
+              {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Sauvegarder
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={!!deleteUserId} onOpenChange={() => setDeleteUserId(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirmer la suppression</DialogTitle>
+            <DialogDescription>
+              Êtes-vous sûr de vouloir supprimer cet utilisateur ? Cette action est irréversible.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteUserId(null)}>Annuler</Button>
+            <Button variant="destructive" onClick={handleDeleteUser} disabled={isSaving}>
+              {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Supprimer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
@@ -539,6 +660,9 @@ function LinesTab() {
   const [lignes, setLignes] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
+  const [editLigne, setEditLigne] = useState<any>(null);
+  const [deleteLigneId, setDeleteLigneId] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState({
     villeDepart: '', villeArrivee: '', tarifPetit: '500', tarifMoyen: '750', tarifGros: '1000',
   });
@@ -581,96 +705,237 @@ function LinesTab() {
     }
   };
 
-  return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2"><Plus className="h-5 w-5" />Créer une ligne de transport</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleCreate} className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label>Ville de départ</Label>
-                <Select value={formData.villeDepart} onValueChange={(v) => setFormData({ ...formData, villeDepart: v })}>
-                  <SelectTrigger><SelectValue placeholder="Sélectionner" /></SelectTrigger>
-                  <SelectContent>
-                    {WILAYAS.map(w => <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Ville d'arrivée</Label>
-                <Select value={formData.villeArrivee} onValueChange={(v) => setFormData({ ...formData, villeArrivee: v })}>
-                  <SelectTrigger><SelectValue placeholder="Sélectionner" /></SelectTrigger>
-                  <SelectContent>
-                    {WILAYAS.map(w => <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="grid gap-4 md:grid-cols-3">
-              <div className="space-y-2">
-                <Label>Tarif Petit (DA)</Label>
-                <Input type="number" value={formData.tarifPetit} onChange={(e) => setFormData({ ...formData, tarifPetit: e.target.value })} />
-              </div>
-              <div className="space-y-2">
-                <Label>Tarif Moyen (DA)</Label>
-                <Input type="number" value={formData.tarifMoyen} onChange={(e) => setFormData({ ...formData, tarifMoyen: e.target.value })} />
-              </div>
-              <div className="space-y-2">
-                <Label>Tarif Gros (DA)</Label>
-                <Input type="number" value={formData.tarifGros} onChange={(e) => setFormData({ ...formData, tarifGros: e.target.value })} />
-              </div>
-            </div>
-            <Button type="submit" disabled={isCreating} className="bg-emerald-600 hover:bg-emerald-700">
-              {isCreating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
-              Créer la ligne
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
+  const handleEditLigne = async () => {
+    if (!editLigne) return;
+    setIsSaving(true);
+    try {
+      const response = await fetch(`/api/lignes/${editLigne.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          villeDepart: editLigne.villeDepart,
+          villeArrivee: editLigne.villeArrivee,
+          tarifPetit: parseFloat(editLigne.tarifPetit),
+          tarifMoyen: parseFloat(editLigne.tarifMoyen),
+          tarifGros: parseFloat(editLigne.tarifGros),
+          isActive: editLigne.isActive,
+        }),
+      });
+      if (response.ok) {
+        toast({ title: 'Ligne modifiée' });
+        setEditLigne(null);
+        fetchLignes();
+      } else {
+        throw new Error('Failed');
+      }
+    } catch {
+      toast({ title: 'Erreur', description: 'Impossible de modifier la ligne', variant: 'destructive' });
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Lignes de transport ({lignes.length})</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="flex justify-center py-8"><Loader2 className="h-8 w-8 animate-spin text-emerald-600" /></div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Départ</TableHead>
-                  <TableHead>Arrivée</TableHead>
-                  <TableHead>Petit</TableHead>
-                  <TableHead>Moyen</TableHead>
-                  <TableHead>Gros</TableHead>
-                  <TableHead>Statut</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {lignes.map((ligne) => (
-                  <TableRow key={ligne.id}>
-                    <TableCell>{WILAYAS.find(w => w.id === ligne.villeDepart)?.name}</TableCell>
-                    <TableCell>{WILAYAS.find(w => w.id === ligne.villeArrivee)?.name}</TableCell>
-                    <TableCell>{ligne.tarifPetit} DA</TableCell>
-                    <TableCell>{ligne.tarifMoyen} DA</TableCell>
-                    <TableCell>{ligne.tarifGros} DA</TableCell>
-                    <TableCell>
-                      <Badge className={ligne.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}>
-                        {ligne.isActive ? 'Actif' : 'Inactif'}
-                      </Badge>
-                    </TableCell>
+  const handleDeleteLigne = async () => {
+    if (!deleteLigneId) return;
+    setIsSaving(true);
+    try {
+      const response = await fetch(`/api/lignes/${deleteLigneId}`, {
+        method: 'DELETE',
+      });
+      if (response.ok) {
+        toast({ title: 'Ligne supprimée' });
+        setDeleteLigneId(null);
+        fetchLignes();
+      } else {
+        throw new Error('Failed');
+      }
+    } catch {
+      toast({ title: 'Erreur', description: 'Impossible de supprimer la ligne', variant: 'destructive' });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <>
+      <div className="space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2"><Plus className="h-5 w-5" />Créer une ligne de transport</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleCreate} className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Ville de départ</Label>
+                  <Select value={formData.villeDepart} onValueChange={(v) => setFormData({ ...formData, villeDepart: v })}>
+                    <SelectTrigger><SelectValue placeholder="Sélectionner" /></SelectTrigger>
+                    <SelectContent>
+                      {WILAYAS.map(w => <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Ville d'arrivée</Label>
+                  <Select value={formData.villeArrivee} onValueChange={(v) => setFormData({ ...formData, villeArrivee: v })}>
+                    <SelectTrigger><SelectValue placeholder="Sélectionner" /></SelectTrigger>
+                    <SelectContent>
+                      {WILAYAS.map(w => <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="grid gap-4 md:grid-cols-3">
+                <div className="space-y-2">
+                  <Label>Tarif Petit (DA)</Label>
+                  <Input type="number" value={formData.tarifPetit} onChange={(e) => setFormData({ ...formData, tarifPetit: e.target.value })} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Tarif Moyen (DA)</Label>
+                  <Input type="number" value={formData.tarifMoyen} onChange={(e) => setFormData({ ...formData, tarifMoyen: e.target.value })} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Tarif Gros (DA)</Label>
+                  <Input type="number" value={formData.tarifGros} onChange={(e) => setFormData({ ...formData, tarifGros: e.target.value })} />
+                </div>
+              </div>
+              <Button type="submit" disabled={isCreating} className="bg-emerald-600 hover:bg-emerald-700">
+                {isCreating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
+                Créer la ligne
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Lignes de transport ({lignes.length})</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <div className="flex justify-center py-8"><Loader2 className="h-8 w-8 animate-spin text-emerald-600" /></div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Départ</TableHead>
+                    <TableHead>Arrivée</TableHead>
+                    <TableHead>Petit</TableHead>
+                    <TableHead>Moyen</TableHead>
+                    <TableHead>Gros</TableHead>
+                    <TableHead>Statut</TableHead>
+                    <TableHead>Actions</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {lignes.map((ligne) => (
+                    <TableRow key={ligne.id}>
+                      <TableCell>{WILAYAS.find(w => w.id === ligne.villeDepart)?.name}</TableCell>
+                      <TableCell>{WILAYAS.find(w => w.id === ligne.villeArrivee)?.name}</TableCell>
+                      <TableCell>{ligne.tarifPetit} DA</TableCell>
+                      <TableCell>{ligne.tarifMoyen} DA</TableCell>
+                      <TableCell>{ligne.tarifGros} DA</TableCell>
+                      <TableCell>
+                        <Badge className={ligne.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}>
+                          {ligne.isActive ? 'Actif' : 'Inactif'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex gap-2">
+                          <Button size="sm" variant="outline" onClick={() => setEditLigne(ligne)}>
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button size="sm" variant="destructive" onClick={() => setDeleteLigneId(ligne.id)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Edit Ligne Dialog */}
+      <Dialog open={!!editLigne} onOpenChange={() => setEditLigne(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Modifier la ligne</DialogTitle>
+          </DialogHeader>
+          {editLigne && (
+            <div className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Ville de départ</Label>
+                  <Select value={editLigne.villeDepart} onValueChange={(v) => setEditLigne({ ...editLigne, villeDepart: v })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {WILAYAS.map(w => <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Ville d'arrivée</Label>
+                  <Select value={editLigne.villeArrivee} onValueChange={(v) => setEditLigne({ ...editLigne, villeArrivee: v })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {WILAYAS.map(w => <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="grid gap-4 md:grid-cols-3">
+                <div className="space-y-2">
+                  <Label>Tarif Petit (DA)</Label>
+                  <Input type="number" value={editLigne.tarifPetit} onChange={(e) => setEditLigne({ ...editLigne, tarifPetit: e.target.value })} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Tarif Moyen (DA)</Label>
+                  <Input type="number" value={editLigne.tarifMoyen} onChange={(e) => setEditLigne({ ...editLigne, tarifMoyen: e.target.value })} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Tarif Gros (DA)</Label>
+                  <Input type="number" value={editLigne.tarifGros} onChange={(e) => setEditLigne({ ...editLigne, tarifGros: e.target.value })} />
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <input type="checkbox" id="ligneActive" checked={editLigne.isActive} onChange={(e) => setEditLigne({ ...editLigne, isActive: e.target.checked })} />
+                <Label htmlFor="ligneActive">Ligne active</Label>
+              </div>
+            </div>
           )}
-        </CardContent>
-      </Card>
-    </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditLigne(null)}>Annuler</Button>
+            <Button onClick={handleEditLigne} disabled={isSaving} className="bg-emerald-600 hover:bg-emerald-700">
+              {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Sauvegarder
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={!!deleteLigneId} onOpenChange={() => setDeleteLigneId(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirmer la suppression</DialogTitle>
+            <DialogDescription>
+              Êtes-vous sûr de vouloir supprimer cette ligne de transport ? Cette action est irréversible.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteLigneId(null)}>Annuler</Button>
+            <Button variant="destructive" onClick={handleDeleteLigne} disabled={isSaving}>
+              {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Supprimer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
