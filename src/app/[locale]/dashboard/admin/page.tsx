@@ -941,8 +941,63 @@ function LinesTab() {
 
 // Settings Tab
 function SettingsTab() {
-  const [platformCommission, setPlatformCommission] = useState('10');
   const { toast } = useToast();
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [settings, setSettings] = useState({
+    platformCommission: '10',
+    commissionPetit: '100',
+    commissionMoyen: '200',
+    commissionGros: '300',
+  });
+
+  useEffect(() => {
+    fetchSettings();
+  }, []);
+
+  const fetchSettings = async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch('/api/settings');
+      const data = await response.json();
+      setSettings({
+        platformCommission: String(data.platformCommission || 10),
+        commissionPetit: String(data.commissionPetit || 100),
+        commissionMoyen: String(data.commissionMoyen || 200),
+        commissionGros: String(data.commissionGros || 300),
+      });
+    } catch (error) {
+      console.error('Error fetching settings:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      const response = await fetch('/api/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          platformCommission: parseFloat(settings.platformCommission),
+          commissionPetit: parseFloat(settings.commissionPetit),
+          commissionMoyen: parseFloat(settings.commissionMoyen),
+          commissionGros: parseFloat(settings.commissionGros),
+        }),
+      });
+      
+      if (response.ok) {
+        toast({ title: 'Paramètres sauvegardés', description: 'Les paramètres ont été enregistrés avec succès' });
+      } else {
+        throw new Error('Failed');
+      }
+    } catch {
+      toast({ title: 'Erreur', description: 'Impossible de sauvegarder les paramètres', variant: 'destructive' });
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -952,29 +1007,59 @@ function SettingsTab() {
           <CardDescription>Configurez les commissions et paramètres globaux</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="space-y-2">
-            <Label>Commission plateforme (%)</Label>
-            <Input type="number" value={platformCommission} onChange={(e) => setPlatformCommission(e.target.value)} className="max-w-xs" />
-            <p className="text-xs text-slate-500">Pourcentage prélevé sur chaque transaction</p>
-          </div>
-          <div className="space-y-4">
-            <Label>Commissions relais par format (DA)</Label>
-            <div className="grid gap-4 md:grid-cols-3 max-w-lg">
+          {isLoading ? (
+            <div className="flex justify-center py-8"><Loader2 className="h-8 w-8 animate-spin text-emerald-600" /></div>
+          ) : (
+            <>
               <div className="space-y-2">
-                <Label className="text-sm">Petit</Label>
-                <Input type="number" defaultValue="100" />
+                <Label>Commission plateforme (%)</Label>
+                <Input 
+                  type="number" 
+                  value={settings.platformCommission} 
+                  onChange={(e) => setSettings({ ...settings, platformCommission: e.target.value })} 
+                  className="max-w-xs" 
+                />
+                <p className="text-xs text-slate-500">Pourcentage prélevé sur chaque transaction</p>
               </div>
-              <div className="space-y-2">
-                <Label className="text-sm">Moyen</Label>
-                <Input type="number" defaultValue="200" />
+              <div className="space-y-4">
+                <Label>Commissions relais par format (DA)</Label>
+                <div className="grid gap-4 md:grid-cols-3 max-w-lg">
+                  <div className="space-y-2">
+                    <Label className="text-sm">Petit</Label>
+                    <Input 
+                      type="number" 
+                      value={settings.commissionPetit}
+                      onChange={(e) => setSettings({ ...settings, commissionPetit: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-sm">Moyen</Label>
+                    <Input 
+                      type="number" 
+                      value={settings.commissionMoyen}
+                      onChange={(e) => setSettings({ ...settings, commissionMoyen: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-sm">Gros</Label>
+                    <Input 
+                      type="number" 
+                      value={settings.commissionGros}
+                      onChange={(e) => setSettings({ ...settings, commissionGros: e.target.value })}
+                    />
+                  </div>
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label className="text-sm">Gros</Label>
-                <Input type="number" defaultValue="300" />
-              </div>
-            </div>
-          </div>
-          <Button onClick={() => toast({ title: 'Paramètres sauvegardés' })} className="bg-emerald-600 hover:bg-emerald-700">Sauvegarder</Button>
+              <Button 
+                onClick={handleSave} 
+                className="bg-emerald-600 hover:bg-emerald-700"
+                disabled={isSaving}
+              >
+                {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                Sauvegarder
+              </Button>
+            </>
+          )}
         </CardContent>
       </Card>
 
@@ -986,6 +1071,18 @@ function SettingsTab() {
         <CardContent>
           <Button asChild className="bg-blue-600 hover:bg-blue-700">
             <a href="/api/seed" target="_blank">Initialiser les données de démo</a>
+          </Button>
+        </CardContent>
+      </Card>
+      
+      <Card>
+        <CardHeader>
+          <CardTitle>Réinitialiser le statut des relais</CardTitle>
+          <CardDescription>Remettre tous les relais en attente de validation</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button asChild variant="outline">
+            <a href="/api/admin/reset-relais-status" target="_blank">Réinitialiser les statuts relais</a>
           </Button>
         </CardContent>
       </Card>
