@@ -35,32 +35,31 @@ export default function RelaisDashboard() {
   const [stats, setStats] = useState({ pending: 0, received: 0, handedOver: 0, earnings: 0 });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [loadingTimeout, setLoadingTimeout] = useState(false);
 
-  // Set a timeout to prevent infinite loading
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setLoadingTimeout(true);
-    }, 3000);
-    return () => clearTimeout(timer);
-  }, []);
-
+  // Simple redirect if not authenticated
   useEffect(() => {
     if (status === 'unauthenticated') {
       router.push(`/${locale}/auth/login`);
-    } else if (status === 'authenticated' && session?.user?.role && session.user.role !== 'RELAIS') {
-      const correctPath = getRoleBasedDashboardPath(session.user.role, locale);
-      window.location.href = correctPath;
     }
-  }, [status, session, router, locale]);
+  }, [status, router, locale]);
 
+  // Fetch relais info when session is ready
   useEffect(() => {
-    if (session?.user?.id && session?.user?.role === 'RELAIS') {
+    if (status === 'authenticated' && session?.user?.id) {
+      // Redirect if not RELAIS role
+      if (session.user.role !== 'RELAIS') {
+        const paths: Record<string, string> = {
+          'ADMIN': `/${locale}/dashboard/admin`,
+          'TRANSPORTER': `/${locale}/dashboard/transporter`,
+          'CLIENT': `/${locale}/dashboard/client`,
+        };
+        const path = paths[session.user.role] || `/${locale}/dashboard/client`;
+        window.location.href = path;
+        return;
+      }
       fetchRelaisInfo();
-    } else if (status === 'authenticated') {
-      setIsLoading(false);
     }
-  }, [session?.user?.id, session?.user?.role, status]);
+  }, [status, session, locale]);
 
   const fetchRelaisInfo = async () => {
     setIsLoading(true);
@@ -92,8 +91,8 @@ export default function RelaisDashboard() {
     }
   };
 
-  // Show loading while checking authentication (with timeout)
-  if ((status === 'loading' || isLoading) && !loadingTimeout) {
+  // Loading state
+  if (status === 'loading' || (status === 'authenticated' && isLoading)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
         <div className="text-center">
@@ -104,28 +103,8 @@ export default function RelaisDashboard() {
     );
   }
 
-  // If loading timed out without session, show login option
-  if ((status === 'unauthenticated' || !session?.user) && loadingTimeout) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
-        <div className="text-center max-w-md p-6">
-          <AlertCircle className="h-12 w-12 text-orange-600 mx-auto mb-4" />
-          <h2 className="text-xl font-bold mb-2">Session expirée</h2>
-          <p className="text-slate-600 mb-4">Veuillez vous reconnecter pour accéder à votre espace.</p>
-          <Button onClick={() => {
-            window.location.href = `/${locale}/auth/login`;
-          }}>
-            Se connecter
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  // If authenticated but not a relais, redirect
-  if (session?.user?.role && session.user.role !== 'RELAIS') {
-    const correctPath = getRoleBasedDashboardPath(session.user.role, locale);
-    window.location.href = correctPath;
+  // Not authenticated
+  if (status === 'unauthenticated' || !session?.user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
         <div className="text-center">
@@ -136,31 +115,13 @@ export default function RelaisDashboard() {
     );
   }
 
-  // If not a relais user after loading, show error
-  if (!session?.user?.role && loadingTimeout) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
-        <div className="text-center max-w-md p-6">
-          <AlertCircle className="h-12 w-12 text-orange-600 mx-auto mb-4" />
-          <h2 className="text-xl font-bold mb-2">Accès non autorisé</h2>
-          <p className="text-slate-600 mb-4">Ce compte n'a pas les permissions nécessaires.</p>
-          <Button onClick={() => {
-            window.location.href = `/${locale}/auth/login`;
-          }}>
-            Se connecter avec un autre compte
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  // Still loading with no timeout
-  if (!session?.user?.role && !loadingTimeout) {
+  // Wrong role
+  if (session.user.role !== 'RELAIS') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
         <div className="text-center">
           <Loader2 className="h-8 w-8 animate-spin text-emerald-600 mx-auto mb-4" />
-          <p className="text-slate-600">Chargement...</p>
+          <p className="text-slate-600">Redirection vers votre espace...</p>
         </div>
       </div>
     );

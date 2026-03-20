@@ -31,7 +31,7 @@ function getRoleBasedDashboardPath(role: string, locale: string): string {
 }
 
 function ClientDashboardContent() {
-  const { data: session, status, update } = useSession();
+  const { data: session, status } = useSession();
   const t = useTranslations();
   const locale = useLocale();
   const router = useRouter();
@@ -44,20 +44,25 @@ function ClientDashboardContent() {
   const [trackingNumber, setTrackingNumber] = useState(initialTracking);
   const [stats, setStats] = useState({ created: 0, inTransit: 0, delivered: 0, totalSpent: 0 });
 
-  // Force session refresh on mount
-  useEffect(() => {
-    update();
-  }, [update]);
-
+  // Simple redirect if not authenticated
   useEffect(() => {
     if (status === 'unauthenticated') {
       router.push(`/${locale}/auth/login`);
-    } else if (status === 'authenticated' && session?.user?.role && session.user.role !== 'CLIENT') {
-      // Redirect to correct dashboard based on role
-      const correctPath = `/${locale}/dashboard/${session.user.role.toLowerCase() === 'admin' ? 'admin' : session.user.role.toLowerCase() === 'transporter' ? 'transporter' : session.user.role.toLowerCase() === 'relais' ? 'relais' : 'client'}`;
-      window.location.href = correctPath;
     }
-  }, [status, session, router, locale]);
+  }, [status, router, locale]);
+
+  // Redirect if wrong role
+  useEffect(() => {
+    if (status === 'authenticated' && session?.user?.role && session.user.role !== 'CLIENT') {
+      const paths: Record<string, string> = {
+        'ADMIN': `/${locale}/dashboard/admin`,
+        'TRANSPORTER': `/${locale}/dashboard/transporter`,
+        'RELAIS': `/${locale}/dashboard/relais`,
+      };
+      const path = paths[session.user.role] || `/${locale}/dashboard/client`;
+      window.location.href = path;
+    }
+  }, [status, session, locale]);
 
   useEffect(() => {
     if (session?.user?.id) {
@@ -84,13 +89,23 @@ function ClientDashboardContent() {
   if (status === 'loading') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
-        <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-emerald-600 mx-auto mb-4" />
+          <p className="text-slate-600">Chargement...</p>
+        </div>
       </div>
     );
   }
 
   if (!session?.user) {
-    return null;
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-emerald-600 mx-auto mb-4" />
+          <p className="text-slate-600">Redirection...</p>
+        </div>
+      </div>
+    );
   }
 
   return (
