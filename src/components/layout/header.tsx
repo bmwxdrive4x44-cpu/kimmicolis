@@ -24,7 +24,7 @@ import {
   LogOut,
   LayoutDashboard,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useSession, signOut } from 'next-auth/react';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 
@@ -32,8 +32,13 @@ export function Header() {
   const t = useTranslations();
   const locale = useLocale();
   const pathname = usePathname();
-  const { data: session, status } = useSession();
+  const { data: session, status, update } = useSession();
   const [isOpen, setIsOpen] = useState(false);
+
+  // Force session refresh on mount and when pathname changes
+  useEffect(() => {
+    update();
+  }, [update, pathname]);
 
   const navItems = [
     { href: '/', label: t('nav.home') },
