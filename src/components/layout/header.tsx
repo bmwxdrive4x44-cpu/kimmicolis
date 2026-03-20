@@ -34,11 +34,20 @@ export function Header() {
   const pathname = usePathname();
   const { data: session, status, update } = useSession();
   const [isOpen, setIsOpen] = useState(false);
+  const [hasLoaded, setHasLoaded] = useState(false);
 
-  // Force session refresh on mount and when pathname changes
+  // Force session refresh on mount
   useEffect(() => {
     update();
-  }, [update, pathname]);
+  }, [update]);
+
+  // Set loaded after initial render
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setHasLoaded(true);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, []);
 
   const navItems = [
     { href: '/', label: t('nav.home') },
@@ -76,8 +85,8 @@ export function Header() {
     }
   };
 
-  // Show loading state
-  if (status === 'loading') {
+  // Show loading state only for initial auth check
+  if (status === 'loading' && !hasLoaded) {
     return (
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex h-16 items-center justify-between px-4">
