@@ -27,7 +27,7 @@ function getRoleBasedDashboardPath(role: string, locale: string): string {
 }
 
 export default function RelaisDashboard() {
-  const { data: session, status, update } = useSession();
+  const { data: session, status } = useSession();
   const locale = useLocale();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState('overview');
@@ -35,45 +35,31 @@ export default function RelaisDashboard() {
   const [stats, setStats] = useState({ pending: 0, received: 0, handedOver: 0, earnings: 0 });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [hasRedirected, setHasRedirected] = useState(false);
 
-  // Force session refresh on mount
+  // Simple redirect if not authenticated
   useEffect(() => {
-    update();
-  }, [update]);
-
-  useEffect(() => {
-    // Prevent multiple redirects
-    if (hasRedirected) return;
-    
     if (status === 'unauthenticated') {
-      setHasRedirected(true);
       router.push(`/${locale}/auth/login`);
-    } else if (status === 'authenticated' && session?.user?.role && session.user.role !== 'RELAIS') {
-      setHasRedirected(true);
-      // Use window.location for a full page reload to avoid session caching issues
-      const correctPath = getRoleBasedDashboardPath(session.user.role, locale);
-      window.location.href = correctPath;
     }
-  }, [status, session, router, locale, hasRedirected]);
+  }, [status, router, locale]);
 
+  // Fetch relais info when session is ready
   useEffect(() => {
-    if (session?.user?.id && session?.user?.role === 'RELAIS') {
+    if (status === 'authenticated' && session?.user?.id) {
+      // Redirect if not RELAIS role
+      if (session.user.role !== 'RELAIS') {
+        const paths: Record<string, string> = {
+          'ADMIN': `/${locale}/dashboard/admin`,
+          'TRANSPORTER': `/${locale}/dashboard/transporter`,
+          'CLIENT': `/${locale}/dashboard/client`,
+        };
+        const path = paths[session.user.role] || `/${locale}/dashboard/client`;
+        window.location.href = path;
+        return;
+      }
       fetchRelaisInfo();
-    } else if (status === 'authenticated' && session?.user?.role !== 'RELAIS') {
-      // Not a relais user, stop loading
-      setIsLoading(false);
-    } else if (status === 'authenticated' && !session?.user?.role) {
-      // Session exists but no role - try to refresh
-      update();
-      // Set a timeout to stop loading if refresh doesn't work
-      const timeout = setTimeout(() => {
-        setIsLoading(false);
-        setError('Session invalide. Veuillez vous reconnecter.');
-      }, 5000);
-      return () => clearTimeout(timeout);
     }
-  }, [session?.user?.id, session?.user?.role, status]);
+  }, [status, session, locale]);
 
   const fetchRelaisInfo = async () => {
     setIsLoading(true);
@@ -105,8 +91,8 @@ export default function RelaisDashboard() {
     }
   };
 
-  // Show loading while checking authentication
-  if (status === 'loading' || isLoading) {
+  // Loading state
+  if (status === 'loading' || (status === 'authenticated' && isLoading)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
         <div className="text-center">
@@ -117,23 +103,8 @@ export default function RelaisDashboard() {
     );
   }
 
-  // If not authenticated, redirect to login
+  // Not authenticated
   if (status === 'unauthenticated' || !session?.user) {
-    router.push(`/${locale}/auth/login`);
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin text-emerald-600 mx-auto mb-4" />
-          <p className="text-slate-600">Redirection vers la connexion...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // If authenticated but not a relais, redirect to appropriate dashboard
-  if (session.user.role && session.user.role !== 'RELAIS') {
-    const correctPath = getRoleBasedDashboardPath(session.user.role, locale);
-    window.location.href = correctPath;
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
         <div className="text-center">
@@ -144,21 +115,13 @@ export default function RelaisDashboard() {
     );
   }
 
-  // If authenticated but no role, show error
-  if (!session.user.role) {
+  // Wrong role
+  if (session.user.role !== 'RELAIS') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
-        <div className="text-center max-w-md p-6">
-          <AlertCircle className="h-12 w-12 text-red-600 mx-auto mb-4" />
-          <h2 className="text-xl font-bold mb-2">Session invalide</h2>
-          <p className="text-slate-600 mb-4">Votre session ne contient pas les informations nécessaires. Veuillez vous reconnecter.</p>
-          <Button onClick={() => {
-            fetch('/api/logout', { method: 'POST' }).then(() => {
-              window.location.href = `/${locale}/auth/login`;
-            });
-          }}>
-            Se reconnecter
-          </Button>
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-emerald-600 mx-auto mb-4" />
+          <p className="text-slate-600">Redirection vers votre espace...</p>
         </div>
       </div>
     );
