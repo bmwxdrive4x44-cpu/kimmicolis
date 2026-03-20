@@ -31,7 +31,7 @@ function getRoleBasedDashboardPath(role: string, locale: string): string {
 }
 
 function ClientDashboardContent() {
-  const { data: session, status } = useSession();
+  const { data: session, status, update } = useSession();
   const t = useTranslations();
   const locale = useLocale();
   const router = useRouter();
@@ -44,12 +44,18 @@ function ClientDashboardContent() {
   const [trackingNumber, setTrackingNumber] = useState(initialTracking);
   const [stats, setStats] = useState({ created: 0, inTransit: 0, delivered: 0, totalSpent: 0 });
 
+  // Force session refresh on mount
+  useEffect(() => {
+    update();
+  }, [update]);
+
   useEffect(() => {
     if (status === 'unauthenticated') {
       router.push(`/${locale}/auth/login`);
     } else if (status === 'authenticated' && session?.user?.role && session.user.role !== 'CLIENT') {
-      const correctPath = getRoleBasedDashboardPath(session.user.role, locale);
-      router.push(correctPath);
+      // Redirect to correct dashboard based on role
+      const correctPath = `/${locale}/dashboard/${session.user.role.toLowerCase() === 'admin' ? 'admin' : session.user.role.toLowerCase() === 'transporter' ? 'transporter' : session.user.role.toLowerCase() === 'relais' ? 'relais' : 'client'}`;
+      window.location.href = correctPath;
     }
   }, [status, session, router, locale]);
 
