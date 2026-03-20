@@ -2,7 +2,7 @@
 
 import { Suspense, useState } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
-import { signIn } from 'next-auth/react';
+import { signIn, signOut } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Link } from '@/i18n/routing';
 import { Button } from '@/components/ui/button';
@@ -41,6 +41,16 @@ function LoginForm() {
     setIsLoading(true);
 
     try {
+      // First, completely clear the existing session
+      await signOut({ redirect: false });
+      
+      // Clear any cached session data
+      await fetch('/api/logout', { method: 'POST' });
+      
+      // Small delay to ensure session is cleared
+      await new Promise(resolve => setTimeout(resolve, 300));
+
+      // Now sign in with new credentials
       const result = await signIn('credentials', {
         email,
         password,
@@ -61,7 +71,7 @@ function LoginForm() {
         
         toast({
           title: 'Connexion réussie',
-          description: 'Bienvenue sur SwiftColis!',
+          description: `Bienvenue, ${sessionData?.user?.name || 'utilisateur'}!`,
         });
         
         // Redirect based on role - force full page reload

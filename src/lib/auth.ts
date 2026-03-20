@@ -1,7 +1,6 @@
 import type { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import { db } from './db';
-import { compare } from 'crypto';
 
 // Simple password hashing
 async function hashPassword(password: string): Promise<string> {
@@ -31,7 +30,7 @@ export const authOptions: NextAuthOptions = {
         }
 
         const user = await db.user.findUnique({
-          where: { email: credentials.email },
+          where: { email: credentials.email.toLowerCase() },
           include: { relais: true },
         });
 
@@ -56,17 +55,28 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger, session }) {
+      // Initial sign in
       if (user) {
         token.id = user.id;
+        token.email = user.email;
+        token.name = user.name;
         token.role = user.role;
         token.relaisId = user.relaisId;
       }
+      
+      // Update session
+      if (trigger === 'update' && session) {
+        token = { ...token, ...session };
+      }
+      
       return token;
     },
     async session({ session, token }) {
       if (session.user) {
         session.user.id = token.id as string;
+        session.user.email = token.email as string;
+        session.user.name = token.name as string;
         session.user.role = token.role as string;
         session.user.relaisId = token.relaisId as string | null;
       }
@@ -85,14 +95,21 @@ export const authOptions: NextAuthOptions = {
       return baseUrl;
     },
   },
+  events: {
+    async signOut() {
+      // Clear any additional session data if needed
+    },
+  },
   pages: {
     signIn: '/auth/login',
   },
   session: {
     strategy: 'jwt',
+    maxAge: 30 * 24 * 60 * 60, // 30 days
   },
   secret: process.env.NEXTAUTH_SECRET || 'swiftcolis-secret-key-2024',
   debug: process.env.NODE_ENV === 'development',
+  useSecureCookies: process.env.NODE_ENV === 'production',
 };
 
 declare module 'next-auth' {
@@ -115,6 +132,8 @@ declare module 'next-auth' {
 declare module 'next-auth/jwt' {
   interface JWT {
     id: string;
+    email: string;
+    name: string;
     role: string;
     relaisId?: string | null;
   }
