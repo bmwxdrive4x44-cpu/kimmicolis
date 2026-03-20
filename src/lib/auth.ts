@@ -65,9 +65,26 @@ export const authOptions: NextAuthOptions = {
         token.relaisId = user.relaisId;
       }
       
-      // Update session
-      if (trigger === 'update' && session) {
-        token = { ...token, ...session };
+      // Update session - fetch fresh user data from database
+      if (trigger === 'update' && token.id) {
+        try {
+          const freshUser = await db.user.findUnique({
+            where: { id: token.id as string },
+            include: { relais: true },
+          });
+          if (freshUser) {
+            token.id = freshUser.id;
+            token.email = freshUser.email;
+            token.name = freshUser.name;
+            token.role = freshUser.role;
+            token.relaisId = freshUser.relais?.id || null;
+          }
+        } catch (error) {
+          console.error('Error refreshing user data:', error);
+        }
+        if (session) {
+          token = { ...token, ...session };
+        }
       }
       
       return token;

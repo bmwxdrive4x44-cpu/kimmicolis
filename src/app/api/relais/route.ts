@@ -1,16 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 
-// GET all relais
+// GET all relais or filter by userId
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status');
     const ville = searchParams.get('ville');
+    const userId = searchParams.get('userId');
 
     let where: any = {};
     if (status) where.status = status;
     if (ville) where.ville = ville;
+    if (userId) where.userId = userId;
 
     const relais = await db.relais.findMany({
       where,

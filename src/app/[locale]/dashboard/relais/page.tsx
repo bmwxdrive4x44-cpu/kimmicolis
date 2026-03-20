@@ -63,6 +63,15 @@ export default function RelaisDashboard() {
     } else if (status === 'authenticated' && session?.user?.role !== 'RELAIS') {
       // Not a relais user, stop loading
       setIsLoading(false);
+    } else if (status === 'authenticated' && !session?.user?.role) {
+      // Session exists but no role - try to refresh
+      update();
+      // Set a timeout to stop loading if refresh doesn't work
+      const timeout = setTimeout(() => {
+        setIsLoading(false);
+        setError('Session invalide. Veuillez vous reconnecter.');
+      }, 5000);
+      return () => clearTimeout(timeout);
     }
   }, [session?.user?.id, session?.user?.role, status]);
 
@@ -108,13 +117,48 @@ export default function RelaisDashboard() {
     );
   }
 
-  // If not authenticated or not a relais, don't render anything (will redirect)
-  if (!session?.user || session.user.role !== 'RELAIS') {
+  // If not authenticated, redirect to login
+  if (status === 'unauthenticated' || !session?.user) {
+    router.push(`/${locale}/auth/login`);
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-emerald-600 mx-auto mb-4" />
+          <p className="text-slate-600">Redirection vers la connexion...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // If authenticated but not a relais, redirect to appropriate dashboard
+  if (session.user.role && session.user.role !== 'RELAIS') {
+    const correctPath = getRoleBasedDashboardPath(session.user.role, locale);
+    window.location.href = correctPath;
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
         <div className="text-center">
           <Loader2 className="h-8 w-8 animate-spin text-emerald-600 mx-auto mb-4" />
           <p className="text-slate-600">Redirection...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // If authenticated but no role, show error
+  if (!session.user.role) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
+        <div className="text-center max-w-md p-6">
+          <AlertCircle className="h-12 w-12 text-red-600 mx-auto mb-4" />
+          <h2 className="text-xl font-bold mb-2">Session invalide</h2>
+          <p className="text-slate-600 mb-4">Votre session ne contient pas les informations nécessaires. Veuillez vous reconnecter.</p>
+          <Button onClick={() => {
+            fetch('/api/logout', { method: 'POST' }).then(() => {
+              window.location.href = `/${locale}/auth/login`;
+            });
+          }}>
+            Se reconnecter
+          </Button>
         </div>
       </div>
     );
