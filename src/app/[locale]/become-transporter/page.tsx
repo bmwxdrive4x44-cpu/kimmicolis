@@ -1,8 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { useSession } from 'next-auth/react';
-import { useTranslations } from 'next-intl';
+import { useSession, signIn } from 'next-auth/react';
+import { useTranslations, useLocale } from 'next-intl';
 import { Link } from '@/i18n/routing';
 import { Header } from '@/components/layout/header';
 import { Footer } from '@/components/layout/footer';
@@ -13,18 +13,23 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Separator } from '@/components/ui/separator';
 import { WILAYAS } from '@/lib/constants';
-import { Truck, MapPin, Star, CheckCircle, Loader2, Route } from 'lucide-react';
+import { Truck, MapPin, Star, CheckCircle, Loader2, Route, User, Mail, Lock, Phone } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { useRouter } from 'next/navigation';
 
 export default function BecomeTransporterPage() {
   const { data: session } = useSession();
+  const locale = useLocale();
   const t = useTranslations('transporter.register');
   const { toast } = useToast();
-  const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [accountData, setAccountData] = useState({
+    email: '',
+    password: '',
+    confirmPassword: '',
+  });
   const [formData, setFormData] = useState({
     fullName: '',
     phone: '',
@@ -49,21 +54,41 @@ export default function BecomeTransporterPage() {
     setIsLoading(true);
 
     try {
-      // If not logged in, create user first
       let userId = session?.user?.id;
 
+      // If not logged in, create account first
       if (!userId) {
-        // This would typically redirect to registration
-        toast({
-          title: 'Connexion requise',
-          description: 'Veuillez vous connecter ou créer un compte pour devenir transporteur',
+        if (accountData.password !== accountData.confirmPassword) {
+          toast({ title: 'Erreur', description: 'Les mots de passe ne correspondent pas', variant: 'destructive' });
+          return;
+        }
+        if (accountData.password.length < 6) {
+          toast({ title: 'Erreur', description: 'Le mot de passe doit contenir au moins 6 caractères', variant: 'destructive' });
+          return;
+        }
+
+        const registerRes = await fetch('/api/users', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: formData.fullName,
+            email: accountData.email,
+            phone: formData.phone,
+            password: accountData.password,
+            role: 'TRANSPORTER',
+          }),
         });
-        router.push('/auth/register');
-        return;
+
+        const registerData = await registerRes.json();
+        if (!registerRes.ok) {
+          toast({ title: 'Erreur', description: registerData.details || registerData.error || 'Erreur lors de la création du compte', variant: 'destructive' });
+          return;
+        }
+        userId = registerData.id;
       }
 
-      // Create transporter registration
-      const response = await fetch('/api/transporters', {
+      // Submit transporter application
+      const appRes = await fetch('/api/transporters', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -72,25 +97,31 @@ export default function BecomeTransporterPage() {
           phone: formData.phone,
           vehicle: formData.vehicle,
           license: formData.license,
-          experience: parseInt(formData.experience),
+          experience: parseInt(formData.experience) || 0,
           regions: formData.regions,
           description: formData.description,
         }),
       });
 
-      if (response.ok) {
-        setSuccess(true);
-        toast({
-          title: t('success'),
-          description: 'Votre demande sera examinée par notre équipe',
-        });
-      } else {
-        throw new Error('Failed to submit');
+      if (!appRes.ok) {
+        const data = await appRes.json();
+        throw new Error(data.error || 'Erreur lors de la soumission');
       }
-    } catch {
+
+      // Auto-connect the new account if it was just created
+      if (!session?.user?.id) {
+        await signIn('credentials', {
+          email: accountData.email,
+          password: accountData.password,
+          redirect: false,
+        });
+      }
+
+      setSuccess(true);
+    } catch (err) {
       toast({
         title: 'Erreur',
-        description: 'Impossible de soumettre la demande',
+        description: err instanceof Error ? err.message : 'Impossible de soumettre la demande',
         variant: 'destructive',
       });
     } finally {
@@ -222,32 +253,113 @@ export default function BecomeTransporterPage() {
           <CardHeader>
             <CardTitle>Inscription Transporteur</CardTitle>
             <CardDescription>
-              Remplissez ce formulaire pour rejoindre notre réseau de transporteurs partenaires
+              {session?.user
+                ? `Connecté en tant que ${session.user.name} — remplissez les infos de votre candidature`
+                : 'Créez votre compte et soumettez votre candidature en une seule étape'}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-6">
+
+              {/* Account section — only for non-logged-in users */}
+              {!session?.user && (
+                <>
+                  <div className="space-y-1">
+                    <h3 className="font-semibold text-sm uppercase tracking-wide text-muted-foreground flex items-center gap-2">
+                      <User className="h-4 w-4" /> Créer votre compte
+                    </h3>
+                    <p className="text-xs text-muted-foreground">
+                      Déjà inscrit ?{' '}
+                      <Link href={`/${locale}/auth/login`} className="text-emerald-600 underline hover:no-underline">
+                        Connectez-vous
+                      </Link>
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email</Label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        id="email"
+                        type="email"
+                        placeholder="email@exemple.com"
+                        value={accountData.email}
+                        onChange={(e) => setAccountData({ ...accountData, email: e.target.value })}
+                        className="pl-10"
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="password">Mot de passe</Label>
+                      <div className="relative">
+                        <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          id="password"
+                          type="password"
+                          placeholder="••••••••"
+                          value={accountData.password}
+                          onChange={(e) => setAccountData({ ...accountData, password: e.target.value })}
+                          className="pl-10"
+                          required
+                          minLength={6}
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="confirmPassword">Confirmer</Label>
+                      <div className="relative">
+                        <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          id="confirmPassword"
+                          type="password"
+                          placeholder="••••••••"
+                          value={accountData.confirmPassword}
+                          onChange={(e) => setAccountData({ ...accountData, confirmPassword: e.target.value })}
+                          className="pl-10"
+                          required
+                          minLength={6}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <Separator />
+                  <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+                    <Truck className="h-4 w-4" /> Informations transporteur
+                  </p>
+                </>
+              )}
+
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="fullName">{t('fullName')}</Label>
-                  <Input
-                    id="fullName"
-                    value={formData.fullName}
-                    onChange={(e) => setFormData(prev => ({ ...prev, fullName: e.target.value }))}
-                    placeholder="Votre nom complet"
-                    required
-                  />
+                  <div className="relative">
+                    <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="fullName"
+                      value={formData.fullName}
+                      onChange={(e) => setFormData(prev => ({ ...prev, fullName: e.target.value }))}
+                      placeholder="Votre nom complet"
+                      className="pl-10"
+                      required
+                    />
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="phone">{t('phone')}</Label>
-                  <Input
-                    id="phone"
-                    type="tel"
-                    value={formData.phone}
-                    onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
-                    placeholder="+213 XX XX XX XX"
-                    required
-                  />
+                  <div className="relative">
+                    <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="phone"
+                      type="tel"
+                      value={formData.phone}
+                      onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
+                      placeholder="+213 XX XX XX XX"
+                      className="pl-10"
+                      required
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -327,7 +439,7 @@ export default function BecomeTransporterPage() {
               <Button
                 type="submit"
                 className="w-full bg-emerald-600 hover:bg-emerald-700"
-                disabled={isLoading}
+                disabled={isLoading || !formData.vehicle}
               >
                 {isLoading ? (
                   <>
