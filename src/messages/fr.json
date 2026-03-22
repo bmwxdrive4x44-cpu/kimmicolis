@@ -338,6 +338,33 @@
       "pending": "En attente de validation"
     }
   },
+  "payment": {
+    "checkout_title": "Paiement du colis",
+    "checkout_description": "Finalisez le paiement de votre colis",
+    "no_unpaid_parcels": "Vous n'avez aucun colis en attente de paiement",
+    "back_to_dashboard": "Retour au tableau de bord",
+    "select_parcel": "Sélectionnez un colis à payer",
+    "tracking": "Numéro de suivi",
+    "format": "Format",
+    "route": "Itinéraire",
+    "amount": "Montant",
+    "payment_summary": "Résumé du paiement",
+    "base_price": "Prix base",
+    "fees": "Frais",
+    "total": "Total",
+    "pay_now": "Payer maintenant",
+    "processing": "En cours de traitement...",
+    "initiating_payment": "Initiation du paiement",
+    "please_wait": "Veuillez patienter, nous initialisons votre paiement...",
+    "processing_payment": "Traitement du paiement",
+    "processing_message": "Votre paiement est en cours de traitement. Cela peut prendre quelques secondes.",
+    "payment_successful": "Paiement réussi !",
+    "transaction_id": "ID de transaction",
+    "payment_complete_message": "Votre colis sera bientôt pris en charge par un transporteur.",
+    "payment_failed": "Paiement échoué",
+    "unknown_error": "Une erreur inconnue s'est produite",
+    "try_again": "Réessayer"
+  },
   "wilayas": {
     "alger": "Alger",
     "oran": "Oran",

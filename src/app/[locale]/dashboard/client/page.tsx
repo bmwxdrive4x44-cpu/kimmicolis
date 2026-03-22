@@ -183,7 +183,7 @@ function ClientDashboardContent() {
 
         {/* Main Content Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-3 mb-8">
+          <TabsList className="grid w-full grid-cols-4 mb-8">
             <TabsTrigger value="create" className="flex items-center gap-2">
               <Plus className="h-4 w-4" />
               Créer un colis
@@ -191,6 +191,10 @@ function ClientDashboardContent() {
             <TabsTrigger value="track" className="flex items-center gap-2">
               <MapPin className="h-4 w-4" />
               Suivi
+            </TabsTrigger>
+            <TabsTrigger value="payment" className="flex items-center gap-2">
+              <CreditCard className="h-4 w-4" />
+              Paiement
             </TabsTrigger>
             <TabsTrigger value="history" className="flex items-center gap-2">
               <History className="h-4 w-4" />
@@ -204,6 +208,10 @@ function ClientDashboardContent() {
 
           <TabsContent value="track">
             <TrackingTab initialTracking={trackingNumber} setTrackingNumber={setTrackingNumber} />
+          </TabsContent>
+
+          <TabsContent value="payment">
+            <PaymentTab userId={session.user.id} />
           </TabsContent>
 
           <TabsContent value="history">
@@ -575,6 +583,98 @@ function TrackingTab({ initialTracking, setTrackingNumber }: { initialTracking: 
         {result?.error && (
           <div className="text-center py-8 text-red-500">
             Colis non trouvé
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// Payment Tab - Show unpaid parcels
+function PaymentTab({ userId }: { userId: string }) {
+  const { push } = useRouter();
+  const locale = useLocale();
+  const [parcels, setParcels] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    fetchUnpaidParcels();
+  }, [userId]);
+
+  const fetchUnpaidParcels = async () => {
+    try {
+      const response = await fetch(`/api/parcels?clientId=${userId}&status=CREATED`);
+      const data = await response.json();
+      setParcels(data);
+    } catch (error) {
+      console.error('Error fetching parcels:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Paiement des colis</CardTitle>
+        <CardDescription>Colis en attente de paiement</CardDescription>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="flex justify-center py-8">
+            <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
+          </div>
+        ) : parcels.length === 0 ? (
+          <div className="text-center py-12">
+            <Package className="h-16 w-16 mx-auto mb-4 opacity-30" />
+            <p className="text-slate-600 mb-4">Aucun colis en attente de paiement</p>
+            <Button variant="outline" onClick={() => push(`/${locale}/dashboard/client?tab=create`)}>
+              Créer un nouveau colis
+            </Button>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {parcels.map((parcel) => (
+              <Card key={parcel.id} className="border-blue-200 bg-blue-50">
+                <CardContent className="pt-4">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground">N° Suivi</p>
+                      <p className="font-mono font-bold">{parcel.trackingNumber}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Format</p>
+                      <p className="font-semibold">{parcel.format}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Itinéraire</p>
+                      <p className="text-sm">
+                        {WILAYAS.find(w => w.id === parcel.villeDepart)?.name} →{' '}
+                        {WILAYAS.find(w => w.id === parcel.villeArrivee)?.name}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Montant</p>
+                      <p className="text-lg font-bold text-green-600">{parcel.prixClient.toFixed(2)} DA</p>
+                    </div>
+                  </div>
+                  <Button
+                    onClick={() => push(`/${locale}/payment/checkout`)}
+                    className="w-full bg-green-600 hover:bg-green-700"
+                  >
+                    <CreditCard className="h-4 w-4 mr-2" />
+                    Payer ce colis
+                  </Button>
+                </CardContent>
+              </Card>
+            ))}
+            <Button
+              onClick={() => push(`/${locale}/payment/checkout`)}
+              className="w-full bg-emerald-600 hover:bg-emerald-700 text-lg py-6"
+            >
+              <CreditCard className="h-4 w-4 mr-2" />
+              Payer tous les colis ({parcels.length})
+            </Button>
           </div>
         )}
       </CardContent>

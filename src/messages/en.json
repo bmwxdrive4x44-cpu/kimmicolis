@@ -338,6 +338,33 @@
       "pending": "Pending validation"
     }
   },
+  "payment": {
+    "checkout_title": "Parcel Payment",
+    "checkout_description": "Finalize your parcel payment",
+    "no_unpaid_parcels": "You have no unpaid parcels",
+    "back_to_dashboard": "Back to Dashboard",
+    "select_parcel": "Select a parcel to pay",
+    "tracking": "Tracking Number",
+    "format": "Format",
+    "route": "Route",
+    "amount": "Amount",
+    "payment_summary": "Payment Summary",
+    "base_price": "Base Price",
+    "fees": "Fees",
+    "total": "Total",
+    "pay_now": "Pay Now",
+    "processing": "Processing...",
+    "initiating_payment": "Initiating Payment",
+    "please_wait": "Please wait, we are initiating your payment...",
+    "processing_payment": "Processing Payment",
+    "processing_message": "Your payment is being processed. This may take a few seconds.",
+    "payment_successful": "Payment Successful!",
+    "transaction_id": "Transaction ID",
+    "payment_complete_message": "Your parcel will soon be handled by a transporter.",
+    "payment_failed": "Payment Failed",
+    "unknown_error": "An unknown error occurred",
+    "try_again": "Try Again"
+  },
   "wilayas": {
     "alger": "Algiers",
     "oran": "Oran",

@@ -338,6 +338,33 @@
       "pending": "Pendiente de validación"
     }
   },
+  "payment": {
+    "checkout_title": "Pago del Paquete",
+    "checkout_description": "Finaliza el pago de tu paquete",
+    "no_unpaid_parcels": "No tienes paquetes pendientes de pago",
+    "back_to_dashboard": "Volver al Panel de Control",
+    "select_parcel": "Selecciona un paquete para pagar",
+    "tracking": "Número de Seguimiento",
+    "format": "Formato",
+    "route": "Ruta",
+    "amount": "Cantidad",
+    "payment_summary": "Resumen de Pago",
+    "base_price": "Precio Base",
+    "fees": "Cuotas",
+    "total": "Total",
+    "pay_now": "Pagar Ahora",
+    "processing": "Procesando...",
+    "initiating_payment": "Iniciando Pago",
+    "please_wait": "Por favor espera, estamos iniciando tu pago...",
+    "processing_payment": "Procesando Pago",
+    "processing_message": "Tu pago está siendo procesado. Esto puede tomar algunos segundos.",
+    "payment_successful": "¡Pago Exitoso!",
+    "transaction_id": "ID de Transacción",
+    "payment_complete_message": "Tu paquete será manejado pronto por un transportista.",
+    "payment_failed": "Pago Fallido",
+    "unknown_error": "Ocurrió un error desconocido",
+    "try_again": "Intentar de Nuevo"
+  },
   "wilayas": {
     "alger": "Argel",
     "oran": "Orán",

@@ -338,6 +338,33 @@
       "pending": "في انتظار التحقق"
     }
   },
+  "payment": {
+    "checkout_title": "دفع الطرد",
+    "checkout_description": "أتمم دفع طردك",
+    "no_unpaid_parcels": "ليس لديك طرود في انتظار الدفع",
+    "back_to_dashboard": "العودة إلى لوحة التحكم",
+    "select_parcel": "اختر طرداً للدفع",
+    "tracking": "رقم التتبع",
+    "format": "الصيغة",
+    "route": "الطريق",
+    "amount": "المبلغ",
+    "payment_summary": "ملخص الدفع",
+    "base_price": "السعر الأساسي",
+    "fees": "الرسوم",
+    "total": "الإجمالي",
+    "pay_now": "ادفع الآن",
+    "processing": "جاري المعالجة...",
+    "initiating_payment": "بدء الدفع",
+    "please_wait": "يرجى الانتظار، نحن نبدأ عملية الدفع...",
+    "processing_payment": "معالجة الدفع",
+    "processing_message": "يتم معالجة دفعتك. قد يستغرق هذا بضع ثوانٍ.",
+    "payment_successful": "تم الدفع بنجاح!",
+    "transaction_id": "معرف المعاملة",
+    "payment_complete_message": "سيتم التعامل مع طردك قريباً من قبل ناقل.",
+    "payment_failed": "فشل الدفع",
+    "unknown_error": "حدث خطأ غير معروف",
+    "try_again": "حاول مجدداً"
+  },
   "wilayas": {
     "alger": "الجزائر",
     "oran": "وهران",
