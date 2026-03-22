@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { useSession, signIn } from 'next-auth/react';
 import { useTranslations, useLocale } from 'next-intl';
 import { Link } from '@/i18n/routing';
@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
 import { WILAYAS } from '@/lib/constants';
-import { Store, MapPin, Camera, CheckCircle, Loader2, User, Mail, Lock, Phone } from 'lucide-react';
+import { Store, MapPin, Camera, CheckCircle, Loader2, User, Mail, Lock, Phone, X, ImagePlus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 export default function BecomeRelayPage() {
@@ -37,6 +37,61 @@ export default function BecomeRelayPage() {
     ville: '',
     phone: '',
   });
+  const [photos, setPhotos] = useState<string[]>([]);
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const MAX_PHOTOS = 5;
+
+  const readFileAsBase64 = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+      if (!file.type.startsWith('image/')) {
+        reject(new Error('Seules les images sont acceptées'));
+        return;
+      }
+      if (file.size > 2 * 1024 * 1024) {
+        reject(new Error(`${file.name} dépasse 2 Mo`));
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = () => reject(new Error('Erreur de lecture'));
+      reader.readAsDataURL(file);
+    });
+
+  const addFiles = useCallback(async (files: FileList | File[]) => {
+    const remaining = MAX_PHOTOS - photos.length;
+    if (remaining <= 0) {
+      toast({ title: 'Limite atteinte', description: `Maximum ${MAX_PHOTOS} photos`, variant: 'destructive' });
+      return;
+    }
+    const toProcess = Array.from(files).slice(0, remaining);
+    const results: string[] = [];
+    for (const file of toProcess) {
+      try {
+        const base64 = await readFileAsBase64(file);
+        results.push(base64);
+      } catch (err) {
+        toast({ title: 'Erreur', description: err instanceof Error ? err.message : 'Fichier invalide', variant: 'destructive' });
+      }
+    }
+    if (results.length) setPhotos(prev => [...prev, ...results]);
+  }, [photos.length, toast]);
+
+  const removePhoto = (index: number) => {
+    setPhotos(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+  const handleDragLeave = () => setIsDragging(false);
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    if (e.dataTransfer.files?.length) addFiles(e.dataTransfer.files);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -86,6 +141,7 @@ export default function BecomeRelayPage() {
           commerceName: formData.commerceName,
           address: formData.address,
           ville: formData.ville,
+          photos: photos.length ? photos : undefined,
         }),
       });
 
@@ -364,11 +420,62 @@ export default function BecomeRelayPage() {
 
               <div className="space-y-2">
                 <Label>{t('photos')}</Label>
-                <div className="border-2 border-dashed rounded-lg p-8 text-center">
-                  <Camera className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                  <p className="text-sm text-muted-foreground">Glissez vos photos ici ou cliquez pour télécharger</p>
-                  <p className="text-xs text-muted-foreground mt-1">(Optionnel - Max 5 photos)</p>
+
+                {/* Drop zone */}
+                <div
+                  onClick={() => photos.length < MAX_PHOTOS && fileInputRef.current?.click()}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                  className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
+                    isDragging
+                      ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950'
+                      : photos.length < MAX_PHOTOS
+                      ? 'border-slate-300 hover:border-emerald-400 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer'
+                      : 'border-slate-200 opacity-50 cursor-not-allowed'
+                  }`}
+                >
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="hidden"
+                    onChange={(e) => e.target.files && addFiles(e.target.files)}
+                  />
+                  <ImagePlus className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                  <p className="text-sm text-muted-foreground">
+                    {photos.length < MAX_PHOTOS
+                      ? 'Glissez vos photos ici ou cliquez pour sélectionner'
+                      : 'Nombre maximum de photos atteint'}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Optionnel · {photos.length}/{MAX_PHOTOS} photos · JPG, PNG · Max 2 Mo/photo
+                  </p>
                 </div>
+
+                {/* Previews */}
+                {photos.length > 0 && (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-3">
+                    {photos.map((src, i) => (
+                      <div key={i} className="relative group rounded-lg overflow-hidden border aspect-square">
+                        <img
+                          src={src}
+                          alt={`Photo ${i + 1}`}
+                          className="w-full h-full object-cover"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removePhoto(i)}
+                          className="absolute top-1 right-1 bg-black/60 hover:bg-black/80 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                          aria-label="Supprimer"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-4">
