@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { requireRole } from '@/lib/rbac';
 
-// GET all lignes
+// GET all lignes (PUBLIC)
 export async function GET() {
   try {
     const lignes = await db.ligne.findMany({
@@ -14,8 +15,11 @@ export async function GET() {
   }
 }
 
-// POST create ligne
+// POST create ligne (ADMIN ONLY)
 export async function POST(request: NextRequest) {
+  const auth = await requireRole(request, ['ADMIN']);
+  if (!auth.success) return auth.response;
+
   try {
     const body = await request.json();
     const { villeDepart, villeArrivee, tarifPetit, tarifMoyen, tarifGros } = body;
@@ -37,8 +41,11 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// PUT update ligne
+// PUT update ligne (ADMIN ONLY)
 export async function PUT(request: NextRequest) {
+  const auth = await requireRole(request, ['ADMIN']);
+  if (!auth.success) return auth.response;
+
   try {
     const body = await request.json();
     const { id, tarifPetit, tarifMoyen, tarifGros, isActive } = body;

@@ -64,6 +64,9 @@ export const PARCEL_STATUS = [
   { id: 'EN_TRANSPORT', label: 'En transport', labelEn: 'In Transit', labelAr: 'قيد النقل', color: 'bg-orange-500' },
   { id: 'ARRIVE_RELAIS_DESTINATION', label: 'Arrivé au relais', labelEn: 'Arrived at Relay', labelAr: 'وصل لنقطة التوصيل', color: 'bg-teal-500' },
   { id: 'LIVRE', label: 'Livré', labelEn: 'Delivered', labelAr: 'تم التوصيل', color: 'bg-emerald-600' },
+  { id: 'ANNULE', label: 'Annulé', labelEn: 'Cancelled', labelAr: 'ملغى', color: 'bg-red-500' },
+  { id: 'RETOUR', label: 'Retour', labelEn: 'Return', labelAr: 'عودة', color: 'bg-pink-500' },
+  { id: 'EN_DISPUTE', label: 'En litige', labelEn: 'In Dispute', labelAr: 'في نزاع', color: 'bg-red-600' },
 ];
 
 export const TRAJET_STATUS = [

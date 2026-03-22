@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { hashPassword } from '@/lib/auth';
+import { requireRole } from '@/lib/rbac';
 
-// GET all users
-export async function GET() {
+// GET all users (ADMIN ONLY)
+export async function GET(request: NextRequest) {
+  const auth = await requireRole(request, ['ADMIN']);
+  if (!auth.success) return auth.response;
+
   try {
     const users = await db.user.findMany({
       select: {

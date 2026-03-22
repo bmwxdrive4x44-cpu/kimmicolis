@@ -103,7 +103,7 @@ model Colis {
   commissionPlateforme Float
   commissionRelais Float
   netTransporteur Float
-  status          String   @default("CREATED") // CREATED, PAID, RECU_RELAIS, EN_TRANSPORT, ARRIVE_RELAIS_DESTINATION, LIVRE
+  status          String   @default("CREATED") // CREATED, PAID, RECU_RELAIS, EN_TRANSPORT, ARRIVE_RELAIS_DESTINATION, LIVRE, ANNULE, RETOUR, EN_DISPUTE
   qrCode          String   // QR code data
   qrCodeImage     String?  // QR code image URL
   dateCreation    DateTime @default(now())

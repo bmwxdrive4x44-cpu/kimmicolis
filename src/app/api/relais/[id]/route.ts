@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { requireRole, hasAccess, verifyJWT } from '@/lib/rbac';
 
-// GET single relais
+// GET single relais (PUBLIC)
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -27,13 +28,15 @@ export async function GET(
   }
 }
 
-// PUT update relais (status, commissions, or info)
+// PUT update relais - ADMIN for status, SELF for info (ADMIN ONLY for status)
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const { payload } = await verifyJWT(request);
+  const { id } = await params;
+
   try {
-    const { id } = await params;
     const body = await request.json();
     
     // Extract all possible fields
@@ -49,6 +52,13 @@ export async function PUT(
       longitude,
       photos,
     } = body;
+
+    // STATUS CHANGE REQUIRES ADMIN
+    if (status !== undefined && !payload?.role.includes('ADMIN')) {
+      return NextResponse.json({
+        error: 'Forbidden: only admins can change relay status',
+      }, { status: 403 });
+    }
 
     // Build data object with only provided fields
     const data: any = {};

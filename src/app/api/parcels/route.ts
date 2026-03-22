@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { generateTrackingNumber, generateQRData, PLATFORM_COMMISSION, DEFAULT_RELAY_COMMISSION } from '@/lib/constants';
+import { checkRateLimit, RATE_LIMIT_PRESETS } from '@/lib/ratelimit';
+import { verifyJWT } from '@/lib/rbac';
 
 // GET all parcels
 export async function GET(request: NextRequest) {
@@ -53,6 +55,29 @@ export async function GET(request: NextRequest) {
 
 // POST create parcel
 export async function POST(request: NextRequest) {
+  // Rate limit: 30 requests per minute per user
+  const { payload } = await verifyJWT(request);
+  const rateLimitResult = await checkRateLimit(
+    request,
+    RATE_LIMIT_PRESETS.moderate,
+    payload?.id
+  );
+
+  if (rateLimitResult.limited) {
+    return NextResponse.json(
+      {
+        error: 'Too many requests. Please slow down.',
+        retryAfter: rateLimitResult.retryAfter,
+      },
+      {
+        status: 429,
+        headers: {
+          'Retry-After': String(rateLimitResult.retryAfter),
+        },
+      }
+    );
+  }
+
   try {
     const body = await request.json();
     const {

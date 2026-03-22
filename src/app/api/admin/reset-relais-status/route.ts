@@ -1,8 +1,12 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { requireRole } from '@/lib/rbac';
 
-// Reset all relais to PENDING status (except if you want to keep some approved)
-export async function GET() {
+// Reset all relais to PENDING status - ADMIN ONLY
+export async function GET(request: NextRequest) {
+  const auth = await requireRole(request, ['ADMIN']);
+  if (!auth.success) return auth.response;
+
   try {
     // Update all relais to PENDING status
     const result = await db.$executeRawUnsafe(`
