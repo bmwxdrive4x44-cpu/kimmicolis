@@ -56,7 +56,7 @@ export function Footer() {
                 </Link>
               </li>
               <li>
-                <Link href="/auth/register" className="text-sm text-slate-400 hover:text-emerald-400 transition-colors flex items-center gap-2">
+                <Link href="/dashboard/client" className="text-sm text-slate-400 hover:text-emerald-400 transition-colors flex items-center gap-2">
                   <div className="w-1.5 h-1.5 rounded-full bg-emerald-500/50" />
                   {t('nav.createParcel')}
                 </Link>
@@ -68,7 +68,7 @@ export function Footer() {
                 </Link>
               </li>
               <li>
-                <Link href="/auth/register" className="text-sm text-slate-400 hover:text-emerald-400 transition-colors flex items-center gap-2">
+                <Link href="/become-transporter" className="text-sm text-slate-400 hover:text-emerald-400 transition-colors flex items-center gap-2">
                   <div className="w-1.5 h-1.5 rounded-full bg-emerald-500/50" />
                   {t('nav.becomeTransporter')}
                 </Link>
