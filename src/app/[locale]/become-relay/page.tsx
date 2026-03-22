@@ -1,768 +1,148 @@
-'use client';
+﻿'use client';
 
-import { useState, useRef, useCallback } from 'react';
-import { useSession, signIn } from 'next-auth/react';
-import { useTranslations, useLocale } from 'next-intl';
+import { useRouter } from 'next/navigation';
+import { useLocale } from 'next-intl';
 import { Link } from '@/i18n/routing';
 import { Header } from '@/components/layout/header';
 import { Footer } from '@/components/layout/footer';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
-import { Separator } from '@/components/ui/separator';
-import { WILAYAS } from '@/lib/constants';
-import { Store, MapPin, Camera, CheckCircle, Loader2, User, Mail, Lock, Phone, X, ImagePlus } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { Store, CheckCircle, Clock, Users, TrendingUp, ArrowRight } from 'lucide-react';
 
-export default function BecomeRelayPage() {
-  const { data: session } = useSession();
-  const locale = useLocale();
-  const t = useTranslations('relais.register');
-  const { toast } = useToast();
-  const [isLoading, setIsLoading] = useState(false);
-  const [success, setSuccess] = useState(false);
-  const [accountData, setAccountData] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    password: '',
-    confirmPassword: '',
-  });
-  const [formData, setFormData] = useState({
-    commerceName: '',
-    address: '',
-    ville: '',
-    phone: '',
-  });
-  const [photos, setPhotos] = useState<string[]>([]);
-  const [isDragging, setIsDragging] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const MAX_PHOTOS = 5;
-
-  const readFileAsBase64 = (file: File): Promise<string> =>
-    new Promise((resolve, reject) => {
-      if (!file.type.startsWith('image/')) {
-        reject(new Error('Seules les images sont acceptées'));
-        return;
-      }
-      if (file.size > 2 * 1024 * 1024) {
-        reject(new Error(`${file.name} dépasse 2 Mo`));
-        return;
-      }
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = () => reject(new Error('Erreur de lecture'));
-      reader.readAsDataURL(file);
-    });
-
-  const addFiles = useCallback(async (files: FileList | File[]) => {
-    const remaining = MAX_PHOTOS - photos.length;
-    if (remaining <= 0) {
-      toast({ title: 'Limite atteinte', description: `Maximum ${MAX_PHOTOS} photos`, variant: 'destructive' });
-      return;
-    }
-    const toProcess = Array.from(files).slice(0, remaining);
-    const results: string[] = [];
-    for (const file of toProcess) {
-      try {
-        const base64 = await readFileAsBase64(file);
-        results.push(base64);
-      } catch (err) {
-        toast({ title: 'Erreur', description: err instanceof Error ? err.message : 'Fichier invalide', variant: 'destructive' });
-      }
-    }
-    if (results.length) setPhotos(prev => [...prev, ...results]);
-  }, [photos.length, toast]);
-
-  const removePhoto = (index: number) => {
-    setPhotos(prev => prev.filter((_, i) => i !== index));
-  };
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
-  };
-  const handleDragLeave = () => setIsDragging(false);
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-    if (e.dataTransfer.files?.length) addFiles(e.dataTransfer.files);
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-
-    try {
-      let userId = session?.user?.id;
-
-      // If not logged in, create account first
-      if (!userId) {
-        if (accountData.password !== accountData.confirmPassword) {
-          toast({ title: 'Erreur', description: 'Les mots de passe ne correspondent pas', variant: 'destructive' });
-          return;
-        }
-        if (accountData.password.length < 6) {
-          toast({ title: 'Erreur', description: 'Le mot de passe doit contenir au moins 6 caractères', variant: 'destructive' });
-          return;
-        }
-
-        // Create account with RELAIS role
-        const registerRes = await fetch('/api/users', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: accountData.name,
-            email: accountData.email,
-            phone: accountData.phone || formData.phone,
-            password: accountData.password,
-            role: 'RELAIS',
-          }),
-        });
-
-        const registerData = await registerRes.json();
-        if (!registerRes.ok) {
-          toast({ title: 'Erreur', description: registerData.details || registerData.error || 'Erreur lors de la création du compte', variant: 'destructive' });
-          return;
-        }
-        userId = registerData.id;
-      }
-
-      // Submit relais application
-      const relaisRes = await fetch('/api/relais', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId,
-          commerceName: formData.commerceName,
-          address: formData.address,
-          ville: formData.ville,
-          photos: photos.length ? photos : undefined,
-        }),
-      });
-
-      if (!relaisRes.ok) {
-        const data = await relaisRes.json();
-        throw new Error(data.error || 'Erreur lors de la soumission');
-      }
-
-      // Auto-connect the new account if it was just created
-      if (!session?.user?.id) {
-        await signIn('credentials', {
-          email: accountData.email,
-          password: accountData.password,
-          redirect: false,
-        });
-      }
-
-      setSuccess(true);
-    } catch (err) {
-      toast({
-        title: 'Erreur',
-        description: err instanceof Error ? err.message : 'Impossible de soumettre la demande',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  if (success) {
-    return (
-      <div className="min-h-screen flex flex-col">
-        <Header />
-        <main className="flex-1 container px-4 py-16">
-          <Card className="max-w-lg mx-auto text-center">
-            <CardContent className="pt-8">
-              <div className="w-20 h-20 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-6">
-                <CheckCircle className="h-10 w-10 text-emerald-600" />
-              </div>
-              <h2 className="text-2xl font-bold mb-2">{t('success')}</h2>
-              <p className="text-muted-foreground mb-6">
-                {t('pending')}. Notre équipe examinera votre demande et vous contactera sous 48h.
-              </p>
-              <Link href="/">
-                <Button className="bg-emerald-600 hover:bg-emerald-700">
-                  Retour à l'accueil
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
-        </main>
-        <Footer />
-      </div>
-    );
+const BENEFITS = [
+  {
+    icon: Users,
+    title: 'Clients de qualitÃ©',
+    description: 'AccÃ©dez Ã  un rÃ©seau de clients vÃ©rifiÃ©s cherchant des solutions fiables'
+  },
+  {
+    icon: TrendingUp,
+    title: 'Revenus supplÃ©mentaires',
+    description: 'Gagnez et dÃ©veloppez votre activitÃ© grÃ¢ce aux services de colis'
+  },
+  {
+    icon: Clock,
+    title: 'FlexibilitÃ©',
+    description: 'GÃ©rez vos horaires et commandes en fonction de votre disponibilitÃ©'
+  },
+  {
+    icon: CheckCircle,
+    title: 'Support 24/7',
+    description: 'Une Ã©quipe dÃ©diÃ©e pour vous accompagner Ã  chaque Ã©tape'
   }
-
-  return (
-    <div className="min-h-screen flex flex-col">
-      <Header />
-      <main className="flex-1 container px-4 py-8">
-        {/* Hero */}
-        <div className="text-center mb-12">
-          <Store className="h-16 w-16 text-emerald-600 mx-auto mb-4" />
-          <h1 className="text-3xl font-bold mb-2">{t('title')}</h1>
-          <p className="text-muted-foreground max-w-2xl mx-auto">
-            {t('subtitle')}. Générez des revenus complémentaires en devenant point de dépôt et de retrait.
-          </p>
-        </div>
-
-        {/* Benefits */}
-        <div className="grid gap-6 md:grid-cols-3 max-w-4xl mx-auto mb-12">
-          <Card>
-            <CardContent className="pt-6 text-center">
-              <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-4">
-                <MapPin className="h-6 w-6 text-emerald-600" />
-              </div>
-              <h3 className="font-semibold mb-2">Visibilité</h3>
-              <p className="text-sm text-muted-foreground">Votre commerce apparaît sur notre carte interactive</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6 text-center">
-              <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center mx-auto mb-4">
-                <Store className="h-6 w-6 text-blue-600" />
-              </div>
-              <h3 className="font-semibold mb-2">Revenus</h3>
-              <p className="text-sm text-muted-foreground">Gagnez des commissions sur chaque colis traité</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6 text-center">
-              <div className="w-12 h-12 rounded-full bg-purple-100 flex items-center justify-center mx-auto mb-4">
-                <CheckCircle className="h-6 w-6 text-purple-600" />
-              </div>
-              <h3 className="font-semibold mb-2">Simplicité</h3>
-              <p className="text-sm text-muted-foreground">Scannez simplement les QR codes pour gérer les colis</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Form */}
-        <Card className="max-w-2xl mx-auto">
-          <CardHeader>
-            <CardTitle>Formulaire d'inscription</CardTitle>
-            <CardDescription>
-              {session?.user
-                ? `Connecté en tant que ${session.user.name} — remplissez les infos de votre point relais`
-                : 'Créez votre compte et soumettez votre demande en une seule étape'}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-6">
-
-              {/* Account section — only for non-logged-in users */}
-              {!session?.user && (
-                <>
-                  <div className="space-y-1">
-                    <h3 className="font-semibold text-sm uppercase tracking-wide text-muted-foreground flex items-center gap-2">
-                      <User className="h-4 w-4" /> Créer votre compte
-                    </h3>
-                    <p className="text-xs text-muted-foreground">
-                      Déjà inscrit ?{' '}
-                      <Link href={`/${locale}/auth/login`} className="text-emerald-600 underline hover:no-underline">
-                        Connectez-vous
-                      </Link>
-                    </p>
-                  </div>
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label htmlFor="name">Nom complet</Label>
-                      <div className="relative">
-                        <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          id="name"
-                          placeholder="Votre nom complet"
-                          value={accountData.name}
-                          onChange={(e) => setAccountData({ ...accountData, name: e.target.value })}
-                          className="pl-10"
-                          required
-                        />
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="account-phone">Téléphone</Label>
-                      <div className="relative">
-                        <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          id="account-phone"
-                          type="tel"
-                          placeholder="+213 XX XX XX XX"
-                          value={accountData.phone}
-                          onChange={(e) => setAccountData({ ...accountData, phone: e.target.value })}
-                          className="pl-10"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Email</Label>
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="email"
-                        type="email"
-                        placeholder="email@exemple.com"
-                        value={accountData.email}
-                        onChange={(e) => setAccountData({ ...accountData, email: e.target.value })}
-                        className="pl-10"
-                        required
-                      />
-                    </div>
-                  </div>
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label htmlFor="password">Mot de passe</Label>
-                      <div className="relative">
-                        <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          id="password"
-                          type="password"
-                          placeholder="••••••••"
-                          value={accountData.password}
-                          onChange={(e) => setAccountData({ ...accountData, password: e.target.value })}
-                          className="pl-10"
-                          required
-                          minLength={6}
-                        />
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="confirmPassword">Confirmer</Label>
-                      <div className="relative">
-                        <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          id="confirmPassword"
-                          type="password"
-                          placeholder="••••••••"
-                          value={accountData.confirmPassword}
-                          onChange={(e) => setAccountData({ ...accountData, confirmPassword: e.target.value })}
-                          className="pl-10"
-                          required
-                          minLength={6}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                  <Separator />
-                  <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-2">
-                    <Store className="h-4 w-4" /> Informations du point relais
-                  </p>
-                </>
-              )}
-
-              {/* Relay info */}
-              <div className="space-y-2">
-                <Label htmlFor="commerceName">{t('commerceName')}</Label>
-                <div className="relative">
-                  <Store className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="commerceName"
-                    placeholder="Ex: Épicerie du Centre"
-                    value={formData.commerceName}
-                    onChange={(e) => setFormData({ ...formData, commerceName: e.target.value })}
-                    className="pl-10"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="address">{t('address')}</Label>
-                <Textarea
-                  id="address"
-                  placeholder="Ex: 123 Rue Didouche Mourad, Alger Centre"
-                  value={formData.address}
-                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                  required
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>{t('city')}</Label>
-                <Select
-                  value={formData.ville}
-                  onValueChange={(value) => setFormData({ ...formData, ville: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Sélectionnez votre ville" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {WILAYAS.map((w) => (
-                      <SelectItem key={w.id} value={w.id}>
-                        {w.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {session?.user && (
-                <div className="space-y-2">
-                  <Label htmlFor="relay-phone">Téléphone professionnel</Label>
-                  <div className="relative">
-                    <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="relay-phone"
-                      type="tel"
-                      placeholder="+213 XX XX XX XX"
-                      value={formData.phone}
-                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                      className="pl-10"
-                    />
-                  </div>
-                </div>
-              )}
-
-              <div className="space-y-2">
-                <Label>{t('photos')}</Label>
-
-                {/* Drop zone */}
-                <div
-                  onClick={() => photos.length < MAX_PHOTOS && fileInputRef.current?.click()}
-                  onDragOver={handleDragOver}
-                  onDragLeave={handleDragLeave}
-                  onDrop={handleDrop}
-                  className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
-                    isDragging
-                      ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950'
-                      : photos.length < MAX_PHOTOS
-                      ? 'border-slate-300 hover:border-emerald-400 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer'
-                      : 'border-slate-200 opacity-50 cursor-not-allowed'
-                  }`}
-                >
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    className="hidden"
-                    onChange={(e) => e.target.files && addFiles(e.target.files)}
-                  />
-                  <ImagePlus className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                  <p className="text-sm text-muted-foreground">
-                    {photos.length < MAX_PHOTOS
-                      ? 'Glissez vos photos ici ou cliquez pour sélectionner'
-                      : 'Nombre maximum de photos atteint'}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Optionnel · {photos.length}/{MAX_PHOTOS} photos · JPG, PNG · Max 2 Mo/photo
-                  </p>
-                </div>
-
-                {/* Previews */}
-                {photos.length > 0 && (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-3">
-                    {photos.map((src, i) => (
-                      <div key={i} className="relative group rounded-lg overflow-hidden border aspect-square">
-                        <img
-                          src={src}
-                          alt={`Photo ${i + 1}`}
-                          className="w-full h-full object-cover"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => removePhoto(i)}
-                          className="absolute top-1 right-1 bg-black/60 hover:bg-black/80 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
-                          aria-label="Supprimer"
-                        >
-                          <X className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-4">
-                <h4 className="font-semibold mb-2">Conditions</h4>
-                <ul className="text-sm text-muted-foreground space-y-1">
-                  <li>• Être un commerce de proximité (épicerie, pharmacie, bureau de tabac, etc.)</li>
-                  <li>• Avoir des horaires d'ouverture réguliers</li>
-                  <li>• Disposer d'un espace de stockage sécurisé</li>
-                  <li>• Accepter les conditions d'utilisation de SwiftColis</li>
-                </ul>
-              </div>
-
-              <Button
-                type="submit"
-                className="w-full bg-emerald-600 hover:bg-emerald-700"
-                disabled={isLoading || !formData.ville}
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    Soumission en cours...
-                  </>
-                ) : (
-                  t('submit')
-                )}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-      </main>
-      <Footer />
-    </div>
-  );
-}
-
+];
 
 export default function BecomeRelayPage() {
-  const { data: session } = useSession();
-  const t = useTranslations('relais.register');
-  const { toast } = useToast();
   const router = useRouter();
-  const [isLoading, setIsLoading] = useState(false);
-  const [success, setSuccess] = useState(false);
-  const [formData, setFormData] = useState({
-    commerceName: '',
-    address: '',
-    ville: '',
-    phone: '',
-    description: '',
-  });
+  const locale = useLocale();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-
-    try {
-      // If not logged in, create user first
-      let userId = session?.user?.id;
-      
-      if (!userId) {
-        // This would typically redirect to registration
-        toast({
-          title: 'Connexion requise',
-          description: 'Veuillez vous connecter ou créer un compte pour devenir relais',
-        });
-        router.push('/auth/register');
-        return;
-      }
-
-      // Create relais registration
-      const response = await fetch('/api/relais', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId,
-          commerceName: formData.commerceName,
-          address: formData.address,
-          ville: formData.ville,
-        }),
-      });
-
-      if (response.ok) {
-        setSuccess(true);
-        toast({
-          title: t('success'),
-          description: 'Votre demande sera examinée par notre équipe',
-        });
-      } else {
-        throw new Error('Failed to submit');
-      }
-    } catch {
-      toast({
-        title: 'Erreur',
-        description: 'Impossible de soumettre la demande',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsLoading(false);
-    }
+  const handleSignUp = () => {
+    router.push(`/${locale}/auth/register?role=RELAIS`);
   };
 
-  if (success) {
-    return (
-      <div className="min-h-screen flex flex-col">
-        <Header />
-        <main className="flex-1 container px-4 py-16">
-          <Card className="max-w-lg mx-auto text-center">
-            <CardContent className="pt-8">
-              <div className="w-20 h-20 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-6">
-                <CheckCircle className="h-10 w-10 text-emerald-600" />
-              </div>
-              <h2 className="text-2xl font-bold mb-2">{t('success')}</h2>
-              <p className="text-muted-foreground mb-6">
-                {t('pending')}. Notre équipe examinera votre demande et vous contactera sous 48h.
-              </p>
-              <Link href="/">
-                <Button className="bg-emerald-600 hover:bg-emerald-700">
-                  Retour à l'accueil
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
-        </main>
-        <Footer />
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="flex flex-col min-h-screen">
       <Header />
-      <main className="flex-1 container px-4 py-8">
-        {/* Hero */}
-        <div className="text-center mb-12">
-          <Store className="h-16 w-16 text-emerald-600 mx-auto mb-4" />
-          <h1 className="text-3xl font-bold mb-2">{t('title')}</h1>
-          <p className="text-muted-foreground max-w-2xl mx-auto">
-            {t('subtitle')}. Générez des revenus complémentaires en devenant point de dépôt et de retrait.
-          </p>
-        </div>
+      <main className="flex-1">
+        {/* Hero Section */}
+        <section className="relative py-12 md:py-20 bg-gradient-to-br from-emerald-50 via-white to-teal-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-800">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="grid md:grid-cols-2 gap-8 md:gap-12 items-center">
+              <div className="space-y-6">
+                <div>
+                  <h1 className="text-4xl md:text-5xl font-bold text-gray-900 dark:text-white mb-4">
+                    Devenez Point Relais
+                  </h1>
+                  <p className="text-xl text-gray-600 dark:text-gray-300">
+                    Proposez les services de SwiftColis Ã  vos clients et augmentez votre chiffre d'affaires
+                  </p>
+                </div>
 
-        {/* Benefits */}
-        <div className="grid gap-6 md:grid-cols-3 max-w-4xl mx-auto mb-12">
-          <Card>
-            <CardContent className="pt-6 text-center">
-              <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-4">
-                <MapPin className="h-6 w-6 text-emerald-600" />
-              </div>
-              <h3 className="font-semibold mb-2">Visibilité</h3>
-              <p className="text-sm text-muted-foreground">
-                Votre commerce apparaît sur notre carte interactive
-              </p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6 text-center">
-              <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center mx-auto mb-4">
-                <Store className="h-6 w-6 text-blue-600" />
-              </div>
-              <h3 className="font-semibold mb-2">Revenus</h3>
-              <p className="text-sm text-muted-foreground">
-                Gagnez des commissions sur chaque colis traité
-              </p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6 text-center">
-              <div className="w-12 h-12 rounded-full bg-purple-100 flex items-center justify-center mx-auto mb-4">
-                <CheckCircle className="h-6 w-6 text-purple-600" />
-              </div>
-              <h3 className="font-semibold mb-2">Simplicité</h3>
-              <p className="text-sm text-muted-foreground">
-                Scannez simplement les QR codes pour gérer les colis
-              </p>
-            </CardContent>
-          </Card>
-        </div>
+                <div className="flex flex-col sm:flex-row gap-4">
+                  <Button
+                    onClick={handleSignUp}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-6 text-lg flex items-center gap-2"
+                  >
+                    Rejoindre maintenant
+                    <ArrowRight className="h-5 w-5" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="px-8 py-6 text-lg"
+                  >
+                    En savoir plus
+                  </Button>
+                </div>
 
-        {/* Form */}
-        <Card className="max-w-2xl mx-auto">
-          <CardHeader>
-            <CardTitle>Formulaire d'inscription</CardTitle>
-            <CardDescription>
-              Remplissez ce formulaire pour soumettre votre demande
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="commerceName">{t('commerceName')}</Label>
-                <div className="relative">
-                  <Store className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="commerceName"
-                    placeholder="Ex: Épicerie du Centre"
-                    value={formData.commerceName}
-                    onChange={(e) => setFormData({ ...formData, commerceName: e.target.value })}
-                    className="pl-10"
-                    required
-                  />
+                <div className="space-y-2 text-sm text-gray-600 dark:text-gray-400">
+                  <p>âœ“ Inscription gratuite et rapide</p>
+                  <p>âœ“ Aucun engagement minimum</p>
+                  <p>âœ“ Commencez Ã  hÃ©berger immÃ©diatement</p>
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="address">{t('address')}</Label>
-                <Textarea
-                  id="address"
-                  placeholder="Ex: 123 Rue Didouche Mourad, Alger Centre"
-                  value={formData.address}
-                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                  required
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>{t('city')}</Label>
-                <Select
-                  value={formData.ville}
-                  onValueChange={(value) => setFormData({ ...formData, ville: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Sélectionnez votre ville" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {WILAYAS.map((w) => (
-                      <SelectItem key={w.id} value={w.id}>
-                        {w.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="phone">Téléphone professionnel</Label>
-                <Input
-                  id="phone"
-                  type="tel"
-                  placeholder="+213 XX XX XX XX"
-                  value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  required
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>{t('photos')}</Label>
-                <div className="border-2 border-dashed rounded-lg p-8 text-center">
-                  <Camera className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                  <p className="text-sm text-muted-foreground">
-                    Glissez vos photos ici ou cliquez pour télécharger
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    (Optionnel - Max 5 photos)
-                  </p>
+              <div className="relative">
+                <div className="bg-gradient-to-br from-emerald-100 to-teal-100 dark:from-emerald-900/30 dark:to-teal-900/30 rounded-2xl p-12 flex items-center justify-center min-h-96">
+                  <Store className="h-48 w-48 text-emerald-600/20 dark:text-emerald-400/20" />
                 </div>
               </div>
+            </div>
+          </div>
+        </section>
 
-              <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-4">
-                <h4 className="font-semibold mb-2">Conditions</h4>
-                <ul className="text-sm text-muted-foreground space-y-1">
-                  <li>• Être un commerce de proximité (épicerie, pharmacie, bureau de tabac, etc.)</li>
-                  <li>• Avoir des horaires d'ouverture réguliers</li>
-                  <li>• Disposer d'un espace de stockage sécurisé</li>
-                  <li>• Accepter les conditions d'utilisation de SwiftColis</li>
-                </ul>
-              </div>
+        {/* Benefits Section */}
+        <section className="py-12 md:py-20 bg-white dark:bg-slate-900">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="text-center mb-12">
+              <h2 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-4">
+                Avantages pour vous
+              </h2>
+              <p className="text-xl text-gray-600 dark:text-gray-400">
+                DÃ©couvrez pourquoi rejoindre SwiftColis
+              </p>
+            </div>
 
-              <Button
-                type="submit"
-                className="w-full bg-emerald-600 hover:bg-emerald-700"
-                disabled={isLoading}
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    Soumission en cours...
-                  </>
-                ) : (
-                  t('submit')
-                )}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
+            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {BENEFITS.map((benefit, idx) => {
+                const Icon = benefit.icon;
+                return (
+                  <Card key={idx} className="border-0 shadow-none bg-slate-50 dark:bg-slate-800 hover:shadow-md transition">
+                    <CardContent className="pt-6 space-y-4">
+                      <Icon className="h-10 w-10 text-emerald-600 dark:text-emerald-400" />
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                        {benefit.title}
+                      </h3>
+                      <p className="text-gray-600 dark:text-gray-400">
+                        {benefit.description}
+                      </p>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+
+        {/* CTA Section */}
+        <section className="py-12 md:py-20 bg-gradient-to-r from-emerald-600 to-teal-600 text-white">
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-6">
+            <h2 className="text-3xl md:text-4xl font-bold">
+              PrÃªt Ã  rejoindre la famille SwiftColis ?
+            </h2>
+            <p className="text-xl text-emerald-100">
+              Inscription facile, aucune commission cachÃ©e, support complet
+            </p>
+            <Button
+              onClick={handleSignUp}
+              size="lg"
+              className="bg-white text-emerald-600 hover:bg-gray-100 px-8 py-6 text-lg mt-4"
+            >
+              Commencer gratuitement
+              <ArrowRight className="ml-2 h-5 w-5" />
+            </Button>
+          </div>
+        </section>
       </main>
       <Footer />
     </div>
   );
-}

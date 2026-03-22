@@ -2,83 +2,155 @@
 
 import { useState } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { signIn, signOut } from 'next-auth/react';
 import { Link } from '@/i18n/routing';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Package, Loader2, Mail, Lock, User, Phone, Building } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Separator } from '@/components/ui/separator';
+import { Package, Loader2, Mail, Lock, User, Phone, Store, MapPin, Truck } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { WILAYAS } from '@/lib/constants';
 
 export default function RegisterPage() {
   const t = useTranslations('auth.register');
   const locale = useLocale();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+
+  const roleFromUrl = searchParams.get('role') || 'CLIENT';
+
   const [formData, setFormData] = useState({
+    // Common fields
     name: '',
     email: '',
     phone: '',
     password: '',
     confirmPassword: '',
-    role: 'CLIENT',
-    siret: '',
+    role: roleFromUrl,
+
+    // Transporter fields
+    vehicle: '',
+    license: '',
+    experience: '',
+    regions: [] as string[],
+    description: '',
+
+    // Relais fields
+    commerceName: '',
+    address: '',
+    ville: '',
   });
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
+  const handleRegionChange = (region: string, checked: boolean) => {
+    setFormData(prev => ({
+      ...prev,
+      regions: checked
+        ? [...prev.regions, region]
+        : prev.regions.filter(r => r !== region)
+    }));
+  };
+
+  const validateForm = () => {
+    if (!formData.name || !formData.email || !formData.password) {
+      toast({ title: 'Erreur', description: 'Veuillez remplir tous les champs requis', variant: 'destructive' });
+      return false;
+    }
+
     if (formData.password !== formData.confirmPassword) {
-      toast({
-        title: 'Erreur',
-        description: 'Les mots de passe ne correspondent pas',
-        variant: 'destructive',
-      });
-      return;
+      toast({ title: 'Erreur', description: 'Les mots de passe ne correspondent pas', variant: 'destructive' });
+      return false;
     }
 
     if (formData.password.length < 6) {
-      toast({
-        title: 'Erreur',
-        description: 'Le mot de passe doit contenir au moins 6 caractères',
-        variant: 'destructive',
-      });
-      return;
+      toast({ title: 'Erreur', description: 'Le mot de passe doit contenir au moins 6 caractères', variant: 'destructive' });
+      return false;
     }
+
+    if (formData.role === 'TRANSPORTER' && (!formData.vehicle || !formData.license)) {
+      toast({ title: 'Erreur', description: 'Veuillez remplir le type de véhicule et le numéro de permis', variant: 'destructive' });
+      return false;
+    }
+
+    if (formData.role === 'RELAIS' && (!formData.commerceName || !formData.address || !formData.ville)) {
+      toast({ title: 'Erreur', description: 'Veuillez remplir le nom du commerce, l\'adresse et la ville', variant: 'destructive' });
+      return false;
+    }
+
+    return true;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!validateForm()) return;
 
     setIsLoading(true);
 
     try {
-      // First sign out any existing session
       try {
         await signOut({ redirect: false });
       } catch {
-        // Ignore signOut errors
+        // ignore
       }
-      
-      // Create user via API
-      console.log('[Register] Sending formData:', formData);
+
+      // 1. Create user account
       const response = await fetch('/api/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          name: formData.name,
+          email: formData.email,
+          phone: formData.phone,
+          password: formData.password,
+          role: formData.role,
+        }),
       });
 
       const data = await response.json();
-      console.log('[Register] API response:', { status: response.status, data });
+      if (!response.ok) throw new Error(data.details || data.error || 'Erreur lors de l\'inscription');
 
-      if (!response.ok) {
-        throw new Error(data.details || data.error || 'Erreur lors de l\'inscription');
+      const userId = data.id;
+
+      // 2. Create role-specific application
+      if (formData.role === 'TRANSPORTER') {
+        await fetch('/api/transporters', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId,
+            fullName: formData.name,
+            phone: formData.phone,
+            vehicle: formData.vehicle,
+            license: formData.license,
+            experience: parseInt(formData.experience) || 0,
+            regions: JSON.stringify(formData.regions),
+            description: formData.description,
+          }),
+        });
       }
 
-      // Small delay to ensure signOut is complete
-      await new Promise(resolve => setTimeout(resolve, 500));
+      if (formData.role === 'RELAIS') {
+        await fetch('/api/relais', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId,
+            commerceName: formData.commerceName,
+            address: formData.address,
+            ville: formData.ville,
+            phone: formData.phone,
+          }),
+        });
+      }
 
-      // Auto login after registration
+      // 3. Auto login
       const result = await signIn('credentials', {
         email: formData.email,
         password: formData.password,
@@ -86,26 +158,13 @@ export default function RegisterPage() {
       });
 
       if (result?.ok) {
-        toast({
-          title: 'Compte créé',
-          description: 'Bienvenue sur SwiftColis!',
-        });
-        
-        // Use locale in the path
-        const dashboardPath = `/${locale}/dashboard/${formData.role === 'TRANSPORTER' 
-          ? 'transporter' 
-          : formData.role === 'RELAIS' 
-          ? 'relais' 
-          : 'client'}`;
-        
-        // Force a full page reload to refresh session
+        toast({ title: 'Compte créé', description: 'Bienvenue sur SwiftColis!' });
+        const dashboardPath = `/${locale}/dashboard/${
+          formData.role === 'TRANSPORTER' ? 'transporter' : formData.role === 'RELAIS' ? 'relais' : 'client'
+        }`;
         window.location.href = dashboardPath;
       } else {
-        // Registration succeeded but login failed - redirect to login page
-        toast({
-          title: 'Compte créé',
-          description: 'Vous pouvez maintenant vous connecter',
-        });
+        toast({ title: 'Compte créé', description: 'Vous pouvez maintenant vous connecter' });
         router.push(`/${locale}/auth/login`);
       }
     } catch (error) {
@@ -119,6 +178,7 @@ export default function RegisterPage() {
     }
   };
 
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-slate-50 to-emerald-50 dark:from-slate-900 dark:to-slate-800 p-4 py-8">
       <Link href="/" className="flex items-center gap-2 mb-8">
@@ -128,42 +188,75 @@ export default function RegisterPage() {
         </span>
       </Link>
 
-      <Card className="w-full max-w-md shadow-xl">
+      <Card className="w-full max-w-2xl shadow-xl">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl">{t('title')}</CardTitle>
+          <CardTitle className="text-3xl">{t('title')}</CardTitle>
           <CardDescription>{t('subtitle')}</CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-6">
+            {/* Role Selection */}
             <div className="space-y-2">
-              <Label htmlFor="name">{t('name')}</Label>
-              <div className="relative">
-                <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Input
-                  id="name"
-                  type="text"
-                  placeholder="Jean Dupont"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="pl-10"
-                  required
-                />
-              </div>
+              <Label>{t('role.label')}</Label>
+              <Select value={formData.role} onValueChange={(value) => setFormData({ ...formData, role: value })}>
+                <SelectTrigger className="h-11">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="CLIENT">
+                    <div className="flex items-center gap-2">
+                      <span>📦</span>
+                      <span>{t('role.client')}</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="TRANSPORTER">
+                    <div className="flex items-center gap-2">
+                      <span>🚚</span>
+                      <span>{t('role.transporter')}</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="RELAIS">
+                    <div className="flex items-center gap-2">
+                      <span>🏪</span>
+                      <span>{t('role.relais')}</span>
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="email">{t('email')}</Label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="email@exemple.com"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="pl-10"
-                  required
-                />
+            <Separator />
+
+            {/* Common Fields */}
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="name">{t('name')}</Label>
+                <div className="relative">
+                  <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="name"
+                    placeholder="Votre nom complet"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    className="pl-10"
+                    required
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="email">{t('email')}</Label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="email@exemple.com"
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    className="pl-10"
+                    required
+                  />
+                </div>
               </div>
             </div>
 
@@ -182,85 +275,187 @@ export default function RegisterPage() {
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label>{t('role.label')}</Label>
-              <Select
-                value={formData.role}
-                onValueChange={(value) => setFormData({ ...formData, role: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="CLIENT">{t('role.client')}</SelectItem>
-                  <SelectItem value="TRANSPORTER">{t('role.transporter')}</SelectItem>
-                  <SelectItem value="RELAIS">{t('role.relais')}</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {formData.role === 'TRANSPORTER' && (
+            <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="siret">{t('siret')}</Label>
+                <Label htmlFor="password">{t('password')}</Label>
                 <div className="relative">
-                  <Building className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                   <Input
-                    id="siret"
-                    type="text"
-                    placeholder="XXX XXX XXX XXXXX"
-                    value={formData.siret}
-                    onChange={(e) => setFormData({ ...formData, siret: e.target.value })}
+                    id="password"
+                    type="password"
+                    placeholder="••••••••"
+                    value={formData.password}
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                     className="pl-10"
+                    required
                   />
                 </div>
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="confirmPassword">{t('confirmPassword')}</Label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="confirmPassword"
+                    type="password"
+                    placeholder="••••••••"
+                    value={formData.confirmPassword}
+                    onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+                    className="pl-10"
+                    required
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Transporter Fields */}
+            {formData.role === 'TRANSPORTER' && (
+              <>
+                <Separator />
+                <div className="space-y-1 mb-4">
+                  <h3 className="font-semibold text-sm uppercase tracking-wide flex items-center gap-2 text-muted-foreground">
+                    <Truck className="h-4 w-4" /> Informations du transporteur
+                  </h3>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="vehicle">Type de véhicule</Label>
+                    <Input
+                      id="vehicle"
+                      placeholder="Ex: Utilitaire 3.5T"
+                      value={formData.vehicle}
+                      onChange={(e) => setFormData({ ...formData, vehicle: e.target.value })}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="license">Numéro de permis</Label>
+                    <Input
+                      id="license"
+                      placeholder="Ex: AB123456"
+                      value={formData.license}
+                      onChange={(e) => setFormData({ ...formData, license: e.target.value })}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="experience">Années d'expérience</Label>
+                  <Input
+                    id="experience"
+                    type="number"
+                    placeholder="0"
+                    value={formData.experience}
+                    onChange={(e) => setFormData({ ...formData, experience: e.target.value })}
+                    min="0"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Régions desservies</Label>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3 max-h-48 overflow-y-auto p-2 border rounded-lg">
+                    {WILAYAS.map((wilaya) => (
+                      <div key={wilaya.id} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={wilaya.id}
+                          checked={formData.regions.includes(wilaya.id)}
+                          onCheckedChange={(checked) => handleRegionChange(wilaya.id, checked as boolean)}
+                        />
+                        <label htmlFor={wilaya.id} className="text-sm cursor-pointer">
+                          {wilaya.name}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="description">Description (optionnel)</Label>
+                  <Textarea
+                    id="description"
+                    placeholder="Parlez-nous un peu de vous et de votre expérience..."
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    rows={3}
+                  />
+                </div>
+              </>
             )}
 
-            <div className="space-y-2">
-              <Label htmlFor="password">{t('password')}</Label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="••••••••"
-                  value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  className="pl-10"
-                  required
-                />
-              </div>
-            </div>
+            {/* Relais Fields */}
+            {formData.role === 'RELAIS' && (
+              <>
+                <Separator />
+                <div className="space-y-1 mb-4">
+                  <h3 className="font-semibold text-sm uppercase tracking-wide flex items-center gap-2 text-muted-foreground">
+                    <Store className="h-4 w-4" /> Informations du point relais
+                  </h3>
+                </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="confirmPassword">{t('confirmPassword')}</Label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Input
-                  id="confirmPassword"
-                  type="password"
-                  placeholder="••••••••"
-                  value={formData.confirmPassword}
-                  onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-                  className="pl-10"
-                  required
-                />
-              </div>
-            </div>
+                <div className="space-y-2">
+                  <Label htmlFor="commerceName">Nom du commerce</Label>
+                  <div className="relative">
+                    <Store className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="commerceName"
+                      placeholder="Ex: Épicerie du Centre"
+                      value={formData.commerceName}
+                      onChange={(e) => setFormData({ ...formData, commerceName: e.target.value })}
+                      className="pl-10"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="address">Adresse</Label>
+                  <Textarea
+                    id="address"
+                    placeholder="Ex: 123 Rue Didouche Mourad, Alger Centre"
+                    value={formData.address}
+                    onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                    rows={2}
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="ville">Ville</Label>
+                  <div className="relative">
+                    <MapPin className="absolute left-3 top-3 h-4 w-4 text-muted-foreground z-10" />
+                    <Select value={formData.ville} onValueChange={(value) => setFormData({ ...formData, ville: value })}>
+                      <SelectTrigger className="pl-10">
+                        <SelectValue placeholder="Sélectionnez votre ville" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {WILAYAS.map((w) => (
+                          <SelectItem key={w.id} value={w.id}>
+                            {w.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </>
+            )}
           </CardContent>
-          <CardFooter className="flex flex-col gap-4">
-            <Button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700" disabled={isLoading}>
+
+          <div className="px-6 pb-6 space-y-4">
+            <Button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-lg py-6" disabled={isLoading}>
               {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {t('submit')}
+              Créer mon compte
             </Button>
 
             <p className="text-center text-sm text-muted-foreground">
-              {t('haveAccount')}{' '}
-              <Link href="/auth/login" className="text-emerald-600 hover:underline font-medium">
-                {t('loginLink')}
+              Vous avez un compte ?{' '}
+              <Link href={`/${locale}/auth/login`} className="text-emerald-600 hover:underline font-medium">
+                Connectez-vous
               </Link>
             </p>
-          </CardFooter>
+          </div>
         </form>
       </Card>
     </div>

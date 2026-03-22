@@ -1,458 +1,182 @@
 'use client';
 
-import { useState } from 'react';
-import { useSession, signIn } from 'next-auth/react';
-import { useTranslations, useLocale } from 'next-intl';
+import { useRouter } from 'next/navigation';
+import { useLocale } from 'next-intl';
 import { Link } from '@/i18n/routing';
 import { Header } from '@/components/layout/header';
 import { Footer } from '@/components/layout/footer';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Separator } from '@/components/ui/separator';
-import { WILAYAS } from '@/lib/constants';
-import { Truck, MapPin, Star, CheckCircle, Loader2, Route, User, Mail, Lock, Phone } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { Card, CardContent } from '@/components/ui/card';
+import { Truck, Banknote, TrendingUp, Shield, Award, ArrowRight } from 'lucide-react';
+
+const BENEFITS = [
+  {
+    icon: Banknote,
+    title: 'Revenus flexibles',
+    description: 'Gagnez de l\'argent à votre rythme, sans engagement'
+  },
+  {
+    icon: TrendingUp,
+    title: 'Augmentez vos revenus',
+    description: 'Accédez à des commandes régulières de qualité'
+  },
+  {
+    icon: Shield,
+    title: 'Assurance complète',
+    description: 'Protection contre les risques de transport'
+  },
+  {
+    icon: Award,
+    title: 'Système de notation',
+    description: 'Construisez votre réputation et augmentez vos revenus'
+  }
+];
 
 export default function BecomeTransporterPage() {
-  const { data: session } = useSession();
+  const router = useRouter();
   const locale = useLocale();
-  const t = useTranslations('transporter.register');
-  const { toast } = useToast();
-  const [isLoading, setIsLoading] = useState(false);
-  const [success, setSuccess] = useState(false);
-  const [accountData, setAccountData] = useState({
-    email: '',
-    password: '',
-    confirmPassword: '',
-  });
-  const [formData, setFormData] = useState({
-    fullName: '',
-    phone: '',
-    vehicle: '',
-    license: '',
-    experience: '',
-    regions: [] as string[],
-    description: '',
-  });
 
-  const handleRegionChange = (region: string, checked: boolean) => {
-    setFormData(prev => ({
-      ...prev,
-      regions: checked
-        ? [...prev.regions, region]
-        : prev.regions.filter(r => r !== region)
-    }));
+  const handleSignUp = () => {
+    router.push(`/${locale}/auth/register?role=TRANSPORTER`);
   };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-
-    try {
-      let userId = session?.user?.id;
-
-      // If not logged in, create account first
-      if (!userId) {
-        if (accountData.password !== accountData.confirmPassword) {
-          toast({ title: 'Erreur', description: 'Les mots de passe ne correspondent pas', variant: 'destructive' });
-          return;
-        }
-        if (accountData.password.length < 6) {
-          toast({ title: 'Erreur', description: 'Le mot de passe doit contenir au moins 6 caractères', variant: 'destructive' });
-          return;
-        }
-
-        const registerRes = await fetch('/api/users', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: formData.fullName,
-            email: accountData.email,
-            phone: formData.phone,
-            password: accountData.password,
-            role: 'TRANSPORTER',
-          }),
-        });
-
-        const registerData = await registerRes.json();
-        if (!registerRes.ok) {
-          toast({ title: 'Erreur', description: registerData.details || registerData.error || 'Erreur lors de la création du compte', variant: 'destructive' });
-          return;
-        }
-        userId = registerData.id;
-      }
-
-      // Submit transporter application
-      const appRes = await fetch('/api/transporters', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId,
-          fullName: formData.fullName,
-          phone: formData.phone,
-          vehicle: formData.vehicle,
-          license: formData.license,
-          experience: parseInt(formData.experience) || 0,
-          regions: formData.regions,
-          description: formData.description,
-        }),
-      });
-
-      if (!appRes.ok) {
-        const data = await appRes.json();
-        throw new Error(data.error || 'Erreur lors de la soumission');
-      }
-
-      // Auto-connect the new account if it was just created
-      if (!session?.user?.id) {
-        await signIn('credentials', {
-          email: accountData.email,
-          password: accountData.password,
-          redirect: false,
-        });
-      }
-
-      setSuccess(true);
-    } catch (err) {
-      toast({
-        title: 'Erreur',
-        description: err instanceof Error ? err.message : 'Impossible de soumettre la demande',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  if (success) {
-    return (
-      <div className="min-h-screen flex flex-col">
-        <Header />
-        <main className="flex-1 container px-4 py-16">
-          <Card className="max-w-lg mx-auto text-center">
-            <CardContent className="pt-8">
-              <div className="w-20 h-20 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-6">
-                <CheckCircle className="h-10 w-10 text-emerald-600" />
-              </div>
-              <h2 className="text-2xl font-bold mb-2">{t('success')}</h2>
-              <p className="text-muted-foreground mb-6">
-                {t('pending')}. Notre équipe examinera votre demande et vous contactera sous 48h.
-              </p>
-              <Link href="/">
-                <Button className="bg-emerald-600 hover:bg-emerald-700">
-                  Retour à l'accueil
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
-        </main>
-        <Footer />
-      </div>
-    );
-  }
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="flex flex-col min-h-screen">
       <Header />
-      <main className="flex-1 container px-4 py-8">
-        {/* Hero */}
-        <div className="text-center mb-12">
-          <Truck className="h-16 w-16 text-emerald-600 mx-auto mb-4" />
-          <h1 className="text-3xl font-bold mb-2">{t('title')}</h1>
-          <p className="text-muted-foreground max-w-2xl mx-auto">
-            {t('subtitle')}. Transportez des colis et générez des revenus en travaillant selon vos horaires.
-          </p>
-        </div>
+      <main className="flex-1">
+        {/* Hero Section */}
+        <section className="relative py-12 md:py-20 bg-gradient-to-br from-blue-50 via-white to-cyan-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-800">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="grid md:grid-cols-2 gap-8 md:gap-12 items-center">
+              <div className="space-y-6">
+                <div>
+                  <h1 className="text-4xl md:text-5xl font-bold text-gray-900 dark:text-white mb-4">
+                    Devenez Transporteur
+                  </h1>
+                  <p className="text-xl text-gray-600 dark:text-gray-300">
+                    Rejoignez notre réseau de transporteurs et augmentez vos revenus avec nos commandes
+                  </p>
+                </div>
 
-        {/* Benefits */}
-        <div className="grid gap-6 md:grid-cols-3 max-w-4xl mx-auto mb-12">
-          <Card>
-            <CardContent className="pt-6 text-center">
-              <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-4">
-                <Route className="h-6 w-6 text-emerald-600" />
-              </div>
-              <h3 className="font-semibold mb-2">Flexibilité</h3>
-              <p className="text-sm text-muted-foreground">
-                Travaillez selon vos horaires et vos régions préférées
-              </p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6 text-center">
-              <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center mx-auto mb-4">
-                <Truck className="h-6 w-6 text-blue-600" />
-              </div>
-              <h3 className="font-semibold mb-2">Revenus</h3>
-              <p className="text-sm text-muted-foreground">
-                Gagnez des commissions sur chaque livraison effectuée
-              </p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6 text-center">
-              <div className="w-12 h-12 rounded-full bg-orange-100 flex items-center justify-center mx-auto mb-4">
-                <Star className="h-6 w-6 text-orange-600" />
-              </div>
-              <h3 className="font-semibold mb-2">Autonomie</h3>
-              <p className="text-sm text-muted-foreground">
-                Gérez votre activité de transport en toute indépendance
-              </p>
-            </CardContent>
-          </Card>
-        </div>
+                <div className="flex flex-col sm:flex-row gap-4">
+                  <Button
+                    onClick={handleSignUp}
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-6 text-lg flex items-center gap-2"
+                  >
+                    Postuler maintenant
+                    <ArrowRight className="h-5 w-5" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="px-8 py-6 text-lg"
+                  >
+                    Conditions
+                  </Button>
+                </div>
 
-        {/* Requirements */}
-        <Card className="max-w-4xl mx-auto mb-12">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <CheckCircle className="h-5 w-5 text-emerald-600" />
-              Conditions requises
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="flex items-start gap-3">
-                <CheckCircle className="h-5 w-5 text-emerald-600 mt-0.5 flex-shrink-0" />
-                <div>
-                  <h4 className="font-medium">Véhicule adapté</h4>
-                  <p className="text-sm text-muted-foreground">Voiture, camionnette ou véhicule utilitaire</p>
+                <div className="space-y-2 text-sm text-gray-600 dark:text-gray-400">
+                  <p>✓ Inscription rapide et gratuite</p>
+                  <p>✓ Aucun frais cachés</p>
+                  <p>✓ Commencez dès demain</p>
                 </div>
               </div>
-              <div className="flex items-start gap-3">
-                <CheckCircle className="h-5 w-5 text-emerald-600 mt-0.5 flex-shrink-0" />
-                <div>
-                  <h4 className="font-medium">Permis de conduire valide</h4>
-                  <p className="text-sm text-muted-foreground">Permis B minimum, permis poids lourd si nécessaire</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <CheckCircle className="h-5 w-5 text-emerald-600 mt-0.5 flex-shrink-0" />
-                <div>
-                  <h4 className="font-medium">Assurance valide</h4>
-                  <p className="text-sm text-muted-foreground">Assurance responsabilité civile à jour</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <CheckCircle className="h-5 w-5 text-emerald-600 mt-0.5 flex-shrink-0" />
-                <div>
-                  <h4 className="font-medium">Téléphone portable</h4>
-                  <p className="text-sm text-muted-foreground">Pour la coordination et les mises à jour</p>
+
+              <div className="relative">
+                <div className="bg-gradient-to-br from-blue-100 to-cyan-100 dark:from-blue-900/30 dark:to-cyan-900/30 rounded-2xl p-12 flex items-center justify-center min-h-96">
+                  <Truck className="h-48 w-48 text-blue-600/20 dark:text-blue-400/20" />
                 </div>
               </div>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </section>
 
-        {/* Registration Form */}
-        <Card className="max-w-2xl mx-auto">
-          <CardHeader>
-            <CardTitle>Inscription Transporteur</CardTitle>
-            <CardDescription>
-              {session?.user
-                ? `Connecté en tant que ${session.user.name} — remplissez les infos de votre candidature`
-                : 'Créez votre compte et soumettez votre candidature en une seule étape'}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Benefits Section */}
+        <section className="py-12 md:py-20 bg-white dark:bg-slate-900">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="text-center mb-12">
+              <h2 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-4">
+                Avantages pour vous
+              </h2>
+              <p className="text-xl text-gray-600 dark:text-gray-400">
+                Pourquoi rejoindre SwiftColis Transporteurs
+              </p>
+            </div>
 
-              {/* Account section — only for non-logged-in users */}
-              {!session?.user && (
-                <>
-                  <div className="space-y-1">
-                    <h3 className="font-semibold text-sm uppercase tracking-wide text-muted-foreground flex items-center gap-2">
-                      <User className="h-4 w-4" /> Créer votre compte
-                    </h3>
-                    <p className="text-xs text-muted-foreground">
-                      Déjà inscrit ?{' '}
-                      <Link href={`/${locale}/auth/login`} className="text-emerald-600 underline hover:no-underline">
-                        Connectez-vous
-                      </Link>
-                    </p>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Email</Label>
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="email"
-                        type="email"
-                        placeholder="email@exemple.com"
-                        value={accountData.email}
-                        onChange={(e) => setAccountData({ ...accountData, email: e.target.value })}
-                        className="pl-10"
-                        required
-                      />
-                    </div>
-                  </div>
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label htmlFor="password">Mot de passe</Label>
-                      <div className="relative">
-                        <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          id="password"
-                          type="password"
-                          placeholder="••••••••"
-                          value={accountData.password}
-                          onChange={(e) => setAccountData({ ...accountData, password: e.target.value })}
-                          className="pl-10"
-                          required
-                          minLength={6}
-                        />
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="confirmPassword">Confirmer</Label>
-                      <div className="relative">
-                        <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          id="confirmPassword"
-                          type="password"
-                          placeholder="••••••••"
-                          value={accountData.confirmPassword}
-                          onChange={(e) => setAccountData({ ...accountData, confirmPassword: e.target.value })}
-                          className="pl-10"
-                          required
-                          minLength={6}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                  <Separator />
-                  <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-2">
-                    <Truck className="h-4 w-4" /> Informations transporteur
-                  </p>
-                </>
-              )}
+            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {BENEFITS.map((benefit, idx) => {
+                const Icon = benefit.icon;
+                return (
+                  <Card key={idx} className="border-0 shadow-none bg-slate-50 dark:bg-slate-800 hover:shadow-md transition">
+                    <CardContent className="pt-6 space-y-4">
+                      <Icon className="h-10 w-10 text-blue-600 dark:text-blue-400" />
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                        {benefit.title}
+                      </h3>
+                      <p className="text-gray-600 dark:text-gray-400">
+                        {benefit.description}
+                      </p>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          </div>
+        </section>
 
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="fullName">{t('fullName')}</Label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="fullName"
-                      value={formData.fullName}
-                      onChange={(e) => setFormData(prev => ({ ...prev, fullName: e.target.value }))}
-                      placeholder="Votre nom complet"
-                      className="pl-10"
-                      required
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="phone">{t('phone')}</Label>
-                  <div className="relative">
-                    <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="phone"
-                      type="tel"
-                      value={formData.phone}
-                      onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
-                      placeholder="+213 XX XX XX XX"
-                      className="pl-10"
-                      required
-                    />
-                  </div>
-                </div>
-              </div>
+        {/* Requirements Section */}
+        <section className="py-12 md:py-20 bg-slate-50 dark:bg-slate-800">
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-8 text-center">
+              Conditions requises
+            </h2>
+            <div className="grid md:grid-cols-2 gap-8">
+              <Card className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-700">
+                <CardContent className="pt-6">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                    Véhicule
+                  </h3>
+                  <ul className="space-y-2 text-gray-600 dark:text-gray-400">
+                    <li>✓ Véhicule en bon état de fonctionnement</li>
+                    <li>✓ Assurance responsabilité civile valide</li>
+                    <li>✓ Capacité minimum 3,5 tonnes (recommandé)</li>
+                  </ul>
+                </CardContent>
+              </Card>
+              <Card className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-700">
+                <CardContent className="pt-6">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                    Documents
+                  </h3>
+                  <ul className="space-y-2 text-gray-600 dark:text-gray-400">
+                    <li>✓ Permis de conduire valide</li>
+                    <li>✓ Identification valide</li>
+                    <li>✓ Carte grise du véhicule</li>
+                  </ul>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </section>
 
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="vehicle">{t('vehicle')}</Label>
-                  <Select value={formData.vehicle} onValueChange={(value) => setFormData(prev => ({ ...prev, vehicle: value }))}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Type de véhicule" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="voiture">Voiture particulière</SelectItem>
-                      <SelectItem value="camionnette">Camionnette</SelectItem>
-                      <SelectItem value="fourgon">Fourgon</SelectItem>
-                      <SelectItem value="camion">Camion léger</SelectItem>
-                      <SelectItem value="autre">Autre</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="experience">{t('experience')}</Label>
-                  <Select value={formData.experience} onValueChange={(value) => setFormData(prev => ({ ...prev, experience: value }))}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Années d'expérience" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="0">Débutant (0-1 an)</SelectItem>
-                      <SelectItem value="2">2-3 ans</SelectItem>
-                      <SelectItem value="4">4-5 ans</SelectItem>
-                      <SelectItem value="6">6-10 ans</SelectItem>
-                      <SelectItem value="10">Plus de 10 ans</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="license">{t('license')}</Label>
-                <Input
-                  id="license"
-                  value={formData.license}
-                  onChange={(e) => setFormData(prev => ({ ...prev, license: e.target.value }))}
-                  placeholder="Numéro de permis de conduire"
-                  required
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>{t('regions')}</Label>
-                <div className="grid gap-2 md:grid-cols-3 max-h-48 overflow-y-auto border rounded-lg p-4">
-                  {WILAYAS.map((wilaya) => (
-                    <div key={wilaya.id} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={`region-${wilaya.id}`}
-                        checked={formData.regions.includes(wilaya.id)}
-                        onCheckedChange={(checked) => handleRegionChange(wilaya.id, checked as boolean)}
-                      />
-                      <Label htmlFor={`region-${wilaya.id}`} className="text-sm">
-                        {wilaya.name}
-                      </Label>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="description">Description (optionnel)</Label>
-                <Textarea
-                  id="description"
-                  value={formData.description}
-                  onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                  placeholder="Décrivez brièvement votre expérience, vos disponibilités..."
-                  rows={3}
-                />
-              </div>
-
-              <Button
-                type="submit"
-                className="w-full bg-emerald-600 hover:bg-emerald-700"
-                disabled={isLoading || !formData.vehicle}
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Soumission en cours...
-                  </>
-                ) : (
-                  t('submit')
-                )}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
+        {/* CTA Section */}
+        <section className="py-12 md:py-20 bg-gradient-to-r from-blue-600 to-cyan-600 text-white">
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-6">
+            <h2 className="text-3xl md:text-4xl font-bold">
+              Prêt à commencer votre carrière ?
+            </h2>
+            <p className="text-xl text-blue-100">
+              Rejoignez des milliers de transporteurs satisfaits
+            </p>
+            <Button
+              onClick={handleSignUp}
+              size="lg"
+              className="bg-white text-blue-600 hover:bg-gray-100 px-8 py-6 text-lg mt-4"
+            >
+              Postuler gratuitement
+              <ArrowRight className="ml-2 h-5 w-5" />
+            </Button>
+          </div>
+        </section>
       </main>
       <Footer />
     </div>
