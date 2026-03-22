@@ -14,19 +14,27 @@ import {
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { LanguageSwitcher } from './language-switcher';
-import {
-  Package,
-  Menu,
-  User,
-  Truck,
-  Store,
-  Settings,
-  LogOut,
-  LayoutDashboard,
-} from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { Menu, LogOut, LayoutDashboard } from 'lucide-react';
+import { useState } from 'react';
 import { useSession, signOut } from 'next-auth/react';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+
+function Logo() {
+  return (
+    <Link href="/" className="flex items-center gap-2.5 group">
+      <div className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 shadow-md shadow-emerald-500/20 group-hover:shadow-emerald-500/40 transition-shadow">
+        <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5 text-white" strokeWidth={2}>
+          <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/>
+          <path d="M8 22V12h8v10" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"/>
+          <path d="M13 7h2M13 10h2" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}/>
+        </svg>
+      </div>
+      <span className="text-[1.1rem] font-extrabold tracking-tight bg-gradient-to-r from-emerald-600 to-teal-500 bg-clip-text text-transparent">
+        Swift<span className="text-gray-800 dark:text-white">Colis</span>
+      </span>
+    </Link>
+  );
+}
 
 export function Header() {
   const t = useTranslations();
@@ -34,15 +42,6 @@ export function Header() {
   const pathname = usePathname();
   const { data: session, status } = useSession();
   const [isOpen, setIsOpen] = useState(false);
-  const [hasLoaded, setHasLoaded] = useState(false);
-
-  // Set loaded after initial render
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setHasLoaded(true);
-    }, 500);
-    return () => clearTimeout(timer);
-  }, []);
 
   const navItems = [
     { href: '/', label: t('nav.home') },
@@ -82,17 +81,12 @@ export function Header() {
     }
   };
 
-  // Show loading state only for initial auth check
-  if (status === 'loading' && !hasLoaded) {
+  // Show loading skeleton only for initial auth check
+  if (status === 'loading') {
     return (
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex h-16 items-center justify-between px-4">
-          <Link href="/" className="flex items-center gap-2">
-            <Package className="h-8 w-8 text-emerald-600" />
-            <span className="text-xl font-bold bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">
-              SwiftColis
-            </span>
-          </Link>
+          <Logo />
         </div>
       </header>
     );
@@ -102,27 +96,28 @@ export function Header() {
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-16 items-center justify-between px-4">
         {/* Logo */}
-        <Link href="/" className="flex items-center gap-2">
-          <Package className="h-8 w-8 text-emerald-600" />
-          <span className="text-xl font-bold bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">
-            SwiftColis
-          </span>
-        </Link>
+        <Logo />
 
         {/* Desktop Navigation */}
-        <nav className="hidden md:flex items-center gap-6">
+        <nav className="hidden md:flex items-center gap-1">
           {navItems.map((item) => {
             if (item.auth && !session?.user) return null;
             if (item.roles && session?.user && !item.roles.includes(session.user.role)) return null;
+            const active = isActive(item.href);
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                className={`text-sm font-medium transition-colors hover:text-emerald-600 ${
-                  isActive(item.href) ? 'text-emerald-600' : 'text-muted-foreground'
+                className={`relative px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                  active
+                    ? 'text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-accent'
                 }`}
               >
                 {item.label}
+                {active && (
+                  <span className="absolute bottom-0 left-3 right-3 h-0.5 rounded-full bg-emerald-500" />
+                )}
               </Link>
             );
           })}
@@ -198,50 +193,81 @@ export function Header() {
               </Button>
             </SheetTrigger>
             <SheetContent side="right" className="w-80">
-              <div className="flex flex-col gap-4 mt-8">
-                {session?.user ? (
-                  <>
-                    <div className="flex items-center gap-3 pb-4 border-b">
-                      <Avatar className="h-10 w-10">
-                        <AvatarFallback className="bg-emerald-600 text-white">
-                          {session.user.name?.charAt(0).toUpperCase() || 'U'}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <p className="font-medium">{session.user.name}</p>
-                        <p className="text-sm text-muted-foreground">{session.user.email}</p>
+              <div className="flex flex-col gap-4 mt-6">
+                {/* Logo in sheet */}
+                <div className="pb-4 border-b">
+                  <Logo />
+                </div>
+
+                {/* Nav items */}
+                <nav className="flex flex-col gap-1">
+                  {navItems.map((item) => {
+                    if (item.auth && !session?.user) return null;
+                    if (item.roles && session?.user && !item.roles.includes(session.user.role)) return null;
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        onClick={() => setIsOpen(false)}
+                        className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                          isActive(item.href)
+                            ? 'text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20'
+                            : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+                        }`}
+                      >
+                        {item.label}
+                      </Link>
+                    );
+                  })}
+                </nav>
+
+                <div className="border-t pt-4">
+                  {session?.user ? (
+                    <>
+                      <div className="flex items-center gap-3 pb-4 border-b">
+                        <Avatar className="h-10 w-10">
+                          <AvatarFallback className="bg-emerald-600 text-white text-sm font-semibold">
+                            {session.user.name?.charAt(0).toUpperCase() || 'U'}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="min-w-0">
+                          <p className="font-medium truncate">{session.user.name}</p>
+                          <p className="text-sm text-muted-foreground truncate">{session.user.email}</p>
+                        </div>
                       </div>
+                      <div className="flex flex-col gap-1 pt-4">
+                        <Link
+                          href={getDashboardLink() || '/dashboard/client'}
+                          onClick={() => setIsOpen(false)}
+                          className="flex items-center gap-2 px-3 py-2 hover:bg-accent rounded-md text-sm font-medium"
+                        >
+                          <LayoutDashboard className="h-4 w-4" />
+                          {t('common.dashboard')}
+                        </Link>
+                        <button
+                          onClick={handleSignOut}
+                          className="flex items-center gap-2 px-3 py-2 hover:bg-accent rounded-md text-red-600 text-sm font-medium w-full text-left"
+                        >
+                          <LogOut className="h-4 w-4" />
+                          {t('common.logout')}
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex flex-col gap-2">
+                      <Link href="/auth/login" onClick={() => setIsOpen(false)}>
+                        <Button variant="outline" className="w-full">
+                          {t('nav.login')}
+                        </Button>
+                      </Link>
+                      <Link href="/auth/register" onClick={() => setIsOpen(false)}>
+                        <Button className="w-full bg-emerald-600 hover:bg-emerald-700">
+                          {t('nav.register')}
+                        </Button>
+                      </Link>
                     </div>
-                    <Link
-                      href={getDashboardLink() || '/dashboard/client'}
-                      onClick={() => setIsOpen(false)}
-                      className="flex items-center gap-2 p-2 hover:bg-accent rounded-md"
-                    >
-                      <LayoutDashboard className="h-5 w-5" />
-                      {t('common.dashboard')}
-                    </Link>
-                    <button
-                      onClick={handleSignOut}
-                      className="flex items-center gap-2 p-2 hover:bg-accent rounded-md text-red-600"
-                    >
-                      <LogOut className="h-5 w-5" />
-                      {t('common.logout')}
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <Link href="/auth/login" onClick={() => setIsOpen(false)}>
-                      <Button variant="outline" className="w-full">
-                        {t('nav.login')}
-                      </Button>
-                    </Link>
-                    <Link href="/auth/register" onClick={() => setIsOpen(false)}>
-                      <Button className="w-full bg-emerald-600 hover:bg-emerald-700">
-                        {t('nav.register')}
-                      </Button>
-                    </Link>
-                  </>
-                )}
+                  )}
+                </div>
               </div>
             </SheetContent>
           </Sheet>
