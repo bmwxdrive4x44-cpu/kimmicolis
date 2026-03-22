@@ -313,6 +313,31 @@
       "notifications": "Notifications"
     }
   },
+  "transporter": {
+    "dashboard": {
+      "title": "Espace Transporteur",
+      "welcome": "Bienvenue",
+      "stats": {
+        "routes": "Trajets actifs",
+        "missions": "Missions",
+        "completed": "Terminées",
+        "earnings": "Gains totaux"
+      }
+    },
+    "register": {
+      "title": "Devenir transporteur",
+      "subtitle": "Rejoignez notre réseau de transporteurs partenaires",
+      "fullName": "Nom complet",
+      "phone": "Téléphone",
+      "vehicle": "Type de véhicule",
+      "license": "Numéro de permis",
+      "experience": "Années d'expérience",
+      "regions": "Régions desservies",
+      "submit": "Soumettre la demande",
+      "success": "Demande soumise avec succès",
+      "pending": "En attente de validation"
+    }
+  },
   "wilayas": {
     "alger": "Alger",
     "oran": "Oran",

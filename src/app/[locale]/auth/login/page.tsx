@@ -68,12 +68,12 @@ function LoginForm() {
         const sessionRes = await fetch('/api/auth/session');
         const sessionData = await sessionRes.json();
         const userRole = sessionData?.user?.role || 'CLIENT';
-        
+
         toast({
           title: 'Connexion réussie',
           description: `Bienvenue, ${sessionData?.user?.name || 'utilisateur'}!`,
         });
-        
+
         // Redirect based on role - force full page reload
         const dashboardPath = getDashboardPath(userRole);
         window.location.href = dashboardPath;

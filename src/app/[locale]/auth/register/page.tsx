@@ -61,6 +61,7 @@ export default function RegisterPage() {
       }
       
       // Create user via API
+      console.log('[Register] Sending formData:', formData);
       const response = await fetch('/api/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -68,6 +69,7 @@ export default function RegisterPage() {
       });
 
       const data = await response.json();
+      console.log('[Register] API response:', { status: response.status, data });
 
       if (!response.ok) {
         throw new Error(data.details || data.error || 'Erreur lors de l\'inscription');

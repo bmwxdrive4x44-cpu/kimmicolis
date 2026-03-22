@@ -31,25 +31,40 @@ function getRoleBasedDashboardPath(role: string, locale: string): string {
 }
 
 function ClientDashboardContent() {
-  const { data: session, status } = useSession();
-  const t = useTranslations();
   const locale = useLocale();
+
+  const { data: session, status, update } = useSession({
+    required: true,
+    onUnauthenticated() {
+      // If user becomes unauthenticated, enforce login redirect
+      window.location.replace(`/${locale}/auth/login`);
+    },
+  });
+
+  const t = useTranslations();
   const router = useRouter();
   const searchParams = useSearchParams();
-  
+
   const initialTab = useMemo(() => searchParams.get('track') ? 'track' : 'create', [searchParams]);
   const initialTracking = useMemo(() => searchParams.get('track') || '', [searchParams]);
-  
+
   const [activeTab, setActiveTab] = useState(initialTab);
   const [trackingNumber, setTrackingNumber] = useState(initialTracking);
   const [stats, setStats] = useState({ created: 0, inTransit: 0, delivered: 0, totalSpent: 0 });
 
-  // Simple redirect if not authenticated
+  // Debug logging
   useEffect(() => {
-    if (status === 'unauthenticated') {
-      router.push(`/${locale}/auth/login`);
+    console.log('[Dashboard] Session status:', status);
+    console.log('[Dashboard] Session data:', session);
+  }, [status, session]);
+
+  useEffect(() => {
+    // Retry session update if no user in session after authentication
+    if (status === 'authenticated' && !session?.user) {
+      console.warn('[Dashboard] Authenticated but no user object; forcing session update');
+      update();
     }
-  }, [status, router, locale]);
+  }, [status, session, update]);
 
   // Redirect if wrong role
   useEffect(() => {
@@ -86,23 +101,27 @@ function ClientDashboardContent() {
     }
   };
 
-  if (status === 'loading') {
+  if (status === 'loading' || status === 'unauthenticated') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
         <div className="text-center">
           <Loader2 className="h-8 w-8 animate-spin text-emerald-600 mx-auto mb-4" />
-          <p className="text-slate-600">Chargement...</p>
+          <p className="text-slate-600">Connexion en cours...</p>
         </div>
       </div>
     );
   }
 
-  if (!session?.user) {
+  if (status === 'authenticated' && !session?.user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
         <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin text-emerald-600 mx-auto mb-4" />
-          <p className="text-slate-600">Redirection...</p>
+          <p className="text-red-600 font-bold mb-4">Erreur : session utilisateur introuvable</p>
+          <p className="text-slate-600 mb-4">Veuillez rafraîchir ou vous reconnecter.</p>
+          <Button onClick={() => update()}>Réessayer</Button>
+          <Button variant="outline" className="ml-3" onClick={() => router.push(`/${locale}/auth/login`)}>
+            Aller à la connexion
+          </Button>
         </div>
       </div>
     );

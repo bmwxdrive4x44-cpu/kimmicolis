@@ -8,7 +8,7 @@ import { CTA } from '@/components/landing/cta';
 
 export default function HomePage() {
   return (
-    <div className="flex min-h-screen flex-col bg-slate-900">
+    <div className="flex min-h-screen flex-col bg-background">
       <Header />
       <main className="flex-1">
         <Hero />

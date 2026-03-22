@@ -32,14 +32,9 @@ export function Header() {
   const t = useTranslations();
   const locale = useLocale();
   const pathname = usePathname();
-  const { data: session, status, update } = useSession();
+  const { data: session, status } = useSession();
   const [isOpen, setIsOpen] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false);
-
-  // Force session refresh on mount
-  useEffect(() => {
-    update();
-  }, [update]);
 
   // Set loaded after initial render
   useEffect(() => {
@@ -51,6 +46,8 @@ export function Header() {
 
   const navItems = [
     { href: '/', label: t('nav.home') },
+    { href: '/become-relay', label: t('nav.becomeRelay') },
+    { href: '/become-transporter', label: t('nav.becomeTransporter') },
     { href: '/dashboard/client', label: t('nav.createParcel'), auth: true, roles: ['CLIENT'] },
   ];
 

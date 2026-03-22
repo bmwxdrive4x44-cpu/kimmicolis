@@ -16,6 +16,7 @@ export async function verifyPassword(password: string, hashedPassword: string): 
   return hash === hashedPassword;
 }
 
+// Configuration NextAuth
 export const authOptions: NextAuthOptions = {
   providers: [
     CredentialsProvider({
@@ -49,91 +50,57 @@ export const authOptions: NextAuthOptions = {
           email: user.email,
           name: user.name,
           role: user.role,
-          relaisId: user.relais?.id || null,
+          phone: user.phone ?? undefined,
+          relaisId: user.relais?.id ?? null,
+          relaisStatus: user.relais?.status ?? undefined,
         };
       },
     }),
   ],
+  secret: process.env.NEXTAUTH_SECRET,
+  debug: process.env.NODE_ENV === 'development',
+  session: {
+    strategy: 'jwt',
+  },
   callbacks: {
-    async jwt({ token, user, trigger, session }) {
-      // Initial sign in
+    async jwt({ token, user }) {
       if (user) {
-        token.id = user.id;
-        token.email = user.email;
-        token.name = user.name;
         token.role = user.role;
+        token.phone = user.phone;
         token.relaisId = user.relaisId;
+        token.relaisStatus = user.relaisStatus;
       }
-      
-      // Update session - fetch fresh user data from database
-      if (trigger === 'update' && token.id) {
-        try {
-          const freshUser = await db.user.findUnique({
-            where: { id: token.id as string },
-            include: { relais: true },
-          });
-          if (freshUser) {
-            token.id = freshUser.id;
-            token.email = freshUser.email;
-            token.name = freshUser.name;
-            token.role = freshUser.role;
-            token.relaisId = freshUser.relais?.id || null;
-          }
-        } catch (error) {
-          console.error('Error refreshing user data:', error);
-        }
-        if (session) {
-          token = { ...token, ...session };
-        }
-      }
-      
       return token;
     },
     async session({ session, token }) {
-      if (session.user) {
-        session.user.id = token.id as string;
-        session.user.email = token.email as string;
-        session.user.name = token.name as string;
+      if (token && session.user) {
+        session.user.id = token.sub!;
         session.user.role = token.role as string;
-        session.user.relaisId = token.relaisId as string | null;
+        session.user.phone = token.phone as string;
+        session.user.relaisId = token.relaisId as string;
+        session.user.relaisStatus = token.relaisStatus as string;
       }
       return session;
     },
     async redirect({ url, baseUrl }) {
-      // Handle relative URLs
-      if (url.startsWith('/')) {
-        return `${baseUrl}${url}`;
-      }
-      // Handle same-origin URLs
-      if (new URL(url).origin === baseUrl) {
-        return url;
-      }
-      // Default to baseUrl
+      if (url.startsWith(baseUrl)) return url;
+      if (url.startsWith('/')) return url;
       return baseUrl;
-    },
-  },
-  events: {
-    async signOut() {
-      // Clear any additional session data if needed
     },
   },
   pages: {
     signIn: '/auth/login',
   },
-  session: {
-    strategy: 'jwt',
-    maxAge: 30 * 24 * 60 * 60, // 30 days
-  },
-  secret: process.env.NEXTAUTH_SECRET || 'swiftcolis-secret-key-2024',
-  debug: process.env.NODE_ENV === 'development',
-  useSecureCookies: process.env.NODE_ENV === 'production',
 };
 
+// Déclarations de types pour NextAuth
 declare module 'next-auth' {
   interface User {
     id: string;
     role: string;
+    phone?: string;
     relaisId?: string | null;
+    relaisStatus?: string;
   }
   interface Session {
     user: User & {
@@ -141,7 +108,9 @@ declare module 'next-auth' {
       email: string;
       name: string;
       role: string;
-      relaisId: string | null;
+      phone?: string;
+      relaisId?: string | null;
+      relaisStatus?: string;
     };
   }
 }
@@ -152,7 +121,9 @@ declare module 'next-auth/jwt' {
     email: string;
     name: string;
     role: string;
+    phone?: string;
     relaisId?: string | null;
+    relaisStatus?: string;
   }
 }
 

@@ -313,6 +313,31 @@
       "notifications": "الإشعارات"
     }
   },
+  "transporter": {
+    "dashboard": {
+      "title": "مساحة الناقل",
+      "welcome": "مرحباً",
+      "stats": {
+        "routes": "الطرق النشطة",
+        "missions": "المهام",
+        "completed": "مكتملة",
+        "earnings": "إجمالي الأرباح"
+      }
+    },
+    "register": {
+      "title": "كن ناقلاً",
+      "subtitle": "انضم إلى شبكة الناقلين الشركاء",
+      "fullName": "الاسم الكامل",
+      "phone": "الهاتف",
+      "vehicle": "نوع المركبة",
+      "license": "رقم الرخصة",
+      "experience": "سنوات الخبرة",
+      "regions": "مناطق الخدمة",
+      "submit": "إرسال الطلب",
+      "success": "تم إرسال الطلب بنجاح",
+      "pending": "في انتظار التحقق"
+    }
+  },
   "wilayas": {
     "alger": "الجزائر",
     "oran": "وهران",

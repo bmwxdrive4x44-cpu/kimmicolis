@@ -313,6 +313,31 @@
       "notifications": "Notificaciones"
     }
   },
+  "transporter": {
+    "dashboard": {
+      "title": "Espacio Transportista",
+      "welcome": "Bienvenido",
+      "stats": {
+        "routes": "Rutas Activas",
+        "missions": "Misiones",
+        "completed": "Completadas",
+        "earnings": "Ganancias Totales"
+      }
+    },
+    "register": {
+      "title": "Convertirse en Transportista",
+      "subtitle": "Únete a nuestra red de transportistas socios",
+      "fullName": "Nombre Completo",
+      "phone": "Teléfono",
+      "vehicle": "Tipo de Vehículo",
+      "license": "Número de Licencia",
+      "experience": "Años de Experiencia",
+      "regions": "Regiones de Servicio",
+      "submit": "Enviar Solicitud",
+      "success": "Solicitud Enviada Exitosamente",
+      "pending": "Pendiente de validación"
+    }
+  },
   "wilayas": {
     "alger": "Argel",
     "oran": "Orán",

@@ -30,6 +30,7 @@ model User {
   trajets             Trajet[]        @relation("TransporterTrajets")
   missions            Mission[]       @relation("TransporterMissions")
   relais              Relais?         @relation("UserRelais")
+  transporterApplication TransporterApplication? @relation("UserTransporterApplication")
   notifications       Notification[]
 }
 
@@ -53,6 +54,24 @@ model Relais {
   user             User     @relation("UserRelais", fields: [userId], references: [id])
   parcelsDepart    Colis[]  @relation("RelaisDepart")
   parcelsArrivee   Colis[]  @relation("RelaisArrivee")
+}
+
+// Transporter applications
+model TransporterApplication {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  fullName        String
+  phone           String
+  vehicle         String
+  license         String
+  experience      Int
+  regions         String   // JSON array of regions
+  description     String?
+  status          String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  user            User     @relation("UserTransporterApplication", fields: [userId], references: [id])
 }
 
 // Transport lines with pricing

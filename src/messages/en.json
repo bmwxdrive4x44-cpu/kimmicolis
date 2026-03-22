@@ -313,6 +313,31 @@
       "notifications": "Notifications"
     }
   },
+  "transporter": {
+    "dashboard": {
+      "title": "Transporter Space",
+      "welcome": "Welcome",
+      "stats": {
+        "routes": "Active Routes",
+        "missions": "Missions",
+        "completed": "Completed",
+        "earnings": "Total Earnings"
+      }
+    },
+    "register": {
+      "title": "Become a Transporter",
+      "subtitle": "Join our network of partner transporters",
+      "fullName": "Full Name",
+      "phone": "Phone",
+      "vehicle": "Vehicle Type",
+      "license": "License Number",
+      "experience": "Years of Experience",
+      "regions": "Service Regions",
+      "submit": "Submit Application",
+      "success": "Application Submitted Successfully",
+      "pending": "Pending validation"
+    }
+  },
   "wilayas": {
     "alger": "Algiers",
     "oran": "Oran",
