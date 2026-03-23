@@ -28,6 +28,20 @@ export interface IPayment {
   expiresAt: Date;
 }
 
+type PaymentDelegate = {
+  findFirst(args: Record<string, unknown>): Promise<IPayment | null>;
+  findUnique(args: Record<string, unknown>): Promise<IPayment | null>;
+  create(args: Record<string, unknown>): Promise<IPayment>;
+  update(args: Record<string, unknown>): Promise<IPayment>;
+  findMany(args: Record<string, unknown>): Promise<IPayment[]>;
+  count(args?: Record<string, unknown>): Promise<number>;
+  aggregate(args: Record<string, unknown>): Promise<{ _sum: { amount: number | null } }>;
+};
+
+// VS Code garde parfois un type PrismaClient périmé après ajout d'un nouveau modèle.
+// Cette vue locale évite les faux diagnostics tant que le client généré runtime est à jour.
+const paymentDb = db as typeof db & { payment: PaymentDelegate };
+
 /**
  * Generate unique payment ID
  */
@@ -76,7 +90,7 @@ export async function createPayment(
       return { success: false, error: 'Amount mismatch' };
     }
 
-    const existingActivePayment = await db.payment.findFirst({
+    const existingActivePayment = await paymentDb.payment.findFirst({
       where: {
         colisId,
         status: { in: ['PENDING', 'PROCESSING'] },
@@ -92,7 +106,7 @@ export async function createPayment(
       };
     }
 
-    const completedPayment = await db.payment.findFirst({
+    const completedPayment = await paymentDb.payment.findFirst({
       where: {
         colisId,
         status: 'COMPLETED',
@@ -104,7 +118,7 @@ export async function createPayment(
     }
 
     // Create payment object
-    const payment = await db.payment.create({
+    const payment = await paymentDb.payment.create({
       data: {
         id: generatePaymentId(),
         colisId,
@@ -134,7 +148,7 @@ export async function createPayment(
  * Get payment status
  */
 export async function getPaymentStatus(paymentId: string): Promise<IPayment | null> {
-  const payment = await db.payment.findUnique({
+  const payment = await paymentDb.payment.findUnique({
     where: { id: paymentId },
   });
 
@@ -144,7 +158,7 @@ export async function getPaymentStatus(paymentId: string): Promise<IPayment | nu
     new Date() > payment.expiresAt &&
     (payment.status === 'PENDING' || payment.status === 'PROCESSING')
   ) {
-    return db.payment.update({
+    return paymentDb.payment.update({
       where: { id: paymentId },
       data: {
         status: 'FAILED',
@@ -168,7 +182,7 @@ export async function processPayment(
   payment?: IPayment;
   error?: string;
 }> {
-  const payment = await db.payment.findUnique({
+  const payment = await paymentDb.payment.findUnique({
     where: { id: paymentId },
   });
 
@@ -196,7 +210,7 @@ export async function processPayment(
     const isSuccess = Math.random() < successRate;
 
     if (isSuccess) {
-      await db.payment.update({
+      await paymentDb.payment.update({
         where: { id: paymentId },
         data: {
           status: 'PROCESSING',
@@ -206,7 +220,7 @@ export async function processPayment(
 
       await new Promise((resolve) => setTimeout(resolve, 1000 + Math.random() * 2000));
 
-      const completedPayment = await db.payment.update({
+      const completedPayment = await paymentDb.payment.update({
         where: { id: paymentId },
         data: {
           status: 'COMPLETED',
@@ -234,7 +248,7 @@ export async function processPayment(
       'Issuer rejected transaction',
     ];
 
-    const failedPayment = await db.payment.update({
+    const failedPayment = await paymentDb.payment.update({
       where: { id: paymentId },
       data: {
         status: 'FAILED',
@@ -248,7 +262,7 @@ export async function processPayment(
       error: failedPayment.errorMessage || 'Payment failed',
     };
   } catch (error) {
-    const failedPayment = await db.payment.update({
+    const failedPayment = await paymentDb.payment.update({
       where: { id: paymentId },
       data: {
         status: 'FAILED',
@@ -275,7 +289,7 @@ export async function refundPayment(
   payment?: IPayment;
   error?: string;
 }> {
-  const payment = await db.payment.findUnique({
+  const payment = await paymentDb.payment.findUnique({
     where: { id: paymentId },
   });
 
@@ -291,7 +305,7 @@ export async function refundPayment(
   }
 
   try {
-    const refundedPayment = await db.payment.update({
+    const refundedPayment = await paymentDb.payment.update({
       where: { id: paymentId },
       data: {
         status: 'REFUNDED',
@@ -317,7 +331,7 @@ export async function refundPayment(
  * Get all payments by client (for dashboard)
  */
 export async function getClientPayments(clientId: string): Promise<IPayment[]> {
-  return db.payment.findMany({
+  return paymentDb.payment.findMany({
     where: { clientId },
     orderBy: { createdAt: 'desc' },
   });
@@ -334,11 +348,11 @@ export async function getPaymentStats(): Promise<{
   pending: number;
 }> {
   const [totalPayments, aggregate, completed, failed, pending] = await Promise.all([
-    db.payment.count(),
-    db.payment.aggregate({ _sum: { amount: true } }),
-    db.payment.count({ where: { status: 'COMPLETED' } }),
-    db.payment.count({ where: { status: 'FAILED' } }),
-    db.payment.count({ where: { status: { in: ['PENDING', 'PROCESSING'] } } }),
+    paymentDb.payment.count(),
+    paymentDb.payment.aggregate({ _sum: { amount: true } }),
+    paymentDb.payment.count({ where: { status: 'COMPLETED' } }),
+    paymentDb.payment.count({ where: { status: 'FAILED' } }),
+    paymentDb.payment.count({ where: { status: { in: ['PENDING', 'PROCESSING'] } } }),
   ]);
 
   return {
