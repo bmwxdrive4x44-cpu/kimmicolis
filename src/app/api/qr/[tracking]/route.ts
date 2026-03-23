@@ -89,6 +89,28 @@ export async function POST(
       withdrawalCode,
     } = body;
 
+    const relayActions = new Set(['validate_payment', 'deposit', 'arrive_dest', 'deliver', 'receive']);
+    let actingRelaisId = typeof relaisId === 'string' && relaisId.trim().length > 0 ? relaisId.trim() : undefined;
+
+    if (relayActions.has(action) && userId) {
+      const relayFromUser = await db.relais.findUnique({
+        where: { userId: String(userId) },
+        select: { id: true, commerceName: true },
+      });
+
+      if (relayFromUser) {
+        if (actingRelaisId && actingRelaisId !== relayFromUser.id) {
+          console.warn('[QR] Client relaisId mismatch, resolved from userId', {
+            providedRelaisId: actingRelaisId,
+            resolvedRelaisId: relayFromUser.id,
+            relayName: relayFromUser.commerceName,
+            userId,
+          });
+        }
+        actingRelaisId = relayFromUser.id;
+      }
+    }
+
     const parcel = await db.colis.findUnique({
       where: { trackingNumber: tracking },
       include: {
@@ -110,16 +132,19 @@ export async function POST(
       if (parcel.status !== 'CREATED') {
         return NextResponse.json({ error: `Action invalide : statut actuel ${parcel.status}` }, { status: 400 });
       }
-      if (parcel.relaisDepartId !== relaisId) {
+      if (!actingRelaisId) {
+        return NextResponse.json({ error: 'Relais non identifié (userId/relaisId manquant)' }, { status: 400 });
+      }
+      if (parcel.relaisDepartId !== actingRelaisId) {
         console.error('[QR] Mismatch relais:', { 
           parcelId: parcel.id, 
           tracking,
           expectedRelaisId: parcel.relaisDepartId, 
-          providedRelaisId: relaisId,
+          providedRelaisId: actingRelaisId,
           parcelRelaisDepart: parcel.relaisDepart?.commerceName,
         });
         return NextResponse.json({ 
-          error: `Ce relais n'est pas le relais de départ. Attendu: ${parcel.relaisDepart?.commerceName || parcel.relaisDepartId}, Fourni: ${relaisId}` 
+          error: `Ce relais n'est pas le relais de départ. Attendu: ${parcel.relaisDepart?.commerceName || parcel.relaisDepartId}` 
         }, { status: 403 });
       }
       newStatus = 'PAID_RELAY';
@@ -128,7 +153,7 @@ export async function POST(
       // Track cash collection
       await db.relaisCash.create({
         data: {
-          relaisId,
+          relaisId: actingRelaisId,
           colisId: parcel.id,
           amount: parcel.prixClient,
           type: 'COLLECTED',
@@ -136,7 +161,7 @@ export async function POST(
         },
       });
       await db.relais.update({
-        where: { id: relaisId },
+        where: { id: actingRelaisId },
         data: { cashCollected: { increment: parcel.prixClient } },
       });
     }
@@ -146,12 +171,15 @@ export async function POST(
       if (parcel.status !== 'PAID_RELAY') {
         return NextResponse.json({ error: `Le paiement doit être validé d'abord (statut: ${parcel.status})` }, { status: 400 });
       }
-      if (parcel.relaisDepartId !== relaisId) {
+      if (!actingRelaisId) {
+        return NextResponse.json({ error: 'Relais non identifié (userId/relaisId manquant)' }, { status: 400 });
+      }
+      if (parcel.relaisDepartId !== actingRelaisId) {
         console.error('[QR] Mismatch relais on deposit:', { 
           parcelId: parcel.id, 
           tracking,
           expectedRelaisId: parcel.relaisDepartId, 
-          providedRelaisId: relaisId,
+          providedRelaisId: actingRelaisId,
         });
         return NextResponse.json({ 
           error: `Ce relais n'est pas le relais de départ. Opération d'accès refusée.` 
@@ -190,7 +218,10 @@ export async function POST(
       if (parcel.status !== 'EN_TRANSPORT') {
         return NextResponse.json({ error: `Le colis doit être en transport (statut: ${parcel.status})` }, { status: 400 });
       }
-      if (parcel.relaisArriveeId !== relaisId) {
+      if (!actingRelaisId) {
+        return NextResponse.json({ error: 'Relais non identifié (userId/relaisId manquant)' }, { status: 400 });
+      }
+      if (parcel.relaisArriveeId !== actingRelaisId) {
         return NextResponse.json({ error: 'Ce relais n\'est pas le relais de destination' }, { status: 403 });
       }
       newStatus = 'ARRIVE_RELAIS_DESTINATION';
@@ -202,7 +233,10 @@ export async function POST(
       if (parcel.status !== 'ARRIVE_RELAIS_DESTINATION') {
         return NextResponse.json({ error: `Le colis n'est pas encore arrivé (statut: ${parcel.status})` }, { status: 400 });
       }
-      if (parcel.relaisArriveeId !== relaisId) {
+      if (!actingRelaisId) {
+        return NextResponse.json({ error: 'Relais non identifié (userId/relaisId manquant)' }, { status: 400 });
+      }
+      if (parcel.relaisArriveeId !== actingRelaisId) {
         return NextResponse.json({ error: 'Ce relais n\'est pas le relais de destination' }, { status: 403 });
       }
       if (
@@ -271,10 +305,13 @@ export async function POST(
 
     // ── Legacy compatibility actions ───────────────────────────────────────────
     else if (action === 'receive') {
-      if (parcel.relaisDepartId === relaisId && parcel.status === 'PAID_RELAY') {
+      if (!actingRelaisId) {
+        return NextResponse.json({ error: 'Relais non identifié (userId/relaisId manquant)' }, { status: 400 });
+      }
+      if (parcel.relaisDepartId === actingRelaisId && parcel.status === 'PAID_RELAY') {
         newStatus = 'DEPOSITED_RELAY';
         notes = 'Colis reçu au point relais de départ (compat)';
-      } else if (parcel.relaisArriveeId === relaisId && parcel.status === 'EN_TRANSPORT') {
+      } else if (parcel.relaisArriveeId === actingRelaisId && parcel.status === 'EN_TRANSPORT') {
         newStatus = 'ARRIVE_RELAIS_DESTINATION';
         notes = 'Colis arrivé au point relais de destination (compat)';
       } else {
@@ -302,7 +339,7 @@ export async function POST(
     // ── Anti-fraud ActionLog ────────────────────────────────────────────────────
     await db.actionLog.create({
       data: {
-        userId: userId || relaisId || transporteurId || null,
+        userId: userId || actingRelaisId || transporteurId || null,
         entityType: 'COLIS',
         entityId: parcel.id,
         action: `QR_SCAN:${action.toUpperCase()}`,
