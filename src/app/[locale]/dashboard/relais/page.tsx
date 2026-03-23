@@ -253,6 +253,38 @@ export default function RelaisDashboard() {
           </Card>
         </div>
 
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle>Synthèse colis</CardTitle>
+            <CardDescription>Vue agrégée cohérente avec les autres dashboards</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4 md:grid-cols-3">
+              <div className="rounded-lg border p-4 bg-slate-50 dark:bg-slate-800/60">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm text-slate-600 dark:text-slate-400">Créés</p>
+                  <Package className="h-4 w-4 text-slate-400" />
+                </div>
+                <p className="text-2xl font-bold mt-1">{stats.pending}</p>
+              </div>
+              <div className="rounded-lg border p-4 bg-slate-50 dark:bg-slate-800/60">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm text-slate-600 dark:text-slate-400">En transit</p>
+                  <ArrowDownToLine className="h-4 w-4 text-orange-500" />
+                </div>
+                <p className="text-2xl font-bold mt-1">{stats.received}</p>
+              </div>
+              <div className="rounded-lg border p-4 bg-slate-50 dark:bg-slate-800/60">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm text-slate-600 dark:text-slate-400">Livrés</p>
+                  <CheckCircle className="h-4 w-4 text-emerald-600" />
+                </div>
+                <p className="text-2xl font-bold mt-1">{stats.handedOver}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="grid w-full grid-cols-4 mb-8">
             <TabsTrigger value="overview"><BarChart3 className="h-4 w-4 mr-1 hidden sm:inline" />Vue d'ensemble</TabsTrigger>
