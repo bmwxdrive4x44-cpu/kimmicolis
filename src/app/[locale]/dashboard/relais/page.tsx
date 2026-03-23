@@ -760,8 +760,48 @@ function SettingsTab({ relaisInfo, onUpdate }: { relaisInfo: any; onUpdate: () =
   };
 
   const handleUpdateHours = async () => {
-    toast({ title: 'Horaires mis à jour', description: `Ouverture: ${hours.open}, Fermeture: ${hours.close}` });
-    // Note: Could add API call here to persist hours in database
+    if (!relaisInfo?.id) {
+      toast({ title: 'Erreur', description: 'Relais non trouvé', variant: 'destructive' });
+      return;
+    }
+
+    if (!hours.open || !hours.close) {
+      toast({ title: 'Erreur', description: 'Veuillez renseigner les deux horaires', variant: 'destructive' });
+      return;
+    }
+
+    if (hours.open >= hours.close) {
+      toast({ title: 'Erreur', description: "L'heure d'ouverture doit être antérieure à l'heure de fermeture", variant: 'destructive' });
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const response = await fetch(`/api/relais/${relaisInfo.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          openTime: hours.open,
+          closeTime: hours.close,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => null);
+        throw new Error(error?.details || error?.error || 'Impossible de mettre à jour les horaires');
+      }
+
+      toast({ title: 'Horaires mis à jour', description: `Ouverture: ${hours.open}, Fermeture: ${hours.close}` });
+      onUpdate();
+    } catch (err) {
+      toast({
+        title: 'Erreur',
+        description: err instanceof Error ? err.message : 'Impossible de mettre à jour les horaires',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -864,8 +904,8 @@ function SettingsTab({ relaisInfo, onUpdate }: { relaisInfo: any; onUpdate: () =
               />
             </div>
           </div>
-          <Button variant="outline" className="mt-4" disabled={!relaisInfo} onClick={handleUpdateHours}>
-            Mettre à jour les horaires
+          <Button variant="outline" className="mt-4" disabled={!relaisInfo || isSaving} onClick={handleUpdateHours}>
+            {isSaving ? 'Mise à jour...' : 'Mettre à jour les horaires'}
           </Button>
         </CardContent>
       </Card>

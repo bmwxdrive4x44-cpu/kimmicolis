@@ -58,6 +58,8 @@ export async function PUT(
       commerceName,
       address,
       ville,
+      openTime,
+      closeTime,
       latitude,
       longitude,
       photos,
@@ -102,6 +104,8 @@ export async function PUT(
     if (commerceName !== undefined) data.commerceName = commerceName;
     if (address !== undefined) data.address = address;
     if (ville !== undefined) data.ville = ville;
+    if (openTime !== undefined) data.openTime = openTime;
+    if (closeTime !== undefined) data.closeTime = closeTime;
     if (latitude !== undefined) data.latitude = latitude;
     if (longitude !== undefined) data.longitude = longitude;
     if (photos !== undefined) data.photos = photos;

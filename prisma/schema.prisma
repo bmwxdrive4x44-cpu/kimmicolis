@@ -42,6 +42,8 @@ model Relais {
   commerceName     String
   address          String
   ville            String
+  openTime         String?
+  closeTime        String?
   latitude         Float?
   longitude        Float?
   photos           String?  // JSON array of photo URLs
