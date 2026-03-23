@@ -15,7 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { WILAYAS, PARCEL_STATUS, TRAJET_STATUS } from '@/lib/constants';
-import { Truck, Plus, Package, MapPin, DollarSign, Loader2, CheckCircle, Clock, Route, QrCode, Navigation, Scan } from 'lucide-react';
+import { Truck, Plus, Package, MapPin, DollarSign, Loader2, CheckCircle, Clock, Route, QrCode, Scan, Wallet } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 function getRoleBasedDashboardPath(role: string, locale: string): string {
@@ -33,6 +33,7 @@ export default function TransporterDashboard() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState('overview');
   const [stats, setStats] = useState({ trajets: 0, missions: 0, completed: 0, earnings: 0 });
+  const [wallet, setWallet] = useState({ pending: 0, available: 0, paid: 0 });
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -52,19 +53,22 @@ export default function TransporterDashboard() {
   const fetchStats = async () => {
     setIsLoading(true);
     try {
-      const [trajetsRes, missionsRes] = await Promise.all([
+      const [trajetsRes, missionsRes, gainsRes] = await Promise.all([
         fetch(`/api/trajets?transporteurId=${session?.user?.id}`),
         fetch(`/api/missions?transporteurId=${session?.user?.id}`),
+        fetch(`/api/transporteur/gains`),
       ]);
       const trajets = await trajetsRes.json();
       const missions = await missionsRes.json();
+      const gains = gainsRes.ok ? await gainsRes.json() : null;
       
       setStats({
         trajets: trajets.length,
-        missions: missions.filter((m: any) => m.status === 'ASSIGNE' || m.status === 'EN_COURS').length,
-        completed: missions.filter((m: any) => m.status === 'LIVRE').length,
-        earnings: missions.reduce((sum: number, m: any) => sum + (m.colis?.netTransporteur || 0), 0),
+        missions: missions.filter((m: any) => ['ASSIGNE', 'PICKED_UP'].includes(m.status)).length,
+        completed: missions.filter((m: any) => m.status === 'COMPLETED').length,
+        earnings: gains?.wallet?.total ?? missions.reduce((sum: number, m: any) => sum + (m.gainAmount || m.colis?.netTransporteur || 0), 0),
       });
+      if (gains?.wallet) setWallet(gains.wallet);
     } catch (error) {
       console.error('Error fetching stats:', error);
     } finally {
@@ -115,27 +119,28 @@ export default function TransporterDashboard() {
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Livrés</CardTitle>
-              <CheckCircle className="h-4 w-4 text-slate-400" />
+              <CardTitle className="text-sm font-medium">Gains disponibles</CardTitle>
+              <DollarSign className="h-4 w-4 text-emerald-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.completed}</div>
+              <div className="text-2xl font-bold text-emerald-600">{wallet.available.toFixed(0)} DA</div>
+              {wallet.pending > 0 && <p className="text-xs text-slate-500">{wallet.pending.toFixed(0)} DA en attente</p>}
             </CardContent>
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Gains</CardTitle>
-              <DollarSign className="h-4 w-4 text-slate-400" />
+              <CardTitle className="text-sm font-medium">Gains totaux</CardTitle>
+              <Wallet className="h-4 w-4 text-slate-400" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-emerald-600">{stats.earnings} DA</div>
+              <div className="text-2xl font-bold">{stats.earnings.toFixed(0)} DA</div>
             </CardContent>
           </Card>
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="grid w-full grid-cols-4 mb-8">
-            <TabsTrigger value="overview"><MapPin className="h-4 w-4 mr-2" />Vue d'ensemble</TabsTrigger>
+            <TabsTrigger value="overview"><MapPin className="h-4 w-4 mr-2" />Vue d&apos;ensemble</TabsTrigger>
             <TabsTrigger value="trajets"><Route className="h-4 w-4 mr-2" />Mes trajets</TabsTrigger>
             <TabsTrigger value="missions"><Package className="h-4 w-4 mr-2" />Missions</TabsTrigger>
             <TabsTrigger value="scan"><QrCode className="h-4 w-4 mr-2" />Scanner</TabsTrigger>
@@ -151,7 +156,7 @@ export default function TransporterDashboard() {
             <MissionsTab userId={session.user.id} />
           </TabsContent>
           <TabsContent value="scan">
-            <ScanTab />
+            <ScanTab userId={session.user.id} />
           </TabsContent>
         </Tabs>
       </main>
@@ -173,12 +178,12 @@ function OverviewTab({ userId, setActiveTab }: { userId: string; setActiveTab: (
 
   const fetchData = async () => {
     try {
-      // Get parcels with status RECU_RELAIS (waiting for transport)
-      const parcelsRes = await fetch('/api/parcels?status=RECU_RELAIS');
+      // Get parcels available for transport (new + legacy statuses)
+      const parcelsRes = await fetch('/api/parcels?available=true');
       const parcels = await parcelsRes.json();
       
       // Convert to mission-like format for display
-      const missions = parcels.map((p: any) => ({
+      const missions = (Array.isArray(parcels) ? parcels : []).map((p: any) => ({
         id: p.id,
         colis: p,
         colisId: p.id,
@@ -426,9 +431,11 @@ function TrajetsTab({ userId }: { userId: string }) {
 
 // Missions Tab
 function MissionsTab({ userId }: { userId: string }) {
+  const { toast } = useToast();
   const [missions, setMissions] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState('all');
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   useEffect(() => { fetchMissions(); }, [userId]);
 
@@ -443,13 +450,26 @@ function MissionsTab({ userId }: { userId: string }) {
     }
   };
 
-  const handleStatusChange = async (id: string, status: string) => {
-    await fetch(`/api/missions/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status }),
-    });
-    fetchMissions();
+  const handleDeliveryAction = async (missionId: string, trackingNumber: string, action: 'pickup' | 'arrive_relay') => {
+    setActionLoading(missionId);
+    try {
+      const response = await fetch('/api/delivery/confirm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ trackingNumber, missionId, action }),
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        toast({ title: 'Erreur', description: result.error ?? 'Action échouée', variant: 'destructive' });
+      } else {
+        toast({ title: '✅ Succès', description: result.message });
+        fetchMissions();
+      }
+    } catch {
+      toast({ title: 'Erreur', variant: 'destructive' });
+    } finally {
+      setActionLoading(null);
+    }
   };
 
   const filteredMissions = filter === 'all' ? missions : missions.filter(m => m.status === filter);
@@ -467,8 +487,8 @@ function MissionsTab({ userId }: { userId: string }) {
             <SelectContent>
               <SelectItem value="all">Toutes</SelectItem>
               <SelectItem value="ASSIGNE">Assignées</SelectItem>
-              <SelectItem value="EN_COURS">En cours</SelectItem>
-              <SelectItem value="LIVRE">Livrées</SelectItem>
+              <SelectItem value="PICKED_UP">En transit</SelectItem>
+              <SelectItem value="COMPLETED">Livrées</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -487,24 +507,46 @@ function MissionsTab({ userId }: { userId: string }) {
                   <div>
                     <p className="font-mono font-semibold">{m.colis?.trackingNumber}</p>
                     <p className="text-sm text-slate-500">{m.colis?.villeDepart} → {m.colis?.villeArrivee}</p>
-                    <p className="text-xs text-slate-400">{m.colis?.format} - {m.colis?.netTransporteur} DA</p>
+                    <p className="text-xs text-slate-400">
+                      {m.colis?.format} · Gain: {(m.gainAmount || m.colis?.netTransporteur || 0).toFixed(0)} DA
+                      {m.gainStatus === 'AVAILABLE' && <span className="ml-1 text-emerald-600 font-semibold">✓ Disponible</span>}
+                      {m.gainStatus === 'PAID' && <span className="ml-1 text-blue-600 font-semibold">✓ Payé</span>}
+                    </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Badge variant="outline">{m.status}</Badge>
+                  <Badge variant="outline" className="text-xs">{m.status}</Badge>
+                  {/* Pickup action: ASSIGNE → PICKED_UP */}
                   {m.status === 'ASSIGNE' && (
-                    <Button size="sm" onClick={() => handleStatusChange(m.id, 'EN_COURS')}>
-                      <Navigation className="h-4 w-4 mr-1" />Démarrer
+                    <Button
+                      size="sm"
+                      className="bg-orange-500 hover:bg-orange-600"
+                      onClick={() => handleDeliveryAction(m.id, m.colis?.trackingNumber, 'pickup')}
+                      disabled={actionLoading === m.id}
+                    >
+                      {actionLoading === m.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Scan className="h-3 w-3 mr-1" />Prendre en charge</>}
                     </Button>
                   )}
-                  {m.status === 'EN_COURS' && (
-                    <Button size="sm" className="bg-green-600" onClick={() => handleStatusChange(m.id, 'LIVRE')}>
-                      <CheckCircle className="h-4 w-4 mr-1" />Livré
+                  {/* Arrive relay action: PICKED_UP → ARRIVED_RELAY */}
+                  {m.status === 'PICKED_UP' && (
+                    <Button
+                      size="sm"
+                      className="bg-teal-600 hover:bg-teal-700"
+                      onClick={() => handleDeliveryAction(m.id, m.colis?.trackingNumber, 'arrive_relay')}
+                      disabled={actionLoading === m.id}
+                    >
+                      {actionLoading === m.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <><CheckCircle className="h-3 w-3 mr-1" />Livrer au relais</>}
                     </Button>
+                  )}
+                  {m.status === 'COMPLETED' && (
+                    <Badge className="bg-green-100 text-green-700 text-xs">Livré</Badge>
                   )}
                 </div>
               </div>
             ))}
+            {filteredMissions.length === 0 && (
+              <p className="text-center text-slate-500 py-8">Aucune mission</p>
+            )}
           </div>
         )}
       </CardContent>
@@ -512,123 +554,135 @@ function MissionsTab({ userId }: { userId: string }) {
   );
 }
 
-// Scan Tab
-function ScanTab() {
+// Scan Tab (transporter)
+function ScanTab({ userId }: { userId: string }) {
   const { toast } = useToast();
-  const [scanResult, setScanResult] = useState<string>('');
+  const [trackingInput, setTrackingInput] = useState('');
   const [parcel, setParcel] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [isUpdating, setIsUpdating] = useState(false);
+  const [isActioning, setIsActioning] = useState(false);
 
-  const handleScan = async () => {
-    if (!scanResult) return;
+  const handleSearch = async () => {
+    if (!trackingInput.trim()) return;
     setIsLoading(true);
+    setParcel(null);
     try {
-      const response = await fetch(`/api/parcels?tracking=${scanResult}`);
+      const response = await fetch(`/api/parcels?tracking=${trackingInput.trim().toUpperCase()}`);
       const data = await response.json();
-      if (data.error) {
-        toast({ title: 'Erreur', description: 'Colis non trouvé', variant: 'destructive' });
-        setParcel(null);
-      } else {
+      if (Array.isArray(data) && data.length > 0) {
+        setParcel(data[0]);
+      } else if (data?.trackingNumber) {
         setParcel(data);
+      } else {
+        toast({ title: 'Introuvable', description: 'Aucun colis avec ce numéro', variant: 'destructive' });
       }
     } catch {
-      toast({ title: 'Erreur', description: 'Colis non trouvé', variant: 'destructive' });
+      toast({ title: 'Erreur', variant: 'destructive' });
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleUpdateStatus = async (status: string) => {
+  const handleDeliveryAction = async (action: 'pickup' | 'arrive_relay') => {
     if (!parcel) return;
-    setIsUpdating(true);
+    setIsActioning(true);
     try {
-      const response = await fetch(`/api/parcels/${parcel.id}`, {
-        method: 'PUT',
+      const response = await fetch('/api/delivery/confirm', {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status }),
+        body: JSON.stringify({ trackingNumber: parcel.trackingNumber, action }),
       });
-      
-      if (response.ok) {
-        toast({ title: 'Statut mis à jour', description: `Le colis est maintenant: ${PARCEL_STATUS.find(s => s.id === status)?.label}` });
-        setParcel({ ...parcel, status });
+      const result = await response.json();
+      if (!response.ok) {
+        toast({ title: 'Erreur', description: result.error ?? 'Action échouée', variant: 'destructive' });
       } else {
-        throw new Error('Failed');
+        toast({ title: '✅ Succès', description: result.message });
+        setParcel({ ...parcel, status: result.newStatus });
       }
     } catch {
-      toast({ title: 'Erreur', description: 'Impossible de mettre à jour le statut', variant: 'destructive' });
+      toast({ title: 'Erreur', variant: 'destructive' });
     } finally {
-      setIsUpdating(false);
+      setIsActioning(false);
     }
   };
 
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2"><Scan className="h-5 w-5" />Scanner QR Code</CardTitle>
-        <CardDescription>Scannez le QR code d'un colis pour le traiter</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        <div className="flex gap-2">
-          <Input
-            placeholder="Entrez le numéro de suivi (ex: SCXXXXXXXXX)"
-            value={scanResult}
-            onChange={(e) => setScanResult(e.target.value.toUpperCase())}
-            className="font-mono"
-          />
-          <Button onClick={handleScan} disabled={isLoading}>
-            {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <QrCode className="h-4 w-4 mr-2" />}
-            Rechercher
-          </Button>
-        </div>
+  const statusLabel = (s: string) => PARCEL_STATUS.find(p => p.id === s)?.label ?? s;
+  const statusColor = (s: string) => PARCEL_STATUS.find(p => p.id === s)?.color ?? 'bg-gray-400';
 
-        {parcel && !parcel.error && (
-          <Card className="bg-slate-50 dark:bg-slate-800">
-            <CardContent className="py-4">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <p className="font-mono font-bold">{parcel.trackingNumber}</p>
-                  <p className="text-sm text-slate-500">
-                    {WILAYAS.find(w => w.id === parcel.villeDepart)?.name || parcel.villeDepart} → {WILAYAS.find(w => w.id === parcel.villeArrivee)?.name || parcel.villeArrivee}
-                  </p>
-                  <p className="text-xs text-slate-400">Format: {parcel.format}</p>
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><Scan className="h-5 w-5" />Scanner QR Code</CardTitle>
+          <CardDescription>Scannez le QR code du colis lors de la prise en charge ou de la livraison au relais</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex gap-2">
+            <Input
+              placeholder="Numéro de suivi"
+              value={trackingInput}
+              onChange={(e) => setTrackingInput(e.target.value.toUpperCase())}
+              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+              className="font-mono"
+            />
+            <Button onClick={handleSearch} disabled={isLoading || !trackingInput}>
+              {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <QrCode className="h-4 w-4 mr-2" />}
+              Rechercher
+            </Button>
+          </div>
+
+          {parcel && (
+            <Card className="border-2 border-slate-200">
+              <CardContent className="py-4 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-mono font-bold">{parcel.trackingNumber}</p>
+                    <p className="text-sm text-slate-500">{parcel.villeDepart} → {parcel.villeArrivee} · {parcel.format}</p>
+                    <p className="text-xs text-slate-400">Gain: {(parcel.netTransporteur ?? 0).toFixed(0)} DA</p>
+                  </div>
+                  <Badge className={`${statusColor(parcel.status)} text-white`}>{statusLabel(parcel.status)}</Badge>
                 </div>
-                <Badge className={`${PARCEL_STATUS.find(s => s.id === parcel.status)?.color} text-white`}>
-                  {PARCEL_STATUS.find(s => s.id === parcel.status)?.label}
-                </Badge>
-              </div>
-              
-              <div className="flex flex-wrap gap-2">
-                {['RECU_RELAIS'].includes(parcel.status) && (
-                  <Button 
-                    size="sm" 
-                    className="bg-emerald-600 hover:bg-emerald-700"
-                    onClick={() => handleUpdateStatus('EN_TRANSPORT')}
-                    disabled={isUpdating}
-                  >
-                    {isUpdating ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Truck className="h-4 w-4 mr-1" />}
-                    Prendre en charge
-                  </Button>
+
+                {/* Pickup action */}
+                {['DEPOSITED_RELAY', 'ASSIGNED', 'RECU_RELAIS'].includes(parcel.status) && (
+                  <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 rounded-lg p-4">
+                    <p className="font-semibold text-orange-800 mb-2 text-sm">Prise en charge du colis au relais de départ</p>
+                    <Button
+                      className="bg-orange-500 hover:bg-orange-600"
+                      disabled={isActioning}
+                      onClick={() => handleDeliveryAction('pickup')}
+                    >
+                      {isActioning ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Truck className="h-4 w-4 mr-2" />}
+                      Scanner — Prise en charge
+                    </Button>
+                  </div>
                 )}
-                {['EN_TRANSPORT'].includes(parcel.status) && (
-                  <Button 
-                    size="sm" 
-                    className="bg-green-600 hover:bg-green-700"
-                    onClick={() => handleUpdateStatus('ARRIVE_RELAIS_DESTINATION')}
-                    disabled={isUpdating}
-                  >
-                    {isUpdating ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <CheckCircle className="h-4 w-4 mr-1" />}
-                    Arrivé au relais
-                  </Button>
+
+                {/* Arrive relay action */}
+                {['PICKED_UP', 'EN_TRANSPORT'].includes(parcel.status) && (
+                  <div className="bg-teal-50 dark:bg-teal-900/20 border border-teal-200 rounded-lg p-4">
+                    <p className="font-semibold text-teal-800 mb-2 text-sm">Livraison au relais de destination</p>
+                    <Button
+                      className="bg-teal-600 hover:bg-teal-700"
+                      disabled={isActioning}
+                      onClick={() => handleDeliveryAction('arrive_relay')}
+                    >
+                      {isActioning ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle className="h-4 w-4 mr-2" />}
+                      Scanner — Livré au relais
+                    </Button>
+                  </div>
                 )}
-                {['ARRIVE_RELAIS_DESTINATION', 'LIVRE'].includes(parcel.status) && (
-                  <Badge className="bg-green-100 text-green-700 px-4 py-2">Colis déjà livré ou au relais</Badge>
+
+                {['ARRIVED_RELAY', 'ARRIVE_RELAIS_DESTINATION', 'DELIVERED', 'LIVRE'].includes(parcel.status) && (
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                    <p className="text-green-700 text-sm font-semibold">✅ Colis livré au relais de destination</p>
+                  </div>
                 )}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-      </CardContent>
-    </Card>
+              </CardContent>
+            </Card>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 }

@@ -12,14 +12,20 @@ export async function GET(request: NextRequest) {
     const clientId = searchParams.get('clientId');
     const status = searchParams.get('status');
     const tracking = searchParams.get('tracking');
+    const available = searchParams.get('available'); // "true" = show available for transport
 
-    let where: any = {};
+    const where: Record<string, unknown> = {};
 
     if (clientId) {
       where.clientId = clientId;
     }
     if (status) {
       where.status = status;
+    } else if (available === 'true') {
+      // Show parcels available for transport: deposited at relay (new + legacy statuses)
+      where.status = { in: ['DEPOSITED_RELAY', 'RECU_RELAIS', 'PAID_RELAY'] };
+      // Only parcels without an active mission
+      where.missions = { none: { status: { in: ['ASSIGNE', 'PICKED_UP'] } } };
     }
     if (tracking) {
       where.trackingNumber = tracking;

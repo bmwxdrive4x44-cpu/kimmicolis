@@ -13,8 +13,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { WILAYAS, PARCEL_STATUS, RELAIS_STATUS, DEFAULT_RELAY_COMMISSION } from '@/lib/constants';
-import { Store, Package, QrCode, DollarSign, Loader2, CheckCircle, Clock, Scan, ArrowDownToLine, ArrowUpFromLine, Settings, BarChart3, AlertCircle, Save } from 'lucide-react';
+import { WILAYAS, PARCEL_STATUS, RELAIS_STATUS, DEFAULT_RELAY_COMMISSION, RELAY_BLOCK_THRESHOLD_DA } from '@/lib/constants';
+import { Store, Package, QrCode, DollarSign, Loader2, CheckCircle, Clock, Scan, ArrowDownToLine, AlertCircle, Save, BanknoteIcon, TrendingUp, ShieldAlert } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 function getRoleBasedDashboardPath(role: string, locale: string): string {
@@ -33,6 +33,7 @@ export default function RelaisDashboard() {
   const [activeTab, setActiveTab] = useState('overview');
   const [relaisInfo, setRelaisInfo] = useState<any>(null);
   const [stats, setStats] = useState({ pending: 0, received: 0, handedOver: 0, earnings: 0 });
+  const [financials, setFinancials] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -77,9 +78,13 @@ export default function RelaisDashboard() {
           const statsRes = await fetch(`/api/relais/${relais.id}/stats`);
           const statsData = await statsRes.json();
           setStats(statsData);
-        } catch {
-          // Stats API might not work, use defaults
-        }
+        } catch { /* Use defaults */ }
+
+        // Fetch financials
+        try {
+          const finRes = await fetch(`/api/relais/financials?relaisId=${relais.id}`);
+          if (finRes.ok) setFinancials(await finRes.json());
+        } catch { /* Use defaults */ }
       } else {
         setError('Aucun point relais associé à votre compte. Veuillez contacter l\'administrateur.');
       }
@@ -150,7 +155,22 @@ export default function RelaisDashboard() {
           </Card>
         )}
 
-        {/* Relais Status Banner */}
+        {/* Blocked Banner */}
+        {relaisInfo?.isBlocked && (
+          <Card className="mb-8 border-red-400 bg-red-50 dark:bg-red-900/20">
+            <CardContent className="py-4">
+              <div className="flex items-center gap-4">
+                <ShieldAlert className="h-6 w-6 text-red-600" />
+                <div>
+                  <p className="font-bold text-red-700 dark:text-red-400">⛔ Compte bloqué automatiquement</p>
+                  <p className="text-sm text-red-600">Le solde non reversé dépasse le seuil autorisé. Veuillez contacter l&apos;administrateur pour un reversement.</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Status Banner */}
         {relaisInfo && relaisInfo.status === 'PENDING' && (
           <Card className="mb-8 border-orange-200 bg-orange-50 dark:bg-orange-900/20">
             <CardContent className="py-4">
@@ -158,21 +178,7 @@ export default function RelaisDashboard() {
                 <Clock className="h-6 w-6 text-orange-600" />
                 <div>
                   <p className="font-semibold text-orange-700 dark:text-orange-400">Inscription en attente de validation</p>
-                  <p className="text-sm text-orange-600 dark:text-orange-500">Votre demande est en cours d'examen par l'administrateur</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {relaisInfo && relaisInfo.status === 'REJECTED' && (
-          <Card className="mb-8 border-red-200 bg-red-50 dark:bg-red-900/20">
-            <CardContent className="py-4">
-              <div className="flex items-center gap-4">
-                <AlertCircle className="h-6 w-6 text-red-600" />
-                <div>
-                  <p className="font-semibold text-red-700 dark:text-red-400">Inscription refusée</p>
-                  <p className="text-sm text-red-600 dark:text-red-500">Veuillez contacter le support pour plus d'informations</p>
+                  <p className="text-sm text-orange-600 dark:text-orange-500">Votre demande est en cours d&apos;examen par l&apos;administrateur</p>
                 </div>
               </div>
             </CardContent>
@@ -192,7 +198,7 @@ export default function RelaisDashboard() {
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Reçus</CardTitle>
+              <CardTitle className="text-sm font-medium">Déposés</CardTitle>
               <ArrowDownToLine className="h-4 w-4 text-blue-500" />
             </CardHeader>
             <CardContent>
@@ -201,36 +207,44 @@ export default function RelaisDashboard() {
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Remis</CardTitle>
-              <ArrowUpFromLine className="h-4 w-4 text-green-500" />
+              <CardTitle className="text-sm font-medium">Total encaissé</CardTitle>
+              <BanknoteIcon className="h-4 w-4 text-emerald-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.handedOver}</div>
+              <div className="text-2xl font-bold text-emerald-600">
+                {(financials?.totalEncaisse ?? 0).toFixed(0)} DA
+              </div>
             </CardContent>
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Commissions</CardTitle>
-              <DollarSign className="h-4 w-4 text-emerald-500" />
+              <CardTitle className="text-sm font-medium">Solde à reverser</CardTitle>
+              <TrendingUp className="h-4 w-4 text-amber-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-emerald-600">{stats.earnings} DA</div>
+              <div className={`text-2xl font-bold ${relaisInfo?.isBlocked ? 'text-red-600' : 'text-amber-600'}`}>
+                {(financials?.balance ?? 0).toFixed(0)} DA
+              </div>
             </CardContent>
           </Card>
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-3 mb-8">
-            <TabsTrigger value="overview"><BarChart3 className="h-4 w-4 mr-2" />Vue d'ensemble</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-4 mb-8">
+            <TabsTrigger value="overview"><Store className="h-4 w-4 mr-2" />Vue d&apos;ensemble</TabsTrigger>
             <TabsTrigger value="scan"><QrCode className="h-4 w-4 mr-2" />Scanner</TabsTrigger>
-            <TabsTrigger value="settings"><Settings className="h-4 w-4 mr-2" />Paramètres</TabsTrigger>
+            <TabsTrigger value="financials"><DollarSign className="h-4 w-4 mr-2" />Financier</TabsTrigger>
+            <TabsTrigger value="settings"><Package className="h-4 w-4 mr-2" />Paramètres</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview">
             <OverviewTab relaisInfo={relaisInfo} setActiveTab={setActiveTab} />
           </TabsContent>
           <TabsContent value="scan">
-            <ScanTab relaisId={relaisInfo?.id} />
+            <ScanTab relaisId={relaisInfo?.id} onUpdate={fetchRelaisInfo} />
+          </TabsContent>
+          <TabsContent value="financials">
+            <FinancialsTab relaisInfo={relaisInfo} financials={financials} />
           </TabsContent>
           <TabsContent value="settings">
             <SettingsTab relaisInfo={relaisInfo} onUpdate={fetchRelaisInfo} />
@@ -305,19 +319,26 @@ function OverviewTab({ relaisInfo, setActiveTab }: { relaisInfo: any; setActiveT
           <CardTitle>Actions rapides</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 md:grid-cols-3">
             <Button variant="outline" className="justify-start h-auto py-4" onClick={() => setActiveTab('scan')}>
-              <QrCode className="h-5 w-5 mr-3" />
+              <BanknoteIcon className="h-5 w-5 mr-3 text-blue-500" />
               <div className="text-left">
-                <p className="font-semibold">Scanner un QR Code</p>
-                <p className="text-sm text-slate-500">Réceptionner ou remettre un colis</p>
+                <p className="font-semibold">Valider paiement cash</p>
+                <p className="text-sm text-slate-500">Client paie au comptoir</p>
               </div>
             </Button>
-            <Button variant="outline" className="justify-start h-auto py-4" onClick={() => setActiveTab('settings')}>
-              <Settings className="h-5 w-5 mr-3" />
+            <Button variant="outline" className="justify-start h-auto py-4" onClick={() => setActiveTab('scan')}>
+              <QrCode className="h-5 w-5 mr-3 text-emerald-500" />
               <div className="text-left">
-                <p className="font-semibold">Mes paramètres</p>
-                <p className="text-sm text-slate-500">Modifier les informations du relais</p>
+                <p className="font-semibold">Scanner dépôt colis</p>
+                <p className="text-sm text-slate-500">Confirmer dépôt physique</p>
+              </div>
+            </Button>
+            <Button variant="outline" className="justify-start h-auto py-4" onClick={() => setActiveTab('financials')}>
+              <TrendingUp className="h-5 w-5 mr-3 text-amber-500" />
+              <div className="text-left">
+                <p className="font-semibold">Tableau financier</p>
+                <p className="text-sm text-slate-500">Solde, encaissements</p>
               </div>
             </Button>
           </div>
@@ -327,24 +348,30 @@ function OverviewTab({ relaisInfo, setActiveTab }: { relaisInfo: any; setActiveT
   );
 }
 
-// Scan Tab
-function ScanTab({ relaisId }: { relaisId: string | undefined }) {
+// Scan Tab – full new workflow
+function ScanTab({ relaisId, onUpdate }: { relaisId: string | undefined; onUpdate: () => void }) {
   const { toast } = useToast();
-  const [scanResult, setScanResult] = useState('');
+  const [trackingInput, setTrackingInput] = useState('');
   const [parcel, setParcel] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isActioning, setIsActioning] = useState(false);
+  const [cashAmount, setCashAmount] = useState('');
 
-  const handleScan = async () => {
-    if (!scanResult) return;
+  const handleSearch = async () => {
+    if (!trackingInput.trim()) return;
     setIsLoading(true);
+    setParcel(null);
     try {
-      const response = await fetch(`/api/parcels?tracking=${scanResult}`);
+      const response = await fetch(`/api/parcels?tracking=${trackingInput.trim().toUpperCase()}`);
       const data = await response.json();
-      if (data.error) {
-        toast({ title: 'Erreur', description: 'Colis non trouvé', variant: 'destructive' });
-        setParcel(null);
-      } else {
+      if (data && Array.isArray(data) && data.length > 0) {
+        setParcel(data[0]);
+        setCashAmount(String(data[0].prixClient ?? ''));
+      } else if (data && !Array.isArray(data) && data.trackingNumber) {
         setParcel(data);
+        setCashAmount(String(data.prixClient ?? ''));
+      } else {
+        toast({ title: 'Introuvable', description: 'Aucun colis avec ce numéro', variant: 'destructive' });
       }
     } catch {
       toast({ title: 'Erreur', description: 'Impossible de rechercher le colis', variant: 'destructive' });
@@ -353,98 +380,302 @@ function ScanTab({ relaisId }: { relaisId: string | undefined }) {
     }
   };
 
-  const handleStatusChange = async (status: string) => {
-    if (!parcel) return;
+  const performAction = async (action: string, extraData?: Record<string, unknown>) => {
+    if (!parcel || !relaisId) return;
+    setIsActioning(true);
     try {
-      const response = await fetch(`/api/parcels/${parcel.id}`, {
-        method: 'PUT',
+      const response = await fetch('/api/relais/scan-qr', {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status }),
+        body: JSON.stringify({
+          trackingNumber: parcel.trackingNumber,
+          relaisId,
+          action,
+          ...extraData,
+        }),
       });
-      
-      if (response.ok) {
-        toast({ title: 'Statut mis à jour', description: 'Le statut du colis a été modifié' });
-        setParcel({ ...parcel, status });
-      } else {
-        throw new Error('Failed');
+      const result = await response.json();
+      if (!response.ok) {
+        toast({ title: 'Erreur', description: result.error ?? 'Action échouée', variant: 'destructive' });
+        return;
       }
+      toast({ title: '✅ Succès', description: result.message });
+      setParcel({ ...parcel, status: result.newStatus });
+      onUpdate();
     } catch {
-      toast({ title: 'Erreur', description: 'Impossible de mettre à jour le statut', variant: 'destructive' });
+      toast({ title: 'Erreur', description: 'Impossible d\'effectuer l\'action', variant: 'destructive' });
+    } finally {
+      setIsActioning(false);
     }
   };
 
+  const statusLabel = (s: string) => PARCEL_STATUS.find(p => p.id === s)?.label ?? s;
+  const statusColor = (s: string) => PARCEL_STATUS.find(p => p.id === s)?.color ?? 'bg-gray-400';
+
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2"><Scan className="h-5 w-5" />Scanner QR Code</CardTitle>
-        <CardDescription>Scannez le QR code d'un colis pour le réceptionner ou le remettre</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        <div className="flex gap-2">
-          <Input
-            placeholder="Entrez le numéro de suivi (ex: SCXXXXXXXXX)"
-            value={scanResult}
-            onChange={(e) => setScanResult(e.target.value.toUpperCase())}
-            className="font-mono"
-          />
-          <Button onClick={handleScan} disabled={isLoading}>
-            {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <QrCode className="h-4 w-4 mr-2" />}
-            Rechercher
-          </Button>
-        </div>
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><Scan className="h-5 w-5" />Scanner / Rechercher un colis</CardTitle>
+          <CardDescription>Saisissez le numéro de suivi ou scannez le QR code du colis</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex gap-2">
+            <Input
+              placeholder="Numéro de suivi (ex: SC1234567890)"
+              value={trackingInput}
+              onChange={(e) => setTrackingInput(e.target.value.toUpperCase())}
+              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+              className="font-mono"
+            />
+            <Button onClick={handleSearch} disabled={isLoading || !trackingInput}>
+              {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <QrCode className="h-4 w-4 mr-2" />}
+              Rechercher
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
-        {parcel && !parcel.error && (
-          <Card className="bg-slate-50 dark:bg-slate-800">
-            <CardContent className="py-6">
-              <div className="flex items-center justify-between mb-6">
-                <div>
-                  <p className="font-mono font-bold text-lg">{parcel.trackingNumber}</p>
-                  <p className="text-slate-500">{parcel.villeDepart} → {parcel.villeArrivee}</p>
-                </div>
-                <Badge className={`${PARCEL_STATUS.find(s => s.id === parcel.status)?.color} text-white px-4 py-2`}>
-                  {PARCEL_STATUS.find(s => s.id === parcel.status)?.label}
-                </Badge>
+      {parcel && (
+        <Card className="border-2 border-emerald-200 dark:border-emerald-800">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-mono font-bold text-xl">{parcel.trackingNumber}</p>
+                <p className="text-slate-500 text-sm">{parcel.villeDepart} → {parcel.villeArrivee} · {parcel.format}</p>
               </div>
-
-              <div className="grid gap-4 md:grid-cols-2 mb-6">
-                <div>
-                  <p className="text-sm text-slate-500">Client</p>
-                  <p className="font-semibold">{parcel.client?.name || 'N/A'}</p>
-                  <p className="text-sm">{parcel.client?.phone || 'N/A'}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-slate-500">Format</p>
-                  <p className="font-semibold">{parcel.format}</p>
-                  <p className="text-sm">Commission: {parcel.commissionRelais || 0} DA</p>
-                </div>
+              <Badge className={`${statusColor(parcel.status)} text-white px-3 py-1`}>
+                {statusLabel(parcel.status)}
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Parcel info */}
+            <div className="grid gap-4 md:grid-cols-3 text-sm">
+              <div>
+                <p className="text-slate-500">Client</p>
+                <p className="font-semibold">{parcel.client?.name ?? 'N/A'}</p>
+                <p>{parcel.client?.phone ?? 'N/A'}</p>
               </div>
+              <div>
+                <p className="text-slate-500">Montant à encaisser</p>
+                <p className="font-bold text-lg text-emerald-700">{parcel.prixClient?.toFixed(0) ?? 0} DA</p>
+                <p className="text-xs text-slate-400">Commission relais: {parcel.commissionRelais?.toFixed(0) ?? 0} DA</p>
+              </div>
+              <div>
+                <p className="text-slate-500">Format / Poids</p>
+                <p className="font-semibold">{parcel.format}</p>
+                {parcel.weight && <p>{parcel.weight} kg</p>}
+              </div>
+            </div>
 
-              <div className="flex flex-wrap gap-4">
-                {['CREATED', 'PAID'].includes(parcel.status) && (
-                  <Button className="bg-emerald-600 hover:bg-emerald-700" onClick={() => handleStatusChange('RECU_RELAIS')}>
-                    <ArrowDownToLine className="h-4 w-4 mr-2" />Confirmer réception
+            {/* ─── ACTION BUTTONS based on current status ─── */}
+
+            {/* STEP 1: Validate cash payment (CREATED → PAID_RELAY) */}
+            {(parcel.status === 'CREATED' || parcel.status === 'PAID') && parcel.relaisDepartId === relaisId && (
+              <div className="border border-blue-200 bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 space-y-3">
+                <p className="font-semibold text-blue-800 dark:text-blue-300 flex items-center gap-2">
+                  <BanknoteIcon className="h-4 w-4" /> Étape 1 — Valider le paiement cash
+                </p>
+                <div className="flex gap-3 items-end">
+                  <div className="flex-1">
+                    <Label>Montant encaissé (DA)</Label>
+                    <Input
+                      type="number"
+                      value={cashAmount}
+                      onChange={(e) => setCashAmount(e.target.value)}
+                      className="font-mono"
+                    />
+                  </div>
+                  <Button
+                    className="bg-blue-600 hover:bg-blue-700"
+                    disabled={isActioning || !cashAmount}
+                    onClick={() => performAction('validate_payment', { cashAmount: parseFloat(cashAmount) })}
+                  >
+                    {isActioning ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <BanknoteIcon className="h-4 w-4 mr-2" />}
+                    Valider paiement
                   </Button>
-                )}
-                {parcel.status === 'ARRIVE_RELAIS_DESTINATION' && (
-                  <Button className="bg-green-600 hover:bg-green-700" onClick={() => handleStatusChange('LIVRE')}>
-                    <CheckCircle className="h-4 w-4 mr-2" />Confirmer remise au client
-                  </Button>
-                )}
-                {parcel.status === 'LIVRE' && (
-                  <Badge className="bg-green-100 text-green-700 px-4 py-2 text-base">Colis déjà livré</Badge>
-                )}
-                {parcel.status === 'RECU_RELAIS' && (
-                  <Badge className="bg-yellow-100 text-yellow-700 px-4 py-2 text-base">En attente de transport</Badge>
-                )}
-                {parcel.status === 'EN_TRANSPORT' && (
-                  <Badge className="bg-orange-100 text-orange-700 px-4 py-2 text-base">En cours de transport</Badge>
-                )}
+                </div>
               </div>
-            </CardContent>
-          </Card>
-        )}
-      </CardContent>
-    </Card>
+            )}
+
+            {/* STEP 2: Confirm physical deposit (PAID_RELAY → DEPOSITED_RELAY) */}
+            {(parcel.status === 'PAID_RELAY' || parcel.status === 'RECU_RELAIS') && parcel.relaisDepartId === relaisId && (
+              <div className="border border-yellow-200 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg p-4 space-y-3">
+                <p className="font-semibold text-yellow-800 dark:text-yellow-300 flex items-center gap-2">
+                  <QrCode className="h-4 w-4" /> Étape 2 — Confirmer le dépôt physique
+                </p>
+                <p className="text-sm text-yellow-700">Après scan, le colis sera disponible pour les transporteurs</p>
+                <Button
+                  className="bg-yellow-600 hover:bg-yellow-700"
+                  disabled={isActioning}
+                  onClick={() => performAction('deposit_scan')}
+                >
+                  {isActioning ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <QrCode className="h-4 w-4 mr-2" />}
+                  Scanner dépôt
+                </Button>
+              </div>
+            )}
+
+            {/* Parcel waiting for transporter */}
+            {(parcel.status === 'DEPOSITED_RELAY' || parcel.status === 'ASSIGNED' || parcel.status === 'PICKED_UP') && (
+              <div className="border border-slate-200 bg-slate-50 dark:bg-slate-800 rounded-lg p-4">
+                <p className="text-slate-600 text-sm flex items-center gap-2">
+                  <Clock className="h-4 w-4" />
+                  {parcel.status === 'DEPOSITED_RELAY' && 'Colis déposé — en attente d\'un transporteur'}
+                  {parcel.status === 'ASSIGNED' && 'Transporteur assigné — en attente de prise en charge'}
+                  {parcel.status === 'PICKED_UP' && 'Colis en route vers le relais de destination'}
+                </p>
+              </div>
+            )}
+
+            {/* STEP 5: Receive from transporter at destination relay (PICKED_UP → ARRIVED_RELAY) */}
+            {(parcel.status === 'PICKED_UP' || parcel.status === 'EN_TRANSPORT' || parcel.status === 'ARRIVE_RELAIS_DESTINATION') && parcel.relaisArriveeId === relaisId && (
+              <div className="border border-teal-200 bg-teal-50 dark:bg-teal-900/20 rounded-lg p-4 space-y-3">
+                <p className="font-semibold text-teal-800 dark:text-teal-300 flex items-center gap-2">
+                  <ArrowDownToLine className="h-4 w-4" /> Réceptionner le colis du transporteur
+                </p>
+                <Button
+                  className="bg-teal-600 hover:bg-teal-700"
+                  disabled={isActioning}
+                  onClick={() => performAction('receive_transporter')}
+                >
+                  {isActioning ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <ArrowDownToLine className="h-4 w-4 mr-2" />}
+                  Confirmer réception transporteur
+                </Button>
+              </div>
+            )}
+
+            {/* STEP 6: Deliver to client (ARRIVED_RELAY → DELIVERED) */}
+            {(parcel.status === 'ARRIVED_RELAY' || parcel.status === 'ARRIVE_RELAIS_DESTINATION') && parcel.relaisArriveeId === relaisId && (
+              <div className="border border-emerald-200 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg p-4 space-y-3">
+                <p className="font-semibold text-emerald-800 dark:text-emerald-300 flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4" /> Remettre le colis au client
+                </p>
+                <Button
+                  className="bg-emerald-600 hover:bg-emerald-700"
+                  disabled={isActioning}
+                  onClick={() => performAction('deliver_client')}
+                >
+                  {isActioning ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle className="h-4 w-4 mr-2" />}
+                  Colis remis au client
+                </Button>
+              </div>
+            )}
+
+            {/* Final state */}
+            {(parcel.status === 'DELIVERED' || parcel.status === 'LIVRE') && (
+              <div className="border border-green-200 bg-green-50 dark:bg-green-900/20 rounded-lg p-4">
+                <p className="text-green-700 font-semibold flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4" /> Colis livré avec succès
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+// Financials Tab
+function FinancialsTab({ relaisInfo, financials }: { relaisInfo: any; financials: any }) {
+  const balance = financials?.balance ?? 0;
+  const totalEncaisse = financials?.totalEncaisse ?? 0;
+  const totalReverse = financials?.totalReverse ?? 0;
+  const blockRisk = financials?.blockRiskPercent ?? 0;
+
+  return (
+    <div className="space-y-6">
+      {/* Financial Summary */}
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card className="border-emerald-200">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-emerald-700">Total encaissé</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-3xl font-bold text-emerald-600">{totalEncaisse.toFixed(0)} DA</p>
+            <p className="text-xs text-slate-500 mt-1">Cash reçu des clients</p>
+          </CardContent>
+        </Card>
+        <Card className="border-blue-200">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-blue-700">Total reversé</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-3xl font-bold text-blue-600">{totalReverse.toFixed(0)} DA</p>
+            <p className="text-xs text-slate-500 mt-1">Envoyé à la plateforme</p>
+          </CardContent>
+        </Card>
+        <Card className={balance > RELAY_BLOCK_THRESHOLD_DA * 0.8 ? 'border-red-300' : 'border-amber-200'}>
+          <CardHeader className="pb-2">
+            <CardTitle className={`text-sm font-medium ${balance > RELAY_BLOCK_THRESHOLD_DA * 0.8 ? 'text-red-700' : 'text-amber-700'}`}>
+              Solde à reverser
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className={`text-3xl font-bold ${balance > RELAY_BLOCK_THRESHOLD_DA * 0.8 ? 'text-red-600' : 'text-amber-600'}`}>
+              {balance.toFixed(0)} DA
+            </p>
+            <p className="text-xs text-slate-500 mt-1">Seuil: {RELAY_BLOCK_THRESHOLD_DA.toLocaleString()} DA</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Block Risk Progress */}
+      {blockRisk > 50 && (
+        <Card className="border-orange-300 bg-orange-50 dark:bg-orange-900/10">
+          <CardContent className="py-4">
+            <div className="flex items-center gap-3">
+              <AlertCircle className="h-5 w-5 text-orange-600 flex-shrink-0" />
+              <div className="flex-1">
+                <p className="font-semibold text-orange-700">Risque de blocage: {blockRisk.toFixed(0)}%</p>
+                <div className="w-full bg-orange-200 rounded-full h-2 mt-2">
+                  <div
+                    className="bg-orange-600 h-2 rounded-full"
+                    style={{ width: `${Math.min(blockRisk, 100)}%` }}
+                  />
+                </div>
+                <p className="text-xs text-orange-600 mt-1">
+                  Reversez {(balance * 0.5).toFixed(0)} DA ou plus pour réduire le risque
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Transaction History */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Historique des transactions</CardTitle>
+          <CardDescription>Encaissements et reversements</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {financials?.transactions?.length > 0 ? (
+            <div className="space-y-2">
+              {financials.transactions.slice(0, 20).map((tx: any) => (
+                <div key={tx.id} className="flex items-center justify-between py-2 border-b last:border-0">
+                  <div>
+                    <p className="font-medium text-sm">
+                      {tx.type === 'COLLECTED' ? '📥 Encaissement' : '📤 Reversement'}
+                      {tx.colis && <span className="text-slate-400 ml-2 font-mono text-xs">{tx.colis.trackingNumber}</span>}
+                    </p>
+                    <p className="text-xs text-slate-500">{new Date(tx.createdAt).toLocaleDateString('fr-DZ', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
+                    {tx.description && <p className="text-xs text-slate-400">{tx.description}</p>}
+                  </div>
+                  <p className={`font-bold ${tx.type === 'COLLECTED' ? 'text-emerald-600' : 'text-blue-600'}`}>
+                    {tx.type === 'COLLECTED' ? '+' : '-'}{tx.amount.toFixed(0)} DA
+                  </p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-center text-slate-500 py-8">Aucune transaction enregistrée</p>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 }
 
@@ -458,10 +689,6 @@ function SettingsTab({ relaisInfo, onUpdate }: { relaisInfo: any; onUpdate: () =
     ville: '',
     phone: '',
   });
-  const [hours, setHours] = useState({
-    open: '08:00',
-    close: '18:00',
-  });
 
   useEffect(() => {
     if (relaisInfo) {
@@ -471,9 +698,6 @@ function SettingsTab({ relaisInfo, onUpdate }: { relaisInfo: any; onUpdate: () =
         ville: relaisInfo.ville || '',
         phone: relaisInfo.user?.phone || '',
       });
-      // Load hours if available
-      if (relaisInfo.openTime) setHours(h => ({ ...h, open: relaisInfo.openTime }));
-      if (relaisInfo.closeTime) setHours(h => ({ ...h, close: relaisInfo.closeTime }));
     }
   }, [relaisInfo]);
 
@@ -485,7 +709,6 @@ function SettingsTab({ relaisInfo, onUpdate }: { relaisInfo: any; onUpdate: () =
 
     setIsSaving(true);
     try {
-      // Update relais info
       const relaisResponse = await fetch(`/api/relais/${relaisInfo.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -501,169 +724,61 @@ function SettingsTab({ relaisInfo, onUpdate }: { relaisInfo: any; onUpdate: () =
         throw new Error(error.details || 'Failed to save relais');
       }
 
-      // Update user phone if changed
       if (relaisInfo.user?.id && formData.phone !== relaisInfo.user?.phone) {
-        const userResponse = await fetch(`/api/users/${relaisInfo.user.id}`, {
+        await fetch(`/api/users/${relaisInfo.user.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            phone: formData.phone,
-          }),
+          body: JSON.stringify({ phone: formData.phone }),
         });
-
-        if (!userResponse.ok) {
-          console.error('Failed to update phone');
-        }
       }
 
       toast({ title: 'Succès', description: 'Paramètres sauvegardés' });
       onUpdate();
     } catch (err) {
-      toast({ 
-        title: 'Erreur', 
-        description: err instanceof Error ? err.message : 'Impossible de sauvegarder', 
-        variant: 'destructive' 
+      toast({
+        title: 'Erreur',
+        description: err instanceof Error ? err.message : 'Impossible de sauvegarder',
+        variant: 'destructive',
       });
     } finally {
       setIsSaving(false);
     }
   };
 
-  const handleUpdateHours = async () => {
-    toast({ title: 'Horaires mis à jour', description: `Ouverture: ${hours.open}, Fermeture: ${hours.close}` });
-    // Note: Could add API call here to persist hours in database
-  };
-
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Informations du commerce</CardTitle>
-          <CardDescription>Modifiez les informations de votre point relais</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+    <Card>
+      <CardHeader>
+        <CardTitle>Paramètres du point relais</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-2">
-            <Label htmlFor="commerceName">Nom du commerce</Label>
-            <Input 
-              id="commerceName"
-              value={formData.commerceName} 
-              onChange={(e) => setFormData({ ...formData, commerceName: e.target.value })} 
-              disabled={!relaisInfo || isSaving}
-              placeholder="Ex: Épicerie du Centre"
-            />
+            <Label>Nom du commerce</Label>
+            <Input value={formData.commerceName} onChange={(e) => setFormData({ ...formData, commerceName: e.target.value })} />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="address">Adresse</Label>
-            <Input 
-              id="address"
-              value={formData.address} 
-              onChange={(e) => setFormData({ ...formData, address: e.target.value })} 
-              disabled={!relaisInfo || isSaving}
-              placeholder="Ex: 123 Rue Didouche Mourad"
-            />
+            <Label>Téléphone</Label>
+            <Input value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="ville">Ville</Label>
-            <Select 
-              value={formData.ville} 
-              onValueChange={(v) => setFormData({ ...formData, ville: v })} 
-              disabled={!relaisInfo || isSaving}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Sélectionner une ville" />
-              </SelectTrigger>
+            <Label>Adresse</Label>
+            <Input value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} />
+          </div>
+          <div className="space-y-2">
+            <Label>Ville</Label>
+            <Select value={formData.ville} onValueChange={(v) => setFormData({ ...formData, ville: v })}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                {WILAYAS.map(w => <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>)}
+                {WILAYAS.map((w) => <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="phone">Téléphone</Label>
-            <Input 
-              id="phone"
-              value={formData.phone} 
-              onChange={(e) => setFormData({ ...formData, phone: e.target.value })} 
-              disabled={!relaisInfo || isSaving}
-              placeholder="+213 XX XX XX XX"
-            />
-          </div>
-          
-          <Button 
-            onClick={handleSave} 
-            className="bg-emerald-600 hover:bg-emerald-700" 
-            disabled={!relaisInfo || isSaving}
-          >
-            {isSaving ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                Sauvegarde en cours...
-              </>
-            ) : (
-              <>
-                <Save className="h-4 w-4 mr-2" />
-                Sauvegarder les modifications
-              </>
-            )}
-          </Button>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Horaires d'ouverture</CardTitle>
-          <CardDescription>Définissez vos horaires d'ouverture</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <Label>Ouverture</Label>
-              <Input 
-                type="time" 
-                value={hours.open}
-                onChange={(e) => setHours({ ...hours, open: e.target.value })}
-                disabled={!relaisInfo} 
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Fermeture</Label>
-              <Input 
-                type="time" 
-                value={hours.close}
-                onChange={(e) => setHours({ ...hours, close: e.target.value })}
-                disabled={!relaisInfo} 
-              />
-            </div>
-          </div>
-          <Button variant="outline" className="mt-4" disabled={!relaisInfo} onClick={handleUpdateHours}>
-            Mettre à jour les horaires
-          </Button>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Statut du relais</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center gap-4">
-            {relaisInfo ? (
-              <>
-                <Badge className={`${RELAIS_STATUS.find(s => s.id === relaisInfo.status)?.color} text-white px-4 py-2 text-base`}>
-                  {RELAIS_STATUS.find(s => s.id === relaisInfo.status)?.label}
-                </Badge>
-                {relaisInfo.status === 'PENDING' && (
-                  <p className="text-sm text-orange-600">Votre demande est en cours de validation</p>
-                )}
-                {relaisInfo.status === 'APPROVED' && (
-                  <p className="text-sm text-green-600">Votre relais est actif et visible sur la plateforme</p>
-                )}
-              </>
-            ) : (
-              <p className="text-slate-500">Chargement...</p>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+        </div>
+        <Button onClick={handleSave} disabled={isSaving} className="bg-emerald-600 hover:bg-emerald-700">
+          {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+          Sauvegarder
+        </Button>
+      </CardContent>
+    </Card>
   );
 }

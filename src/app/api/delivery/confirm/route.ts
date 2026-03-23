@@ -4,8 +4,16 @@ import { requireRole } from '@/lib/rbac';
 
 /**
  * POST /api/delivery/confirm
- * Transporter confirms delivery of a parcel via QR scan.
- * Updates the mission and parcel status.
+ * Transporter scans QR code at key steps.
+ *
+ * Actions:
+ *   - "pickup": Transporter scans QR when picking up parcel from relay
+ *       DEPOSITED_RELAY / ASSIGNED → PICKED_UP
+ *   - "arrive_relay": Transporter scans QR when dropping off at destination relay
+ *       PICKED_UP → ARRIVED_RELAY
+ *
+ * Legacy action (backward compat):
+ *   - (no action / default): ARRIVE_RELAIS_DESTINATION
  */
 export async function POST(request: NextRequest) {
   const auth = await requireRole(request, ['TRANSPORTER', 'ADMIN']);
@@ -13,7 +21,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { trackingNumber, qrData, missionId, location } = body;
+    const { trackingNumber, qrData, missionId, action, location, photoUrl } = body;
 
     // Parse tracking from QR data if not directly provided
     let tracking = trackingNumber;
@@ -33,6 +41,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Resolve parcel and mission
     let parcel;
     let mission;
 
@@ -42,41 +51,95 @@ export async function POST(request: NextRequest) {
         include: { colis: true },
       });
       if (!mission) {
-        return NextResponse.json({ error: 'Mission not found' }, { status: 404 });
+        return NextResponse.json({ error: 'Mission non trouvée' }, { status: 404 });
       }
       parcel = mission.colis;
     } else {
-      parcel = await db.colis.findUnique({
-        where: { trackingNumber: tracking },
-      });
+      parcel = await db.colis.findUnique({ where: { trackingNumber: tracking } });
       if (!parcel) {
-        return NextResponse.json({ error: 'Parcel not found' }, { status: 404 });
+        return NextResponse.json({ error: 'Colis non trouvé' }, { status: 404 });
       }
-      // Find associated mission for this transporter
       mission = await db.mission.findFirst({
         where: {
           colisId: parcel.id,
           transporteurId: auth.payload.id,
-          status: { in: ['ASSIGNE', 'EN_COURS'] },
+          status: { in: ['ASSIGNE', 'PICKED_UP'] },
         },
       });
     }
 
     if (!parcel) {
-      return NextResponse.json({ error: 'Parcel not found' }, { status: 404 });
+      return NextResponse.json({ error: 'Colis non trouvé' }, { status: 404 });
     }
 
-    // Update parcel status to ARRIVE_RELAIS_DESTINATION
+    // Determine effective action
+    let effectiveAction = action;
+    if (!effectiveAction) {
+      // Auto-detect from parcel status
+      if (['DEPOSITED_RELAY', 'ASSIGNED', 'RECU_RELAIS'].includes(parcel.status)) {
+        effectiveAction = 'pickup';
+      } else if (['PICKED_UP', 'EN_TRANSPORT'].includes(parcel.status)) {
+        effectiveAction = 'arrive_relay';
+      } else {
+        effectiveAction = 'arrive_relay'; // legacy default
+      }
+    }
+
+    let newParcelStatus: string;
+    let newMissionStatus: string;
+    let notes: string;
+    const parcelUpdateData: Record<string, unknown> = {};
+    const missionUpdateData: Record<string, unknown> = {};
+
+    // ──────────────────────────────────────────────
+    // ACTION: pickup
+    // Transporter picks up parcel at departure relay
+    // ──────────────────────────────────────────────
+    if (effectiveAction === 'pickup') {
+      const validStatuses = ['DEPOSITED_RELAY', 'ASSIGNED', 'RECU_RELAIS', 'PAID_RELAY'];
+      if (!validStatuses.includes(parcel.status)) {
+        return NextResponse.json(
+          { error: `Impossible de prendre en charge un colis avec le statut: ${parcel.status}` },
+          { status: 400 }
+        );
+      }
+      newParcelStatus = 'PICKED_UP';
+      newMissionStatus = 'PICKED_UP';
+      notes = 'Colis pris en charge par le transporteur';
+      missionUpdateData.pickedUpAt = new Date();
+    }
+
+    // ──────────────────────────────────────────────
+    // ACTION: arrive_relay
+    // Transporter delivers parcel to destination relay
+    // ──────────────────────────────────────────────
+    else if (effectiveAction === 'arrive_relay') {
+      if (!['PICKED_UP', 'EN_TRANSPORT'].includes(parcel.status)) {
+        return NextResponse.json(
+          { error: `Impossible de livrer au relais un colis avec le statut: ${parcel.status}` },
+          { status: 400 }
+        );
+      }
+      newParcelStatus = 'ARRIVED_RELAY';
+      newMissionStatus = 'COMPLETED';
+      notes = 'Colis livré au relais de destination par le transporteur';
+      missionUpdateData.completedAt = new Date();
+      if (photoUrl) parcelUpdateData.photoLivraison = photoUrl;
+    } else {
+      return NextResponse.json({ error: `Action inconnue: ${effectiveAction}` }, { status: 400 });
+    }
+
+    // Update parcel
     const updatedParcel = await db.colis.update({
       where: { id: parcel.id },
-      data: { status: 'ARRIVE_RELAIS_DESTINATION' },
+      data: { status: newParcelStatus, ...parcelUpdateData },
     });
 
-    // Update mission status
+    // Update mission
     if (mission) {
       await db.mission.update({
         where: { id: mission.id },
-        data: { status: 'LIVRE', completedAt: new Date() },
+        data: { status: newMissionStatus, ...missionUpdateData },
       });
     }
 
@@ -84,9 +147,11 @@ export async function POST(request: NextRequest) {
     await db.trackingHistory.create({
       data: {
         colisId: parcel.id,
-        status: 'ARRIVE_RELAIS_DESTINATION',
-        location: location || undefined,
-        notes: 'Colis livré au relais de destination par le transporteur',
+        status: newParcelStatus,
+        location: location ?? null,
+        notes,
+        actionBy: auth.payload.id,
+        photoUrl: photoUrl ?? null,
       },
     });
 
@@ -94,8 +159,8 @@ export async function POST(request: NextRequest) {
     await db.notification.create({
       data: {
         userId: parcel.clientId,
-        title: 'Votre colis est arrivé',
-        message: `Votre colis ${parcel.trackingNumber} est arrivé au point relais de destination. Vous pouvez le récupérer.`,
+        title: 'Mise à jour de votre colis',
+        message: `${notes} — Colis: ${parcel.trackingNumber}`,
         type: 'IN_APP',
       },
     });
@@ -103,10 +168,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       parcel: updatedParcel,
-      message: 'Livraison confirmée au relais de destination',
+      message: notes,
+      newStatus: newParcelStatus,
     });
   } catch (error) {
-    console.error('Error confirming delivery:', error);
-    return NextResponse.json({ error: 'Failed to confirm delivery' }, { status: 500 });
+    console.error('Error confirming delivery step:', error);
+    return NextResponse.json({ error: 'Failed to process delivery action' }, { status: 500 });
   }
 }

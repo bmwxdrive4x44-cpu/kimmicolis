@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 
-// GET all missions
+// GET missions
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const transporteurId = searchParams.get('transporteurId');
     const status = searchParams.get('status');
 
-    let where: any = {};
+    const where: Record<string, unknown> = {};
     if (transporteurId) where.transporteurId = transporteurId;
     if (status) where.status = status;
 
@@ -35,34 +35,55 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST create/accept mission
+// POST create / accept mission
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { colisId, transporteurId, trajetId } = body;
 
-    // Create mission
+    if (!colisId || !transporteurId) {
+      return NextResponse.json({ error: 'colisId and transporteurId are required' }, { status: 400 });
+    }
+
+    // Verify parcel is in DEPOSITED_RELAY status (strict workflow)
+    const parcel = await db.colis.findUnique({ where: { id: colisId } });
+    if (!parcel) {
+      return NextResponse.json({ error: 'Parcel not found' }, { status: 404 });
+    }
+    // Accept both new and legacy statuses for backward compatibility
+    const acceptableStatuses = ['DEPOSITED_RELAY', 'RECU_RELAIS', 'PAID_RELAY', 'PAID'];
+    if (!acceptableStatuses.includes(parcel.status)) {
+      return NextResponse.json(
+        { error: `Impossible d'assigner un transporteur à un colis avec le statut: ${parcel.status}` },
+        { status: 400 }
+      );
+    }
+
+    // Create mission with gain amount (transporter gets paid after delivery)
     const mission = await db.mission.create({
       data: {
         colisId,
         transporteurId,
         trajetId,
         status: 'ASSIGNE',
+        gainAmount: parcel.netTransporteur,
+        gainStatus: 'PENDING',
       },
     });
 
-    // Update parcel status
+    // Update parcel status to ASSIGNED
     await db.colis.update({
       where: { id: colisId },
-      data: { status: 'EN_TRANSPORT' },
+      data: { status: 'ASSIGNED' },
     });
 
     // Add tracking history
     await db.trackingHistory.create({
       data: {
         colisId,
-        status: 'EN_TRANSPORT',
-        notes: 'Colis pris en charge par le transporteur',
+        status: 'ASSIGNED',
+        notes: 'Transporteur assigné au colis',
+        actionBy: transporteurId,
       },
     });
 
@@ -74,48 +95,19 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // Notify client
+    await db.notification.create({
+      data: {
+        userId: parcel.clientId,
+        title: 'Transporteur assigné',
+        message: `Un transporteur a été assigné à votre colis ${parcel.trackingNumber}`,
+        type: 'IN_APP',
+      },
+    });
+
     return NextResponse.json(mission);
   } catch (error) {
     console.error('Error creating mission:', error);
     return NextResponse.json({ error: 'Failed to create mission' }, { status: 500 });
-  }
-}
-
-// PUT complete mission
-export async function PUT(request: NextRequest) {
-  try {
-    const body = await request.json();
-    const { id, status } = body;
-
-    const mission = await db.mission.update({
-      where: { id },
-      data: {
-        status,
-        completedAt: status === 'LIVRE' ? new Date() : null,
-      },
-    });
-
-    // Update parcel status
-    if (status === 'LIVRE') {
-      await db.colis.update({
-        where: { id: mission.colisId },
-        data: {
-          status: 'ARRIVE_RELAIS_DESTINATION',
-        },
-      });
-
-      await db.trackingHistory.create({
-        data: {
-          colisId: mission.colisId,
-          status: 'ARRIVE_RELAIS_DESTINATION',
-          notes: 'Colis arrivé au relais de destination',
-        },
-      });
-    }
-
-    return NextResponse.json(mission);
-  } catch (error) {
-    console.error('Error updating mission:', error);
-    return NextResponse.json({ error: 'Failed to update mission' }, { status: 500 });
   }
 }
