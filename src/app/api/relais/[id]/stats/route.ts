@@ -40,12 +40,13 @@ export async function GET(
       WHERE "relaisDepartId" = ${id} OR "relaisArriveeId" = ${id}
     `;
 
-    const pending = parcels.filter(p => 
-      ['CREATED', 'PAID'].includes(p.status) && p.relaisDepartId === id
+    const pending = parcels.filter(p =>
+      ['CREATED', 'PAID', 'PAID_RELAY'].includes(p.status) && p.relaisDepartId === id
     ).length;
-    
-    const received = parcels.filter(p => 
-      p.status === 'RECU_RELAIS' || p.status === 'EN_TRANSPORT'
+
+    const received = parcels.filter(p =>
+      (p.relaisDepartId === id && ['DEPOSITED_RELAY', 'RECU_RELAIS'].includes(p.status)) ||
+      (p.relaisArriveeId === id && p.status === 'ARRIVE_RELAIS_DESTINATION')
     ).length;
     
     const handedOver = parcels.filter(p => 
