@@ -304,9 +304,9 @@ function OverviewTab({ userId, setActiveTab }: { userId: string; setActiveTab: (
                 <div key={t.id} className="flex items-center justify-between p-3 border rounded-lg">
                   <div>
                     <p className="font-semibold">{WILAYAS.find(w => w.id === t.villeDepart)?.name} → {WILAYAS.find(w => w.id === t.villeArrivee)?.name}</p>
-                    <p className="text-xs text-slate-500">{new Date(t.dateDepart).toLocaleString('fr-FR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'})} · {t.placesColis - t.placesUtilisees} place(s) restante(s)</p>
+                    <p className="text-xs text-slate-500">{new Date(t.dateDepart).toLocaleString('fr-FR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'})} · Capacité restante: {Math.max((t.placesColis || 0) - (t.placesUtilisees || 0), 0)} colis</p>
                   </div>
-                  <Badge variant="outline">{t.placesUtilisees}/{t.placesColis}</Badge>
+                  <Badge variant="outline">Chargé {t.placesUtilisees}/{t.placesColis}</Badge>
                 </div>
               ))}
             </div>
@@ -447,8 +447,9 @@ function TrajetsTab({ userId }: { userId: string }) {
                 <Input type="datetime-local" value={formData.dateDepart} onChange={(e) => setFormData({ ...formData, dateDepart: e.target.value })} />
               </div>
               <div className="space-y-2">
-                <Label>Places disponibles</Label>
-                <Input type="number" value={formData.placesColis} onChange={(e) => setFormData({ ...formData, placesColis: e.target.value })} />
+                <Label>Capacité colis (max)</Label>
+                <Input type="number" min={1} step={1} value={formData.placesColis} onChange={(e) => setFormData({ ...formData, placesColis: e.target.value })} placeholder="Ex: 10" />
+                <p className="text-xs text-slate-500">Nombre maximum de colis que vous pouvez transporter sur ce trajet.</p>
               </div>
             </div>
             <div className="space-y-2">
@@ -476,7 +477,7 @@ function TrajetsTab({ userId }: { userId: string }) {
                 <TableRow>
                   <TableHead>Trajet</TableHead>
                   <TableHead>Date départ</TableHead>
-                  <TableHead>Places</TableHead>
+                  <TableHead>Capacité</TableHead>
                   <TableHead>Statut</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
@@ -493,7 +494,10 @@ function TrajetsTab({ userId }: { userId: string }) {
                     <TableCell className="text-sm">
                       {new Date(t.dateDepart).toLocaleString('fr-FR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'})}
                     </TableCell>
-                    <TableCell>{t.placesUtilisees}/{t.placesColis}</TableCell>
+                    <TableCell>
+                      <p className="font-medium">{Math.max((t.placesColis || 0) - (t.placesUtilisees || 0), 0)} dispo</p>
+                      <p className="text-xs text-slate-500">Chargé {t.placesUtilisees}/{t.placesColis}</p>
+                    </TableCell>
                     <TableCell>
                       <Badge className={`${TRAJET_STATUS.find(s => s.id === t.status)?.color} text-white`}>
                         {TRAJET_STATUS.find(s => s.id === t.status)?.label}
