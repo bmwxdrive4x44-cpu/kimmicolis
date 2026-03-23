@@ -37,6 +37,11 @@ function normalizeTrajet<T extends { villesEtapes?: unknown }>(trajet: T): T & {
   };
 }
 
+function serializeVillesEtapes(value: unknown): string | null {
+  const normalized = parseVillesEtapes(value);
+  return normalized.length > 0 ? JSON.stringify(normalized) : null;
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -84,7 +89,7 @@ export async function PUT(
     const updateData: any = {};
     if (status) updateData.status = status;
     if (placesUtilisees !== undefined) updateData.placesUtilisees = placesUtilisees;
-    if (villesEtapes !== undefined) updateData.villesEtapes = parseVillesEtapes(villesEtapes);
+    if (villesEtapes !== undefined) updateData.villesEtapes = serializeVillesEtapes(villesEtapes);
 
     const trajet = await db.trajet.update({
       where: { id },

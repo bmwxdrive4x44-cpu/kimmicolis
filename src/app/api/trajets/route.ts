@@ -37,6 +37,11 @@ function normalizeTrajet<T extends { villesEtapes?: unknown }>(trajet: T): T & {
   };
 }
 
+function serializeVillesEtapes(value: unknown): string | null {
+  const normalized = parseVillesEtapes(value);
+  return normalized.length > 0 ? JSON.stringify(normalized) : null;
+}
+
 // GET all trajets
 export async function GET(request: NextRequest) {
   try {
@@ -77,14 +82,13 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { transporteurId, villeDepart, villeArrivee, villesEtapes, dateDepart, placesColis } = body;
-    const normalizedVillesEtapes = parseVillesEtapes(villesEtapes);
 
     const trajet = await db.trajet.create({
       data: {
         transporteurId,
         villeDepart,
         villeArrivee,
-        villesEtapes: normalizedVillesEtapes,
+        villesEtapes: serializeVillesEtapes(villesEtapes),
         dateDepart: new Date(dateDepart),
         placesColis: placesColis || 10,
         status: 'PROGRAMME',
