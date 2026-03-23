@@ -436,6 +436,21 @@ export function CreateParcelForm({ userId }: CreateParcelFormProps) {
               </div>
             </div>
 
+            {formData.relaisDepartId && (
+              <div className="rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-950 dark:border-amber-700 p-3 text-sm">
+                <p className="font-semibold text-amber-800 dark:text-amber-300">
+                  ⚠️ Relais de dépôt obligatoire
+                </p>
+                <p className="text-amber-700 dark:text-amber-400">
+                  Vous devez remettre ce colis exclusivement à :
+                  <span className="font-bold"> {relaisList.find(r => r.id === formData.relaisDepartId)?.commerceName}</span>
+                </p>
+                <p className="text-amber-600 dark:text-amber-500 text-xs mt-1">
+                  Aucun dépôt possible dans un autre relais, même ville.
+                </p>
+              </div>
+            )}
+
             <div className="flex gap-4">
               <Button variant="outline" onClick={() => setStep(1)} className="flex-1">
                 Retour
