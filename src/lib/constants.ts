@@ -58,15 +58,19 @@ export const PARCEL_FORMATS = [
 ];
 
 export const PARCEL_STATUS = [
-  { id: 'CREATED', label: 'Créé', labelEn: 'Created', labelAr: 'تم الإنشاء', color: 'bg-gray-500' },
-  { id: 'PAID', label: 'Payé', labelEn: 'Paid', labelAr: 'مدفوع', color: 'bg-blue-500' },
-  { id: 'RECU_RELAIS', label: 'Reçu au relais', labelEn: 'Received at Relay', labelAr: 'استُلم في نقطة التوصيل', color: 'bg-yellow-500' },
-  { id: 'EN_TRANSPORT', label: 'En transport', labelEn: 'In Transit', labelAr: 'قيد النقل', color: 'bg-orange-500' },
-  { id: 'ARRIVE_RELAIS_DESTINATION', label: 'Arrivé au relais', labelEn: 'Arrived at Relay', labelAr: 'وصل لنقطة التوصيل', color: 'bg-teal-500' },
-  { id: 'LIVRE', label: 'Livré', labelEn: 'Delivered', labelAr: 'تم التوصيل', color: 'bg-emerald-600' },
-  { id: 'ANNULE', label: 'Annulé', labelEn: 'Cancelled', labelAr: 'ملغى', color: 'bg-red-500' },
-  { id: 'RETOUR', label: 'Retour', labelEn: 'Return', labelAr: 'عودة', color: 'bg-pink-500' },
-  { id: 'EN_DISPUTE', label: 'En litige', labelEn: 'In Dispute', labelAr: 'في نزاع', color: 'bg-red-600' },
+  { id: 'CREATED',                    label: 'Créé',                    labelEn: 'Created',               labelAr: 'تم الإنشاء',            color: 'bg-gray-500',    step: 1 },
+  { id: 'PAID_RELAY',                 label: 'Paiement validé (relais)', labelEn: 'Payment validated',     labelAr: 'تم التحقق من الدفع',    color: 'bg-blue-500',    step: 2 },
+  { id: 'DEPOSITED_RELAY',            label: 'Déposé au relais',         labelEn: 'Deposited at relay',    labelAr: 'تم الإيداع في النقطة',  color: 'bg-yellow-500',  step: 3 },
+  { id: 'EN_TRANSPORT',               label: 'En transport',             labelEn: 'In Transit',            labelAr: 'قيد النقل',             color: 'bg-orange-500',  step: 4 },
+  { id: 'ARRIVE_RELAIS_DESTINATION',  label: 'Arrivé au relais',         labelEn: 'Arrived at Relay',      labelAr: 'وصل لنقطة التوصيل',     color: 'bg-teal-500',    step: 5 },
+  { id: 'LIVRE',                      label: 'Livré',                    labelEn: 'Delivered',             labelAr: 'تم التوصيل',            color: 'bg-emerald-600', step: 6 },
+  // Legacy / compat
+  { id: 'PAID',       label: 'Payé (en ligne)',  labelEn: 'Paid',       labelAr: 'مدفوع',  color: 'bg-blue-400',  step: 2 },
+  { id: 'RECU_RELAIS',label: 'Reçu au relais',   labelEn: 'Received',   labelAr: 'مستلم',  color: 'bg-yellow-400',step: 3 },
+  // Terminal statuses
+  { id: 'ANNULE',     label: 'Annulé',           labelEn: 'Cancelled',  labelAr: 'ملغى',   color: 'bg-red-500',   step: 0 },
+  { id: 'RETOUR',     label: 'Retour',            labelEn: 'Return',     labelAr: 'عودة',   color: 'bg-pink-500',  step: 0 },
+  { id: 'EN_DISPUTE', label: 'En litige',         labelEn: 'In Dispute', labelAr: 'في نزاع',color: 'bg-red-600',   step: 0 },
 ];
 
 export const TRAJET_STATUS = [
@@ -133,3 +137,39 @@ export function generateQRData(trackingNumber: string): string {
     generated: new Date().toISOString(),
   });
 }
+
+// ─── MVP Workflow helpers ──────────────────────────────────────────────────────
+
+/** Ordered status transitions for the MVP workflow */
+export const PARCEL_STATUS_FLOW: Record<string, string | null> = {
+  CREATED:                    'PAID_RELAY',
+  PAID_RELAY:                 'DEPOSITED_RELAY',
+  DEPOSITED_RELAY:            'EN_TRANSPORT',
+  EN_TRANSPORT:               'ARRIVE_RELAIS_DESTINATION',
+  ARRIVE_RELAIS_DESTINATION:  'LIVRE',
+  LIVRE:                      null,
+  ANNULE:                     null,
+  RETOUR:                     null,
+  EN_DISPUTE:                 null,
+};
+
+/** Who is responsible for each status transition */
+export const PARCEL_STATUS_ACTOR: Record<string, string> = {
+  PAID_RELAY:                'RELAIS',
+  DEPOSITED_RELAY:           'RELAIS',
+  EN_TRANSPORT:              'TRANSPORTER',
+  ARRIVE_RELAIS_DESTINATION: 'RELAIS',
+  LIVRE:                     'RELAIS',
+};
+
+/** Human-readable label for each QR scan action */
+export const QR_ACTION_LABELS: Record<string, { fr: string; en: string }> = {
+  validate_payment:  { fr: 'Valider le paiement cash',       en: 'Validate cash payment' },
+  deposit:           { fr: 'Confirmer le dépôt du colis',    en: 'Confirm parcel deposit' },
+  pickup:            { fr: 'Prise en charge par transporteur', en: 'Transporter pickup' },
+  arrive_dest:       { fr: 'Arrivée au relais destination',  en: 'Arrived at destination relay' },
+  deliver:           { fr: 'Remis au client',                en: 'Delivered to client' },
+};
+
+/** Minimum cash threshold before auto-block alert (in DZD) */
+export const RELAY_CASH_ALERT_THRESHOLD = 50000;

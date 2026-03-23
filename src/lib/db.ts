@@ -4,9 +4,9 @@ const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined
 }
 
-// For Supabase: MUST use direct connection (port 5432) to avoid "prepared statement" errors
-// The pooler (port 6543) doesn't support prepared statements which Prisma uses
-const databaseUrl = process.env.DATABASE_URL
+// Runtime should use DATABASE_URL (typically Supabase pooler on Vercel).
+// DIRECT_DATABASE_URL is mainly for Prisma CLI/migrations.
+const databaseUrl = process.env.DATABASE_URL || process.env.DIRECT_DATABASE_URL
 
 export const db =
   globalForPrisma.prisma ??

@@ -55,6 +55,30 @@ export default function BecomeRelayPage() {
                     Proposez les services de SwiftColis à vos clients et augmentez votre chiffre d'affaires
                   </p>
                 </div>
+
+                {/* Process Steps */}
+                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-6 space-y-4">
+                  <h3 className="font-semibold text-emerald-700 dark:text-emerald-400">Comment ça fonctionne?</h3>
+                  <div className="space-y-3 text-sm text-gray-700 dark:text-gray-300">
+                    <div className="flex gap-3">
+                      <span className="font-bold text-emerald-600 flex-shrink-0">1.</span>
+                      <p>Créez un compte en quelques secondes avec vos informations personnelles</p>
+                    </div>
+                    <div className="flex gap-3">
+                      <span className="font-bold text-emerald-600 flex-shrink-0">2.</span>
+                      <p>Complétez les informations de votre point relais (nom du commerce, adresse, ville)</p>
+                    </div>
+                    <div className="flex gap-3">
+                      <span className="font-bold text-emerald-600 flex-shrink-0">3.</span>
+                      <p>Votre demande est validée par notre équipe (généralement 24h)</p>
+                    </div>
+                    <div className="flex gap-3">
+                      <span className="font-bold text-emerald-600 flex-shrink-0">4.</span>
+                      <p>Commencez à recevoir et traiter les colis</p>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="flex flex-col sm:flex-row gap-4">
                   <Button
                     onClick={handleSignUp}

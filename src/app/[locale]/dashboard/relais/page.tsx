@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { useLocale } from 'next-intl';
 import { useRouter } from 'next/navigation';
@@ -13,8 +13,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { WILAYAS, PARCEL_STATUS, RELAIS_STATUS, DEFAULT_RELAY_COMMISSION } from '@/lib/constants';
-import { Store, Package, QrCode, DollarSign, Loader2, CheckCircle, Clock, Scan, ArrowDownToLine, ArrowUpFromLine, Settings, BarChart3, AlertCircle, Save } from 'lucide-react';
+import { WILAYAS, PARCEL_STATUS, RELAIS_STATUS, DEFAULT_RELAY_COMMISSION, RELAY_CASH_ALERT_THRESHOLD } from '@/lib/constants';
+import { Store, Package, QrCode, DollarSign, Loader2, CheckCircle, Clock, Scan, ArrowDownToLine, ArrowUpFromLine, Settings, BarChart3, AlertCircle, Save, AlertTriangle, CreditCard, History, BanknoteIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 function getRoleBasedDashboardPath(role: string, locale: string): string {
@@ -33,6 +33,7 @@ export default function RelaisDashboard() {
   const [activeTab, setActiveTab] = useState('overview');
   const [relaisInfo, setRelaisInfo] = useState<any>(null);
   const [stats, setStats] = useState({ pending: 0, received: 0, handedOver: 0, earnings: 0 });
+  const [cashInfo, setCashInfo] = useState({ cashCollected: 0, cashReversed: 0, balance: 0, totalCommissions: 0 });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -43,25 +44,7 @@ export default function RelaisDashboard() {
     }
   }, [status, router, locale]);
 
-  // Fetch relais info when session is ready
-  useEffect(() => {
-    if (status === 'authenticated' && session?.user?.id) {
-      // Redirect if not RELAIS role
-      if (session.user.role !== 'RELAIS') {
-        const paths: Record<string, string> = {
-          'ADMIN': `/${locale}/dashboard/admin`,
-          'TRANSPORTER': `/${locale}/dashboard/transporter`,
-          'CLIENT': `/${locale}/dashboard/client`,
-        };
-        const path = paths[session.user.role] || `/${locale}/dashboard/client`;
-        window.location.href = path;
-        return;
-      }
-      fetchRelaisInfo();
-    }
-  }, [status, session, locale]);
-
-  const fetchRelaisInfo = async () => {
+  const fetchRelaisInfo = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
@@ -72,16 +55,15 @@ export default function RelaisDashboard() {
         const relais = data[0];
         setRelaisInfo(relais);
         
-        // Fetch stats
-        try {
-          const statsRes = await fetch(`/api/relais/${relais.id}/stats`);
-          const statsData = await statsRes.json();
-          setStats(statsData);
-        } catch {
-          // Stats API might not work, use defaults
-        }
+        // Fetch stats and cash in parallel
+        const [statsRes, cashRes] = await Promise.all([
+          fetch(`/api/relais/${relais.id}/stats`).catch(() => null),
+          fetch(`/api/relais-cash?relaisId=${relais.id}`).catch(() => null),
+        ]);
+        if (statsRes?.ok) setStats(await statsRes.json());
+        if (cashRes?.ok) setCashInfo(await cashRes.json());
       } else {
-        setError('Aucun point relais associé à votre compte. Veuillez contacter l\'administrateur.');
+        router.push(`/${locale}/complete-profile/relais`);
       }
     } catch (err) {
       console.error('Error:', err);
@@ -89,7 +71,23 @@ export default function RelaisDashboard() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [session?.user?.id, locale, router]);
+
+  // Fetch relais info when session is ready
+  useEffect(() => {
+    if (status === 'authenticated' && session?.user?.id) {
+      if (session.user.role !== 'RELAIS') {
+        const paths: Record<string, string> = {
+          'ADMIN': `/${locale}/dashboard/admin`,
+          'TRANSPORTER': `/${locale}/dashboard/transporter`,
+          'CLIENT': `/${locale}/dashboard/client`,
+        };
+        window.location.href = paths[session.user.role] || `/${locale}/dashboard/client`;
+        return;
+      }
+      fetchRelaisInfo();
+    }
+  }, [status, session, locale, fetchRelaisInfo]);
 
   // Loading state
   if (status === 'loading' || (status === 'authenticated' && isLoading)) {
@@ -131,48 +129,69 @@ export default function RelaisDashboard() {
     <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-900">
       <Header />
       <main className="flex-1 container px-4 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold">Espace Point Relais</h1>
-          <p className="text-slate-600 dark:text-slate-400 mt-1">
-            {relaisInfo?.commerceName || session.user.name}
-          </p>
+        <div className="mb-6 flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Espace Point Relais</h1>
+            <p className="text-slate-600 dark:text-slate-400 mt-1 flex items-center gap-2">
+              <Store className="h-4 w-4" />
+              {relaisInfo?.commerceName || session.user.name}
+              {relaisInfo && (
+                <Badge className={`${RELAIS_STATUS.find(s => s.id === relaisInfo.status)?.color} text-white ml-2`}>
+                  {RELAIS_STATUS.find(s => s.id === relaisInfo.status)?.label}
+                </Badge>
+              )}
+            </p>
+          </div>
         </div>
 
         {/* Error Banner */}
         {error && (
-          <Card className="mb-8 border-red-200 bg-red-50 dark:bg-red-900/20">
+          <Card className="mb-6 border-red-200 bg-red-50 dark:bg-red-900/20">
             <CardContent className="py-4">
-              <div className="flex items-center gap-4">
-                <AlertCircle className="h-6 w-6 text-red-600" />
+              <div className="flex items-center gap-3">
+                <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0" />
                 <p className="text-red-700 dark:text-red-400">{error}</p>
               </div>
             </CardContent>
           </Card>
         )}
 
-        {/* Relais Status Banner */}
-        {relaisInfo && relaisInfo.status === 'PENDING' && (
-          <Card className="mb-8 border-orange-200 bg-orange-50 dark:bg-orange-900/20">
+        {relaisInfo?.status === 'PENDING' && (
+          <Card className="mb-6 border-orange-200 bg-orange-50 dark:bg-orange-900/20">
             <CardContent className="py-4">
               <div className="flex items-center gap-4">
                 <Clock className="h-6 w-6 text-orange-600" />
                 <div>
                   <p className="font-semibold text-orange-700 dark:text-orange-400">Inscription en attente de validation</p>
-                  <p className="text-sm text-orange-600 dark:text-orange-500">Votre demande est en cours d'examen par l'administrateur</p>
+                  <p className="text-sm text-orange-600">Votre demande est en cours d'examen par l'administrateur</p>
                 </div>
               </div>
             </CardContent>
           </Card>
         )}
 
-        {relaisInfo && relaisInfo.status === 'REJECTED' && (
-          <Card className="mb-8 border-red-200 bg-red-50 dark:bg-red-900/20">
+        {relaisInfo?.status === 'REJECTED' && (
+          <Card className="mb-6 border-red-200 bg-red-50 dark:bg-red-900/20">
             <CardContent className="py-4">
               <div className="flex items-center gap-4">
                 <AlertCircle className="h-6 w-6 text-red-600" />
                 <div>
-                  <p className="font-semibold text-red-700 dark:text-red-400">Inscription refusée</p>
-                  <p className="text-sm text-red-600 dark:text-red-500">Veuillez contacter le support pour plus d'informations</p>
+                  <p className="font-semibold text-red-700">Inscription refusée</p>
+                  <p className="text-sm text-red-600">Veuillez contacter le support pour plus d'informations</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {cashInfo.balance >= RELAY_CASH_ALERT_THRESHOLD && (
+          <Card className="mb-6 border-red-300 bg-red-50 dark:bg-red-900/20">
+            <CardContent className="py-4">
+              <div className="flex items-center gap-3">
+                <AlertTriangle className="h-5 w-5 text-red-600" />
+                <div>
+                  <p className="font-semibold text-red-700">Solde cash élevé — reversal requis</p>
+                  <p className="text-sm text-red-600">Vous détenez {cashInfo.balance.toFixed(0)} DA. Vous devez reverser la somme à la plateforme.</p>
                 </div>
               </div>
             </CardContent>
@@ -188,24 +207,29 @@ export default function RelaisDashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{stats.pending}</div>
+              <p className="text-xs text-slate-500">colis à traiter</p>
             </CardContent>
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Reçus</CardTitle>
+              <CardTitle className="text-sm font-medium">Reçus / Déposés</CardTitle>
               <ArrowDownToLine className="h-4 w-4 text-blue-500" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{stats.received}</div>
+              <p className="text-xs text-slate-500">total reçus</p>
             </CardContent>
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Remis</CardTitle>
-              <ArrowUpFromLine className="h-4 w-4 text-green-500" />
+              <CardTitle className="text-sm font-medium">Cash en main</CardTitle>
+              <BanknoteIcon className="h-4 w-4 text-emerald-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.handedOver}</div>
+              <div className={`text-2xl font-bold ${cashInfo.balance >= RELAY_CASH_ALERT_THRESHOLD ? 'text-red-600' : 'text-emerald-600'}`}>
+                {cashInfo.balance.toFixed(0)} DA
+              </div>
+              <p className="text-xs text-slate-500">à reverser</p>
             </CardContent>
           </Card>
           <Card>
@@ -214,23 +238,28 @@ export default function RelaisDashboard() {
               <DollarSign className="h-4 w-4 text-emerald-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-emerald-600">{stats.earnings} DA</div>
+              <div className="text-2xl font-bold text-emerald-600">{cashInfo.totalCommissions.toFixed(0)} DA</div>
+              <p className="text-xs text-slate-500">total gagné</p>
             </CardContent>
           </Card>
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-3 mb-8">
-            <TabsTrigger value="overview"><BarChart3 className="h-4 w-4 mr-2" />Vue d'ensemble</TabsTrigger>
-            <TabsTrigger value="scan"><QrCode className="h-4 w-4 mr-2" />Scanner</TabsTrigger>
-            <TabsTrigger value="settings"><Settings className="h-4 w-4 mr-2" />Paramètres</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-4 mb-8">
+            <TabsTrigger value="overview"><BarChart3 className="h-4 w-4 mr-1 hidden sm:inline" />Vue d'ensemble</TabsTrigger>
+            <TabsTrigger value="scan"><QrCode className="h-4 w-4 mr-1 hidden sm:inline" />Scanner QR</TabsTrigger>
+            <TabsTrigger value="cash"><CreditCard className="h-4 w-4 mr-1 hidden sm:inline" />Caisse</TabsTrigger>
+            <TabsTrigger value="settings"><Settings className="h-4 w-4 mr-1 hidden sm:inline" />Paramètres</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview">
-            <OverviewTab relaisInfo={relaisInfo} setActiveTab={setActiveTab} />
+            <OverviewTab relaisInfo={relaisInfo} setActiveTab={setActiveTab} cashInfo={cashInfo} />
           </TabsContent>
           <TabsContent value="scan">
-            <ScanTab relaisId={relaisInfo?.id} />
+            <ScanTab relaisId={relaisInfo?.id} userId={session.user.id} onRefresh={fetchRelaisInfo} />
+          </TabsContent>
+          <TabsContent value="cash">
+            <CashTab relaisId={relaisInfo?.id} cashInfo={cashInfo} userId={session.user.id} onRefresh={fetchRelaisInfo} />
           </TabsContent>
           <TabsContent value="settings">
             <SettingsTab relaisInfo={relaisInfo} onUpdate={fetchRelaisInfo} />
@@ -243,82 +272,68 @@ export default function RelaisDashboard() {
 }
 
 // Overview Tab
-function OverviewTab({ relaisInfo, setActiveTab }: { relaisInfo: any; setActiveTab: (tab: string) => void }) {
+function OverviewTab({ relaisInfo, setActiveTab, cashInfo }: { relaisInfo: any; setActiveTab: (tab: string) => void; cashInfo: any }) {
   return (
     <div className="grid gap-6 lg:grid-cols-2">
       <Card>
-        <CardHeader>
-          <CardTitle>Information du relais</CardTitle>
-        </CardHeader>
+        <CardHeader><CardTitle>Information du relais</CardTitle></CardHeader>
         <CardContent>
           {relaisInfo ? (
-            <div className="space-y-3">
-              <div className="flex justify-between">
-                <span className="text-slate-500">Commerce:</span>
-                <span className="font-semibold">{relaisInfo.commerceName}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Adresse:</span>
-                <span>{relaisInfo.address}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Ville:</span>
-                <span>{WILAYAS.find(w => w.id === relaisInfo.ville)?.name || relaisInfo.ville}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Statut:</span>
+            <div className="space-y-3 text-sm">
+              <div className="flex justify-between"><span className="text-slate-500">Commerce</span><span className="font-semibold">{relaisInfo.commerceName}</span></div>
+              <div className="flex justify-between"><span className="text-slate-500">Adresse</span><span>{relaisInfo.address}</span></div>
+              <div className="flex justify-between"><span className="text-slate-500">Ville</span><span>{WILAYAS.find(w => w.id === relaisInfo.ville)?.name || relaisInfo.ville}</span></div>
+              <div className="flex justify-between"><span className="text-slate-500">Statut</span>
                 <Badge className={`${RELAIS_STATUS.find(s => s.id === relaisInfo.status)?.color} text-white`}>
                   {RELAIS_STATUS.find(s => s.id === relaisInfo.status)?.label}
                 </Badge>
               </div>
             </div>
-          ) : (
-            <p className="text-slate-500 text-center py-4">Chargement...</p>
-          )}
+          ) : <p className="text-slate-500 text-center py-4">Chargement...</p>}
         </CardContent>
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Commissions par format</CardTitle>
-        </CardHeader>
+        <CardHeader><CardTitle>Résumé financier</CardTitle></CardHeader>
+        <CardContent className="space-y-3 text-sm">
+          <div className="flex justify-between"><span className="text-slate-500">Total encaissé</span><span className="font-bold">{cashInfo.cashCollected.toFixed(0)} DA</span></div>
+          <div className="flex justify-between"><span className="text-slate-500">Total reversé</span><span className="font-bold text-blue-600">{cashInfo.cashReversed.toFixed(0)} DA</span></div>
+          <div className="flex justify-between border-t pt-2"><span className="font-semibold">Solde à reverser</span><span className="font-bold text-orange-600">{cashInfo.balance.toFixed(0)} DA</span></div>
+          <div className="flex justify-between"><span className="text-slate-500">Commissions relais</span><span className="font-bold text-emerald-600">{cashInfo.totalCommissions.toFixed(0)} DA</span></div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle>Commissions par format</CardTitle></CardHeader>
         <CardContent>
           <div className="grid gap-4 md:grid-cols-3">
             <div className="p-4 border rounded-lg text-center">
               <p className="text-2xl font-bold">{relaisInfo?.commissionPetit || DEFAULT_RELAY_COMMISSION.PETIT} DA</p>
-              <p className="text-sm text-slate-500">Petit colis</p>
+              <p className="text-xs text-slate-500 mt-1">Petit</p>
             </div>
             <div className="p-4 border rounded-lg text-center">
               <p className="text-2xl font-bold">{relaisInfo?.commissionMoyen || DEFAULT_RELAY_COMMISSION.MOYEN} DA</p>
-              <p className="text-sm text-slate-500">Moyen colis</p>
+              <p className="text-xs text-slate-500 mt-1">Moyen</p>
             </div>
             <div className="p-4 border rounded-lg text-center">
               <p className="text-2xl font-bold">{relaisInfo?.commissionGros || DEFAULT_RELAY_COMMISSION.GROS} DA</p>
-              <p className="text-sm text-slate-500">Gros colis</p>
+              <p className="text-xs text-slate-500 mt-1">Gros</p>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      <Card className="lg:col-span-2">
-        <CardHeader>
-          <CardTitle>Actions rapides</CardTitle>
-        </CardHeader>
+      <Card>
+        <CardHeader><CardTitle>Actions rapides</CardTitle></CardHeader>
         <CardContent>
-          <div className="grid gap-4 md:grid-cols-2">
-            <Button variant="outline" className="justify-start h-auto py-4" onClick={() => setActiveTab('scan')}>
-              <QrCode className="h-5 w-5 mr-3" />
-              <div className="text-left">
-                <p className="font-semibold">Scanner un QR Code</p>
-                <p className="text-sm text-slate-500">Réceptionner ou remettre un colis</p>
-              </div>
+          <div className="space-y-3">
+            <Button variant="outline" className="w-full justify-start h-auto py-3" onClick={() => setActiveTab('scan')}>
+              <QrCode className="h-5 w-5 mr-3 text-emerald-600" />
+              <div className="text-left"><p className="font-semibold">Scanner un colis</p><p className="text-xs text-slate-500">Valider paiement ou dépôt</p></div>
             </Button>
-            <Button variant="outline" className="justify-start h-auto py-4" onClick={() => setActiveTab('settings')}>
-              <Settings className="h-5 w-5 mr-3" />
-              <div className="text-left">
-                <p className="font-semibold">Mes paramètres</p>
-                <p className="text-sm text-slate-500">Modifier les informations du relais</p>
-              </div>
+            <Button variant="outline" className="w-full justify-start h-auto py-3" onClick={() => setActiveTab('cash')}>
+              <CreditCard className="h-5 w-5 mr-3 text-blue-600" />
+              <div className="text-left"><p className="font-semibold">Gérer la caisse</p><p className="text-xs text-slate-500">Voir et reverser le cash</p></div>
             </Button>
           </div>
         </CardContent>
@@ -327,124 +342,333 @@ function OverviewTab({ relaisInfo, setActiveTab }: { relaisInfo: any; setActiveT
   );
 }
 
-// Scan Tab
-function ScanTab({ relaisId }: { relaisId: string | undefined }) {
+// Scan Tab — MVP workflow
+function ScanTab({ relaisId, userId, onRefresh }: { relaisId: string | undefined; userId: string; onRefresh: () => void }) {
   const { toast } = useToast();
-  const [scanResult, setScanResult] = useState('');
+  const [tracking, setTracking] = useState('');
   const [parcel, setParcel] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
 
-  const handleScan = async () => {
-    if (!scanResult) return;
-    setIsLoading(true);
+  const handleSearch = async () => {
+    if (!tracking.trim()) return;
+    setIsSearching(true);
+    setParcel(null);
     try {
-      const response = await fetch(`/api/parcels?tracking=${scanResult}`);
-      const data = await response.json();
-      if (data.error) {
-        toast({ title: 'Erreur', description: 'Colis non trouvé', variant: 'destructive' });
-        setParcel(null);
+      const res = await fetch(`/api/qr/${tracking.trim().toUpperCase()}`);
+      const data = await res.json();
+      if (!res.ok) {
+        toast({ title: 'Introuvable', description: data.error || 'Colis non trouvé', variant: 'destructive' });
       } else {
         setParcel(data);
       }
     } catch {
-      toast({ title: 'Erreur', description: 'Impossible de rechercher le colis', variant: 'destructive' });
+      toast({ title: 'Erreur réseau', variant: 'destructive' });
     } finally {
-      setIsLoading(false);
+      setIsSearching(false);
     }
   };
 
-  const handleStatusChange = async (status: string) => {
-    if (!parcel) return;
+  const handleAction = async (action: string) => {
+    if (!parcel || !relaisId) return;
+    setIsUpdating(true);
     try {
-      const response = await fetch(`/api/parcels/${parcel.id}`, {
-        method: 'PUT',
+      const res = await fetch(`/api/qr/${parcel.trackingNumber}`, {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status }),
+        body: JSON.stringify({ action, relaisId, userId }),
       });
-      
-      if (response.ok) {
-        toast({ title: 'Statut mis à jour', description: 'Le statut du colis a été modifié' });
-        setParcel({ ...parcel, status });
+      const data = await res.json();
+      if (!res.ok) {
+        toast({ title: 'Erreur', description: data.error, variant: 'destructive' });
       } else {
-        throw new Error('Failed');
+        toast({ title: 'Succès', description: data.message });
+        setParcel((prev: any) => ({ ...prev, status: data.parcel?.status ?? prev.status }));
+        onRefresh();
       }
     } catch {
-      toast({ title: 'Erreur', description: 'Impossible de mettre à jour le statut', variant: 'destructive' });
+      toast({ title: 'Erreur réseau', variant: 'destructive' });
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const currentStatus = parcel?.status;
+  const isDepRelay = parcel?.relaisDepart?.id === relaisId;
+  const isArrRelay = parcel?.relaisArrivee?.id === relaisId;
+  const statusInfo = PARCEL_STATUS.find(s => s.id === currentStatus);
+
+  type ActionDef = { action: string; label: string; description: string; color: string; icon: React.ComponentType<{ className?: string }> };
+  const availableActions: ActionDef[] = [];
+
+  if (parcel) {
+    if (currentStatus === 'CREATED' && isDepRelay) {
+      availableActions.push({
+        action: 'validate_payment',
+        label: 'Valider le paiement cash',
+        description: `Encaisser ${parcel.prixClient ?? '—'} DA du client`,
+        color: 'bg-blue-600 hover:bg-blue-700',
+        icon: BanknoteIcon,
+      });
+    }
+    if (currentStatus === 'PAID_RELAY' && isDepRelay) {
+      availableActions.push({
+        action: 'deposit',
+        label: 'Confirmer le dépôt du colis',
+        description: 'Le colis est physiquement remis au relais',
+        color: 'bg-yellow-600 hover:bg-yellow-700',
+        icon: ArrowDownToLine,
+      });
+    }
+    if (currentStatus === 'ARRIVE_RELAIS_DESTINATION' && isArrRelay) {
+      availableActions.push({
+        action: 'deliver',
+        label: 'Remettre au destinataire',
+        description: 'Confirmer que le client a récupéré son colis',
+        color: 'bg-emerald-600 hover:bg-emerald-700',
+        icon: CheckCircle,
+      });
+    }
+  }
+
+  const STATUS_FLOW = ['CREATED', 'PAID_RELAY', 'DEPOSITED_RELAY', 'EN_TRANSPORT', 'ARRIVE_RELAIS_DESTINATION', 'LIVRE'];
+  const STATUS_LABELS: Record<string, string> = {
+    CREATED: 'Créé', PAID_RELAY: 'Payé', DEPOSITED_RELAY: 'Déposé',
+    EN_TRANSPORT: 'Transport', ARRIVE_RELAIS_DESTINATION: 'Arrivé', LIVRE: 'Livré',
+  };
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><Scan className="h-5 w-5" />Scanner / Rechercher un colis</CardTitle>
+          <CardDescription>Entrez le numéro de suivi ou scannez le QR code</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex gap-2">
+            <Input
+              placeholder="Numéro de suivi (ex: SCXXXXXXXXX)"
+              value={tracking}
+              onChange={(e) => setTracking(e.target.value.toUpperCase())}
+              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+              className="font-mono"
+            />
+            <Button onClick={handleSearch} disabled={isSearching || !tracking.trim()}>
+              {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <QrCode className="h-4 w-4 mr-2" />}
+              Rechercher
+            </Button>
+          </div>
+
+          {parcel && (
+            <Card className="bg-slate-50 dark:bg-slate-800 border-2">
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <p className="font-mono font-bold text-xl">{parcel.trackingNumber}</p>
+                    <p className="text-slate-500 text-sm">{parcel.villeDepart} → {parcel.villeArrivee}</p>
+                  </div>
+                  <Badge className={`${statusInfo?.color ?? 'bg-slate-500'} text-white px-3 py-1`}>
+                    {statusInfo?.label ?? currentStatus}
+                  </Badge>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-3 mb-6 text-sm">
+                  <div><p className="text-slate-500 mb-1">Client</p><p className="font-semibold">{parcel.client?.name}</p><p>{parcel.client?.phone}</p></div>
+                  <div><p className="text-slate-500 mb-1">Format / Prix</p><p className="font-semibold">{parcel.format}</p><p className="text-emerald-700 font-bold">{parcel.prixClient} DA</p></div>
+                  <div>
+                    <p className="text-slate-500 mb-1">Commission relais</p>
+                    <p className="font-bold text-emerald-600">{parcel.commissionRelais} DA</p>
+                    <p className="text-xs text-slate-400">{isDepRelay ? '📍 Relais départ' : isArrRelay ? '📍 Relais arrivée' : ''}</p>
+                  </div>
+                </div>
+
+                {/* Barre de progression statuts */}
+                <div className="flex items-center gap-1 overflow-x-auto pb-2 mb-6">
+                  {STATUS_FLOW.map((s, idx) => {
+                    const cIdx = STATUS_FLOW.indexOf(currentStatus);
+                    const sIdx = STATUS_FLOW.indexOf(s);
+                    const done = sIdx < cIdx;
+                    const active = s === currentStatus;
+                    return (
+                      <div key={s} className="flex items-center gap-1 flex-shrink-0">
+                        <div className={`text-xs px-2 py-1 rounded-full font-medium whitespace-nowrap ${done ? 'bg-emerald-100 text-emerald-700' : active ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-400'}`}>
+                          {STATUS_LABELS[s] ?? s}
+                        </div>
+                        {idx < STATUS_FLOW.length - 1 && <div className={`w-3 h-0.5 flex-shrink-0 ${done ? 'bg-emerald-400' : 'bg-slate-200'}`} />}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {availableActions.length > 0 ? (
+                  <div className="space-y-3">
+                    {availableActions.map((a) => {
+                      const Icon = a.icon;
+                      return (
+                        <Button key={a.action} className={`w-full justify-start h-auto py-4 text-white ${a.color}`} onClick={() => handleAction(a.action)} disabled={isUpdating}>
+                          {isUpdating ? <Loader2 className="h-5 w-5 animate-spin mr-3" /> : <Icon className="h-5 w-5 mr-3" />}
+                          <div className="text-left"><p className="font-semibold">{a.label}</p><p className="text-xs opacity-90">{a.description}</p></div>
+                        </Button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-center py-4 text-slate-500 bg-white dark:bg-slate-900 rounded-lg border">
+                    {currentStatus === 'LIVRE'
+                      ? <div className="flex flex-col items-center gap-2"><CheckCircle className="h-8 w-8 text-emerald-500" /><p className="font-semibold">Colis livré avec succès</p></div>
+                      : <div className="flex flex-col items-center gap-2"><Package className="h-8 w-8 text-slate-400" /><p>Aucune action disponible pour ce relais — statut : <strong>{statusInfo?.label ?? currentStatus}</strong></p></div>
+                    }
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// Cash Tab — Gestion de la caisse
+function CashTab({ relaisId, cashInfo, userId, onRefresh }: { relaisId: string | undefined; cashInfo: any; userId: string; onRefresh: () => void }) {
+  const { toast } = useToast();
+  const [transactions, setTransactions] = useState<any[]>([]);
+  const [reverseAmount, setReverseAmount] = useState('');
+  const [reverseNotes, setReverseNotes] = useState('');
+  const [isReversing, setIsReversing] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const fetchTransactions = useCallback(async () => {
+    if (!relaisId) return;
+    setIsLoading(true);
+    try {
+      const res = await fetch(`/api/relais-cash?relaisId=${relaisId}`);
+      const data = await res.json();
+      setTransactions(data.transactions || []);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [relaisId]);
+
+  useEffect(() => { fetchTransactions(); }, [fetchTransactions]);
+
+  const handleReverse = async () => {
+    const amount = parseFloat(reverseAmount);
+    if (!relaisId || !amount || amount <= 0) {
+      toast({ title: 'Montant invalide', variant: 'destructive' });
+      return;
+    }
+    if (amount > cashInfo.balance) {
+      toast({ title: 'Montant supérieur au solde', description: `Solde disponible : ${cashInfo.balance.toFixed(0)} DA`, variant: 'destructive' });
+      return;
+    }
+    setIsReversing(true);
+    try {
+      const res = await fetch('/api/relais-cash', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ relaisId, amount, notes: reverseNotes, userId }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast({ title: 'Erreur', description: data.error, variant: 'destructive' });
+      } else {
+        toast({ title: 'Versement enregistré', description: `${amount.toFixed(0)} DA enregistré avec succès` });
+        setReverseAmount('');
+        setReverseNotes('');
+        await Promise.all([fetchTransactions(), onRefresh()]);
+      }
+    } finally {
+      setIsReversing(false);
     }
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2"><Scan className="h-5 w-5" />Scanner QR Code</CardTitle>
-        <CardDescription>Scannez le QR code d'un colis pour le réceptionner ou le remettre</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        <div className="flex gap-2">
-          <Input
-            placeholder="Entrez le numéro de suivi (ex: SCXXXXXXXXX)"
-            value={scanResult}
-            onChange={(e) => setScanResult(e.target.value.toUpperCase())}
-            className="font-mono"
-          />
-          <Button onClick={handleScan} disabled={isLoading}>
-            {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <QrCode className="h-4 w-4 mr-2" />}
-            Rechercher
-          </Button>
-        </div>
+    <div className="space-y-6">
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card className="bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 border-emerald-200">
+          <CardContent className="pt-6 text-center">
+            <p className="text-sm text-emerald-700 mb-1">Total encaissé</p>
+            <p className="text-3xl font-bold text-emerald-700">{cashInfo.cashCollected.toFixed(0)} DA</p>
+          </CardContent>
+        </Card>
+        <Card className="bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 border-blue-200">
+          <CardContent className="pt-6 text-center">
+            <p className="text-sm text-blue-700 mb-1">Total reversé</p>
+            <p className="text-3xl font-bold text-blue-700">{cashInfo.cashReversed.toFixed(0)} DA</p>
+          </CardContent>
+        </Card>
+        <Card className={`border-2 ${cashInfo.balance > 0 ? 'border-orange-400 bg-orange-50 dark:bg-orange-900/20' : 'bg-slate-50 dark:bg-slate-800'}`}>
+          <CardContent className="pt-6 text-center">
+            <p className="text-sm text-orange-700 mb-1">Solde à reverser</p>
+            <p className={`text-3xl font-bold ${cashInfo.balance > 0 ? 'text-orange-700' : 'text-slate-500'}`}>
+              {cashInfo.balance.toFixed(0)} DA
+            </p>
+          </CardContent>
+        </Card>
+      </div>
 
-        {parcel && !parcel.error && (
-          <Card className="bg-slate-50 dark:bg-slate-800">
-            <CardContent className="py-6">
-              <div className="flex items-center justify-between mb-6">
-                <div>
-                  <p className="font-mono font-bold text-lg">{parcel.trackingNumber}</p>
-                  <p className="text-slate-500">{parcel.villeDepart} → {parcel.villeArrivee}</p>
-                </div>
-                <Badge className={`${PARCEL_STATUS.find(s => s.id === parcel.status)?.color} text-white px-4 py-2`}>
-                  {PARCEL_STATUS.find(s => s.id === parcel.status)?.label}
-                </Badge>
+      {cashInfo.balance > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2"><ArrowUpFromLine className="h-5 w-5 text-blue-600" />Enregistrer un versement</CardTitle>
+            <CardDescription>Indiquez le montant remis à la plateforme</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Montant (DA)</Label>
+                <Input type="number" placeholder={`Max : ${cashInfo.balance.toFixed(0)} DA`} value={reverseAmount} onChange={(e) => setReverseAmount(e.target.value)} min="1" max={cashInfo.balance} />
               </div>
+              <div className="space-y-2">
+                <Label>Notes (optionnel)</Label>
+                <Input placeholder="Ex : Versement du 23/03" value={reverseNotes} onChange={(e) => setReverseNotes(e.target.value)} />
+              </div>
+            </div>
+            <Button onClick={handleReverse} disabled={isReversing || !reverseAmount || parseFloat(reverseAmount) <= 0} className="bg-blue-600 hover:bg-blue-700">
+              {isReversing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle className="h-4 w-4 mr-2" />}
+              Confirmer le versement
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
-              <div className="grid gap-4 md:grid-cols-2 mb-6">
-                <div>
-                  <p className="text-sm text-slate-500">Client</p>
-                  <p className="font-semibold">{parcel.client?.name || 'N/A'}</p>
-                  <p className="text-sm">{parcel.client?.phone || 'N/A'}</p>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><History className="h-5 w-5" />Historique des transactions</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-emerald-600" /></div>
+          ) : transactions.length === 0 ? (
+            <p className="text-center text-slate-500 py-8">Aucune transaction</p>
+          ) : (
+            <div className="space-y-3">
+              {transactions.map((tx: any) => (
+                <div key={tx.id} className="flex items-center justify-between p-3 border rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${tx.type === 'COLLECTED' ? 'bg-emerald-100' : 'bg-blue-100'}`}>
+                      {tx.type === 'COLLECTED' ? <ArrowDownToLine className="h-4 w-4 text-emerald-600" /> : <ArrowUpFromLine className="h-4 w-4 text-blue-600" />}
+                    </div>
+                    <div>
+                      <p className="font-semibold text-sm">
+                        {tx.type === 'COLLECTED' ? 'Encaissement' : 'Versement'}
+                        {tx.colis && <span className="font-mono text-slate-500 ml-2 text-xs">#{tx.colis.trackingNumber}</span>}
+                      </p>
+                      <p className="text-xs text-slate-500">{new Date(tx.createdAt).toLocaleString('fr-FR')}</p>
+                      {tx.notes && <p className="text-xs text-slate-400">{tx.notes}</p>}
+                    </div>
+                  </div>
+                  <p className={`font-bold ${tx.type === 'COLLECTED' ? 'text-emerald-600' : 'text-blue-600'}`}>
+                    {tx.type === 'COLLECTED' ? '+' : '-'}{tx.amount.toFixed(0)} DA
+                  </p>
                 </div>
-                <div>
-                  <p className="text-sm text-slate-500">Format</p>
-                  <p className="font-semibold">{parcel.format}</p>
-                  <p className="text-sm">Commission: {parcel.commissionRelais || 0} DA</p>
-                </div>
-              </div>
-
-              <div className="flex flex-wrap gap-4">
-                {['CREATED', 'PAID'].includes(parcel.status) && (
-                  <Button className="bg-emerald-600 hover:bg-emerald-700" onClick={() => handleStatusChange('RECU_RELAIS')}>
-                    <ArrowDownToLine className="h-4 w-4 mr-2" />Confirmer réception
-                  </Button>
-                )}
-                {parcel.status === 'ARRIVE_RELAIS_DESTINATION' && (
-                  <Button className="bg-green-600 hover:bg-green-700" onClick={() => handleStatusChange('LIVRE')}>
-                    <CheckCircle className="h-4 w-4 mr-2" />Confirmer remise au client
-                  </Button>
-                )}
-                {parcel.status === 'LIVRE' && (
-                  <Badge className="bg-green-100 text-green-700 px-4 py-2 text-base">Colis déjà livré</Badge>
-                )}
-                {parcel.status === 'RECU_RELAIS' && (
-                  <Badge className="bg-yellow-100 text-yellow-700 px-4 py-2 text-base">En attente de transport</Badge>
-                )}
-                {parcel.status === 'EN_TRANSPORT' && (
-                  <Badge className="bg-orange-100 text-orange-700 px-4 py-2 text-base">En cours de transport</Badge>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-      </CardContent>
-    </Card>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 }
 

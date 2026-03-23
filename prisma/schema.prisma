@@ -48,12 +48,15 @@ model Relais {
   commissionMoyen  Float    @default(200)
   commissionGros   Float    @default(300)
   status           String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  cashCollected    Float    @default(0)  // Total cash collected from clients
+  cashReversed     Float    @default(0)  // Total reversed to platform
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
   
   user             User     @relation("UserRelais", fields: [userId], references: [id])
   parcelsDepart    Colis[]  @relation("RelaisDepart")
   parcelsArrivee   Colis[]  @relation("RelaisArrivee")
+  cashTransactions RelaisCash[]
 }
 
 // Transporter applications
@@ -103,9 +106,10 @@ model Colis {
   commissionPlateforme Float
   commissionRelais Float
   netTransporteur Float
-  status          String   @default("CREATED") // CREATED, PAID, RECU_RELAIS, EN_TRANSPORT, ARRIVE_RELAIS_DESTINATION, LIVRE, ANNULE, RETOUR, EN_DISPUTE
+  status          String   @default("CREATED") // CREATED | PAID_RELAY | DEPOSITED_RELAY | EN_TRANSPORT | ARRIVE_RELAIS_DESTINATION | LIVRE | ANNULE | RETOUR | EN_DISPUTE
   qrCode          String   // QR code data
   qrCodeImage     String?  // QR code image URL
+  photoProof      String?  // JSON array of proof photo URLs
   dateCreation    DateTime @default(now())
   dateLimit       DateTime?
   deliveredAt     DateTime?
@@ -117,6 +121,7 @@ model Colis {
   relaisArrivee   Relais   @relation("RelaisArrivee", fields: [relaisArriveeId], references: [id])
   missions        Mission[]
   trackingHistory TrackingHistory[]
+  relaisCash      RelaisCash[]
 }
 
 // Transporter trips/routes
@@ -185,4 +190,42 @@ model Setting {
   key         String   @unique
   value       String
   updatedAt   DateTime @updatedAt
+}
+
+// Transporter wallet - pending vs available earnings
+model TransporterWallet {
+  id                String   @id @default(cuid())
+  transporteurId    String   @unique
+  pendingEarnings   Float    @default(0)  // En attente (colis en cours)
+  availableEarnings Float    @default(0)  // Disponibles au retrait
+  totalEarned       Float    @default(0)  // Total historique gagné
+  totalWithdrawn    Float    @default(0)  // Total retiré
+  updatedAt         DateTime @updatedAt
+  createdAt         DateTime @default(now())
+}
+
+// Relay cash ledger - track cash collected vs reversed
+model RelaisCash {
+  id             String   @id @default(cuid())
+  relaisId       String
+  colisId        String
+  amount         Float    // Cash amount collected from client
+  type           String   // COLLECTED | REVERSED
+  notes          String?
+  createdAt      DateTime @default(now())
+
+  relais         Relais   @relation(fields: [relaisId], references: [id])
+  colis          Colis    @relation(fields: [colisId], references: [id])
+}
+
+// Action log for anti-fraud audit trail
+model ActionLog {
+  id          String   @id @default(cuid())
+  userId      String?  // Who performed the action
+  entityType  String   // COLIS | RELAIS | TRANSPORTER | USER
+  entityId    String
+  action      String   // QR_SCAN | PAYMENT_VALIDATE | STATUS_CHANGE | LOGIN | etc.
+  details     String?  // JSON string with extra info
+  ipAddress   String?
+  createdAt   DateTime @default(now())
 }

@@ -32,7 +32,20 @@ export const authOptions: NextAuthOptions = {
 
         const user = await db.user.findUnique({
           where: { email: credentials.email.toLowerCase() },
-          include: { relais: true },
+          select: {
+            id: true,
+            email: true,
+            name: true,
+            role: true,
+            phone: true,
+            password: true,
+            relais: {
+              select: {
+                id: true,
+                status: true,
+              },
+            },
+          },
         });
 
         if (!user || !user.password) {

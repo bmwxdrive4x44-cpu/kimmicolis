@@ -11,9 +11,22 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const user = await db.user.findUnique({
+    const user = await db.user.findFirst({
       where: { email: email.toLowerCase() },
-      include: { relais: true },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        isActive: true,
+        password: true,
+        relais: {
+          select: {
+            id: true,
+            status: true,
+          },
+        },
+      },
     });
 
     if (!user) {

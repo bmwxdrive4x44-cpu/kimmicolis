@@ -38,7 +38,7 @@ export async function PUT(request: NextRequest) {
     const { platformCommission, commissionPetit, commissionMoyen, commissionGros } = body;
 
     // Update each setting
-    const updates = [];
+    const updates: Promise<unknown>[] = [];
     
     if (platformCommission !== undefined) {
       updates.push(

@@ -74,16 +74,7 @@ export default function RegisterPage() {
       return false;
     }
 
-    if (formData.role === 'TRANSPORTER' && (!formData.vehicle || !formData.license)) {
-      toast({ title: 'Erreur', description: 'Veuillez remplir le type de véhicule et le numéro de permis', variant: 'destructive' });
-      return false;
-    }
-
-    if (formData.role === 'RELAIS' && (!formData.commerceName || !formData.address || !formData.ville)) {
-      toast({ title: 'Erreur', description: 'Veuillez remplir le nom du commerce, l\'adresse et la ville', variant: 'destructive' });
-      return false;
-    }
-
+    // Role-specific fields are optional at signup - user can complete them later
     return true;
   };
 
@@ -118,8 +109,8 @@ export default function RegisterPage() {
 
       const userId = data.id;
 
-      // 2. Create role-specific application
-      if (formData.role === 'TRANSPORTER') {
+      // 2. Create role-specific application (only if details provided)
+      if (formData.role === 'TRANSPORTER' && formData.vehicle && formData.license) {
         await fetch('/api/transporters', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -136,7 +127,7 @@ export default function RegisterPage() {
         });
       }
 
-      if (formData.role === 'RELAIS') {
+      if (formData.role === 'RELAIS' && formData.commerceName && formData.address && formData.ville) {
         await fetch('/api/relais', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -159,10 +150,17 @@ export default function RegisterPage() {
 
       if (result?.ok) {
         toast({ title: 'Compte créé', description: 'Bienvenue sur SwiftColis!' });
-        const dashboardPath = `/${locale}/dashboard/${
-          formData.role === 'TRANSPORTER' ? 'transporter' : formData.role === 'RELAIS' ? 'relais' : 'client'
-        }`;
-        window.location.href = dashboardPath;
+        
+        // If RELAIS or TRANSPORTER without details, redirect to completion page
+        if ((formData.role === 'RELAIS' && !formData.commerceName) || 
+            (formData.role === 'TRANSPORTER' && !formData.vehicle)) {
+          window.location.href = `/${locale}/complete-profile/${formData.role === 'TRANSPORTER' ? 'transporter' : 'relais'}`;
+        } else {
+          const dashboardPath = `/${locale}/dashboard/${
+            formData.role === 'TRANSPORTER' ? 'transporter' : formData.role === 'RELAIS' ? 'relais' : 'client'
+          }`;
+          window.location.href = dashboardPath;
+        }
       } else {
         toast({ title: 'Compte créé', description: 'Vous pouvez maintenant vous connecter' });
         router.push(`/${locale}/auth/login`);
@@ -320,23 +318,21 @@ export default function RegisterPage() {
 
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="vehicle">Type de véhicule</Label>
+                    <Label htmlFor="vehicle">Type de véhicule (optionnel)</Label>
                     <Input
                       id="vehicle"
                       placeholder="Ex: Utilitaire 3.5T"
                       value={formData.vehicle}
                       onChange={(e) => setFormData({ ...formData, vehicle: e.target.value })}
-                      required
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="license">Numéro de permis</Label>
+                    <Label htmlFor="license">Numéro de permis (optionnel)</Label>
                     <Input
                       id="license"
                       placeholder="Ex: AB123456"
                       value={formData.license}
                       onChange={(e) => setFormData({ ...formData, license: e.target.value })}
-                      required
                     />
                   </div>
                 </div>
@@ -394,8 +390,14 @@ export default function RegisterPage() {
                   </h3>
                 </div>
 
+                <div>
+                  <p className="text-sm text-slate-600 dark:text-slate-400 mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                    Les détails du point relais sont optionnels à l'inscription. Vous pourrez les ajouter après.
+                  </p>
+                </div>
+
                 <div className="space-y-2">
-                  <Label htmlFor="commerceName">Nom du commerce</Label>
+                  <Label htmlFor="commerceName">Nom du commerce (optionnel)</Label>
                   <div className="relative">
                     <Store className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                     <Input
@@ -404,25 +406,23 @@ export default function RegisterPage() {
                       value={formData.commerceName}
                       onChange={(e) => setFormData({ ...formData, commerceName: e.target.value })}
                       className="pl-10"
-                      required
                     />
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="address">Adresse</Label>
+                  <Label htmlFor="address">Adresse (optionnel)</Label>
                   <Textarea
                     id="address"
                     placeholder="Ex: 123 Rue Didouche Mourad, Alger Centre"
                     value={formData.address}
                     onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                     rows={2}
-                    required
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="ville">Ville</Label>
+                  <Label htmlFor="ville">Ville (optionnel)</Label>
                   <div className="relative">
                     <MapPin className="absolute left-3 top-3 h-4 w-4 text-muted-foreground z-10" />
                     <Select value={formData.ville} onValueChange={(value) => setFormData({ ...formData, ville: value })}>
