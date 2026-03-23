@@ -510,6 +510,14 @@ function ScanTab({ relaisId, userId, onRefresh }: { relaisId: string | undefined
       toast({ title: 'Erreur', description: 'ID relais non trouvé. Rechargez la page.', variant: 'destructive' });
       return;
     }
+    if (receptionParcel.relaisDepart?.id !== relaisId) {
+      toast({
+        title: 'Relais incorrect',
+        description: `Ce colis doit être traité au relais de départ: ${receptionParcel.relaisDepart?.commerceName ?? 'inconnu'}`,
+        variant: 'destructive',
+      });
+      return;
+    }
     
     // Step 1: Validate payment
     setIsReceptionProcessing(true);
@@ -647,7 +655,7 @@ function ScanTab({ relaisId, userId, onRefresh }: { relaisId: string | undefined
                 </div>
               </div>
 
-              {receptionParcel.status === 'CREATED' && (
+              {receptionParcel.status === 'CREATED' && receptionParcel.relaisDepart?.id === relaisId && (
                 <Button 
                   onClick={handleValidateReceptionPayment} 
                   disabled={isReceptionProcessing}
@@ -665,6 +673,13 @@ function ScanTab({ relaisId, userId, onRefresh }: { relaisId: string | undefined
                     </>
                   )}
                 </Button>
+              )}
+              {receptionParcel.status === 'CREATED' && receptionParcel.relaisDepart?.id !== relaisId && (
+                <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 rounded text-sm text-amber-700 dark:text-amber-300">
+                  Ce colis ne peut pas être encaissé dans ce point relais. Relais de départ attendu :
+                  {' '}
+                  <strong>{receptionParcel.relaisDepart?.commerceName ?? 'inconnu'}</strong>.
+                </div>
               )}
               {receptionParcel.status !== 'CREATED' && (
                 <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 rounded text-sm text-blue-700 dark:text-blue-300">
