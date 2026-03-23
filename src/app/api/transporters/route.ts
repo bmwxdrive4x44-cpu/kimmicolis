@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { requireRole } from '@/lib/rbac';
+import { isAlgerianCommerceRegisterNumber, normalizeCommerceRegisterNumber } from '@/lib/validators';
 
 // GET all transporter applications
 export async function GET(request: NextRequest) {
@@ -46,10 +47,17 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const { userId, fullName, phone, vehicle, license, commerceRegisterNumber, experience, regions, description } = body;
-    const rcNumber = String(commerceRegisterNumber || '').trim();
+    const rcNumber = normalizeCommerceRegisterNumber(String(commerceRegisterNumber || ''));
 
     if (!userId || !fullName || !phone || !vehicle || !license || !rcNumber) {
       return NextResponse.json({ error: 'Missing required fields (numéro RC obligatoire)' }, { status: 400 });
+    }
+
+    if (!isAlgerianCommerceRegisterNumber(rcNumber)) {
+      return NextResponse.json({
+        error: 'Invalid commerce register number format',
+        details: 'Format RC algérien invalide (ex: RC-16/1234567B21)',
+      }, { status: 400 });
     }
 
     if (auth.payload.role === 'TRANSPORTER' && userId !== auth.payload.id) {

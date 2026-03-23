@@ -17,6 +17,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Loader2, Store, Truck, CheckCircle, AlertCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { WILAYAS } from '@/lib/constants';
+import { isAlgerianCommerceRegisterNumber, normalizeCommerceRegisterNumber } from '@/lib/validators';
 
 export default function CompleteProfilePage() {
   const { data: session, status } = useSession();
@@ -126,12 +127,28 @@ export default function CompleteProfilePage() {
         });
         return false;
       }
+      if (!isAlgerianCommerceRegisterNumber(data.commerceRegisterNumber)) {
+        toast({
+          title: 'Erreur',
+          description: 'Format RC invalide (ex: RC-16/1234567B21)',
+          variant: 'destructive',
+        });
+        return false;
+      }
     } else if (isTransporter) {
       const data = formData as any;
       if (!data.vehicle || !data.license || !data.commerceRegisterNumber?.trim()) {
         toast({
           title: 'Erreur',
           description: 'Veuillez remplir le type de véhicule, le numéro de permis et le numéro du registre du commerce',
+          variant: 'destructive',
+        });
+        return false;
+      }
+      if (!isAlgerianCommerceRegisterNumber(data.commerceRegisterNumber)) {
+        toast({
+          title: 'Erreur',
+          description: 'Format RC invalide (ex: RC-16/1234567B21)',
           variant: 'destructive',
         });
         return false;
@@ -152,7 +169,7 @@ export default function CompleteProfilePage() {
         const updateUserResponse = await fetch(`/api/users/${session.user.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ siret: data.commerceRegisterNumber.trim() }),
+          body: JSON.stringify({ siret: normalizeCommerceRegisterNumber(data.commerceRegisterNumber) }),
         });
 
         if (!updateUserResponse.ok) {
@@ -169,7 +186,7 @@ export default function CompleteProfilePage() {
             address: data.address,
             ville: data.ville,
             phone: session.user.phone || '',
-            commerceRegisterNumber: data.commerceRegisterNumber.trim(),
+            commerceRegisterNumber: normalizeCommerceRegisterNumber(data.commerceRegisterNumber),
           }),
         });
 
@@ -185,7 +202,7 @@ export default function CompleteProfilePage() {
         const updateUserResponse = await fetch(`/api/users/${session.user.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ siret: data.commerceRegisterNumber.trim() }),
+          body: JSON.stringify({ siret: normalizeCommerceRegisterNumber(data.commerceRegisterNumber) }),
         });
 
         if (!updateUserResponse.ok) {
@@ -202,7 +219,7 @@ export default function CompleteProfilePage() {
             phone: session.user.phone || '',
             vehicle: data.vehicle,
             license: data.license,
-            commerceRegisterNumber: data.commerceRegisterNumber.trim(),
+            commerceRegisterNumber: normalizeCommerceRegisterNumber(data.commerceRegisterNumber),
             experience: parseInt(data.experience) || 0,
             regions: data.regions || [],
             description: data.description,

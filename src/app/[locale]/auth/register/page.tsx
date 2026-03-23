@@ -16,6 +16,7 @@ import { Separator } from '@/components/ui/separator';
 import { Package, Loader2, Mail, Lock, User, Phone, Store, MapPin, Truck } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { WILAYAS } from '@/lib/constants';
+import { isAlgerianCommerceRegisterNumber, normalizeCommerceRegisterNumber } from '@/lib/validators';
 
 function RegisterForm() {
   const t = useTranslations('auth.register');
@@ -80,6 +81,11 @@ function RegisterForm() {
       return false;
     }
 
+    if ((formData.role === 'TRANSPORTER' || formData.role === 'RELAIS') && !isAlgerianCommerceRegisterNumber(formData.commerceRegisterNumber)) {
+      toast({ title: 'Erreur', description: 'Format RC invalide (ex: RC-16/1234567B21)', variant: 'destructive' });
+      return false;
+    }
+
     // Other role-specific fields can still be completed later
     return true;
   };
@@ -107,7 +113,7 @@ function RegisterForm() {
           phone: formData.phone,
           password: formData.password,
           role: formData.role,
-          siret: (formData.role === 'TRANSPORTER' || formData.role === 'RELAIS') ? formData.commerceRegisterNumber.trim() : undefined,
+          siret: (formData.role === 'TRANSPORTER' || formData.role === 'RELAIS') ? normalizeCommerceRegisterNumber(formData.commerceRegisterNumber) : undefined,
         }),
       });
 
@@ -155,7 +161,7 @@ function RegisterForm() {
             phone: formData.phone,
             vehicle: formData.vehicle,
             license: formData.license,
-            commerceRegisterNumber: formData.commerceRegisterNumber.trim(),
+            commerceRegisterNumber: normalizeCommerceRegisterNumber(formData.commerceRegisterNumber),
             experience: parseInt(formData.experience) || 0,
             regions: formData.regions,
             description: formData.description,
@@ -180,7 +186,7 @@ function RegisterForm() {
             address: formData.address,
             ville: formData.ville,
             phone: formData.phone,
-            commerceRegisterNumber: formData.commerceRegisterNumber.trim(),
+            commerceRegisterNumber: normalizeCommerceRegisterNumber(formData.commerceRegisterNumber),
           }),
         });
 

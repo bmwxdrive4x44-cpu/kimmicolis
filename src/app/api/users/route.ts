@@ -4,6 +4,7 @@ import { hashPassword } from '@/lib/auth';
 import { requireRole } from '@/lib/rbac';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import { isAlgerianCommerceRegisterNumber, normalizeCommerceRegisterNumber } from '@/lib/validators';
 
 // GET all users (ADMIN ONLY)
 export async function GET(request: NextRequest) {
@@ -72,10 +73,19 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    if ((role === 'TRANSPORTER' || role === 'RELAIS') && !String(siret || '').trim()) {
+    const normalizedSiret = normalizeCommerceRegisterNumber(String(siret || ''));
+
+    if ((role === 'TRANSPORTER' || role === 'RELAIS') && !normalizedSiret) {
       return NextResponse.json({
         error: 'Missing required fields',
         details: 'Le numéro du registre du commerce est obligatoire pour les transporteurs et les points relais',
+      }, { status: 400 });
+    }
+
+    if ((role === 'TRANSPORTER' || role === 'RELAIS') && !isAlgerianCommerceRegisterNumber(normalizedSiret)) {
+      return NextResponse.json({
+        error: 'Invalid commerce register number format',
+        details: 'Format RC algérien invalide (ex: RC-16/1234567B21)',
       }, { status: 400 });
     }
 
@@ -102,7 +112,7 @@ export async function POST(request: NextRequest) {
         password: hashedPassword,
         phone: phone || null,
         role: role || 'CLIENT',
-        siret: (role === 'TRANSPORTER' || role === 'RELAIS') ? String(siret).trim() : null,
+        siret: (role === 'TRANSPORTER' || role === 'RELAIS') ? normalizedSiret : null,
       },
     });
 

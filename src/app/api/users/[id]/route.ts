@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { hashPassword } from '@/lib/auth';
+import { isAlgerianCommerceRegisterNumber, normalizeCommerceRegisterNumber } from '@/lib/validators';
 
 // GET single user
 export async function GET(
@@ -61,7 +62,16 @@ export async function PUT(
     if (phone !== undefined) updateData.phone = phone;
     if (email !== undefined) updateData.email = email;
     if (isActive !== undefined) updateData.isActive = isActive;
-    if (siret !== undefined) updateData.siret = siret;
+    if (siret !== undefined) {
+      const normalizedSiret = normalizeCommerceRegisterNumber(String(siret || ''));
+      if (normalizedSiret && !isAlgerianCommerceRegisterNumber(normalizedSiret)) {
+        return NextResponse.json({
+          error: 'Invalid commerce register number format',
+          details: 'Format RC algérien invalide (ex: RC-16/1234567B21)',
+        }, { status: 400 });
+      }
+      updateData.siret = normalizedSiret || null;
+    }
     if (password) {
       updateData.password = await hashPassword(password);
     }
