@@ -28,9 +28,6 @@ export interface IPayment {
   expiresAt: Date;
 }
 
-// In-memory payment store (in production: use dedicated payment service)
-const paymentStore = new Map<string, IPayment>();
-
 /**
  * Generate unique payment ID
  */
@@ -71,24 +68,55 @@ export async function createPayment(
       return { success: false, error: 'Client mismatch' };
     }
 
+    if (colis.status !== 'CREATED') {
+      return { success: false, error: `Parcel cannot be paid with status ${colis.status}` };
+    }
+
+    if (amount !== colis.prixClient) {
+      return { success: false, error: 'Amount mismatch' };
+    }
+
+    const existingActivePayment = await db.payment.findFirst({
+      where: {
+        colisId,
+        status: { in: ['PENDING', 'PROCESSING'] },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (existingActivePayment) {
+      return {
+        success: true,
+        payment: existingActivePayment,
+        paymentUrl: `/payment/checkout?paymentId=${existingActivePayment.id}`,
+      };
+    }
+
+    const completedPayment = await db.payment.findFirst({
+      where: {
+        colisId,
+        status: 'COMPLETED',
+      },
+    });
+
+    if (completedPayment) {
+      return { success: false, error: 'Parcel already paid' };
+    }
+
     // Create payment object
-    const payment: IPayment = {
-      id: generatePaymentId(),
-      colisId,
-      clientId,
-      amount,
-      currency: 'DZD', // Algerian Dinar
-      status: 'PENDING',
-      method: paymentMethod,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      expiresAt: new Date(Date.now() + 15 * 60 * 1000), // 15 min timeout
-    };
+    const payment = await db.payment.create({
+      data: {
+        id: generatePaymentId(),
+        colisId,
+        clientId,
+        amount,
+        currency: 'DZD',
+        status: 'PENDING',
+        method: paymentMethod,
+        expiresAt: new Date(Date.now() + 15 * 60 * 1000),
+      },
+    });
 
-    // Store payment
-    paymentStore.set(payment.id, payment);
-
-    // Return payment object + URL to payment gateway
     return {
       success: true,
       payment,
@@ -106,14 +134,23 @@ export async function createPayment(
  * Get payment status
  */
 export async function getPaymentStatus(paymentId: string): Promise<IPayment | null> {
-  const payment = paymentStore.get(paymentId);
+  const payment = await db.payment.findUnique({
+    where: { id: paymentId },
+  });
+
   if (!payment) return null;
 
-  // Check if expired (15 min timeout)
-  if (new Date() > payment.expiresAt) {
-    payment.status = 'FAILED';
-    payment.errorMessage = 'Payment session expired';
-    payment.updatedAt = new Date();
+  if (
+    new Date() > payment.expiresAt &&
+    (payment.status === 'PENDING' || payment.status === 'PROCESSING')
+  ) {
+    return db.payment.update({
+      where: { id: paymentId },
+      data: {
+        status: 'FAILED',
+        errorMessage: 'Payment session expired',
+      },
+    });
   }
 
   return payment;
@@ -131,9 +168,24 @@ export async function processPayment(
   payment?: IPayment;
   error?: string;
 }> {
-  const payment = paymentStore.get(paymentId);
+  const payment = await db.payment.findUnique({
+    where: { id: paymentId },
+  });
+
   if (!payment) {
     return { success: false, error: `Payment ${paymentId} not found` };
+  }
+
+  if (payment.status === 'COMPLETED') {
+    return { success: true, payment };
+  }
+
+  if (payment.status === 'REFUNDED') {
+    return { success: false, payment, error: 'Refunded payment cannot be processed again' };
+  }
+
+  if (payment.status === 'FAILED' && new Date() > payment.expiresAt) {
+    return { success: false, payment, error: 'Payment session expired' };
   }
 
   // Simulate network delay (2-5 seconds)
@@ -141,64 +193,72 @@ export async function processPayment(
   await new Promise((resolve) => setTimeout(resolve, delay));
 
   try {
-    // Simulate success/failure based on rate
     const isSuccess = Math.random() < successRate;
 
     if (isSuccess) {
-      payment.status = 'PROCESSING';
-      payment.transactionRef = generateTransactionRef();
-      payment.updatedAt = new Date();
-      paymentStore.set(paymentId, payment);
+      await db.payment.update({
+        where: { id: paymentId },
+        data: {
+          status: 'PROCESSING',
+          transactionRef: generateTransactionRef(),
+        },
+      });
 
-      // Simulate another delay before final confirmation
       await new Promise((resolve) => setTimeout(resolve, 1000 + Math.random() * 2000));
 
-      // Update to COMPLETED
-      payment.status = 'COMPLETED';
-      payment.processedAt = new Date();
-      payment.updatedAt = new Date();
-      paymentStore.set(paymentId, payment);
+      const completedPayment = await db.payment.update({
+        where: { id: paymentId },
+        data: {
+          status: 'COMPLETED',
+          processedAt: new Date(),
+          errorMessage: null,
+        },
+      });
 
-      // Update colis status to PAID
       await db.colis.update({
         where: { id: payment.colisId },
-        data: { 
+        data: {
           status: 'PAID',
           updatedAt: new Date(),
         },
       });
 
-      return { success: true, payment };
-    } else {
-      // Simulate payment failure
-      const failureReasons = [
-        'Insufficient funds',
-        'Card declined',
-        'Invalid card details',
-        'Transaction timeout',
-        'Issuer rejected transaction',
-      ];
-
-      payment.status = 'FAILED';
-      payment.errorMessage = failureReasons[Math.floor(Math.random() * failureReasons.length)];
-      payment.updatedAt = new Date();
-      paymentStore.set(paymentId, payment);
-
-      return {
-        success: false,
-        payment,
-        error: payment.errorMessage,
-      };
+      return { success: true, payment: completedPayment };
     }
-  } catch (error) {
-    payment.status = 'FAILED';
-    payment.errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    payment.updatedAt = new Date();
-    paymentStore.set(paymentId, payment);
+
+    const failureReasons = [
+      'Insufficient funds',
+      'Card declined',
+      'Invalid card details',
+      'Transaction timeout',
+      'Issuer rejected transaction',
+    ];
+
+    const failedPayment = await db.payment.update({
+      where: { id: paymentId },
+      data: {
+        status: 'FAILED',
+        errorMessage: failureReasons[Math.floor(Math.random() * failureReasons.length)],
+      },
+    });
 
     return {
       success: false,
-      payment,
+      payment: failedPayment,
+      error: failedPayment.errorMessage || 'Payment failed',
+    };
+  } catch (error) {
+    const failedPayment = await db.payment.update({
+      where: { id: paymentId },
+      data: {
+        status: 'FAILED',
+        errorMessage: error instanceof Error ? error.message : 'Unknown error',
+      },
+    });
+
+    return {
+      success: false,
+      payment: failedPayment,
       error: 'Payment processing failed',
     };
   }
@@ -215,7 +275,10 @@ export async function refundPayment(
   payment?: IPayment;
   error?: string;
 }> {
-  const payment = paymentStore.get(paymentId);
+  const payment = await db.payment.findUnique({
+    where: { id: paymentId },
+  });
+
   if (!payment) {
     return { success: false, error: 'Payment not found' };
   }
@@ -228,18 +291,20 @@ export async function refundPayment(
   }
 
   try {
-    payment.status = 'REFUNDED';
-    payment.errorMessage = `Refunded: ${reason}`;
-    payment.updatedAt = new Date();
-    paymentStore.set(paymentId, payment);
+    const refundedPayment = await db.payment.update({
+      where: { id: paymentId },
+      data: {
+        status: 'REFUNDED',
+        errorMessage: `Refunded: ${reason}`,
+      },
+    });
 
-    // Revert colis to CREATED (unpaid)
     await db.colis.update({
       where: { id: payment.colisId },
       data: { status: 'CREATED' },
     });
 
-    return { success: true, payment };
+    return { success: true, payment: refundedPayment };
   } catch (error) {
     return {
       success: false,
@@ -252,13 +317,10 @@ export async function refundPayment(
  * Get all payments by client (for dashboard)
  */
 export async function getClientPayments(clientId: string): Promise<IPayment[]> {
-  const payments: IPayment[] = [];
-  paymentStore.forEach((payment) => {
-    if (payment.clientId === clientId) {
-      payments.push(payment);
-    }
+  return db.payment.findMany({
+    where: { clientId },
+    orderBy: { createdAt: 'desc' },
   });
-  return payments.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 }
 
 /**
@@ -271,23 +333,17 @@ export async function getPaymentStats(): Promise<{
   failed: number;
   pending: number;
 }> {
-  let total = 0;
-  let amount = 0;
-  let completed = 0;
-  let failed = 0;
-  let pending = 0;
-
-  paymentStore.forEach((payment) => {
-    total++;
-    amount += payment.amount;
-    if (payment.status === 'COMPLETED') completed++;
-    else if (payment.status === 'FAILED') failed++;
-    else if (payment.status === 'PENDING' || payment.status === 'PROCESSING') pending++;
-  });
+  const [totalPayments, aggregate, completed, failed, pending] = await Promise.all([
+    db.payment.count(),
+    db.payment.aggregate({ _sum: { amount: true } }),
+    db.payment.count({ where: { status: 'COMPLETED' } }),
+    db.payment.count({ where: { status: 'FAILED' } }),
+    db.payment.count({ where: { status: { in: ['PENDING', 'PROCESSING'] } } }),
+  ]);
 
   return {
-    totalPayments: total,
-    totalAmount: amount,
+    totalPayments,
+    totalAmount: aggregate._sum.amount || 0,
     completed,
     failed,
     pending,

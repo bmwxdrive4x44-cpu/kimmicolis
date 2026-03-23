@@ -31,6 +31,7 @@ model User {
   missions            Mission[]       @relation("TransporterMissions")
   relais              Relais?         @relation("UserRelais")
   transporterApplication TransporterApplication? @relation("UserTransporterApplication")
+  payments            Payment[]
   notifications       Notification[]
 }
 
@@ -120,8 +121,32 @@ model Colis {
   relaisDepart    Relais   @relation("RelaisDepart", fields: [relaisDepartId], references: [id])
   relaisArrivee   Relais   @relation("RelaisArrivee", fields: [relaisArriveeId], references: [id])
   missions        Mission[]
+  payments        Payment[]
   trackingHistory TrackingHistory[]
   relaisCash      RelaisCash[]
+}
+
+model Payment {
+  id             String   @id
+  colisId        String
+  clientId       String
+  amount         Float
+  currency       String   @default("DZD")
+  status         String   @default("PENDING") // PENDING | PROCESSING | COMPLETED | FAILED | REFUNDED
+  method         String?
+  transactionRef String?  @unique
+  errorMessage   String?
+  processedAt    DateTime?
+  expiresAt      DateTime
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  colis          Colis    @relation(fields: [colisId], references: [id])
+  client         User     @relation(fields: [clientId], references: [id])
+
+  @@index([clientId, createdAt])
+  @@index([colisId, createdAt])
+  @@index([status, createdAt])
 }
 
 // Transporter trips/routes
