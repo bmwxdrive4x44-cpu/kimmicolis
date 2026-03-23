@@ -173,3 +173,6 @@ export const QR_ACTION_LABELS: Record<string, { fr: string; en: string }> = {
 
 /** Minimum cash threshold before auto-block alert (in DZD) */
 export const RELAY_CASH_ALERT_THRESHOLD = 50000;
+
+/** Backward-compatible alias used by relay API routes */
+export const RELAY_BLOCK_THRESHOLD_DA = RELAY_CASH_ALERT_THRESHOLD;
