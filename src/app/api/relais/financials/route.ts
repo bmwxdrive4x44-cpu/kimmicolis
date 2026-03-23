@@ -58,7 +58,7 @@ export async function GET(request: NextRequest) {
       relaisId,
       commerceName: relais.commerceName,
       totalEncaisse: relais.totalEncaisse,
-      totalReverse: relais.totalReverseé,
+      totalReverse: relais.totalReverseé, // DB field uses accented char; API exposes clean name
       balance,
       isBlocked: relais.isBlocked,
       blockThreshold: RELAY_BLOCK_THRESHOLD_DA,

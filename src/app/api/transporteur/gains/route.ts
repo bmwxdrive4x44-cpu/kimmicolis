@@ -63,7 +63,7 @@ export async function GET(request: NextRequest) {
     // Monthly breakdown of confirmed earnings
     const monthlyMap = new Map<string, number>();
     missions
-      .filter((m) => m.gainStatus !== 'PENDING' && m.completedAt)
+      .filter((m) => m.gainStatus !== 'PENDING' && m.completedAt !== null)
       .forEach((m) => {
         const month = m.completedAt!.toISOString().slice(0, 7);
         const gain = m.gainAmount || m.colis?.netTransporteur || 0;

@@ -16,7 +16,9 @@ if (!databaseUrl && process.env.NODE_ENV !== 'test') {
   }
 }
 
-// Use placeholder URL during build phase only; runtime requires a real URL.
+// Use placeholder URL during build phase only; runtime requires a real DATABASE_URL.
+// In production, if DATABASE_URL is absent, all DB queries will throw a connection error.
+// This placeholder ONLY prevents a Prisma constructor validation error at build time.
 const resolvedUrl =
   databaseUrl || 'postgresql://localhost:5432/placeholder_build_only?schema=public'
 

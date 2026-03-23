@@ -96,7 +96,8 @@ export async function POST(request: NextRequest) {
     // Transporter picks up parcel at departure relay
     // ──────────────────────────────────────────────
     if (effectiveAction === 'pickup') {
-      const validStatuses = ['DEPOSITED_RELAY', 'ASSIGNED', 'RECU_RELAIS', 'PAID_RELAY'];
+      // DEPOSITED_RELAY/ASSIGNED = new workflow; RECU_RELAIS = legacy backward compat
+      const validStatuses = ['DEPOSITED_RELAY', 'ASSIGNED', 'RECU_RELAIS'];
       if (!validStatuses.includes(parcel.status)) {
         return NextResponse.json(
           { error: `Impossible de prendre en charge un colis avec le statut: ${parcel.status}` },
