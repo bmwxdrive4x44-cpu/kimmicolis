@@ -327,6 +327,26 @@ function TrajetsTab({ userId }: { userId: string }) {
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const formatVillesEtapes = (value: unknown): string[] => {
+    if (!value) return [];
+    if (Array.isArray(value)) {
+      return value.map((item) => String(item).trim()).filter(Boolean);
+    }
+    if (typeof value === 'string') {
+      const raw = value.trim();
+      if (!raw) return [];
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          return parsed.map((item) => String(item).trim()).filter(Boolean);
+        }
+      } catch {
+        // not JSON, fallback to CSV
+      }
+      return raw.split(',').map((item) => item.trim()).filter(Boolean);
+    }
+    return [];
+  };
   const [formData, setFormData] = useState({
     villeDepart: '',
     villeArrivee: '',
@@ -466,8 +486,8 @@ function TrajetsTab({ userId }: { userId: string }) {
                   <TableRow key={t.id}>
                     <TableCell className="font-medium">
                       {WILAYAS.find(w => w.id === t.villeDepart)?.name} → {WILAYAS.find(w => w.id === t.villeArrivee)?.name}
-                      {t.villesEtapes && t.villesEtapes.length > 0 && (
-                        <p className="text-xs text-slate-400">via {t.villesEtapes.join(', ')}</p>
+                      {formatVillesEtapes(t.villesEtapes).length > 0 && (
+                        <p className="text-xs text-slate-400">via {formatVillesEtapes(t.villesEtapes).join(', ')}</p>
                       )}
                     </TableCell>
                     <TableCell className="text-sm">
