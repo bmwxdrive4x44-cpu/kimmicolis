@@ -176,8 +176,58 @@ export default function AdminDashboard() {
 
 // Overview Tab
 function OverviewTab({ stats, setActiveTab }: { stats: any; setActiveTab: (tab: string) => void }) {
+  const statusCounts = (stats?.parcelsByStatus || []).reduce((acc: Record<string, number>, item: any) => {
+    acc[item.status] = item.count;
+    return acc;
+  }, {});
+
+  const createdCount =
+    (statusCounts.CREATED || 0) +
+    (statusCounts.PAID || 0) +
+    (statusCounts.PAID_RELAY || 0);
+
+  const inTransitCount =
+    (statusCounts.DEPOSITED_RELAY || 0) +
+    (statusCounts.RECU_RELAIS || 0) +
+    (statusCounts.EN_TRANSPORT || 0) +
+    (statusCounts.ARRIVE_RELAIS_DESTINATION || 0);
+
+  const deliveredCount = statusCounts.LIVRE || 0;
+
   return (
     <div className="grid gap-6 lg:grid-cols-2">
+      <Card className="lg:col-span-2">
+        <CardHeader>
+          <CardTitle>Synthèse colis</CardTitle>
+          <CardDescription>Vue agrégée cohérente avec le dashboard client</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 md:grid-cols-3">
+            <div className="rounded-lg border p-4 bg-slate-50 dark:bg-slate-800/60">
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-slate-600 dark:text-slate-400">Créés</p>
+                <Package className="h-4 w-4 text-slate-400" />
+              </div>
+              <p className="text-2xl font-bold mt-1">{createdCount}</p>
+            </div>
+            <div className="rounded-lg border p-4 bg-slate-50 dark:bg-slate-800/60">
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-slate-600 dark:text-slate-400">En transit</p>
+                <Truck className="h-4 w-4 text-orange-500" />
+              </div>
+              <p className="text-2xl font-bold mt-1">{inTransitCount}</p>
+            </div>
+            <div className="rounded-lg border p-4 bg-slate-50 dark:bg-slate-800/60">
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-slate-600 dark:text-slate-400">Livrés</p>
+                <CheckCircle className="h-4 w-4 text-emerald-600" />
+              </div>
+              <p className="text-2xl font-bold mt-1">{deliveredCount}</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle>Colis par statut</CardTitle>
