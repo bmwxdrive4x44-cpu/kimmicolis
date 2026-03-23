@@ -1,6 +1,42 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 
+function parseVillesEtapes(value: unknown): string[] {
+  if (!value) return [];
+
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item).trim()).filter(Boolean);
+  }
+
+  if (typeof value === 'string') {
+    const raw = value.trim();
+    if (!raw) return [];
+
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        return parsed.map((item) => String(item).trim()).filter(Boolean);
+      }
+      if (typeof parsed === 'string') {
+        return parsed.split(',').map((item) => item.trim()).filter(Boolean);
+      }
+    } catch {
+      // Not JSON, fallback to CSV
+    }
+
+    return raw.split(',').map((item) => item.trim()).filter(Boolean);
+  }
+
+  return [];
+}
+
+function normalizeTrajet<T extends { villesEtapes?: unknown }>(trajet: T): T & { villesEtapes: string[] } {
+  return {
+    ...trajet,
+    villesEtapes: parseVillesEtapes(trajet.villesEtapes),
+  };
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -29,7 +65,7 @@ export async function GET(
       return NextResponse.json({ error: 'Trajet not found' }, { status: 404 });
     }
 
-    return NextResponse.json(trajet);
+    return NextResponse.json(normalizeTrajet(trajet));
   } catch (error) {
     console.error('Fetch trajet error:', error);
     return NextResponse.json({ error: 'Failed to fetch trajet' }, { status: 500 });
@@ -43,18 +79,19 @@ export async function PUT(
   try {
     const { id } = await params;
     const body = await request.json();
-    const { status, placesUtilisees } = body;
+    const { status, placesUtilisees, villesEtapes } = body;
 
     const updateData: any = {};
     if (status) updateData.status = status;
     if (placesUtilisees !== undefined) updateData.placesUtilisees = placesUtilisees;
+    if (villesEtapes !== undefined) updateData.villesEtapes = parseVillesEtapes(villesEtapes);
 
     const trajet = await db.trajet.update({
       where: { id },
       data: updateData,
     });
 
-    return NextResponse.json(trajet);
+    return NextResponse.json(normalizeTrajet(trajet));
   } catch (error) {
     console.error('Update trajet error:', error);
     return NextResponse.json({ error: 'Failed to update trajet' }, { status: 500 });

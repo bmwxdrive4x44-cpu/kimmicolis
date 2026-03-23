@@ -1,6 +1,42 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 
+function parseVillesEtapes(value: unknown): string[] {
+  if (!value) return [];
+
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item).trim()).filter(Boolean);
+  }
+
+  if (typeof value === 'string') {
+    const raw = value.trim();
+    if (!raw) return [];
+
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        return parsed.map((item) => String(item).trim()).filter(Boolean);
+      }
+      if (typeof parsed === 'string') {
+        return parsed.split(',').map((item) => item.trim()).filter(Boolean);
+      }
+    } catch {
+      // Not JSON, fallback to CSV
+    }
+
+    return raw.split(',').map((item) => item.trim()).filter(Boolean);
+  }
+
+  return [];
+}
+
+function normalizeTrajet<T extends { villesEtapes?: unknown }>(trajet: T): T & { villesEtapes: string[] } {
+  return {
+    ...trajet,
+    villesEtapes: parseVillesEtapes(trajet.villesEtapes),
+  };
+}
+
 // GET all trajets
 export async function GET(request: NextRequest) {
   try {
@@ -29,7 +65,7 @@ export async function GET(request: NextRequest) {
       orderBy: { dateDepart: 'asc' },
     });
 
-    return NextResponse.json(trajets);
+    return NextResponse.json(trajets.map(normalizeTrajet));
   } catch (error) {
     console.error('Error fetching trajets:', error);
     return NextResponse.json({ error: 'Failed to fetch trajets' }, { status: 500 });
@@ -41,20 +77,21 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { transporteurId, villeDepart, villeArrivee, villesEtapes, dateDepart, placesColis } = body;
+    const normalizedVillesEtapes = parseVillesEtapes(villesEtapes);
 
     const trajet = await db.trajet.create({
       data: {
         transporteurId,
         villeDepart,
         villeArrivee,
-        villesEtapes: villesEtapes ? JSON.stringify(villesEtapes) : null,
+        villesEtapes: normalizedVillesEtapes,
         dateDepart: new Date(dateDepart),
         placesColis: placesColis || 10,
         status: 'PROGRAMME',
       },
     });
 
-    return NextResponse.json(trajet);
+    return NextResponse.json(normalizeTrajet(trajet));
   } catch (error) {
     console.error('Error creating trajet:', error);
     return NextResponse.json({ error: 'Failed to create trajet' }, { status: 500 });
