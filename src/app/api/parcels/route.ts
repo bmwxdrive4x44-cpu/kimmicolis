@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { generateTrackingNumber, generateQRData, PLATFORM_COMMISSION, DEFAULT_RELAY_COMMISSION } from '@/lib/constants';
 import { checkRateLimit, RATE_LIMIT_PRESETS } from '@/lib/ratelimit';
 import { verifyJWT } from '@/lib/rbac';
+import { generateQRCodeImage, buildQRCodePayload } from '@/lib/qrcode';
 
 // GET all parcels
 export async function GET(request: NextRequest) {
@@ -11,14 +12,20 @@ export async function GET(request: NextRequest) {
     const clientId = searchParams.get('clientId');
     const status = searchParams.get('status');
     const tracking = searchParams.get('tracking');
+    const available = searchParams.get('available'); // "true" = show available for transport
 
-    let where: any = {};
+    const where: Record<string, unknown> = {};
 
     if (clientId) {
       where.clientId = clientId;
     }
     if (status) {
       where.status = status;
+    } else if (available === 'true') {
+      // Show parcels available for transport: deposited at relay (new + legacy statuses)
+      where.status = { in: ['DEPOSITED_RELAY', 'RECU_RELAIS', 'PAID_RELAY'] };
+      // Only parcels without an active mission
+      where.missions = { none: { status: { in: ['ASSIGNE', 'PICKED_UP'] } } };
     }
     if (tracking) {
       where.trackingNumber = tracking;
@@ -115,6 +122,8 @@ export async function POST(request: NextRequest) {
     // Generate tracking number and QR code
     const trackingNumber = generateTrackingNumber();
     const qrCode = generateQRData(trackingNumber);
+    const qrPayload = buildQRCodePayload(trackingNumber);
+    const qrCodeImage = await generateQRCodeImage(qrPayload);
 
     // Create parcel
     const colis = await db.colis.create({
@@ -133,6 +142,7 @@ export async function POST(request: NextRequest) {
         commissionRelais: relayFee,
         netTransporteur,
         qrCode,
+        qrCodeImage,
         status: 'CREATED',
         dateLimit: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
       },

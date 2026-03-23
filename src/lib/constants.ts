@@ -58,16 +58,44 @@ export const PARCEL_FORMATS = [
 ];
 
 export const PARCEL_STATUS = [
+  // New workflow statuses (MVP)
   { id: 'CREATED', label: 'Créé', labelEn: 'Created', labelAr: 'تم الإنشاء', color: 'bg-gray-500' },
-  { id: 'PAID', label: 'Payé', labelEn: 'Paid', labelAr: 'مدفوع', color: 'bg-blue-500' },
-  { id: 'RECU_RELAIS', label: 'Reçu au relais', labelEn: 'Received at Relay', labelAr: 'استُلم في نقطة التوصيل', color: 'bg-yellow-500' },
-  { id: 'EN_TRANSPORT', label: 'En transport', labelEn: 'In Transit', labelAr: 'قيد النقل', color: 'bg-orange-500' },
-  { id: 'ARRIVE_RELAIS_DESTINATION', label: 'Arrivé au relais', labelEn: 'Arrived at Relay', labelAr: 'وصل لنقطة التوصيل', color: 'bg-teal-500' },
-  { id: 'LIVRE', label: 'Livré', labelEn: 'Delivered', labelAr: 'تم التوصيل', color: 'bg-emerald-600' },
-  { id: 'ANNULE', label: 'Annulé', labelEn: 'Cancelled', labelAr: 'ملغى', color: 'bg-red-500' },
+  { id: 'PAID_RELAY', label: 'Payé au relais', labelEn: 'Paid at Relay', labelAr: 'مدفوع في نقطة التوصيل', color: 'bg-blue-500' },
+  { id: 'DEPOSITED_RELAY', label: 'Déposé au relais', labelEn: 'Deposited at Relay', labelAr: 'مودع في نقطة التوصيل', color: 'bg-yellow-600' },
+  { id: 'ASSIGNED', label: 'Assigné transporteur', labelEn: 'Assigned to Transporter', labelAr: 'مُعيَّن للناقل', color: 'bg-purple-500' },
+  { id: 'PICKED_UP', label: 'Pris en charge', labelEn: 'Picked Up', labelAr: 'تم الاستلام', color: 'bg-orange-500' },
+  { id: 'ARRIVED_RELAY', label: 'Arrivé relais destination', labelEn: 'Arrived at Destination Relay', labelAr: 'وصل نقطة الوصول', color: 'bg-teal-500' },
+  { id: 'DELIVERED', label: 'Livré', labelEn: 'Delivered', labelAr: 'تم التسليم', color: 'bg-emerald-600' },
+  { id: 'CANCELLED', label: 'Annulé', labelEn: 'Cancelled', labelAr: 'ملغى', color: 'bg-red-500' },
+  // Legacy statuses (backward compatibility)
+  { id: 'PAID', label: 'Payé (legacy)', labelEn: 'Paid', labelAr: 'مدفوع', color: 'bg-blue-400' },
+  { id: 'RECU_RELAIS', label: 'Reçu au relais (legacy)', labelEn: 'Received at Relay', labelAr: 'استُلم في نقطة التوصيل', color: 'bg-yellow-400' },
+  { id: 'EN_TRANSPORT', label: 'En transport (legacy)', labelEn: 'In Transit', labelAr: 'قيد النقل', color: 'bg-orange-400' },
+  { id: 'ARRIVE_RELAIS_DESTINATION', label: 'Arrivé relais (legacy)', labelEn: 'Arrived at Relay', labelAr: 'وصل لنقطة التوصيل', color: 'bg-teal-400' },
+  { id: 'LIVRE', label: 'Livré (legacy)', labelEn: 'Delivered', labelAr: 'تم التوصيل', color: 'bg-emerald-500' },
+  { id: 'ANNULE', label: 'Annulé (legacy)', labelEn: 'Cancelled', labelAr: 'ملغى', color: 'bg-red-400' },
   { id: 'RETOUR', label: 'Retour', labelEn: 'Return', labelAr: 'عودة', color: 'bg-pink-500' },
   { id: 'EN_DISPUTE', label: 'En litige', labelEn: 'In Dispute', labelAr: 'في نزاع', color: 'bg-red-600' },
 ];
+
+/** Active (non-terminal) statuses in the new workflow */
+export const ACTIVE_PARCEL_STATUSES = [
+  'CREATED', 'PAID_RELAY', 'DEPOSITED_RELAY', 'ASSIGNED', 'PICKED_UP', 'ARRIVED_RELAY',
+];
+
+/** Ordered steps for the new workflow (used in status badge/timeline) */
+export const PARCEL_WORKFLOW_STEPS = [
+  { status: 'CREATED', step: 1, label: 'Colis créé' },
+  { status: 'PAID_RELAY', step: 2, label: 'Cash encaissé' },
+  { status: 'DEPOSITED_RELAY', step: 3, label: 'Déposé au relais' },
+  { status: 'ASSIGNED', step: 4, label: 'Transporteur assigné' },
+  { status: 'PICKED_UP', step: 5, label: 'Pris en charge' },
+  { status: 'ARRIVED_RELAY', step: 6, label: 'Arrivé destination' },
+  { status: 'DELIVERED', step: 7, label: 'Livré' },
+];
+
+/** Relay auto-block threshold in DA */
+export const RELAY_BLOCK_THRESHOLD_DA = 50000;
 
 export const TRAJET_STATUS = [
   { id: 'PROGRAMME', label: 'Programmé', labelEn: 'Scheduled', labelAr: 'مجدول', color: 'bg-blue-500' },

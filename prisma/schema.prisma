@@ -48,12 +48,18 @@ model Relais {
   commissionMoyen  Float    @default(200)
   commissionGros   Float    @default(300)
   status           String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  // Financial tracking (cash-at-relay model)
+  totalEncaisse    Float    @default(0)   // Total cash collected from clients
+  totalReverseé    Float    @default(0)   // Total reversed/sent to platform
+  isBlocked        Boolean  @default(false) // Auto-blocked if unreversed threshold exceeded
+  blockThreshold   Float    @default(50000) // DA threshold before auto-block
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
   
   user             User     @relation("UserRelais", fields: [userId], references: [id])
   parcelsDepart    Colis[]  @relation("RelaisDepart")
   parcelsArrivee   Colis[]  @relation("RelaisArrivee")
+  cashTransactions CashTransaction[]
 }
 
 // Transporter applications
@@ -103,9 +109,17 @@ model Colis {
   commissionPlateforme Float
   commissionRelais Float
   netTransporteur Float
-  status          String   @default("CREATED") // CREATED, PAID, RECU_RELAIS, EN_TRANSPORT, ARRIVE_RELAIS_DESTINATION, LIVRE, ANNULE, RETOUR, EN_DISPUTE
+  // New workflow statuses: CREATED → PAID_RELAY → DEPOSITED_RELAY → ASSIGNED → PICKED_UP → ARRIVED_RELAY → DELIVERED
+  // Legacy statuses kept for backward compat: PAID, RECU_RELAIS, EN_TRANSPORT, ARRIVE_RELAIS_DESTINATION, LIVRE, ANNULE, RETOUR, EN_DISPUTE
+  status          String   @default("CREATED")
   qrCode          String   // QR code data
-  qrCodeImage     String?  // QR code image URL
+  qrCodeImage     String?  // QR code base64 image
+  // Cash payment proof (cash-at-relay model)
+  cashCollectedByRelay Float? // Amount actually collected from client
+  cashCollectedAt DateTime? // When cash was collected
+  // Photo proof for anti-fraud
+  photoDepot      String?  // Photo URL taken at relay deposit
+  photoLivraison  String?  // Photo URL taken at final delivery
   dateCreation    DateTime @default(now())
   dateLimit       DateTime?
   deliveredAt     DateTime?
@@ -117,6 +131,7 @@ model Colis {
   relaisArrivee   Relais   @relation("RelaisArrivee", fields: [relaisArriveeId], references: [id])
   missions        Mission[]
   trackingHistory TrackingHistory[]
+  cashTransactions CashTransaction[]
 }
 
 // Transporter trips/routes
@@ -143,8 +158,14 @@ model Mission {
   colisId         String
   transporteurId  String
   trajetId        String?
-  status          String   @default("ASSIGNE") // ASSIGNE, EN_COURS, LIVRE
+  // ASSIGNE → PICKED_UP → COMPLETED (maps to parcel statuses)
+  status          String   @default("ASSIGNE") // ASSIGNE, PICKED_UP, COMPLETED
+  // Wallet: gains only released after delivery confirmed
+  gainAmount      Float    @default(0) // Net amount owed to transporter
+  gainStatus      String   @default("PENDING") // PENDING, AVAILABLE, PAID
+  paidAt          DateTime? // When transporter was actually paid
   assignedAt      DateTime @default(now())
+  pickedUpAt      DateTime?
   completedAt     DateTime?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -161,9 +182,25 @@ model TrackingHistory {
   status      String
   location    String?
   notes       String?
+  actionBy    String?  // userId of who performed action
+  photoUrl    String?  // Photo proof attached to this step
   createdAt   DateTime @default(now())
   
   colis       Colis    @relation(fields: [colisId], references: [id])
+}
+
+// Cash transactions (relay collects cash from clients, reverses to platform)
+model CashTransaction {
+  id              String   @id @default(cuid())
+  relaisId        String
+  colisId         String?
+  type            String   // COLLECTED (from client), REVERSED (to platform)
+  amount          Float
+  description     String?
+  createdAt       DateTime @default(now())
+  
+  relais          Relais   @relation(fields: [relaisId], references: [id])
+  colis           Colis?   @relation(fields: [colisId], references: [id])
 }
 
 // Notifications
