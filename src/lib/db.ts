@@ -4,6 +4,27 @@ const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined
 }
 
+function normalizeDatabaseUrl(url: string): string {
+  try {
+    const parsedUrl = new URL(url)
+    const isSupabasePooler = parsedUrl.hostname.includes('pooler.supabase.com') || parsedUrl.port === '6543'
+
+    if (isSupabasePooler) {
+      if (!parsedUrl.searchParams.has('pgbouncer')) {
+        parsedUrl.searchParams.set('pgbouncer', 'true')
+      }
+
+      if (!parsedUrl.searchParams.has('connection_limit')) {
+        parsedUrl.searchParams.set('connection_limit', '1')
+      }
+    }
+
+    return parsedUrl.toString()
+  } catch {
+    return url
+  }
+}
+
 // Runtime should use DATABASE_URL (typically Supabase pooler on Vercel).
 // DIRECT_DATABASE_URL is mainly for Prisma CLI/migrations.
 const databaseUrl = process.env.DATABASE_URL || process.env.DIRECT_DATABASE_URL
@@ -20,7 +41,9 @@ if (!databaseUrl && process.env.NODE_ENV !== 'test') {
 // In production, if DATABASE_URL is absent, all DB queries will throw a connection error.
 // This placeholder ONLY prevents a Prisma constructor validation error at build time.
 const resolvedUrl =
-  databaseUrl || 'postgresql://localhost:5432/placeholder_build_only?schema=public'
+  normalizeDatabaseUrl(
+    databaseUrl || 'postgresql://localhost:5432/placeholder_build_only?schema=public'
+  )
 
 export const db =
   globalForPrisma.prisma ??
