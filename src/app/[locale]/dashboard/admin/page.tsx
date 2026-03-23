@@ -291,9 +291,10 @@ function UsersTab() {
     try {
       const response = await fetch('/api/users');
       const data = await response.json();
-      setUsers(data);
+      setUsers(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Error fetching users:', error);
+      setUsers([]);
     } finally {
       setIsLoading(false);
     }
@@ -348,7 +349,8 @@ function UsersTab() {
     }
   };
 
-  const filteredUsers = filter === 'all' ? users : users.filter(u => u.role === filter);
+  const safeUsers = Array.isArray(users) ? users : [];
+  const filteredUsers = filter === 'all' ? safeUsers : safeUsers.filter(u => u.role === filter);
 
   return (
     <>
@@ -357,7 +359,7 @@ function UsersTab() {
           <div className="flex items-center justify-between">
             <div>
               <CardTitle>Gestion des utilisateurs</CardTitle>
-              <CardDescription>{users.length} utilisateurs inscrits</CardDescription>
+              <CardDescription>{safeUsers.length} utilisateurs inscrits</CardDescription>
             </div>
             <Select value={filter} onValueChange={setFilter}>
               <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>

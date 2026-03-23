@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { jwtVerify } from 'jose';
+import { getToken } from 'next-auth/jwt';
 
 const JWT_SECRET = new TextEncoder().encode(process.env.NEXTAUTH_SECRET || 'secret');
 
@@ -22,13 +23,29 @@ export async function verifyJWT(request: NextRequest): Promise<{
 }> {
   try {
     const authHeader = request.headers.get('authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return { error: 'Missing or invalid authorization header' };
+    if (authHeader?.startsWith('Bearer ')) {
+      const token = authHeader.slice(7);
+      const verified = await jwtVerify(token, JWT_SECRET);
+      return { payload: verified.payload as JWTPayload };
     }
 
-    const token = authHeader.slice(7);
-    const verified = await jwtVerify(token, JWT_SECRET);
-    return { payload: verified.payload as JWTPayload };
+    const nextAuthToken = await getToken({
+      req: request,
+      secret: process.env.NEXTAUTH_SECRET,
+    });
+
+    if (!nextAuthToken) {
+      return { error: 'Missing token' };
+    }
+
+    return {
+      payload: {
+        email: String(nextAuthToken.email ?? ''),
+        id: String(nextAuthToken.sub ?? nextAuthToken.id ?? ''),
+        role: String(nextAuthToken.role ?? ''),
+        name: String(nextAuthToken.name ?? ''),
+      },
+    };
   } catch (err) {
     return { error: 'Invalid token' };
   }
