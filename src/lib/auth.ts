@@ -1,9 +1,15 @@
 import type { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
+import bcrypt from 'bcryptjs';
 import { db } from './db';
 
-// Simple password hashing
-async function hashPassword(password: string): Promise<string> {
+const BCRYPT_ROUNDS = 12;
+
+function isBcryptHash(hashedPassword: string): boolean {
+  return hashedPassword.startsWith('$2a$') || hashedPassword.startsWith('$2b$') || hashedPassword.startsWith('$2y$');
+}
+
+async function hashLegacyPassword(password: string): Promise<string> {
   const encoder = new TextEncoder();
   const data = encoder.encode(password);
   const hashBuffer = await crypto.subtle.digest('SHA-256', data);
@@ -11,9 +17,21 @@ async function hashPassword(password: string): Promise<string> {
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
+async function hashPassword(password: string): Promise<string> {
+  return bcrypt.hash(password, BCRYPT_ROUNDS);
+}
+
 export async function verifyPassword(password: string, hashedPassword: string): Promise<boolean> {
-  const hash = await hashPassword(password);
-  return hash === hashedPassword;
+  if (isBcryptHash(hashedPassword)) {
+    return bcrypt.compare(password, hashedPassword);
+  }
+
+  const legacyHash = await hashLegacyPassword(password);
+  return legacyHash === hashedPassword;
+}
+
+export function passwordNeedsRehash(hashedPassword: string): boolean {
+  return !isBcryptHash(hashedPassword);
 }
 
 // Configuration NextAuth
@@ -56,6 +74,14 @@ export const authOptions: NextAuthOptions = {
 
         if (!isValid) {
           return null;
+        }
+
+        if (passwordNeedsRehash(user.password)) {
+          const upgradedPassword = await hashPassword(credentials.password);
+          await db.user.update({
+            where: { id: user.id },
+            data: { password: upgradedPassword },
+          });
         }
 
         return {

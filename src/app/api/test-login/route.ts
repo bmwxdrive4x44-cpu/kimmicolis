@@ -1,14 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-
-// Simple password hashing - same as in auth.ts
-async function hashPassword(password: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(password);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-}
+import { verifyPassword } from '@/lib/auth';
 
 export async function POST(request: Request) {
   try {
@@ -50,18 +42,14 @@ export async function POST(request: Request) {
       }, { status: 400 });
     }
 
-    // Hash the provided password
-    const hashedPassword = await hashPassword(password);
-
-    // Compare
-    const match = hashedPassword === user.password;
+    const match = await verifyPassword(password, user.password);
 
     return NextResponse.json({
       success: true,
       email,
       userFound: true,
       passwordMatch: match,
-      providedHash: hashedPassword.substring(0, 20) + '...',
+      storedFormat: user.password.startsWith('$2') ? 'bcrypt' : 'legacy-sha256',
       storedHash: user.password.substring(0, 20) + '...',
       user: {
         id: user.id,

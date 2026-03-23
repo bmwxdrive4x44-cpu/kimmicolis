@@ -109,7 +109,20 @@ function RegisterForm() {
 
       const userId = data.id;
 
-      // 2. Create role-specific application (only if details provided)
+      // 2. Auto login before protected profile creation
+      const result = await signIn('credentials', {
+        email: formData.email,
+        password: formData.password,
+        redirect: false,
+      });
+
+      if (!result?.ok) {
+        toast({ title: 'Compte créé', description: 'Vous pouvez maintenant vous connecter' });
+        router.push(`/${locale}/auth/login`);
+        return;
+      }
+
+      // 3. Create role-specific application (only if details provided)
       if (formData.role === 'TRANSPORTER' && formData.vehicle && formData.license) {
         const transporterResponse = await fetch('/api/transporters', {
           method: 'POST',
@@ -151,29 +164,17 @@ function RegisterForm() {
         }
       }
 
-      // 3. Auto login
-      const result = await signIn('credentials', {
-        email: formData.email,
-        password: formData.password,
-        redirect: false,
-      });
+      toast({ title: 'Compte créé', description: 'Bienvenue sur SwiftColis!' });
 
-      if (result?.ok) {
-        toast({ title: 'Compte créé', description: 'Bienvenue sur SwiftColis!' });
-        
-        // If RELAIS or TRANSPORTER without details, redirect to completion page
-        if ((formData.role === 'RELAIS' && !formData.commerceName) || 
-            (formData.role === 'TRANSPORTER' && !formData.vehicle)) {
-          window.location.href = `/${locale}/complete-profile/${formData.role === 'TRANSPORTER' ? 'transporter' : 'relais'}`;
-        } else {
-          const dashboardPath = `/${locale}/dashboard/${
-            formData.role === 'TRANSPORTER' ? 'transporter' : formData.role === 'RELAIS' ? 'relais' : 'client'
-          }`;
-          window.location.href = dashboardPath;
-        }
+      // If RELAIS or TRANSPORTER without details, redirect to completion page
+      if ((formData.role === 'RELAIS' && !formData.commerceName) || 
+          (formData.role === 'TRANSPORTER' && !formData.vehicle)) {
+        window.location.href = `/${locale}/complete-profile/${formData.role === 'TRANSPORTER' ? 'transporter' : 'relais'}`;
       } else {
-        toast({ title: 'Compte créé', description: 'Vous pouvez maintenant vous connecter' });
-        router.push(`/${locale}/auth/login`);
+        const dashboardPath = `/${locale}/dashboard/${
+          formData.role === 'TRANSPORTER' ? 'transporter' : formData.role === 'RELAIS' ? 'relais' : 'client'
+        }`;
+        window.location.href = dashboardPath;
       }
     } catch (error) {
       toast({

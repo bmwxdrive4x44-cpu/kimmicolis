@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { hashPassword, verifyPassword } from '@/lib/auth';
+import { hashPassword, passwordNeedsRehash, verifyPassword } from '@/lib/auth';
 import { checkRateLimit, RATE_LIMIT_PRESETS } from '@/lib/ratelimit';
 
 /**
@@ -73,6 +73,13 @@ export async function POST(request: NextRequest) {
         { error: 'Invalid email or password' },
         { status: 401 }
       );
+    }
+
+    if (passwordNeedsRehash(user.password)) {
+      await db.user.update({
+        where: { id: user.id },
+        data: { password: await hashPassword(password) },
+      });
     }
 
     // Return success (frontend will handle token generation via NextAuth)

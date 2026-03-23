@@ -1,16 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { requireRole } from '@/lib/rbac';
 
 // GET all transporter applications
 export async function GET(request: NextRequest) {
   try {
+    const auth = await requireRole(request, ['TRANSPORTER', 'ADMIN']);
+    if (!auth.success) return auth.response;
+
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status');
     const userId = searchParams.get('userId');
 
     const where: any = {};
     if (status) where.status = status;
-    if (userId) where.userId = userId;
+    if (userId) {
+      if (auth.payload.role !== 'ADMIN' && userId !== auth.payload.id) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
+      where.userId = userId;
+    } else if (auth.payload.role === 'TRANSPORTER') {
+      where.userId = auth.payload.id;
+    }
 
     const applications = await db.transporterApplication.findMany({
       where,
@@ -30,11 +41,18 @@ export async function GET(request: NextRequest) {
 // POST create transporter application
 export async function POST(request: NextRequest) {
   try {
+    const auth = await requireRole(request, ['TRANSPORTER', 'ADMIN']);
+    if (!auth.success) return auth.response;
+
     const body = await request.json();
     const { userId, fullName, phone, vehicle, license, experience, regions, description } = body;
 
     if (!userId || !fullName || !phone || !vehicle || !license) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    }
+
+    if (auth.payload.role === 'TRANSPORTER' && userId !== auth.payload.id) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     // Check if already applied
@@ -51,7 +69,7 @@ export async function POST(request: NextRequest) {
         vehicle,
         license,
         experience: experience || 0,
-        regions: JSON.stringify(regions || []),
+        regions: Array.isArray(regions) ? JSON.stringify(regions) : typeof regions === 'string' ? regions : '[]',
         description: description || null,
         status: 'PENDING',
       },

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { hashPassword } from '@/lib/auth';
+import { verifyPassword } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
   const email = request.nextUrl.searchParams.get('email');
@@ -37,9 +37,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Check password
-    const hashedInputPassword = await hashPassword(password || '');
-    const passwordMatch = user.password === hashedInputPassword;
+    const passwordMatch = password ? await verifyPassword(password, user.password || '') : false;
 
     return NextResponse.json({
       exists: true,
@@ -55,7 +53,7 @@ export async function GET(request: NextRequest) {
       },
       passwordCheck: {
         provided: password,
-        hashedInput: hashedInputPassword,
+        storedFormat: user.password?.startsWith('$2') ? 'bcrypt' : 'legacy-sha256',
         storedHash: user.password,
         matches: passwordMatch,
       }
