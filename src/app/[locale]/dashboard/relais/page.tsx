@@ -53,6 +53,7 @@ export default function RelaisDashboard() {
       
       if (data && data.length > 0) {
         const relais = data[0];
+        console.log('[Relais Dashboard] Info relais chargée:', { id: relais.id, name: relais.commerceName });
 
         if (!relais.commerceName?.trim() || !relais.address?.trim() || !relais.ville?.trim()) {
           router.push(`/${locale}/complete-profile/relais`);
@@ -60,6 +61,7 @@ export default function RelaisDashboard() {
         }
 
         setRelaisInfo(relais);
+        console.log('[Relais Dashboard] State relaisInfo mise à jour');
         
         // Fetch stats and cash in parallel
         const [statsRes, cashRes] = await Promise.all([
@@ -69,6 +71,7 @@ export default function RelaisDashboard() {
         if (statsRes?.ok) setStats(await statsRes.json());
         if (cashRes?.ok) setCashInfo(await cashRes.json());
       } else {
+        console.warn('[Relais Dashboard] Aucun relais trouvé pour cet utilisateur');
         router.push(`/${locale}/complete-profile/relais`);
       }
     } catch (err) {
@@ -503,10 +506,22 @@ function ScanTab({ relaisId, userId, onRefresh }: { relaisId: string | undefined
 
   const handleValidateReceptionPayment = async () => {
     if (!receptionParcel) return;
+    if (!relaisId) {
+      toast({ title: 'Erreur', description: 'ID relais non trouvé. Rechargez la page.', variant: 'destructive' });
+      return;
+    }
     
     // Step 1: Validate payment
     setIsReceptionProcessing(true);
     try {
+      console.log('[Reception] Étape 1: Validation paiement cash', {
+        tracking: receptionParcel.trackingNumber,
+        prixClient: receptionParcel.prixClient,
+        relaisId,
+        parcelRelaisDeparId: receptionParcel.relaisDepart?.id,
+        parcelRelaisDeparName: receptionParcel.relaisDepart?.commerceName,
+      });
+
       const res1 = await fetch(`/api/qr/${receptionParcel.trackingNumber}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -516,14 +531,19 @@ function ScanTab({ relaisId, userId, onRefresh }: { relaisId: string | undefined
           userId,
         }),
       });
+      
       const data1 = await res1.json();
+      console.log('[Reception] Réponse étape 1:', { status: res1.status, data: data1 });
+      
       if (!res1.ok) {
-        toast({ title: 'Erreur paiement', description: data1.error, variant: 'destructive' });
+        toast({ title: 'Erreur paiement', description: data1.error || 'Impossibilité de valider le paiement', variant: 'destructive' });
         setIsReceptionProcessing(false);
         return;
       }
 
-      // Step 2: Deposit
+      // Step 2: Deposit — only if payment validation succeeded
+      console.log('[Reception] Étape 2: Dépôt du colis');
+      
       const res2 = await fetch(`/api/qr/${receptionParcel.trackingNumber}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -533,17 +553,32 @@ function ScanTab({ relaisId, userId, onRefresh }: { relaisId: string | undefined
           userId,
         }),
       });
+      
       const data2 = await res2.json();
+      console.log('[Reception] Réponse étape 2:', { status: res2.status, data: data2 });
+      
       if (!res2.ok) {
-        toast({ title: 'Erreur dépôt', description: data2.error, variant: 'destructive' });
+        toast({ 
+          title: 'Avertissement', 
+          description: `Paiement validé mais dépôt échoué: ${data2.error}. Relais peut réessayer le dépôt.`,
+          variant: 'destructive'
+        });
+        // Still refresh since payment was recorded
+        setReceptionTracking('');
+        setReceptionParcel(null);
+        onRefresh();
       } else {
-        toast({ title: 'Succès', description: `Réception + Paiement enregistrés — Numéro: ${receptionParcel.trackingNumber}` });
+        toast({ 
+          title: 'Succès', 
+          description: `✓ Paiement encaissé + Dépôt enregistré (${receptionParcel.trackingNumber})`,
+        });
         setReceptionTracking('');
         setReceptionParcel(null);
         onRefresh();
       }
-    } catch {
-      toast({ title: 'Erreur réseau', variant: 'destructive' });
+    } catch (err) {
+      console.error('[Reception] Erreur:', err);
+      toast({ title: 'Erreur réseau', description: String(err), variant: 'destructive' });
     } finally {
       setIsReceptionProcessing(false);
     }

@@ -111,7 +111,16 @@ export async function POST(
         return NextResponse.json({ error: `Action invalide : statut actuel ${parcel.status}` }, { status: 400 });
       }
       if (parcel.relaisDepartId !== relaisId) {
-        return NextResponse.json({ error: 'Ce relais n\'est pas le relais de départ' }, { status: 403 });
+        console.error('[QR] Mismatch relais:', { 
+          parcelId: parcel.id, 
+          tracking,
+          expectedRelaisId: parcel.relaisDepartId, 
+          providedRelaisId: relaisId,
+          parcelRelaisDepart: parcel.relaisDepart?.commerceName,
+        });
+        return NextResponse.json({ 
+          error: `Ce relais n'est pas le relais de départ. Attendu: ${parcel.relaisDepart?.commerceName || parcel.relaisDepartId}, Fourni: ${relaisId}` 
+        }, { status: 403 });
       }
       newStatus = 'PAID_RELAY';
       notes = `Paiement cash de ${parcel.prixClient} DA validé au relais de départ`;
@@ -138,7 +147,15 @@ export async function POST(
         return NextResponse.json({ error: `Le paiement doit être validé d'abord (statut: ${parcel.status})` }, { status: 400 });
       }
       if (parcel.relaisDepartId !== relaisId) {
-        return NextResponse.json({ error: 'Ce relais n\'est pas le relais de départ' }, { status: 403 });
+        console.error('[QR] Mismatch relais on deposit:', { 
+          parcelId: parcel.id, 
+          tracking,
+          expectedRelaisId: parcel.relaisDepartId, 
+          providedRelaisId: relaisId,
+        });
+        return NextResponse.json({ 
+          error: `Ce relais n'est pas le relais de départ. Opération d'accès refusée.` 
+        }, { status: 403 });
       }
       newStatus = 'DEPOSITED_RELAY';
       notes = 'Colis déposé et scanné au relais de départ — disponible pour transport';
