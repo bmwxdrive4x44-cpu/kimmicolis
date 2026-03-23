@@ -324,6 +324,7 @@ function CreateParcelForm({ userId, onCreated, onGoToHistory }: { userId: string
       if (response.ok) {
         const created = await response.json();
         setCreatedParcel(created);
+        toast({ title: 'Colis créé avec succès', description: `Suivi: ${created.trackingNumber}` });
         onCreated();
       } else {
         toast({ title: 'Erreur', description: 'Impossible de créer le colis', variant: 'destructive' });
@@ -624,6 +625,7 @@ function CreateParcelForm({ userId, onCreated, onGoToHistory }: { userId: string
 
 // Tracking Tab
 function TrackingTab({ initialTracking, setTrackingNumber }: { initialTracking: string; setTrackingNumber: (v: string) => void }) {
+  const { toast } = useToast();
   const [tracking, setTracking] = useState(initialTracking);
   const [result, setResult] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -635,14 +637,23 @@ function TrackingTab({ initialTracking, setTrackingNumber }: { initialTracking: 
     setNotFound(false);
     try {
       const response = await fetch(`/api/parcels?tracking=${tracking.trim().toUpperCase()}`);
+      if (!response.ok) {
+        throw new Error('Erreur de recherche du colis');
+      }
       const data = await response.json();
       // API returns array or single object depending on auth context
       const parcel = Array.isArray(data) ? (data[0] ?? null) : (data?.error ? null : data);
       setResult(parcel);
-      if (!parcel) setNotFound(true);
+      if (!parcel) {
+        setNotFound(true);
+        toast({ title: 'Introuvable', description: 'Aucun colis trouvé pour ce numéro', variant: 'destructive' });
+      } else {
+        toast({ title: 'Colis trouvé', description: `Suivi: ${parcel.trackingNumber}` });
+      }
     } catch (error) {
       console.error('Error tracking parcel:', error);
       setNotFound(true);
+      toast({ title: 'Erreur', description: 'Impossible de rechercher ce colis', variant: 'destructive' });
     } finally {
       setIsLoading(false);
     }

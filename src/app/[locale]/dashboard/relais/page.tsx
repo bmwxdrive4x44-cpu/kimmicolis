@@ -496,6 +496,7 @@ function ScanTab({ relaisId, userId, onRefresh }: { relaisId: string | undefined
         toast({ title: 'Introuvable', description: data.error || 'Colis non trouvé', variant: 'destructive' });
       } else {
         setReceptionParcel(data);
+        toast({ title: 'Colis trouvé', description: `Suivi: ${data.trackingNumber}` });
       }
     } catch {
       toast({ title: 'Erreur réseau', variant: 'destructive' });

@@ -599,23 +599,47 @@ function RelaysTab() {
   };
 
   const handleApprove = async (id: string) => {
-    await fetch(`/api/relais/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: 'APPROVED' }),
-    });
-    toast({ title: 'Relais approuvé' });
-    fetchRelais();
+    try {
+      const response = await fetch(`/api/relais/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'APPROVED' }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data?.error || 'Impossible d\'approuver le relais');
+      }
+      toast({ title: 'Relais approuvé', description: 'La validation a été enregistrée.' });
+      fetchRelais();
+    } catch (error) {
+      toast({
+        title: 'Erreur',
+        description: error instanceof Error ? error.message : 'Impossible d\'approuver le relais',
+        variant: 'destructive',
+      });
+    }
   };
 
   const handleReject = async (id: string) => {
-    await fetch(`/api/relais/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: 'REJECTED' }),
-    });
-    toast({ title: 'Relais rejeté' });
-    fetchRelais();
+    try {
+      const response = await fetch(`/api/relais/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'REJECTED' }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data?.error || 'Impossible de rejeter le relais');
+      }
+      toast({ title: 'Relais rejeté', description: 'La décision a été enregistrée.' });
+      fetchRelais();
+    } catch (error) {
+      toast({
+        title: 'Erreur',
+        description: error instanceof Error ? error.message : 'Impossible de rejeter le relais',
+        variant: 'destructive',
+      });
+    }
   };
 
   const handleEditRelais = async () => {

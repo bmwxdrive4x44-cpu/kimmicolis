@@ -394,7 +394,7 @@ function TrajetsTab({ userId }: { userId: string }) {
     e.preventDefault();
     setIsCreating(true);
     try {
-      await fetch('/api/trajets', {
+      const response = await fetch('/api/trajets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -403,11 +403,21 @@ function TrajetsTab({ userId }: { userId: string }) {
           placesColis: parseInt(formData.placesColis),
         }),
       });
-      toast({ title: 'Trajet créé' });
+
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data?.error || 'Impossible d\'enregistrer le trajet');
+      }
+
+      toast({ title: 'Trajet enregistré', description: 'Le trajet a bien été publié.' });
       fetchTrajets();
       setFormData({ villeDepart: '', villeArrivee: '', dateDepart: '', placesColis: '10', villesEtapes: '' });
-    } catch {
-      toast({ title: 'Erreur', variant: 'destructive' });
+    } catch (error) {
+      toast({
+        title: 'Erreur',
+        description: error instanceof Error ? error.message : 'Impossible d\'enregistrer le trajet',
+        variant: 'destructive',
+      });
     } finally {
       setIsCreating(false);
     }
@@ -688,11 +698,18 @@ function ScanTab() {
     try {
       const response = await fetch(`/api/parcels?tracking=${scanResult}`);
       const data = await response.json();
-      if (data.error) {
+      if (!response.ok || data?.error) {
         toast({ title: 'Erreur', description: 'Colis non trouvé', variant: 'destructive' });
         setParcel(null);
       } else {
-        setParcel(data);
+        const foundParcel = Array.isArray(data) ? data[0] : data;
+        if (!foundParcel) {
+          toast({ title: 'Erreur', description: 'Colis non trouvé', variant: 'destructive' });
+          setParcel(null);
+          return;
+        }
+        setParcel(foundParcel);
+        toast({ title: 'Colis trouvé', description: `Suivi: ${foundParcel.trackingNumber}` });
       }
     } catch {
       toast({ title: 'Erreur', description: 'Colis non trouvé', variant: 'destructive' });
