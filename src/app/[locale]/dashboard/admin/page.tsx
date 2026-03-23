@@ -16,7 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { WILAYAS, USER_ROLES, PARCEL_STATUS, RELAIS_STATUS, PARCEL_FORMATS } from '@/lib/constants';
-import { Users, Package, Truck, Store, DollarSign, CheckCircle, XCircle, Loader2, Plus, Settings, BarChart3, MapPin, Trash2, Pencil, Eye, EyeOff } from 'lucide-react';
+import { Users, Package, Truck, Store, DollarSign, CheckCircle, XCircle, Loader2, Plus, Settings, BarChart3, MapPin, Trash2, Pencil, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 // Helper function to get the correct dashboard path based on role
