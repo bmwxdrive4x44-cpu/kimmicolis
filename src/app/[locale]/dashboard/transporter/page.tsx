@@ -87,7 +87,7 @@ export default function TransporterDashboard() {
         trajets: trajets.length,
         missions: missions.filter((m: any) => m.status === 'ASSIGNE' || m.status === 'EN_COURS').length,
         completed: missions.filter((m: any) => m.status === 'LIVRE').length,
-        earnings: missions.reduce((sum: number, m: any) => sum + (m.colis?.netTransporteur || 0), 0),
+        earnings: missions.filter((m: any) => m.status === 'LIVRE').reduce((sum: number, m: any) => sum + (m.colis?.netTransporteur || 0), 0),
       });
     } catch (error) {
       console.error('Error fetching stats:', error);
@@ -158,12 +158,13 @@ export default function TransporterDashboard() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-5 mb-8">
+          <TabsList className="grid w-full grid-cols-6 mb-8">
             <TabsTrigger value="overview"><MapPin className="h-4 w-4 mr-1 hidden sm:inline" />Vue d'ensemble</TabsTrigger>
             <TabsTrigger value="trajets"><Route className="h-4 w-4 mr-1 hidden sm:inline" />Trajets</TabsTrigger>
             <TabsTrigger value="missions"><Package className="h-4 w-4 mr-1 hidden sm:inline" />Missions</TabsTrigger>
             <TabsTrigger value="scan"><QrCode className="h-4 w-4 mr-1 hidden sm:inline" />Scanner</TabsTrigger>
             <TabsTrigger value="wallet"><Wallet className="h-4 w-4 mr-1 hidden sm:inline" />Portefeuille</TabsTrigger>
+            <TabsTrigger value="profil"><Truck className="h-4 w-4 mr-1 hidden sm:inline" />Mon profil</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview">
@@ -180,6 +181,9 @@ export default function TransporterDashboard() {
           </TabsContent>
           <TabsContent value="wallet">
             <WalletTab userId={session.user.id} />
+          </TabsContent>
+          <TabsContent value="profil">
+            <ProfilTab userId={session.user.id} userName={session.user.name || ''} />
           </TabsContent>
         </Tabs>
       </main>
@@ -201,20 +205,15 @@ function OverviewTab({ userId, setActiveTab }: { userId: string; setActiveTab: (
 
   const fetchData = async () => {
     try {
-      // Get parcels with status RECU_RELAIS (waiting for transport)
-      const parcelsRes = await fetch('/api/parcels?status=RECU_RELAIS');
+      const [parcelsRes, trajetsRes] = await Promise.all([
+        fetch('/api/parcels?available=true'),
+        fetch(`/api/trajets?transporteurId=${userId}`),
+      ]);
       const parcels = await parcelsRes.json();
-      
-      // Convert to mission-like format for display
-      const missions = parcels.map((p: any) => ({
-        id: p.id,
-        colis: p,
-        colisId: p.id,
-      }));
+      const trajetsData = await trajetsRes.json();
+      const missions = Array.isArray(parcels) ? parcels.map((p: any) => ({ id: p.id, colis: p, colisId: p.id })) : [];
       setAvailableMissions(missions);
-      
-      const trajetsRes = await fetch(`/api/trajets?transporteurId=${userId}`);
-      setMyTrajets(await trajetsRes.json());
+      setMyTrajets(Array.isArray(trajetsData) ? trajetsData : []);
     } catch (error) {
       console.error('Error fetching data:', error);
     }
@@ -258,16 +257,26 @@ function OverviewTab({ userId, setActiveTab }: { userId: string; setActiveTab: (
           ) : (
             <div className="space-y-3">
               {availableMissions.slice(0, 5).map((m) => (
-                <div key={m.id} className="flex items-center justify-between p-3 border rounded-lg">
-                  <div>
-                    <p className="font-mono text-sm">{m.colis?.trackingNumber}</p>
-                    <p className="text-xs text-slate-500">{m.colis?.villeDepart} → {m.colis?.villeArrivee}</p>
+                <div key={m.id} className="flex items-start justify-between p-3 border rounded-lg gap-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="font-mono text-sm font-semibold">{m.colis?.trackingNumber}</p>
+                    <p className="text-xs text-slate-600">
+                      {WILAYAS.find(w => w.id === m.colis?.villeDepart)?.name || m.colis?.villeDepart}
+                      {' → '}
+                      {WILAYAS.find(w => w.id === m.colis?.villeArrivee)?.name || m.colis?.villeArrivee}
+                    </p>
+                    <p className="text-xs text-slate-400">
+                      {m.colis?.format} · Relais: {m.colis?.relaisDepart?.commerceName || '—'}
+                    </p>
+                    {m.colis?.netTransporteur > 0 && (
+                      <p className="text-xs font-semibold text-emerald-600 mt-0.5">{m.colis.netTransporteur} DA</p>
+                    )}
                   </div>
                   <Button 
                     size="sm" 
                     onClick={() => handleAcceptMission(m.colisId)}
                     disabled={acceptingId === m.colisId}
-                    className="bg-emerald-600 hover:bg-emerald-700"
+                    className="bg-emerald-600 hover:bg-emerald-700 shrink-0"
                   >
                     {acceptingId === m.colisId ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Accepter'}
                   </Button>
@@ -295,7 +304,7 @@ function OverviewTab({ userId, setActiveTab }: { userId: string; setActiveTab: (
                 <div key={t.id} className="flex items-center justify-between p-3 border rounded-lg">
                   <div>
                     <p className="font-semibold">{WILAYAS.find(w => w.id === t.villeDepart)?.name} → {WILAYAS.find(w => w.id === t.villeArrivee)?.name}</p>
-                    <p className="text-xs text-slate-500">{new Date(t.dateDepart).toLocaleDateString('fr-FR')} - {t.placesColis - t.placesUtilisees} places restantes</p>
+                    <p className="text-xs text-slate-500">{new Date(t.dateDepart).toLocaleString('fr-FR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'})} · {t.placesColis - t.placesUtilisees} place(s) restante(s)</p>
                   </div>
                   <Badge variant="outline">{t.placesUtilisees}/{t.placesColis}</Badge>
                 </div>
@@ -317,6 +326,7 @@ function TrajetsTab({ userId }: { userId: string }) {
   const [trajets, setTrajets] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     villeDepart: '',
     villeArrivee: '',
@@ -335,6 +345,28 @@ function TrajetsTab({ userId }: { userId: string }) {
       console.error('Error:', error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleUpdateTrajet = async (trajetId: string, status: string) => {
+    setUpdatingId(trajetId);
+    try {
+      const res = await fetch(`/api/trajets/${trajetId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      });
+      if (res.ok) {
+        const labels: Record<string, string> = { EN_COURS: 'Trajet démarré', TERMINE: 'Trajet terminé', ANNULE: 'Trajet annulé' };
+        toast({ title: labels[status] || 'Statut mis à jour' });
+        fetchTrajets();
+      } else {
+        toast({ title: 'Erreur', variant: 'destructive' });
+      }
+    } catch {
+      toast({ title: 'Erreur', variant: 'destructive' });
+    } finally {
+      setUpdatingId(null);
     }
   };
 
@@ -422,24 +454,51 @@ function TrajetsTab({ userId }: { userId: string }) {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Départ</TableHead>
-                  <TableHead>Arrivée</TableHead>
-                  <TableHead>Date</TableHead>
+                  <TableHead>Trajet</TableHead>
+                  <TableHead>Date départ</TableHead>
                   <TableHead>Places</TableHead>
                   <TableHead>Statut</TableHead>
+                  <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {trajets.map((t) => (
                   <TableRow key={t.id}>
-                    <TableCell>{WILAYAS.find(w => w.id === t.villeDepart)?.name}</TableCell>
-                    <TableCell>{WILAYAS.find(w => w.id === t.villeArrivee)?.name}</TableCell>
-                    <TableCell>{new Date(t.dateDepart).toLocaleDateString('fr-FR')}</TableCell>
+                    <TableCell className="font-medium">
+                      {WILAYAS.find(w => w.id === t.villeDepart)?.name} → {WILAYAS.find(w => w.id === t.villeArrivee)?.name}
+                      {t.villesEtapes && t.villesEtapes.length > 0 && (
+                        <p className="text-xs text-slate-400">via {t.villesEtapes.join(', ')}</p>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      {new Date(t.dateDepart).toLocaleString('fr-FR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'})}
+                    </TableCell>
                     <TableCell>{t.placesUtilisees}/{t.placesColis}</TableCell>
                     <TableCell>
                       <Badge className={`${TRAJET_STATUS.find(s => s.id === t.status)?.color} text-white`}>
                         {TRAJET_STATUS.find(s => s.id === t.status)?.label}
                       </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex gap-1">
+                        {t.status === 'PROGRAMME' && (
+                          <>
+                            <Button size="sm" variant="outline" disabled={updatingId === t.id} onClick={() => handleUpdateTrajet(t.id, 'EN_COURS')}>
+                              {updatingId === t.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Navigation className="h-3 w-3 mr-1" />}
+                              Démarrer
+                            </Button>
+                            <Button size="sm" variant="outline" className="text-red-600 border-red-200 hover:bg-red-50" disabled={updatingId === t.id} onClick={() => handleUpdateTrajet(t.id, 'ANNULE')}>
+                              Annuler
+                            </Button>
+                          </>
+                        )}
+                        {t.status === 'EN_COURS' && (
+                          <Button size="sm" className="bg-green-600 hover:bg-green-700" disabled={updatingId === t.id} onClick={() => handleUpdateTrajet(t.id, 'TERMINE')}>
+                            {updatingId === t.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle className="h-3 w-3 mr-1" />}
+                            Terminer
+                          </Button>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -452,11 +511,19 @@ function TrajetsTab({ userId }: { userId: string }) {
   );
 }
 
+const MISSION_STATUS_LABELS: Record<string, string> = {
+  ASSIGNE: 'Assignée',
+  EN_COURS: 'En cours',
+  LIVRE: 'Livré',
+};
+
 // Missions Tab
 function MissionsTab({ userId }: { userId: string }) {
+  const { toast } = useToast();
   const [missions, setMissions] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState('all');
+  const [processingId, setProcessingId] = useState<string | null>(null);
 
   useEffect(() => { fetchMissions(); }, [userId]);
 
@@ -472,12 +539,25 @@ function MissionsTab({ userId }: { userId: string }) {
   };
 
   const handleStatusChange = async (id: string, status: string) => {
-    await fetch(`/api/missions/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status }),
-    });
-    fetchMissions();
+    setProcessingId(id);
+    try {
+      const res = await fetch(`/api/missions/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      });
+      if (res.ok) {
+        const labels: Record<string, string> = { EN_COURS: 'Transport démarré', LIVRE: 'Colis livré au relais' };
+        toast({ title: labels[status] || 'Statut mis à jour' });
+        fetchMissions();
+      } else {
+        toast({ title: 'Erreur lors de la mise à jour', variant: 'destructive' });
+      }
+    } catch {
+      toast({ title: 'Erreur réseau', variant: 'destructive' });
+    } finally {
+      setProcessingId(null);
+    }
   };
 
   const filteredMissions = filter === 'all' ? missions : missions.filter(m => m.status === filter);
@@ -507,30 +587,60 @@ function MissionsTab({ userId }: { userId: string }) {
         ) : (
           <div className="space-y-4">
             {filteredMissions.map((m) => (
-              <div key={m.id} className="flex items-center justify-between p-4 border rounded-lg">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center">
-                    <Package className="h-6 w-6 text-emerald-600" />
+              <div key={m.id} className="p-4 border rounded-lg space-y-3">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-start gap-3 flex-1 min-w-0">
+                    <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
+                      <Package className="h-5 w-5 text-emerald-600" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-mono font-semibold text-sm">{m.colis?.trackingNumber}</p>
+                      <p className="text-sm text-slate-600">
+                        {WILAYAS.find(w => w.id === m.colis?.villeDepart)?.name || m.colis?.villeDepart}
+                        {' → '}
+                        {WILAYAS.find(w => w.id === m.colis?.villeArrivee)?.name || m.colis?.villeArrivee}
+                      </p>
+                      <p className="text-xs text-slate-400">
+                        {m.colis?.format}
+                        {m.colis?.netTransporteur > 0 ? ` · ${m.colis.netTransporteur} DA` : ''}
+                      </p>
+                      {(m.colis?.relaisDepart || m.colis?.relaisArrivee) && (
+                        <p className="text-xs text-slate-400">
+                          {m.colis?.relaisDepart?.commerceName} → {m.colis?.relaisArrivee?.commerceName}
+                        </p>
+                      )}
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-mono font-semibold">{m.colis?.trackingNumber}</p>
-                    <p className="text-sm text-slate-500">{m.colis?.villeDepart} → {m.colis?.villeArrivee}</p>
-                    <p className="text-xs text-slate-400">{m.colis?.format} - {m.colis?.netTransporteur} DA</p>
+                  <div className="flex flex-col items-end gap-2 shrink-0">
+                    <Badge variant="outline" className={m.status === 'LIVRE' ? 'border-green-500 text-green-700' : m.status === 'EN_COURS' ? 'border-blue-500 text-blue-700' : 'border-orange-400 text-orange-700'}>
+                      {MISSION_STATUS_LABELS[m.status] || m.status}
+                    </Badge>
+                    {m.status === 'ASSIGNE' && (
+                      <Button size="sm" disabled={processingId === m.id} onClick={() => handleStatusChange(m.id, 'EN_COURS')} className="bg-blue-600 hover:bg-blue-700">
+                        {processingId === m.id ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Navigation className="h-3 w-3 mr-1" />}
+                        Démarrer
+                      </Button>
+                    )}
+                    {m.status === 'EN_COURS' && (
+                      <Button size="sm" className="bg-green-600 hover:bg-green-700" disabled={processingId === m.id} onClick={() => handleStatusChange(m.id, 'LIVRE')}>
+                        {processingId === m.id ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <CheckCircle className="h-3 w-3 mr-1" />}
+                        Livré
+                      </Button>
+                    )}
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline">{m.status}</Badge>
-                  {m.status === 'ASSIGNE' && (
-                    <Button size="sm" onClick={() => handleStatusChange(m.id, 'EN_COURS')}>
-                      <Navigation className="h-4 w-4 mr-1" />Démarrer
-                    </Button>
-                  )}
-                  {m.status === 'EN_COURS' && (
-                    <Button size="sm" className="bg-green-600" onClick={() => handleStatusChange(m.id, 'LIVRE')}>
-                      <CheckCircle className="h-4 w-4 mr-1" />Livré
-                    </Button>
-                  )}
-                </div>
+                {(m.colis?.senderFirstName || m.colis?.recipientFirstName) && (
+                  <div className="grid grid-cols-2 gap-2 pt-2 border-t text-xs text-slate-500">
+                    <div>
+                      <span className="font-medium">Expéditeur :</span> {m.colis?.senderFirstName} {m.colis?.senderLastName}
+                      {m.colis?.senderPhone && <span className="block text-slate-400">{m.colis.senderPhone}</span>}
+                    </div>
+                    <div>
+                      <span className="font-medium">Destinataire :</span> {m.colis?.recipientFirstName} {m.colis?.recipientLastName}
+                      {m.colis?.recipientPhone && <span className="block text-slate-400">{m.colis.recipientPhone}</span>}
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -612,22 +722,58 @@ function ScanTab() {
 
         {parcel && !parcel.error && (
           <Card className="bg-slate-50 dark:bg-slate-800">
-            <CardContent className="py-4">
-              <div className="flex items-center justify-between mb-4">
+            <CardContent className="py-4 space-y-4">
+              {/* Header */}
+              <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="font-mono font-bold">{parcel.trackingNumber}</p>
-                  <p className="text-sm text-slate-500">
-                    {WILAYAS.find(w => w.id === parcel.villeDepart)?.name || parcel.villeDepart} → {WILAYAS.find(w => w.id === parcel.villeArrivee)?.name || parcel.villeArrivee}
+                  <p className="font-mono font-bold text-lg">{parcel.trackingNumber}</p>
+                  <p className="text-sm text-slate-600">
+                    {WILAYAS.find(w => w.id === parcel.villeDepart)?.name || parcel.villeDepart}
+                    {' → '}
+                    {WILAYAS.find(w => w.id === parcel.villeArrivee)?.name || parcel.villeArrivee}
                   </p>
-                  <p className="text-xs text-slate-400">Format: {parcel.format}</p>
+                  <p className="text-xs text-slate-400">Format : {parcel.format}</p>
                 </div>
-                <Badge className={`${PARCEL_STATUS.find(s => s.id === parcel.status)?.color} text-white`}>
+                <Badge className={`${PARCEL_STATUS.find(s => s.id === parcel.status)?.color} text-white shrink-0`}>
                   {PARCEL_STATUS.find(s => s.id === parcel.status)?.label}
                 </Badge>
               </div>
-              
+
+              {/* Relais */}
+              {(parcel.relaisDepart || parcel.relaisArrivee) && (
+                <div className="grid grid-cols-2 gap-3 text-xs">
+                  <div className="p-2 bg-white dark:bg-slate-700 rounded border">
+                    <p className="font-semibold text-slate-700 dark:text-slate-200 mb-0.5">Relais départ</p>
+                    <p>{parcel.relaisDepart?.commerceName}</p>
+                    <p className="text-slate-400">{parcel.relaisDepart?.ville} · {parcel.relaisDepart?.address}</p>
+                  </div>
+                  <div className="p-2 bg-white dark:bg-slate-700 rounded border">
+                    <p className="font-semibold text-slate-700 dark:text-slate-200 mb-0.5">Relais arrivée</p>
+                    <p>{parcel.relaisArrivee?.commerceName}</p>
+                    <p className="text-slate-400">{parcel.relaisArrivee?.ville} · {parcel.relaisArrivee?.address}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Expéditeur / Destinataire */}
+              {(parcel.senderFirstName || parcel.recipientFirstName) && (
+                <div className="grid grid-cols-2 gap-3 text-xs">
+                  <div className="p-2 bg-white dark:bg-slate-700 rounded border">
+                    <p className="font-semibold text-slate-700 dark:text-slate-200 mb-0.5">Expéditeur</p>
+                    <p>{parcel.senderFirstName} {parcel.senderLastName}</p>
+                    {parcel.senderPhone && <p className="text-slate-400">{parcel.senderPhone}</p>}
+                  </div>
+                  <div className="p-2 bg-white dark:bg-slate-700 rounded border">
+                    <p className="font-semibold text-slate-700 dark:text-slate-200 mb-0.5">Destinataire</p>
+                    <p>{parcel.recipientFirstName} {parcel.recipientLastName}</p>
+                    {parcel.recipientPhone && <p className="text-slate-400">{parcel.recipientPhone}</p>}
+                  </div>
+                </div>
+              )}
+
+              {/* Actions */}
               <div className="flex flex-wrap gap-2">
-                {['RECU_RELAIS'].includes(parcel.status) && (
+                {['RECU_RELAIS', 'DEPOSITED_RELAY', 'PAID_RELAY'].includes(parcel.status) && (
                   <Button 
                     size="sm" 
                     className="bg-emerald-600 hover:bg-emerald-700"
@@ -638,7 +784,7 @@ function ScanTab() {
                     Prendre en charge
                   </Button>
                 )}
-                {['EN_TRANSPORT'].includes(parcel.status) && (
+                {parcel.status === 'EN_TRANSPORT' && (
                   <Button 
                     size="sm" 
                     className="bg-green-600 hover:bg-green-700"
@@ -646,13 +792,30 @@ function ScanTab() {
                     disabled={isUpdating}
                   >
                     {isUpdating ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <CheckCircle className="h-4 w-4 mr-1" />}
-                    Arrivé au relais
+                    Arrivé au relais destination
                   </Button>
                 )}
                 {['ARRIVE_RELAIS_DESTINATION', 'LIVRE'].includes(parcel.status) && (
-                  <Badge className="bg-green-100 text-green-700 px-4 py-2">Colis déjà livré ou au relais</Badge>
+                  <Badge className="bg-green-100 text-green-700 px-4 py-2">✓ Colis livré / au relais</Badge>
                 )}
               </div>
+
+              {/* Historique tracking */}
+              {parcel.trackingHistory && parcel.trackingHistory.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-slate-600 dark:text-slate-300 mb-2">Historique</p>
+                  <div className="space-y-1">
+                    {parcel.trackingHistory.map((h: any, i: number) => (
+                      <div key={i} className="flex items-center gap-2 text-xs">
+                        <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
+                        <span className="text-slate-500">{new Date(h.createdAt).toLocaleString('fr-FR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'})}</span>
+                        <span className="text-slate-700 dark:text-slate-300">{PARCEL_STATUS.find(s => s.id === h.status)?.label || h.status}</span>
+                        {h.notes && <span className="text-slate-400">· {h.notes}</span>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         )}
@@ -778,6 +941,102 @@ function WalletTab({ userId }: { userId: string }) {
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// Profil Tab
+function ProfilTab({ userId, userName }: { userId: string; userName: string }) {
+  const [profile, setProfile] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const res = await fetch(`/api/transporters?userId=${userId}`);
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) setProfile(data[0]);
+      } catch (error) {
+        console.error('Error fetching profile:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchProfile();
+  }, [userId]);
+
+  if (isLoading) return <div className="flex justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-emerald-600" /></div>;
+
+  const statusConfig: Record<string, { label: string; color: string }> = {
+    APPROVED: { label: 'Approuvé', color: 'bg-green-100 text-green-700 border-green-300' },
+    PENDING:  { label: 'En attente de validation', color: 'bg-yellow-100 text-yellow-700 border-yellow-300' },
+    REJECTED: { label: 'Refusé', color: 'bg-red-100 text-red-700 border-red-300' },
+  };
+
+  const s = profile?.status ? statusConfig[profile.status] : null;
+
+  return (
+    <div className="space-y-6 max-w-2xl">
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Truck className="h-5 w-5 text-emerald-600" />
+                Mon profil transporteur
+              </CardTitle>
+              <CardDescription>Informations de votre dossier</CardDescription>
+            </div>
+            {s && (
+              <Badge className={`${s.color} border text-sm`}>{s.label}</Badge>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {!profile ? (
+            <p className="text-slate-500">Aucun profil trouvé.</p>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-1">
+                <p className="text-xs text-slate-400 uppercase tracking-wide">Nom complet</p>
+                <p className="font-medium">{profile.fullName || userName}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs text-slate-400 uppercase tracking-wide">Téléphone</p>
+                <p className="font-medium">{profile.phone || '—'}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs text-slate-400 uppercase tracking-wide">Véhicule</p>
+                <p className="font-medium">{profile.vehicle || '—'}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs text-slate-400 uppercase tracking-wide">Permis</p>
+                <p className="font-medium">{profile.license || '—'}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs text-slate-400 uppercase tracking-wide">Expérience</p>
+                <p className="font-medium">{profile.experience || '—'}</p>
+              </div>
+              {profile.regions && (
+                <div className="space-y-1">
+                  <p className="text-xs text-slate-400 uppercase tracking-wide">Régions desservies</p>
+                  <div className="flex flex-wrap gap-1">
+                    {(Array.isArray(profile.regions) ? profile.regions : JSON.parse(profile.regions || '[]')).map((r: string) => (
+                      <Badge key={r} variant="outline" className="text-xs">{WILAYAS.find(w => w.id === r)?.name || r}</Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {profile.description && (
+                <div className="space-y-1 sm:col-span-2">
+                  <p className="text-xs text-slate-400 uppercase tracking-wide">Description</p>
+                  <p className="text-sm text-slate-600 dark:text-slate-300">{profile.description}</p>
+                </div>
+              )}
             </div>
           )}
         </CardContent>
