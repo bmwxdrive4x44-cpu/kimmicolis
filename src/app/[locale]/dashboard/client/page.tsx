@@ -94,8 +94,8 @@ function ClientDashboardContent() {
       const parcels = await response.json();
       
       setStats({
-        created: parcels.filter((p: any) => ['CREATED', 'PAID'].includes(p.status)).length,
-        inTransit: parcels.filter((p: any) => ['PAID_RELAY', 'DEPOSITED_RELAY', 'RECU_RELAIS', 'EN_TRANSPORT', 'ARRIVE_RELAIS_DESTINATION'].includes(p.status)).length,
+        created: parcels.filter((p: any) => ['CREATED', 'PAID', 'PAID_RELAY'].includes(p.status)).length,
+        inTransit: parcels.filter((p: any) => ['DEPOSITED_RELAY', 'RECU_RELAIS', 'EN_TRANSPORT', 'ARRIVE_RELAIS_DESTINATION'].includes(p.status)).length,
         delivered: parcels.filter((p: any) => p.status === 'LIVRE').length,
         totalSpent: parcels.reduce((sum: number, p: any) => sum + (p.prixClient || 0), 0),
       });
