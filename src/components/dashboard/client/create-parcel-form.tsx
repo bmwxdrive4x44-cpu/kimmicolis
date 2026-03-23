@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { WILAYAS, PARCEL_FORMATS, PLATFORM_COMMISSION, DEFAULT_RELAY_COMMISSION } from '@/lib/constants';
-import { Package, Loader2, CreditCard, CheckCircle, QrCode, Download } from 'lucide-react';
+import { Package, Loader2, CheckCircle, QrCode, Download } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import Image from 'next/image';
 
@@ -125,25 +125,12 @@ export function CreateParcelForm({ userId }: CreateParcelFormProps) {
     }
   };
 
-  const handlePayment = async () => {
-    setIsLoading(true);
-    // Simulate payment
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-    
-    // Update parcel status to PAID
-    if (createdParcel) {
-      await fetch(`/api/parcels/${createdParcel.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'PAID', notes: 'Paiement confirmé' }),
-      });
-    }
-
-    setIsLoading(false);
+  const handleDepositReady = () => {
+    // Move to success step - no payment here, will be done at relay
     setStep(4);
     toast({
-      title: 'Paiement confirmé',
-      description: 'Votre colis est prêt à être déposé au point relais',
+      title: 'Colis prêt',
+      description: 'Vous pouvez maintenant déposer votre colis au point relais de départ',
     });
   };
 
@@ -192,9 +179,9 @@ export function CreateParcelForm({ userId }: CreateParcelFormProps) {
           <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-6 mb-6 text-left">
             <h3 className="font-semibold mb-4">Prochaines étapes:</h3>
             <ol className="space-y-2 text-sm text-muted-foreground">
-              <li>1. Déposez votre colis au point relais de départ</li>
-              <li>2. Présentez le QR code ou ce numéro de suivi au commerçant</li>
-              <li>3. Suivez votre colis en temps réel</li>
+              <li>1. Rendez-vous au point relais de départ avec votre QR code ou numéro de suivi</li>
+              <li>2. Déposez votre colis au commerçant</li>
+              <li>3. <span className="font-semibold text-foreground">Payez {createdParcel?.prixClient?.toFixed(0) ?? '—'} DA en espèces</span></li>
               <li>4. Récupérez votre colis au point relais de destination</li>
             </ol>
           </div>
@@ -433,20 +420,31 @@ export function CreateParcelForm({ userId }: CreateParcelFormProps) {
               </div>
             )}
 
-            <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-6">
-              <div className="flex justify-between items-center mb-4">
-                <span className="font-semibold">Total à payer</span>
-                <span className="text-2xl font-bold text-emerald-600">{totalPrice.toFixed(0)} DA</span>
+            {/* Payment Info - Cash at Relay */}
+            <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-6">
+              <div className="space-y-3">
+                <h4 className="font-semibold text-blue-900 dark:text-blue-100">Modalités de paiement</h4>
+                <div className="flex justify-between items-center">
+                  <span className="text-blue-900 dark:text-blue-100">Total à payer (en espèces)</span>
+                  <span className="text-2xl font-bold text-blue-600 dark:text-blue-400">{totalPrice.toFixed(0)} DA</span>
+                </div>
+                <p className="text-sm text-blue-800 dark:text-blue-200">
+                  ✓ Paiement au point relais de départ
+                  <br />
+                  ✓ En espèces uniquement
+                  <br />
+                  ✓ Après validation du commerçant
+                </p>
               </div>
             </div>
 
             <div className="flex gap-4">
               <Button variant="outline" onClick={() => router.push('/dashboard/client')} className="flex-1">
-                Payer plus tard
+                Retour au tableau de bord
               </Button>
-              <Button onClick={handlePayment} disabled={isLoading} className="flex-1 bg-emerald-600 hover:bg-emerald-700">
-                {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CreditCard className="h-4 w-4 mr-2" />}
-                Payer maintenant
+              <Button onClick={handleDepositReady} className="flex-1 bg-emerald-600 hover:bg-emerald-700">
+                <Package className="h-4 w-4 mr-2" />
+                Colis prêt
               </Button>
             </div>
           </div>

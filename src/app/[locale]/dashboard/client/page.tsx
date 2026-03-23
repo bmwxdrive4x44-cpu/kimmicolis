@@ -595,24 +595,37 @@ function TrackingTab({ initialTracking, setTrackingNumber }: { initialTracking: 
   );
 }
 
-// Payment Tab - Show unpaid parcels
+// Payment Tab - Show parcels awaiting cash payment at relay
 function PaymentTab({ userId }: { userId: string }) {
   const { push } = useRouter();
   const locale = useLocale();
   const [parcels, setParcels] = useState<any[]>([]);
+  const [relaisMap, setRelaisMap] = useState<Record<string, any>>({});
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    fetchUnpaidParcels();
+    fetchData();
   }, [userId]);
 
-  const fetchUnpaidParcels = async () => {
+  const fetchData = async () => {
     try {
-      const response = await fetch(`/api/parcels?clientId=${userId}&status=CREATED`);
-      const data = await response.json();
-      setParcels(data);
+      const [parcelRes, relaisRes] = await Promise.all([
+        fetch(`/api/parcels?clientId=${userId}&status=CREATED`),
+        fetch('/api/relais?status=APPROVED'),
+      ]);
+      const parcelData = await parcelRes.json();
+      const relaisData = await relaisRes.json();
+      
+      // Map relais by ID for quick lookup
+      const map = relaisData.reduce((acc: Record<string, any>, r: any) => {
+        acc[r.id] = r;
+        return acc;
+      }, {});
+      
+      setParcels(parcelData);
+      setRelaisMap(map);
     } catch (error) {
-      console.error('Error fetching parcels:', error);
+      console.error('Error fetching data:', error);
     } finally {
       setIsLoading(false);
     }
@@ -621,8 +634,8 @@ function PaymentTab({ userId }: { userId: string }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Paiement des colis</CardTitle>
-        <CardDescription>Colis en attente de paiement</CardDescription>
+        <CardTitle>Paiement au relais</CardTitle>
+        <CardDescription>Colis en attente de paiement en espèces au point relais de départ</CardDescription>
       </CardHeader>
       <CardContent>
         {isLoading ? (
@@ -639,47 +652,57 @@ function PaymentTab({ userId }: { userId: string }) {
           </div>
         ) : (
           <div className="space-y-4">
-            {parcels.map((parcel) => (
-              <Card key={parcel.id} className="border-blue-200 bg-blue-50">
-                <CardContent className="pt-4">
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                    <div>
-                      <p className="text-sm text-muted-foreground">N° Suivi</p>
-                      <p className="font-mono font-bold">{parcel.trackingNumber}</p>
+            {parcels.map((parcel) => {
+              const relaisDept = relaisMap[parcel.relaisDepartId];
+              return (
+                <Card key={parcel.id} className="border-blue-200 bg-blue-50">
+                  <CardContent className="pt-4">
+                    <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4">
+                      <div>
+                        <p className="text-sm text-muted-foreground">N° Suivi</p>
+                        <p className="font-mono font-bold text-sm">{parcel.trackingNumber}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Format</p>
+                        <p className="font-semibold">{parcel.format}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Itinéraire</p>
+                        <p className="text-sm">
+                          {WILAYAS.find(w => w.id === parcel.villeDepart)?.name} →{' '}
+                          {WILAYAS.find(w => w.id === parcel.villeArrivee)?.name}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Montant</p>
+                        <p className="text-lg font-bold text-green-600">{parcel.prixClient.toFixed(2)} DA</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Horaires relais</p>
+                        <p className="text-sm">
+                          {relaisDept?.openTime && relaisDept?.closeTime 
+                            ? `${relaisDept.openTime} - ${relaisDept.closeTime}`
+                            : 'Horaires non renseignés'}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Format</p>
-                      <p className="font-semibold">{parcel.format}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Itinéraire</p>
-                      <p className="text-sm">
-                        {WILAYAS.find(w => w.id === parcel.villeDepart)?.name} →{' '}
-                        {WILAYAS.find(w => w.id === parcel.villeArrivee)?.name}
+                    <div className="bg-white dark:bg-slate-900 rounded p-3 mb-4 border border-blue-100 dark:border-blue-900">
+                      <p className="text-sm text-slate-700 dark:text-slate-300">
+                        💳 <span className="font-semibold">Paiement en espèces au point relais de départ</span>
+                        <br />
+                        📍 {relaisDept?.commerceName || 'Relais non disponible'} - {relaisDept?.address}
                       </p>
                     </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Montant</p>
-                      <p className="text-lg font-bold text-green-600">{parcel.prixClient.toFixed(2)} DA</p>
-                    </div>
-                  </div>
-                  <Button
-                    onClick={() => push(`/${locale}/payment/checkout`)}
-                    className="w-full bg-green-600 hover:bg-green-700"
-                  >
-                    <CreditCard className="h-4 w-4 mr-2" />
-                    Payer ce colis
-                  </Button>
-                </CardContent>
-              </Card>
-            ))}
-            <Button
-              onClick={() => push(`/${locale}/payment/checkout`)}
-              className="w-full bg-emerald-600 hover:bg-emerald-700 text-lg py-6"
-            >
-              <CreditCard className="h-4 w-4 mr-2" />
-              Payer tous les colis ({parcels.length})
-            </Button>
+                    <Button
+                      onClick={() => push(`/${locale}/dashboard/client?tab=track&track=${parcel.trackingNumber}`)}
+                      className="w-full bg-blue-600 hover:bg-blue-700"
+                    >
+                      Voir les détails
+                    </Button>
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         )}
       </CardContent>
