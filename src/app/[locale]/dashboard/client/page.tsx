@@ -302,43 +302,43 @@ function CreateParcelForm({ userId, onCreated, onGoToHistory }: { userId: string
   <meta charset="UTF-8" />
   <title>Étiquette - ${createdParcel.trackingNumber}</title>
   <style>
-    @page { size: A5; margin: 8mm; }
+    @page { size: A4; margin: 15mm; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: Arial, Helvetica, sans-serif; background: white; color: #111; }
-    .label { border: 2.5px solid #111; padding: 10px; }
+    .label { border: 3px solid #111; padding: 18px; }
     .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #111; padding-bottom: 8px; margin-bottom: 10px; }
-    .brand { font-size: 20px; font-weight: 900; color: #059669; }
+    .brand { font-size: 32px; font-weight: 900; color: #059669; }
     .tracking-block { text-align: right; }
-    .tracking-label { font-size: 9px; text-transform: uppercase; color: #666; letter-spacing: 1px; }
-    .tracking-number { font-family: 'Courier New', monospace; font-size: 22px; font-weight: 900; letter-spacing: 2px; }
-    .route-banner { background: #059669; color: white; text-align: center; padding: 6px 10px; font-size: 16px; font-weight: 700; letter-spacing: 1px; margin-bottom: 10px; border-radius: 3px; }
-    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
-    .info-box { border: 1.5px solid #ccc; border-radius: 4px; padding: 8px; }
+    .tracking-label { font-size: 13px; text-transform: uppercase; color: #666; letter-spacing: 1px; }
+    .tracking-number { font-family: 'Courier New', monospace; font-size: 34px; font-weight: 900; letter-spacing: 3px; }
+    .route-banner { background: #059669; color: white; text-align: center; padding: 12px 16px; font-size: 26px; font-weight: 700; letter-spacing: 2px; margin-bottom: 18px; border-radius: 4px; }
+    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 18px; }
+    .info-box { border: 2px solid #ccc; border-radius: 6px; padding: 14px; }
     .info-box.sender { border-color: #059669; }
     .info-box.recipient { border-color: #2563eb; }
-    .info-box-title { font-size: 9px; text-transform: uppercase; letter-spacing: 1px; font-weight: 700; margin-bottom: 4px; }
+    .info-box-title { font-size: 13px; text-transform: uppercase; letter-spacing: 1px; font-weight: 700; margin-bottom: 6px; }
     .info-box.sender .info-box-title { color: #059669; }
     .info-box.recipient .info-box-title { color: #2563eb; }
-    .info-name { font-size: 13px; font-weight: 700; }
-    .info-phone { font-size: 11px; color: #444; }
-    .info-city { font-size: 11px; font-weight: 600; }
-    .relay-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
-    .relay-box { background: #f9f9f9; border: 1px solid #ddd; border-radius: 4px; padding: 6px 8px; }
-    .relay-box-title { font-size: 8px; text-transform: uppercase; letter-spacing: 1px; color: #999; margin-bottom: 2px; }
-    .relay-name { font-weight: 700; font-size: 11px; }
-    .relay-address { font-size: 10px; color: #555; }
+    .info-name { font-size: 20px; font-weight: 700; }
+    .info-phone { font-size: 16px; color: #444; }
+    .info-city { font-size: 16px; font-weight: 600; }
+    .relay-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 18px; }
+    .relay-box { background: #f9f9f9; border: 1px solid #ddd; border-radius: 6px; padding: 12px 14px; }
+    .relay-box-title { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #999; margin-bottom: 4px; }
+    .relay-name { font-weight: 700; font-size: 16px; }
+    .relay-address { font-size: 14px; color: #555; }
     .bottom-row { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 8px; }
     .qr-block { text-align: center; }
-    .qr-block img { width: 90px; height: 90px; }
-    .qr-label { font-size: 8px; color: #888; margin-top: 2px; }
-    .meta-block { font-size: 10px; }
-    .meta-block p { margin-bottom: 3px; }
+    .qr-block img { width: 140px; height: 140px; }
+    .qr-label { font-size: 12px; color: #888; margin-top: 4px; }
+    .meta-block { font-size: 15px; }
+    .meta-block p { margin-bottom: 6px; }
     .meta-bold { font-weight: 700; }
-    .withdrawal-box { background: #eff6ff; border: 1.5px dashed #2563eb; border-radius: 4px; padding: 6px 10px; text-align: center; margin-bottom: 10px; }
-    .withdrawal-label { font-size: 8px; text-transform: uppercase; letter-spacing: 1px; color: #2563eb; margin-bottom: 2px; }
-    .withdrawal-code { font-family: 'Courier New', monospace; font-size: 16px; font-weight: 900; color: #1d4ed8; letter-spacing: 3px; }
-    .withdrawal-note { font-size: 8px; color: #3b82f6; margin-top: 2px; }
-    .instructions { background: #fffbeb; border: 1px solid #fbbf24; border-radius: 3px; padding: 5px 8px; font-size: 9px; color: #92400e; line-height: 1.5; }
+    .withdrawal-box { background: #eff6ff; border: 2px dashed #2563eb; border-radius: 6px; padding: 12px 18px; text-align: center; margin-bottom: 18px; }
+    .withdrawal-label { font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: #2563eb; margin-bottom: 4px; }
+    .withdrawal-code { font-family: 'Courier New', monospace; font-size: 28px; font-weight: 900; color: #1d4ed8; letter-spacing: 5px; }
+    .withdrawal-note { font-size: 12px; color: #3b82f6; margin-top: 4px; }
+    .instructions { background: #fffbeb; border: 1px solid #fbbf24; border-radius: 4px; padding: 10px 14px; font-size: 13px; color: #92400e; line-height: 1.6; }
     @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
   </style>
 </head>
@@ -407,7 +407,7 @@ function CreateParcelForm({ userId, onCreated, onGoToHistory }: { userId: string
 <script>window.onload = function() { window.print(); }<\/script>
 </body></html>`;
 
-    const win = window.open('', '_blank', 'width=650,height=900');
+    const win = window.open('', '_blank', 'width=900,height=1200');
     if (win) {
       win.document.write(html);
       win.document.close();
