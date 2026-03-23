@@ -3,9 +3,26 @@ import { db } from '@/lib/db';
 import { requireRole } from '@/lib/rbac';
 
 // GET all lignes (PUBLIC)
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const { searchParams } = new URL(request.url);
+    const villeDepart = searchParams.get('villeDepart');
+    const villeArrivee = searchParams.get('villeArrivee');
+
+    const where: any = {};
+    if (villeDepart && villeArrivee) {
+      where.OR = [
+        { villeDepart, villeArrivee },
+        { villeDepart: villeArrivee, villeArrivee: villeDepart },
+      ];
+    } else if (villeDepart) {
+      where.villeDepart = villeDepart;
+    } else if (villeArrivee) {
+      where.villeArrivee = villeArrivee;
+    }
+
     const lignes = await db.ligne.findMany({
+      where,
       orderBy: [{ villeDepart: 'asc' }, { villeArrivee: 'asc' }],
     });
     return NextResponse.json(lignes);

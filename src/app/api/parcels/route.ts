@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { generateTrackingNumber, generateQRData, PLATFORM_COMMISSION, DEFAULT_RELAY_COMMISSION } from '@/lib/constants';
 import { checkRateLimit, RATE_LIMIT_PRESETS } from '@/lib/ratelimit';
 import { verifyJWT } from '@/lib/rbac';
+import { generateQRCodeImage, buildQRCodePayload } from '@/lib/qrcode';
 
 // GET all parcels
 export async function GET(request: NextRequest) {
@@ -115,6 +116,8 @@ export async function POST(request: NextRequest) {
     // Generate tracking number and QR code
     const trackingNumber = generateTrackingNumber();
     const qrCode = generateQRData(trackingNumber);
+    const qrPayload = buildQRCodePayload(trackingNumber);
+    const qrCodeImage = await generateQRCodeImage(qrPayload);
 
     // Create parcel
     const colis = await db.colis.create({
@@ -133,6 +136,7 @@ export async function POST(request: NextRequest) {
         commissionRelais: relayFee,
         netTransporteur,
         qrCode,
+        qrCodeImage,
         status: 'CREATED',
         dateLimit: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
       },

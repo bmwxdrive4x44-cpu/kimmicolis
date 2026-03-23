@@ -37,7 +37,6 @@ export async function GET(request: NextRequest) {
       where: {
         status: 'PROGRAMME',
         dateDepart: { gte: new Date() },
-        placesColis: { gt: db.trajet.fields.placesUtilisees },
         OR: [
           // Direct route
           {
@@ -72,33 +71,35 @@ export async function GET(request: NextRequest) {
       orderBy: { dateDepart: 'asc' },
     });
 
-    // Score and rank matches
-    const scoredMatches = matchingTrajets.map((trajet) => {
-      let score = 0;
-      
-      // Direct route gets highest score
-      if (trajet.villeDepart === departure && trajet.villeArrivee === arrival) {
-        score = 100;
-      }
-      // Departure matches
-      else if (trajet.villeDepart === departure) {
-        score = 80;
-      }
-      // Arrival matches
-      else if (trajet.villeArrivee === arrival) {
-        score = 70;
-      }
-      // Both on route
-      else {
-        score = 50;
-      }
+    // Score and rank matches, filtering out full trajets
+    const scoredMatches = matchingTrajets
+      .filter((trajet) => trajet.placesColis > trajet.placesUtilisees)
+      .map((trajet) => {
+        let score = 0;
+        
+        // Direct route gets highest score
+        if (trajet.villeDepart === departure && trajet.villeArrivee === arrival) {
+          score = 100;
+        }
+        // Departure matches
+        else if (trajet.villeDepart === departure) {
+          score = 80;
+        }
+        // Arrival matches
+        else if (trajet.villeArrivee === arrival) {
+          score = 70;
+        }
+        // Both on route
+        else {
+          score = 50;
+        }
 
-      // Bonus for available capacity
-      const availableCapacity = trajet.placesColis - trajet.placesUtilisees;
-      score += Math.min(availableCapacity * 2, 20);
+        // Bonus for available capacity
+        const availableCapacity = trajet.placesColis - trajet.placesUtilisees;
+        score += Math.min(availableCapacity * 2, 20);
 
-      return { ...trajet, score };
-    });
+        return { ...trajet, score };
+      });
 
     // Sort by score
     scoredMatches.sort((a, b) => b.score - a.score);
