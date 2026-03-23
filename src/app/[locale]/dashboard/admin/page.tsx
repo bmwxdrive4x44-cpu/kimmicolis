@@ -495,15 +495,20 @@ function ParcelsTab() {
     try {
       const response = await fetch('/api/parcels');
       const data = await response.json();
-      setColis(data);
+      if (!response.ok) {
+        throw new Error(data?.error || 'Failed to fetch parcels');
+      }
+      setColis(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Error fetching parcels:', error);
+      setColis([]);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const filteredColis = filter === 'all' ? colis : colis.filter(c => c.status === filter);
+  const safeColis = Array.isArray(colis) ? colis : [];
+  const filteredColis = filter === 'all' ? safeColis : safeColis.filter(c => c.status === filter);
 
   return (
     <Card>
@@ -511,7 +516,7 @@ function ParcelsTab() {
         <div className="flex items-center justify-between">
           <div>
             <CardTitle>Gestion des colis</CardTitle>
-            <CardDescription>{colis.length} colis au total</CardDescription>
+            <CardDescription>{safeColis.length} colis au total</CardDescription>
           </div>
           <Select value={filter} onValueChange={setFilter}>
             <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
@@ -576,9 +581,18 @@ function RelaysTab() {
     try {
       const response = await fetch('/api/relais');
       const data = await response.json();
-      setRelais(data);
+      if (!response.ok) {
+        throw new Error(data?.error || 'Failed to fetch relais');
+      }
+      setRelais(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Error fetching relais:', error);
+      setRelais([]);
+      toast({
+        title: 'Erreur chargement relais',
+        description: error instanceof Error ? error.message : 'Impossible de charger les points relais',
+        variant: 'destructive',
+      });
     } finally {
       setIsLoading(false);
     }
@@ -656,7 +670,8 @@ function RelaysTab() {
     }
   };
 
-  const filteredRelais = filter === 'all' ? relais : relais.filter(r => r.status === filter);
+  const safeRelais = Array.isArray(relais) ? relais : [];
+  const filteredRelais = filter === 'all' ? safeRelais : safeRelais.filter(r => r.status === filter);
 
   return (
     <>
@@ -665,7 +680,7 @@ function RelaysTab() {
           <div className="flex items-center justify-between">
             <div>
               <CardTitle>Validation des points relais</CardTitle>
-              <CardDescription>{relais.filter(r => r.status === 'PENDING').length} demandes en attente</CardDescription>
+              <CardDescription>{safeRelais.filter(r => r.status === 'PENDING').length} demandes en attente</CardDescription>
             </div>
             <Select value={filter} onValueChange={setFilter}>
               <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
@@ -827,9 +842,18 @@ function LinesTab() {
     try {
       const response = await fetch('/api/lignes');
       const data = await response.json();
-      setLignes(data);
+      if (!response.ok) {
+        throw new Error(data?.error || 'Failed to fetch lignes');
+      }
+      setLignes(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Error fetching lignes:', error);
+      setLignes([]);
+      toast({
+        title: 'Erreur chargement lignes',
+        description: error instanceof Error ? error.message : 'Impossible de charger les lignes',
+        variant: 'destructive',
+      });
     } finally {
       setIsLoading(false);
     }
@@ -910,6 +934,8 @@ function LinesTab() {
     }
   };
 
+  const safeLignes = Array.isArray(lignes) ? lignes : [];
+
   return (
     <>
       <div className="space-y-6">
@@ -963,7 +989,7 @@ function LinesTab() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Lignes de transport ({lignes.length})</CardTitle>
+            <CardTitle>Lignes de transport ({safeLignes.length})</CardTitle>
           </CardHeader>
           <CardContent>
             {isLoading ? (
@@ -982,7 +1008,7 @@ function LinesTab() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {lignes.map((ligne) => (
+                  {safeLignes.map((ligne) => (
                     <TableRow key={ligne.id}>
                       <TableCell>{WILAYAS.find(w => w.id === ligne.villeDepart)?.name}</TableCell>
                       <TableCell>{WILAYAS.find(w => w.id === ligne.villeArrivee)?.name}</TableCell>
@@ -1114,6 +1140,9 @@ function SettingsTab() {
     try {
       const response = await fetch('/api/settings');
       const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data?.error || 'Failed to fetch settings');
+      }
       setSettings({
         platformCommission: String(data.platformCommission || 10),
         commissionPetit: String(data.commissionPetit || 100),
@@ -1122,6 +1151,11 @@ function SettingsTab() {
       });
     } catch (error) {
       console.error('Error fetching settings:', error);
+      toast({
+        title: 'Erreur chargement paramètres',
+        description: error instanceof Error ? error.message : 'Impossible de charger les paramètres',
+        variant: 'destructive',
+      });
     } finally {
       setIsLoading(false);
     }
