@@ -291,10 +291,18 @@ function UsersTab() {
     try {
       const response = await fetch('/api/users');
       const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data?.error || 'Failed to fetch users');
+      }
       setUsers(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Error fetching users:', error);
       setUsers([]);
+      toast({
+        title: 'Erreur chargement utilisateurs',
+        description: error instanceof Error ? error.message : 'Impossible de charger les utilisateurs',
+        variant: 'destructive',
+      });
     } finally {
       setIsLoading(false);
     }
