@@ -99,19 +99,6 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // If user is a relay, create pending relais record
-    if (role === 'RELAIS') {
-      await db.relais.create({
-        data: {
-          userId: user.id,
-          commerceName: name,
-          address: '',
-          ville: '',
-          status: 'PENDING',
-        },
-      });
-    }
-
     return NextResponse.json({
       id: user.id,
       email: user.email,

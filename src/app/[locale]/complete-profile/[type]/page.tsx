@@ -60,10 +60,25 @@ export default function CompleteProfilePage() {
         const data = await response.json();
 
         if (Array.isArray(data) && data.length > 0) {
-          setHasProfile(true);
-          // Redirect to dashboard if profile already exists
-          const dashboardPath = `/${locale}/dashboard/${isRelais ? 'relais' : 'transporter'}`;
-          router.push(dashboardPath);
+          const existingProfile = data[0];
+          const isProfileComplete = isRelais
+            ? Boolean(existingProfile?.commerceName?.trim() && existingProfile?.address?.trim() && existingProfile?.ville?.trim())
+            : Boolean(existingProfile?.vehicle?.trim() && existingProfile?.license?.trim());
+
+          if (isProfileComplete) {
+            setHasProfile(true);
+            const dashboardPath = `/${locale}/dashboard/${isRelais ? 'relais' : 'transporter'}`;
+            router.push(dashboardPath);
+            return;
+          }
+
+          if (isRelais) {
+            setFormData({
+              commerceName: existingProfile?.commerceName || '',
+              address: existingProfile?.address || '',
+              ville: existingProfile?.ville || '',
+            });
+          }
         }
       } catch (error) {
         console.error('Error checking profile:', error);
@@ -155,7 +170,7 @@ export default function CompleteProfilePage() {
             vehicle: data.vehicle,
             license: data.license,
             experience: parseInt(data.experience) || 0,
-            regions: JSON.stringify(data.regions),
+            regions: data.regions || [],
             description: data.description,
           }),
         });

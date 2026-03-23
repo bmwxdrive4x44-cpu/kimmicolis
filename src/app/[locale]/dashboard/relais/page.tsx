@@ -53,6 +53,12 @@ export default function RelaisDashboard() {
       
       if (data && data.length > 0) {
         const relais = data[0];
+
+        if (!relais.commerceName?.trim() || !relais.address?.trim() || !relais.ville?.trim()) {
+          router.push(`/${locale}/complete-profile/relais`);
+          return;
+        }
+
         setRelaisInfo(relais);
         
         // Fetch stats and cash in parallel

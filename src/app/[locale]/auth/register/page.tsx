@@ -111,7 +111,7 @@ function RegisterForm() {
 
       // 2. Create role-specific application (only if details provided)
       if (formData.role === 'TRANSPORTER' && formData.vehicle && formData.license) {
-        await fetch('/api/transporters', {
+        const transporterResponse = await fetch('/api/transporters', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -121,14 +121,19 @@ function RegisterForm() {
             vehicle: formData.vehicle,
             license: formData.license,
             experience: parseInt(formData.experience) || 0,
-            regions: JSON.stringify(formData.regions),
+            regions: formData.regions,
             description: formData.description,
           }),
         });
+
+        if (!transporterResponse.ok) {
+          const transporterError = await transporterResponse.json().catch(() => null);
+          throw new Error(transporterError?.error || 'Erreur lors de la création du profil transporteur');
+        }
       }
 
       if (formData.role === 'RELAIS' && formData.commerceName && formData.address && formData.ville) {
-        await fetch('/api/relais', {
+        const relaisResponse = await fetch('/api/relais', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -139,6 +144,11 @@ function RegisterForm() {
             phone: formData.phone,
           }),
         });
+
+        if (!relaisResponse.ok) {
+          const relaisError = await relaisResponse.json().catch(() => null);
+          throw new Error(relaisError?.error || 'Erreur lors de la création du point relais');
+        }
       }
 
       // 3. Auto login

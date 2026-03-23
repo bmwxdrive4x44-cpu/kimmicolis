@@ -35,6 +35,31 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { userId, commerceName, address, ville, latitude, longitude, photos } = body;
 
+    if (!userId || !commerceName || !address || !ville) {
+      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    }
+
+    const existingRelais = await db.relais.findUnique({
+      where: { userId },
+    });
+
+    if (existingRelais) {
+      const relais = await db.relais.update({
+        where: { userId },
+        data: {
+          commerceName,
+          address,
+          ville,
+          latitude: latitude ?? null,
+          longitude: longitude ?? null,
+          photos: photos ? JSON.stringify(photos) : null,
+          status: 'PENDING',
+        },
+      });
+
+      return NextResponse.json(relais);
+    }
+
     const relais = await db.relais.create({
       data: {
         userId,
