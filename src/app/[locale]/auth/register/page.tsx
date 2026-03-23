@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, Suspense } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { signIn, signOut } from 'next-auth/react';
@@ -17,7 +17,7 @@ import { Package, Loader2, Mail, Lock, User, Phone, Store, MapPin, Truck } from 
 import { useToast } from '@/hooks/use-toast';
 import { WILAYAS } from '@/lib/constants';
 
-export default function RegisterPage() {
+function RegisterForm() {
   const t = useTranslations('auth.register');
   const locale = useLocale();
   const router = useRouter();
@@ -459,5 +459,17 @@ export default function RegisterPage() {
         </form>
       </Card>
     </div>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-emerald-50 dark:from-slate-900 dark:to-slate-800">
+        <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
+      </div>
+    }>
+      <RegisterForm />
+    </Suspense>
   );
 }

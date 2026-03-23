@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Get transaction history
-    const transactions = await db.cashTransaction.findMany({
+    const transactions = await db.relaisCash.findMany({
       where: { relaisId },
       include: {
         colis: { select: { trackingNumber: true, villeDepart: true, villeArrivee: true } },
@@ -51,16 +51,16 @@ export async function GET(request: NextRequest) {
       take: 100,
     });
 
-    const balance = relais.totalEncaisse - relais.totalReverseé;
-    const blockRisk = (balance / RELAY_BLOCK_THRESHOLD_DA) * 100; // percentage
+    const balance = relais.cashCollected - relais.cashReversed;
+    const blockRisk = (balance / RELAY_BLOCK_THRESHOLD_DA) * 100;
 
     return NextResponse.json({
       relaisId,
       commerceName: relais.commerceName,
-      totalEncaisse: relais.totalEncaisse,
-      totalReverse: relais.totalReverseé, // DB field uses accented char; API exposes clean name
+      totalEncaisse: relais.cashCollected,
+      totalReverse: relais.cashReversed,
       balance,
-      isBlocked: relais.isBlocked,
+      isBlocked: balance >= RELAY_BLOCK_THRESHOLD_DA,
       blockThreshold: RELAY_BLOCK_THRESHOLD_DA,
       blockRiskPercent: Math.min(blockRisk, 100),
       transactions,
@@ -91,26 +91,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Point relais non trouvé' }, { status: 404 });
     }
 
-    // Record reversal
-    await db.cashTransaction.create({
-      data: {
-        relaisId,
-        type: 'REVERSED',
-        amount,
-        description: description || `Reversement de ${amount} DA`,
-      },
-    });
-
-    // Update relay totals and check if should unblock
-    const newReversed = relais.totalReverseé + amount;
-    const newBalance = relais.totalEncaisse - newReversed;
-    const shouldUnblock = relais.isBlocked && newBalance < RELAY_BLOCK_THRESHOLD_DA;
+    // Update relay totals
+    const newReversed = relais.cashReversed + amount;
+    const newBalance = relais.cashCollected - newReversed;
 
     const updatedRelais = await db.relais.update({
       where: { id: relaisId },
       data: {
-        totalReverseé: newReversed,
-        isBlocked: shouldUnblock ? false : relais.isBlocked,
+        cashReversed: newReversed,
       },
     });
 

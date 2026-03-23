@@ -63,9 +63,11 @@ export async function POST(request: NextRequest) {
     if (!relais) {
       return NextResponse.json({ error: 'Point relais non trouvé' }, { status: 404 });
     }
-    if (relais.isBlocked) {
+    // Block check: if cashCollected - cashReversed >= threshold, prevent new operations
+    const unreversed = relais.cashCollected - relais.cashReversed;
+    if (unreversed >= RELAY_BLOCK_THRESHOLD_DA) {
       return NextResponse.json(
-        { error: 'Ce point relais est bloqué. Veuillez contacter l\'administrateur.' },
+        { error: 'Ce point relais a atteint le seuil de cash. Veuillez contacter l\'administrateur.' },
         { status: 403 }
       );
     }
@@ -114,42 +116,34 @@ export async function POST(request: NextRequest) {
       const amount = cashAmount ?? parcel.prixClient;
       newStatus = 'PAID_RELAY';
       notes = `Paiement cash validé: ${amount} DA par le relais ${relais.commerceName}`;
-      updateData.cashCollectedByRelay = amount;
-      updateData.cashCollectedAt = new Date();
-
       // Record cash transaction
-      await db.cashTransaction.create({
+      await db.relaisCash.create({
         data: {
           relaisId,
           colisId: parcel.id,
           type: 'COLLECTED',
           amount,
-          description: `Cash encaissé pour colis ${tracking}`,
+          notes: `Cash encaissé pour colis ${tracking}`,
         },
       });
 
-      // Update relay total collected and check block threshold
-      const newTotal = relais.totalEncaisse + amount;
-      const unReversed = newTotal - relais.totalReverseé;
-      const shouldBlock = unReversed >= RELAY_BLOCK_THRESHOLD_DA;
+      // Update relay total collected
+      const newTotal = relais.cashCollected + amount;
+      const newUnreversed = newTotal - relais.cashReversed;
 
       await db.relais.update({
         where: { id: relaisId },
-        data: {
-          totalEncaisse: newTotal,
-          isBlocked: shouldBlock,
-        },
+        data: { cashCollected: newTotal },
       });
 
-      if (shouldBlock) {
-        // Notify admin
+      if (newUnreversed >= RELAY_BLOCK_THRESHOLD_DA) {
         const admins = await db.user.findMany({ where: { role: 'ADMIN' } });
         for (const admin of admins) {
           await db.notification.create({
             data: {
               userId: admin.id,
-              title: '⚠️ Relais bloqué automatiquement',
-              message: `Le relais "${relais.commerceName}" a dépassé le seuil de ${RELAY_BLOCK_THRESHOLD_DA} DA non reversés (${unReversed.toFixed(0)} DA).`,
+              title: '⚠️ Seuil cash relais atteint',
+              message: `Le relais "${relais.commerceName}" a dépassé ${RELAY_BLOCK_THRESHOLD_DA} DA non reversés (${newUnreversed.toFixed(0)} DA).`,
               type: 'IN_APP',
             },
           });
@@ -229,7 +223,7 @@ export async function POST(request: NextRequest) {
       for (const m of missions) {
         await db.mission.update({
           where: { id: m.id },
-          data: { gainStatus: 'AVAILABLE', completedAt: m.completedAt ?? new Date() },
+          data: { completedAt: m.completedAt ?? new Date() },
         });
       }
     } else {
@@ -248,8 +242,6 @@ export async function POST(request: NextRequest) {
         colisId: parcel.id,
         status: newStatus,
         notes,
-        actionBy: actionBy ?? relaisId,
-        photoUrl: photoUrl ?? null,
       },
     });
 
