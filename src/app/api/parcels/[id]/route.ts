@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { requireRole } from '@/lib/rbac';
 
 // GET single parcel
 export async function GET(
@@ -7,6 +8,9 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = await requireRole(request, ['CLIENT', 'RELAIS', 'TRANSPORTER', 'ADMIN']);
+    if (!auth.success) return auth.response;
+
     const { id } = await params;
     
     const parcel = await db.colis.findUnique({
@@ -24,6 +28,10 @@ export async function GET(
       return NextResponse.json({ error: 'Parcel not found' }, { status: 404 });
     }
 
+    if (auth.payload.role === 'CLIENT' && parcel.clientId !== auth.payload.id) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
     return NextResponse.json(parcel);
   } catch (error) {
     console.error('Error fetching parcel:', error);
@@ -37,9 +45,28 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = await requireRole(request, ['CLIENT', 'RELAIS', 'TRANSPORTER', 'ADMIN']);
+    if (!auth.success) return auth.response;
+
     const { id } = await params;
     const body = await request.json();
     const { status, location, notes } = body;
+
+    const existingParcel = await db.colis.findUnique({
+      where: { id },
+      select: { clientId: true },
+    });
+
+    if (!existingParcel) {
+      return NextResponse.json({ error: 'Parcel not found' }, { status: 404 });
+    }
+
+    if (auth.payload.role === 'CLIENT') {
+      const allowedStatuses = ['PAID'];
+      if (existingParcel.clientId !== auth.payload.id || !allowedStatuses.includes(status)) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
+    }
 
     const parcel = await db.colis.update({
       where: { id },

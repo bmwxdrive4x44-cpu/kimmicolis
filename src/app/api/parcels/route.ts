@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { generateTrackingNumber, generateQRData, PLATFORM_COMMISSION, DEFAULT_RELAY_COMMISSION } from '@/lib/constants';
 import { checkRateLimit, RATE_LIMIT_PRESETS } from '@/lib/ratelimit';
-import { verifyJWT } from '@/lib/rbac';
+import { requireRole, verifyJWT } from '@/lib/rbac';
 import { generateQRCodeImage, buildQRCodePayload } from '@/lib/qrcode';
 
 // GET all parcels
@@ -14,10 +14,48 @@ export async function GET(request: NextRequest) {
     const tracking = searchParams.get('tracking');
     const available = searchParams.get('available'); // "true" = show available for transport
 
+    // Public tracking lookup: limited data only
+    if (tracking && !clientId && !status && available !== 'true') {
+      const parcels = await db.colis.findMany({
+        where: { trackingNumber: tracking },
+        select: {
+          id: true,
+          trackingNumber: true,
+          villeDepart: true,
+          villeArrivee: true,
+          format: true,
+          status: true,
+          createdAt: true,
+          relaisDepart: {
+            select: { commerceName: true },
+          },
+          relaisArrivee: {
+            select: { commerceName: true },
+          },
+          trackingHistory: {
+            select: { status: true, notes: true, createdAt: true },
+            orderBy: { createdAt: 'desc' },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      return NextResponse.json(parcels);
+    }
+
+    const auth = await requireRole(request, ['CLIENT', 'RELAIS', 'TRANSPORTER', 'ADMIN']);
+    if (!auth.success) return auth.response;
+    const { payload } = auth;
+
     const where: Record<string, unknown> = {};
 
     if (clientId) {
+      if (payload.role === 'CLIENT' && clientId !== payload.id) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
       where.clientId = clientId;
+    } else if (payload.role === 'CLIENT') {
+      where.clientId = payload.id;
     }
     if (status) {
       where.status = status;
@@ -62,8 +100,12 @@ export async function GET(request: NextRequest) {
 
 // POST create parcel
 export async function POST(request: NextRequest) {
+  const auth = await requireRole(request, ['CLIENT', 'ADMIN']);
+  if (!auth.success) return auth.response;
+
+  const { payload } = auth;
+
   // Rate limit: 30 requests per minute per user
-  const { payload } = await verifyJWT(request);
   const rateLimitResult = await checkRateLimit(
     request,
     RATE_LIMIT_PRESETS.moderate,
@@ -97,6 +139,10 @@ export async function POST(request: NextRequest) {
       weight,
       description,
     } = body;
+
+    if (payload.role === 'CLIENT' && clientId !== payload.id) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
 
     // Get line tariff
     const ligne = await db.ligne.findFirst({

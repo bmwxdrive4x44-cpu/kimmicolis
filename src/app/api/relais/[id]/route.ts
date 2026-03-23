@@ -8,6 +8,9 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = await requireRole(request, ['RELAIS', 'ADMIN']);
+    if (!auth.success) return auth.response;
+
     const { id } = await params;
     
     const relais = await db.relais.findUnique({
@@ -19,6 +22,10 @@ export async function GET(
 
     if (!relais) {
       return NextResponse.json({ error: 'Relais not found' }, { status: 404 });
+    }
+
+    if (auth.payload.role === 'RELAIS' && relais.userId !== auth.payload.id) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     return NextResponse.json(relais);
@@ -33,7 +40,10 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { payload } = await verifyJWT(request);
+  const auth = await requireRole(request, ['RELAIS', 'ADMIN']);
+  if (!auth.success) return auth.response;
+
+  const { payload } = auth;
   const { id } = await params;
 
   try {
@@ -53,10 +63,32 @@ export async function PUT(
       photos,
     } = body;
 
+    const existingRelais = await db.relais.findUnique({
+      where: { id },
+      select: { userId: true },
+    });
+
+    if (!existingRelais) {
+      return NextResponse.json({ error: 'Relais not found' }, { status: 404 });
+    }
+
+    const isAdmin = payload.role === 'ADMIN';
+    const isOwner = existingRelais.userId === payload.id;
+
+    if (!isAdmin && !isOwner) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
     // STATUS CHANGE REQUIRES ADMIN
-    if (status !== undefined && !payload?.role.includes('ADMIN')) {
+    if (status !== undefined && !isAdmin) {
       return NextResponse.json({
         error: 'Forbidden: only admins can change relay status',
+      }, { status: 403 });
+    }
+
+    if (!isAdmin && (commissionPetit !== undefined || commissionMoyen !== undefined || commissionGros !== undefined)) {
+      return NextResponse.json({
+        error: 'Forbidden: only admins can change relay commissions',
       }, { status: 403 });
     }
 
@@ -95,6 +127,9 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = await requireRole(request, ['ADMIN']);
+    if (!auth.success) return auth.response;
+
     const { id } = await params;
     
     await db.relais.delete({

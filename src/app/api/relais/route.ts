@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { requireRole } from '@/lib/rbac';
 
 // GET all relais or filter by userId
 export async function GET(request: NextRequest) {
@@ -9,10 +10,46 @@ export async function GET(request: NextRequest) {
     const ville = searchParams.get('ville');
     const userId = searchParams.get('userId');
 
+    const isPublicApprovedLookup = status === 'APPROVED' && !userId;
+
+    if (isPublicApprovedLookup) {
+      const where: Record<string, unknown> = { status: 'APPROVED' };
+      if (ville) where.ville = ville;
+
+      const relais = await db.relais.findMany({
+        where,
+        select: {
+          id: true,
+          commerceName: true,
+          address: true,
+          ville: true,
+          latitude: true,
+          longitude: true,
+          commissionPetit: true,
+          commissionMoyen: true,
+          commissionGros: true,
+          status: true,
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      return NextResponse.json(relais);
+    }
+
+    const auth = await requireRole(request, ['RELAIS', 'ADMIN']);
+    if (!auth.success) return auth.response;
+
     let where: any = {};
     if (status) where.status = status;
     if (ville) where.ville = ville;
-    if (userId) where.userId = userId;
+    if (userId) {
+      if (auth.payload.role !== 'ADMIN' && userId !== auth.payload.id) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
+      where.userId = userId;
+    } else if (auth.payload.role === 'RELAIS') {
+      where.userId = auth.payload.id;
+    }
 
     const relais = await db.relais.findMany({
       where,
@@ -32,11 +69,18 @@ export async function GET(request: NextRequest) {
 // POST create relais registration
 export async function POST(request: NextRequest) {
   try {
+    const auth = await requireRole(request, ['RELAIS', 'ADMIN']);
+    if (!auth.success) return auth.response;
+
     const body = await request.json();
     const { userId, commerceName, address, ville, latitude, longitude, photos } = body;
 
     if (!userId || !commerceName || !address || !ville) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    }
+
+    if (auth.payload.role === 'RELAIS' && userId !== auth.payload.id) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     const existingRelais = await db.relais.findUnique({
