@@ -40,6 +40,7 @@ export async function POST(request: NextRequest) {
       trackingNumber,
       qrData,
       relaisId,
+      userId,
       action,
       cashAmount,
       photoUrl,
@@ -50,7 +51,32 @@ export async function POST(request: NextRequest) {
       withdrawalCode,
     } = body;
 
-    if (!relaisId) {
+    const relayActions = new Set(['validate_payment', 'deposit_scan', 'receive_transporter', 'deliver_client', 'receive', 'deliver']);
+    let actingRelaisId = typeof relaisId === 'string' && relaisId.trim().length > 0 ? relaisId.trim() : undefined;
+    const actorUserId = typeof actionBy === 'string' && actionBy.trim().length > 0
+      ? actionBy.trim()
+      : typeof userId === 'string' && userId.trim().length > 0
+        ? userId.trim()
+        : undefined;
+
+    if (actorUserId) {
+      const relayFromUser = await db.relais.findUnique({
+        where: { userId: actorUserId },
+        select: { id: true, commerceName: true },
+      });
+
+      if (relayFromUser) {
+        if (actingRelaisId && actingRelaisId !== relayFromUser.id) {
+          return NextResponse.json(
+            { error: `Relais invalide pour cet utilisateur. Relais attendu: ${relayFromUser.commerceName}` },
+            { status: 403 }
+          );
+        }
+        actingRelaisId = relayFromUser.id;
+      }
+    }
+
+    if (relayActions.has(action) && !actingRelaisId) {
       return NextResponse.json({ error: 'relaisId est requis' }, { status: 400 });
     }
 
@@ -84,7 +110,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify relay is not blocked
-    const relais = await db.relais.findUnique({ where: { id: relaisId } });
+    const relais = actingRelaisId ? await db.relais.findUnique({ where: { id: actingRelaisId } }) : null;
     if (!relais) {
       return NextResponse.json({ error: 'Point relais non trouvé' }, { status: 404 });
     }
@@ -100,18 +126,18 @@ export async function POST(request: NextRequest) {
     // Determine effective action from parcel status if not explicit
     let effectiveAction = action;
     if (!effectiveAction) {
-      if (parcel.status === 'CREATED' && parcel.relaisDepartId === relaisId) {
+      if (parcel.status === 'CREATED' && parcel.relaisDepartId === actingRelaisId) {
         effectiveAction = 'validate_payment';
-      } else if (parcel.status === 'PAID_RELAY' && parcel.relaisDepartId === relaisId) {
+      } else if (parcel.status === 'PAID_RELAY' && parcel.relaisDepartId === actingRelaisId) {
         effectiveAction = 'deposit_scan';
-      } else if (parcel.status === 'PICKED_UP' && parcel.relaisArriveeId === relaisId) {
+      } else if (parcel.status === 'PICKED_UP' && parcel.relaisArriveeId === actingRelaisId) {
         effectiveAction = 'receive_transporter';
-      } else if (parcel.status === 'ARRIVED_RELAY' && parcel.relaisArriveeId === relaisId) {
+      } else if (parcel.status === 'ARRIVED_RELAY' && parcel.relaisArriveeId === actingRelaisId) {
         effectiveAction = 'deliver_client';
       }
       // Legacy fallback
       else if (action === 'receive') {
-        effectiveAction = parcel.relaisDepartId === relaisId ? 'validate_payment' : 'receive_transporter';
+        effectiveAction = parcel.relaisDepartId === actingRelaisId ? 'validate_payment' : 'receive_transporter';
       } else if (action === 'deliver') {
         effectiveAction = 'deliver_client';
       }
@@ -126,7 +152,7 @@ export async function POST(request: NextRequest) {
     // Client pays cash at departure relay
     // ──────────────────────────────────────────────
     if (effectiveAction === 'validate_payment') {
-      if (parcel.relaisDepartId !== relaisId) {
+      if (parcel.relaisDepartId !== actingRelaisId) {
         return NextResponse.json(
           { error: 'Ce relais n\'est pas le relais de départ de ce colis' },
           { status: 403 }
@@ -144,7 +170,7 @@ export async function POST(request: NextRequest) {
       // Record cash transaction
       await db.relaisCash.create({
         data: {
-          relaisId,
+          relaisId: actingRelaisId!,
           colisId: parcel.id,
           type: 'COLLECTED',
           amount,
@@ -157,7 +183,7 @@ export async function POST(request: NextRequest) {
       const newUnreversed = newTotal - relais.cashReversed;
 
       await db.relais.update({
-        where: { id: relaisId },
+        where: { id: actingRelaisId! },
         data: { cashCollected: newTotal },
       });
 
@@ -181,7 +207,7 @@ export async function POST(request: NextRequest) {
     // Relay scans QR to confirm parcel is physically deposited
     // ──────────────────────────────────────────────
     else if (effectiveAction === 'deposit_scan') {
-      if (parcel.relaisDepartId !== relaisId) {
+      if (parcel.relaisDepartId !== actingRelaisId) {
         return NextResponse.json(
           { error: 'Ce relais n\'est pas le relais de départ de ce colis' },
           { status: 403 }
@@ -203,7 +229,7 @@ export async function POST(request: NextRequest) {
     // Destination relay receives parcel from transporter
     // ──────────────────────────────────────────────
     else if (effectiveAction === 'receive_transporter') {
-      if (parcel.relaisArriveeId !== relaisId) {
+      if (parcel.relaisArriveeId !== actingRelaisId) {
         return NextResponse.json(
           { error: 'Ce relais n\'est pas le relais de destination de ce colis' },
           { status: 403 }
@@ -224,7 +250,7 @@ export async function POST(request: NextRequest) {
     // Client picks up parcel from destination relay
     // ──────────────────────────────────────────────
     else if (effectiveAction === 'deliver_client') {
-      if (parcel.relaisArriveeId !== relaisId) {
+      if (parcel.relaisArriveeId !== actingRelaisId) {
         return NextResponse.json(
           { error: 'Ce relais n\'est pas le relais de destination' },
           { status: 403 }
