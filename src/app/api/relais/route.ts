@@ -23,6 +23,8 @@ export async function GET(request: NextRequest) {
           commerceName: true,
           address: true,
           ville: true,
+          openTime: true,
+          closeTime: true,
           latitude: true,
           longitude: true,
           commissionPetit: true,

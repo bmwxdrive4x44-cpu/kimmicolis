@@ -241,6 +241,11 @@ function CreateParcelForm({ userId, onCreated }: { userId: string; onCreated: ()
   });
   const [calculatedPrice, setCalculatedPrice] = useState<any>(null);
 
+  const formatRelayHours = (relay: any) => {
+    if (!relay?.openTime || !relay?.closeTime) return 'Horaires non renseignés';
+    return `${relay.openTime} - ${relay.closeTime}`;
+  };
+
   useEffect(() => {
     fetchRelais();
   }, []);
@@ -381,7 +386,7 @@ function CreateParcelForm({ userId, onCreated }: { userId: string; onCreated: ()
                     <SelectTrigger><SelectValue placeholder="Sélectionner" /></SelectTrigger>
                     <SelectContent>
                       {relaisDepart.map(r => (
-                        <SelectItem key={r.id} value={r.id}>{r.commerceName} - {r.address}</SelectItem>
+                        <SelectItem key={r.id} value={r.id}>{r.commerceName} - {r.address} ({formatRelayHours(r)})</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -393,7 +398,7 @@ function CreateParcelForm({ userId, onCreated }: { userId: string; onCreated: ()
                     <SelectTrigger><SelectValue placeholder="Sélectionner" /></SelectTrigger>
                     <SelectContent>
                       {relaisArrivee.map(r => (
-                        <SelectItem key={r.id} value={r.id}>{r.commerceName} - {r.address}</SelectItem>
+                        <SelectItem key={r.id} value={r.id}>{r.commerceName} - {r.address} ({formatRelayHours(r)})</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>

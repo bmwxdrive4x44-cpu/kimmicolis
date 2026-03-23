@@ -38,6 +38,11 @@ export function CreateParcelForm({ userId }: CreateParcelFormProps) {
   });
   const [createdParcel, setCreatedParcel] = useState<any>(null);
 
+  const formatRelayHours = (relay: any) => {
+    if (!relay?.openTime || !relay?.closeTime) return 'Horaires non renseignés';
+    return `${relay.openTime} - ${relay.closeTime}`;
+  };
+
   // Fetch relays when cities change
   useEffect(() => {
     const fetchRelais = async () => {
@@ -265,7 +270,7 @@ export function CreateParcelForm({ userId }: CreateParcelFormProps) {
                     {filteredDepartRelais.length > 0 ? (
                       filteredDepartRelais.map((r) => (
                         <SelectItem key={r.id} value={r.id}>
-                          {r.commerceName} - {r.address}
+                          {r.commerceName} - {r.address} ({formatRelayHours(r)})
                         </SelectItem>
                       ))
                     ) : (
@@ -290,7 +295,7 @@ export function CreateParcelForm({ userId }: CreateParcelFormProps) {
                     {filteredArriveeRelais.length > 0 ? (
                       filteredArriveeRelais.map((r) => (
                         <SelectItem key={r.id} value={r.id}>
-                          {r.commerceName} - {r.address}
+                          {r.commerceName} - {r.address} ({formatRelayHours(r)})
                         </SelectItem>
                       ))
                     ) : (
