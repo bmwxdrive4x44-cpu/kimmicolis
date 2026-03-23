@@ -59,15 +59,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create mission with gain amount (transporter gets paid after delivery)
+    // Create mission
     const mission = await db.mission.create({
       data: {
         colisId,
         transporteurId,
         trajetId,
         status: 'ASSIGNE',
-        gainAmount: parcel.netTransporteur,
-        gainStatus: 'PENDING',
       },
     });
 
@@ -83,7 +81,6 @@ export async function POST(request: NextRequest) {
         colisId,
         status: 'ASSIGNED',
         notes: 'Transporteur assigné au colis',
-        actionBy: transporteurId,
       },
     });
 

@@ -107,7 +107,6 @@ export async function POST(request: NextRequest) {
       newParcelStatus = 'PICKED_UP';
       newMissionStatus = 'PICKED_UP';
       notes = 'Colis pris en charge par le transporteur';
-      missionUpdateData.pickedUpAt = new Date();
     }
 
     // ──────────────────────────────────────────────
@@ -125,7 +124,6 @@ export async function POST(request: NextRequest) {
       newMissionStatus = 'COMPLETED';
       notes = 'Colis livré au relais de destination par le transporteur';
       missionUpdateData.completedAt = new Date();
-      if (photoUrl) parcelUpdateData.photoLivraison = photoUrl;
     } else {
       return NextResponse.json({ error: `Action inconnue: ${effectiveAction}` }, { status: 400 });
     }
@@ -151,8 +149,6 @@ export async function POST(request: NextRequest) {
         status: newParcelStatus,
         location: location ?? null,
         notes,
-        actionBy: auth.payload.id,
-        photoUrl: photoUrl ?? null,
       },
     });
 

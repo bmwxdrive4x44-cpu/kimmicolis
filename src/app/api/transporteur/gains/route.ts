@@ -46,27 +46,26 @@ export async function GET(request: NextRequest) {
       orderBy: { assignedAt: 'desc' },
     });
 
-    // Calculate wallet buckets
+    // Calculate wallet buckets (derived from mission status)
     let pendingGains = 0;   // In transit (not yet delivered)
-    let availableGains = 0; // Delivered but not yet paid
-    let paidGains = 0;      // Already paid out
+    let availableGains = 0; // Delivered (awaiting withdrawal)
+    const paidGains = 0;    // Paid out tracked at wallet level, not per mission
 
     missions.forEach((m) => {
-      const gain = m.gainAmount || m.colis?.netTransporteur || 0;
-      if (m.gainStatus === 'PAID') paidGains += gain;
-      else if (m.gainStatus === 'AVAILABLE') availableGains += gain;
-      else pendingGains += gain; // PENDING
+      const gain = m.colis?.netTransporteur || 0;
+      if (m.status === 'LIVRE' || m.completedAt !== null) availableGains += gain;
+      else pendingGains += gain;
     });
 
     const totalEarnings = paidGains + availableGains; // Confirmed earnings (excludes pending)
 
-    // Monthly breakdown of confirmed earnings
+    // Monthly breakdown of completed missions
     const monthlyMap = new Map<string, number>();
     missions
-      .filter((m) => m.gainStatus !== 'PENDING' && m.completedAt !== null)
+      .filter((m) => m.completedAt !== null)
       .forEach((m) => {
         const month = m.completedAt!.toISOString().slice(0, 7);
-        const gain = m.gainAmount || m.colis?.netTransporteur || 0;
+        const gain = m.colis?.netTransporteur || 0;
         monthlyMap.set(month, (monthlyMap.get(month) ?? 0) + gain);
       });
 
