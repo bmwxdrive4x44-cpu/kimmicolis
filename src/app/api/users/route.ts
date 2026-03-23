@@ -72,6 +72,13 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
+    if ((role === 'TRANSPORTER' || role === 'RELAIS') && !String(siret || '').trim()) {
+      return NextResponse.json({
+        error: 'Missing required fields',
+        details: 'Le numéro du registre du commerce est obligatoire pour les transporteurs et les points relais',
+      }, { status: 400 });
+    }
+
     // Check if user exists
     const existingUser = await db.user.findUnique({
       where: { email: email.toLowerCase() },
@@ -95,7 +102,7 @@ export async function POST(request: NextRequest) {
         password: hashedPassword,
         phone: phone || null,
         role: role || 'CLIENT',
-        siret: role === 'TRANSPORTER' ? siret : null,
+        siret: (role === 'TRANSPORTER' || role === 'RELAIS') ? String(siret).trim() : null,
       },
     });
 

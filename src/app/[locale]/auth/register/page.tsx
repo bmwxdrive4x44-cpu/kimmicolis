@@ -42,6 +42,7 @@ function RegisterForm() {
     experience: '',
     regions: [] as string[],
     description: '',
+    commerceRegisterNumber: '',
 
     // Relais fields
     commerceName: '',
@@ -74,7 +75,12 @@ function RegisterForm() {
       return false;
     }
 
-    // Role-specific fields are optional at signup - user can complete them later
+    if ((formData.role === 'TRANSPORTER' || formData.role === 'RELAIS') && !formData.commerceRegisterNumber.trim()) {
+      toast({ title: 'Erreur', description: 'Le numéro du registre du commerce est obligatoire', variant: 'destructive' });
+      return false;
+    }
+
+    // Other role-specific fields can still be completed later
     return true;
   };
 
@@ -101,6 +107,7 @@ function RegisterForm() {
           phone: formData.phone,
           password: formData.password,
           role: formData.role,
+          siret: (formData.role === 'TRANSPORTER' || formData.role === 'RELAIS') ? formData.commerceRegisterNumber.trim() : undefined,
         }),
       });
 
@@ -138,7 +145,7 @@ function RegisterForm() {
       }
 
       // 3. Create role-specific application (only if details provided)
-      if (formData.role === 'TRANSPORTER' && formData.vehicle && formData.license) {
+      if (formData.role === 'TRANSPORTER' && formData.vehicle && formData.license && formData.commerceRegisterNumber.trim()) {
         const transporterResponse = await fetch('/api/transporters', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -148,6 +155,7 @@ function RegisterForm() {
             phone: formData.phone,
             vehicle: formData.vehicle,
             license: formData.license,
+            commerceRegisterNumber: formData.commerceRegisterNumber.trim(),
             experience: parseInt(formData.experience) || 0,
             regions: formData.regions,
             description: formData.description,
@@ -162,7 +170,7 @@ function RegisterForm() {
         toast({ title: 'Profil transporteur créé', description: 'Votre demande a été enregistrée avec succès.' });
       }
 
-      if (formData.role === 'RELAIS' && formData.commerceName && formData.address && formData.ville) {
+      if (formData.role === 'RELAIS' && formData.commerceName && formData.address && formData.ville && formData.commerceRegisterNumber.trim()) {
         const relaisResponse = await fetch('/api/relais', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -172,6 +180,7 @@ function RegisterForm() {
             address: formData.address,
             ville: formData.ville,
             phone: formData.phone,
+            commerceRegisterNumber: formData.commerceRegisterNumber.trim(),
           }),
         });
 
@@ -187,7 +196,8 @@ function RegisterForm() {
 
       // If RELAIS or TRANSPORTER without details, redirect to completion page
       if ((formData.role === 'RELAIS' && !formData.commerceName) || 
-          (formData.role === 'TRANSPORTER' && !formData.vehicle)) {
+          (formData.role === 'TRANSPORTER' && !formData.vehicle) ||
+          ((formData.role === 'RELAIS' || formData.role === 'TRANSPORTER') && !formData.commerceRegisterNumber.trim())) {
         window.location.href = `/${locale}/complete-profile/${formData.role === 'TRANSPORTER' ? 'transporter' : 'relais'}`;
       } else {
         const dashboardPath = `/${locale}/dashboard/${
@@ -347,6 +357,16 @@ function RegisterForm() {
                 </div>
 
                 <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2 md:col-span-2">
+                    <Label htmlFor="commerceRegisterNumberTransporter">Numéro du registre du commerce <span className="text-red-500">*</span></Label>
+                    <Input
+                      id="commerceRegisterNumberTransporter"
+                      placeholder="Ex: RC-16/1234567 B 21"
+                      value={formData.commerceRegisterNumber}
+                      onChange={(e) => setFormData({ ...formData, commerceRegisterNumber: e.target.value })}
+                      required={formData.role === 'TRANSPORTER'}
+                    />
+                  </div>
                   <div className="space-y-2">
                     <Label htmlFor="vehicle">Type de véhicule (optionnel)</Label>
                     <Input
@@ -424,6 +444,17 @@ function RegisterForm() {
                   <p className="text-sm text-slate-600 dark:text-slate-400 mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
                     Les détails du point relais sont optionnels à l'inscription. Vous pourrez les ajouter après.
                   </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="commerceRegisterNumberRelais">Numéro du registre du commerce <span className="text-red-500">*</span></Label>
+                  <Input
+                    id="commerceRegisterNumberRelais"
+                    placeholder="Ex: RC-16/1234567 B 21"
+                    value={formData.commerceRegisterNumber}
+                    onChange={(e) => setFormData({ ...formData, commerceRegisterNumber: e.target.value })}
+                    required={formData.role === 'RELAIS'}
+                  />
                 </div>
 
                 <div className="space-y-2">

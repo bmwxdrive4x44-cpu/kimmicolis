@@ -75,10 +75,11 @@ export async function POST(request: NextRequest) {
     if (!auth.success) return auth.response;
 
     const body = await request.json();
-    const { userId, commerceName, address, ville, latitude, longitude, photos } = body;
+    const { userId, commerceName, address, ville, latitude, longitude, photos, commerceRegisterNumber } = body;
+    const rcNumber = String(commerceRegisterNumber || '').trim();
 
-    if (!userId || !commerceName || !address || !ville) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    if (!userId || !commerceName || !address || !ville || !rcNumber) {
+      return NextResponse.json({ error: 'Missing required fields (numéro RC obligatoire)' }, { status: 400 });
     }
 
     if (auth.payload.role === 'RELAIS' && userId !== auth.payload.id) {
@@ -90,6 +91,11 @@ export async function POST(request: NextRequest) {
     });
 
     if (existingRelais) {
+      await db.user.update({
+        where: { id: userId },
+        data: { siret: rcNumber },
+      });
+
       const relais = await db.relais.update({
         where: { userId },
         data: {
@@ -105,6 +111,11 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json(relais);
     }
+
+    await db.user.update({
+      where: { id: userId },
+      data: { siret: rcNumber },
+    });
 
     const relais = await db.relais.create({
       data: {

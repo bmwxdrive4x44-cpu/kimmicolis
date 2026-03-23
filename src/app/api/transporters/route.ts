@@ -45,10 +45,11 @@ export async function POST(request: NextRequest) {
     if (!auth.success) return auth.response;
 
     const body = await request.json();
-    const { userId, fullName, phone, vehicle, license, experience, regions, description } = body;
+    const { userId, fullName, phone, vehicle, license, commerceRegisterNumber, experience, regions, description } = body;
+    const rcNumber = String(commerceRegisterNumber || '').trim();
 
-    if (!userId || !fullName || !phone || !vehicle || !license) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    if (!userId || !fullName || !phone || !vehicle || !license || !rcNumber) {
+      return NextResponse.json({ error: 'Missing required fields (numéro RC obligatoire)' }, { status: 400 });
     }
 
     if (auth.payload.role === 'TRANSPORTER' && userId !== auth.payload.id) {
@@ -73,6 +74,11 @@ export async function POST(request: NextRequest) {
         description: description || null,
         status: 'PENDING',
       },
+    });
+
+    await db.user.update({
+      where: { id: userId },
+      data: { siret: rcNumber },
     });
 
     return NextResponse.json(application);

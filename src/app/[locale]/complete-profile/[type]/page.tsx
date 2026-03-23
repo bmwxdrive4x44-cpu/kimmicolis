@@ -38,6 +38,7 @@ export default function CompleteProfilePage() {
     commerceName?: string;
     address?: string;
     ville?: string;
+    commerceRegisterNumber?: string;
     vehicle?: string;
     license?: string;
     experience?: string;
@@ -45,8 +46,8 @@ export default function CompleteProfilePage() {
     description?: string;
   }>(
     isRelais
-      ? { commerceName: '', address: '', ville: '' }
-      : { vehicle: '', license: '', experience: '', regions: [], description: '' }
+      ? { commerceName: '', address: '', ville: '', commerceRegisterNumber: '' }
+      : { vehicle: '', license: '', experience: '', regions: [], description: '', commerceRegisterNumber: '' }
   );
 
   // Check if user already has a profile of this type
@@ -61,9 +62,12 @@ export default function CompleteProfilePage() {
 
         if (Array.isArray(data) && data.length > 0) {
           const existingProfile = data[0];
+          const userRes = await fetch(`/api/users/${session.user.id}`);
+          const userData = userRes.ok ? await userRes.json() : null;
+          const hasRc = Boolean(userData?.siret?.trim());
           const isProfileComplete = isRelais
-            ? Boolean(existingProfile?.commerceName?.trim() && existingProfile?.address?.trim() && existingProfile?.ville?.trim())
-            : Boolean(existingProfile?.vehicle?.trim() && existingProfile?.license?.trim());
+            ? Boolean(existingProfile?.commerceName?.trim() && existingProfile?.address?.trim() && existingProfile?.ville?.trim() && hasRc)
+            : Boolean(existingProfile?.vehicle?.trim() && existingProfile?.license?.trim() && hasRc);
 
           if (isProfileComplete) {
             setHasProfile(true);
@@ -77,7 +81,13 @@ export default function CompleteProfilePage() {
               commerceName: existingProfile?.commerceName || '',
               address: existingProfile?.address || '',
               ville: existingProfile?.ville || '',
+              commerceRegisterNumber: userData?.siret || '',
             });
+          } else {
+            setFormData((prev) => ({
+              ...prev,
+              commerceRegisterNumber: userData?.siret || '',
+            }));
           }
         }
       } catch (error) {
@@ -108,20 +118,20 @@ export default function CompleteProfilePage() {
   const validateForm = () => {
     if (isRelais) {
       const data = formData as any;
-      if (!data.commerceName || !data.address || !data.ville) {
+      if (!data.commerceName || !data.address || !data.ville || !data.commerceRegisterNumber?.trim()) {
         toast({
           title: 'Erreur',
-          description: 'Veuillez remplir tous les champs obligatoires',
+          description: 'Veuillez remplir tous les champs obligatoires, y compris le numéro du registre du commerce',
           variant: 'destructive',
         });
         return false;
       }
     } else if (isTransporter) {
       const data = formData as any;
-      if (!data.vehicle || !data.license) {
+      if (!data.vehicle || !data.license || !data.commerceRegisterNumber?.trim()) {
         toast({
           title: 'Erreur',
-          description: 'Veuillez remplir le type de véhicule et le numéro de permis',
+          description: 'Veuillez remplir le type de véhicule, le numéro de permis et le numéro du registre du commerce',
           variant: 'destructive',
         });
         return false;
@@ -139,6 +149,17 @@ export default function CompleteProfilePage() {
     try {
       if (isRelais) {
         const data = formData as any;
+        const updateUserResponse = await fetch(`/api/users/${session.user.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ siret: data.commerceRegisterNumber.trim() }),
+        });
+
+        if (!updateUserResponse.ok) {
+          const error = await updateUserResponse.json().catch(() => null);
+          throw new Error(error?.error || 'Erreur lors de l\'enregistrement du numéro RC');
+        }
+
         const response = await fetch('/api/relais', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -148,6 +169,7 @@ export default function CompleteProfilePage() {
             address: data.address,
             ville: data.ville,
             phone: session.user.phone || '',
+            commerceRegisterNumber: data.commerceRegisterNumber.trim(),
           }),
         });
 
@@ -160,6 +182,17 @@ export default function CompleteProfilePage() {
         router.push(`/${locale}/dashboard/relais`);
       } else if (isTransporter) {
         const data = formData as any;
+        const updateUserResponse = await fetch(`/api/users/${session.user.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ siret: data.commerceRegisterNumber.trim() }),
+        });
+
+        if (!updateUserResponse.ok) {
+          const error = await updateUserResponse.json().catch(() => null);
+          throw new Error(error?.error || 'Erreur lors de l\'enregistrement du numéro RC');
+        }
+
         const response = await fetch('/api/transporters', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -169,6 +202,7 @@ export default function CompleteProfilePage() {
             phone: session.user.phone || '',
             vehicle: data.vehicle,
             license: data.license,
+            commerceRegisterNumber: data.commerceRegisterNumber.trim(),
             experience: parseInt(data.experience) || 0,
             regions: data.regions || [],
             description: data.description,
@@ -247,6 +281,20 @@ export default function CompleteProfilePage() {
               {isRelais ? (
                 <>
                   <div className="space-y-2">
+                    <Label htmlFor="commerceRegisterNumberRelais" className="text-base font-semibold">
+                      Numéro du registre du commerce <span className="text-red-500">*</span>
+                    </Label>
+                    <Input
+                      id="commerceRegisterNumberRelais"
+                      placeholder="Ex: RC-16/1234567 B 21"
+                      value={(formData as any).commerceRegisterNumber}
+                      onChange={(e) => setFormData({ ...formData, commerceRegisterNumber: e.target.value })}
+                      required
+                      className="h-11"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
                     <Label htmlFor="commerceName" className="text-base font-semibold">
                       Nom du commerce <span className="text-red-500">*</span>
                     </Label>
@@ -298,6 +346,19 @@ export default function CompleteProfilePage() {
               ) : (
                 <>
                   <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2 md:col-span-2">
+                      <Label htmlFor="commerceRegisterNumberTransporter" className="text-base font-semibold">
+                        Numéro du registre du commerce <span className="text-red-500">*</span>
+                      </Label>
+                      <Input
+                        id="commerceRegisterNumberTransporter"
+                        placeholder="Ex: RC-16/1234567 B 21"
+                        value={(formData as any).commerceRegisterNumber}
+                        onChange={(e) => setFormData({ ...formData, commerceRegisterNumber: e.target.value })}
+                        required
+                        className="h-11"
+                      />
+                    </div>
                     <div className="space-y-2">
                       <Label htmlFor="vehicle" className="text-base font-semibold">
                         Type de véhicule <span className="text-red-500">*</span>
