@@ -273,6 +273,9 @@ export function CreateParcelForm({ userId }: CreateParcelFormProps) {
                     )}
                   </SelectContent>
                 </Select>
+                <p className="text-xs text-slate-600 dark:text-slate-400">
+                  Dépôt obligatoire dans ce relais uniquement (aucun dépôt possible dans un autre relais, même ville).
+                </p>
               </div>
             )}
 

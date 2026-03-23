@@ -411,6 +411,9 @@ function CreateParcelForm({ userId, onCreated }: { userId: string; onCreated: ()
                       ))}
                     </SelectContent>
                   </Select>
+                  <p className="text-xs text-slate-600 dark:text-slate-400">
+                    Dépôt obligatoire dans ce relais uniquement (aucun dépôt possible dans un autre relais, même ville).
+                  </p>
                   {relaisDepart.length === 0 && <p className="text-sm text-orange-500">Aucun relais disponible dans cette ville</p>}
                 </div>
                 <div className="space-y-2">
