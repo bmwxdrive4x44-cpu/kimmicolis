@@ -16,7 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { WILAYAS, PARCEL_FORMATS, PARCEL_STATUS, PLATFORM_COMMISSION, DEFAULT_RELAY_COMMISSION, getTariff, generateTrackingNumber, generateQRData } from '@/lib/constants';
-import { Package, Plus, History, MapPin, Loader2, CreditCard, Search, Truck, CheckCircle, Clock, QrCode } from 'lucide-react';
+import { Package, Plus, History, MapPin, Loader2, CreditCard, Search, Truck, CheckCircle, Clock, QrCode, Printer } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import Image from 'next/image';
 
@@ -288,6 +288,132 @@ function CreateParcelForm({ userId, onCreated, onGoToHistory }: { userId: string
     setCreatedParcel(null);
   };
 
+  const printParcelLabel = () => {
+    if (!createdParcel) return;
+    const departRelay = relais.find((r: any) => r.id === formData.relaisDepartId);
+    const arriveeRelay = relais.find((r: any) => r.id === formData.relaisArriveeId);
+    const villeDepart = WILAYAS.find(w => w.id === formData.villeDepart)?.name || formData.villeDepart;
+    const villeArrivee = WILAYAS.find(w => w.id === formData.villeArrivee)?.name || formData.villeArrivee;
+    const format = PARCEL_FORMATS.find(f => f.id === formData.format);
+    const dateCreation = new Date().toLocaleDateString('fr-DZ', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
+    const html = `<!DOCTYPE html>
+<html><head>
+  <meta charset="UTF-8" />
+  <title>Étiquette - ${createdParcel.trackingNumber}</title>
+  <style>
+    @page { size: A5; margin: 8mm; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, Helvetica, sans-serif; background: white; color: #111; }
+    .label { border: 2.5px solid #111; padding: 10px; }
+    .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #111; padding-bottom: 8px; margin-bottom: 10px; }
+    .brand { font-size: 20px; font-weight: 900; color: #059669; }
+    .tracking-block { text-align: right; }
+    .tracking-label { font-size: 9px; text-transform: uppercase; color: #666; letter-spacing: 1px; }
+    .tracking-number { font-family: 'Courier New', monospace; font-size: 22px; font-weight: 900; letter-spacing: 2px; }
+    .route-banner { background: #059669; color: white; text-align: center; padding: 6px 10px; font-size: 16px; font-weight: 700; letter-spacing: 1px; margin-bottom: 10px; border-radius: 3px; }
+    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+    .info-box { border: 1.5px solid #ccc; border-radius: 4px; padding: 8px; }
+    .info-box.sender { border-color: #059669; }
+    .info-box.recipient { border-color: #2563eb; }
+    .info-box-title { font-size: 9px; text-transform: uppercase; letter-spacing: 1px; font-weight: 700; margin-bottom: 4px; }
+    .info-box.sender .info-box-title { color: #059669; }
+    .info-box.recipient .info-box-title { color: #2563eb; }
+    .info-name { font-size: 13px; font-weight: 700; }
+    .info-phone { font-size: 11px; color: #444; }
+    .info-city { font-size: 11px; font-weight: 600; }
+    .relay-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+    .relay-box { background: #f9f9f9; border: 1px solid #ddd; border-radius: 4px; padding: 6px 8px; }
+    .relay-box-title { font-size: 8px; text-transform: uppercase; letter-spacing: 1px; color: #999; margin-bottom: 2px; }
+    .relay-name { font-weight: 700; font-size: 11px; }
+    .relay-address { font-size: 10px; color: #555; }
+    .bottom-row { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 8px; }
+    .qr-block { text-align: center; }
+    .qr-block img { width: 90px; height: 90px; }
+    .qr-label { font-size: 8px; color: #888; margin-top: 2px; }
+    .meta-block { font-size: 10px; }
+    .meta-block p { margin-bottom: 3px; }
+    .meta-bold { font-weight: 700; }
+    .withdrawal-box { background: #eff6ff; border: 1.5px dashed #2563eb; border-radius: 4px; padding: 6px 10px; text-align: center; margin-bottom: 10px; }
+    .withdrawal-label { font-size: 8px; text-transform: uppercase; letter-spacing: 1px; color: #2563eb; margin-bottom: 2px; }
+    .withdrawal-code { font-family: 'Courier New', monospace; font-size: 16px; font-weight: 900; color: #1d4ed8; letter-spacing: 3px; }
+    .withdrawal-note { font-size: 8px; color: #3b82f6; margin-top: 2px; }
+    .instructions { background: #fffbeb; border: 1px solid #fbbf24; border-radius: 3px; padding: 5px 8px; font-size: 9px; color: #92400e; line-height: 1.5; }
+    @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+  </style>
+</head>
+<body>
+<div class="label">
+  <div class="header">
+    <div class="brand">SwiftColis ⚡</div>
+    <div class="tracking-block">
+      <div class="tracking-label">N° de suivi</div>
+      <div class="tracking-number">${createdParcel.trackingNumber}</div>
+    </div>
+  </div>
+  <div class="route-banner">
+    ${villeDepart} &rarr; ${villeArrivee}
+  </div>
+  <div class="info-grid">
+    <div class="info-box sender">
+      <div class="info-box-title">&#128228; Expéditeur</div>
+      <div class="info-name">${formData.senderLastName} ${formData.senderFirstName}</div>
+      <div class="info-phone">&#128241; ${formData.senderPhone}</div>
+      <div class="info-city">&#128205; ${villeDepart}</div>
+    </div>
+    <div class="info-box recipient">
+      <div class="info-box-title">&#128229; Destinataire</div>
+      <div class="info-name">${formData.recipientLastName} ${formData.recipientFirstName}</div>
+      <div class="info-phone">&#128241; ${formData.recipientPhone}</div>
+      <div class="info-city">&#128205; ${villeArrivee}</div>
+    </div>
+  </div>
+  <div class="relay-grid">
+    <div class="relay-box">
+      <div class="relay-box-title">Relais dépôt</div>
+      <div class="relay-name">${departRelay?.commerceName ?? '—'}</div>
+      <div class="relay-address">${departRelay?.address ?? ''}</div>
+    </div>
+    <div class="relay-box">
+      <div class="relay-box-title">Relais destination</div>
+      <div class="relay-name">${arriveeRelay?.commerceName ?? '—'}</div>
+      <div class="relay-address">${arriveeRelay?.address ?? ''}</div>
+    </div>
+  </div>
+  ${createdParcel.withdrawalCode ? `
+  <div class="withdrawal-box">
+    <div class="withdrawal-label">&#128273; Code de retrait destinataire</div>
+    <div class="withdrawal-code">${createdParcel.withdrawalCode}</div>
+    <div class="withdrawal-note">À communiquer uniquement au destinataire</div>
+  </div>` : ''}
+  <div class="bottom-row">
+    ${createdParcel.qrCodeImage ? `
+    <div class="qr-block">
+      <img src="${createdParcel.qrCodeImage}" alt="QR Code" />
+      <div class="qr-label">Scanner au relais</div>
+    </div>` : '<div></div>'}
+    <div class="meta-block">
+      <p><span class="meta-bold">Format :</span> ${format?.label || formData.format}${format ? ` (${format.dimensions})` : ''}</p>
+      ${formData.weight ? `<p><span class="meta-bold">Poids :</span> ${formData.weight} kg</p>` : ''}
+      ${formData.description ? `<p><span class="meta-bold">Contenu :</span> ${formData.description}</p>` : ''}
+      <p><span class="meta-bold">Date :</span> ${dateCreation}</p>
+      <p><span class="meta-bold">Prix :</span> ${createdParcel.prixClient ?? ''} DA</p>
+    </div>
+  </div>
+  <div class="instructions">
+    &#9888;&#65039; À déposer exclusivement au relais indiqué &bull; Règlement en espèces au dépôt &bull; Conserver ce numéro de suivi
+  </div>
+</div>
+<script>window.onload = function() { window.print(); }<\/script>
+</body></html>`;
+
+    const win = window.open('', '_blank', 'width=650,height=900');
+    if (win) {
+      win.document.write(html);
+      win.document.close();
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -382,6 +508,14 @@ function CreateParcelForm({ userId, onCreated, onGoToHistory }: { userId: string
             <p className="font-semibold text-amber-800 dark:text-amber-300 mb-0.5">📍 Relais de dépôt</p>
             <p className="text-amber-700 dark:text-amber-400">{relais.find(r => r.id === formData.relaisDepartId)?.commerceName}</p>
           </div>
+
+          <Button
+            className="w-full bg-blue-600 hover:bg-blue-700 mb-3"
+            onClick={printParcelLabel}
+          >
+            <Printer className="h-4 w-4 mr-2" />
+            Imprimer l'étiquette à coller sur le colis
+          </Button>
 
           <div className="flex flex-col sm:flex-row gap-3">
             <Button variant="outline" className="flex-1" onClick={resetForm}>
