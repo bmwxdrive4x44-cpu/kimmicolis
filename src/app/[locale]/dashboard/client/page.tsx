@@ -20,6 +20,8 @@ import { Package, Plus, History, MapPin, Loader2, CreditCard, Search, Truck, Che
 import { useToast } from '@/hooks/use-toast';
 import Image from 'next/image';
 
+const LABEL_STORAGE_KEY = 'swiftcolis.parcel-labels';
+
 // Helper function for role-based dashboard path
 function getRoleBasedDashboardPath(role: string, locale: string): string {
   switch (role) {
@@ -414,6 +416,39 @@ function CreateParcelForm({ userId, onCreated, onGoToHistory }: { userId: string
     }
   };
 
+  const saveLabelSnapshot = (created: any) => {
+    try {
+      const departRelay = relais.find((r: any) => r.id === formData.relaisDepartId);
+      const arriveeRelay = relais.find((r: any) => r.id === formData.relaisArriveeId);
+      const current = JSON.parse(localStorage.getItem(LABEL_STORAGE_KEY) || '{}');
+      current[created.trackingNumber] = {
+        trackingNumber: created.trackingNumber,
+        withdrawalCode: created.withdrawalCode,
+        qrCodeImage: created.qrCodeImage,
+        prixClient: created.prixClient,
+        createdAt: created.createdAt || new Date().toISOString(),
+        villeDepart: formData.villeDepart,
+        villeArrivee: formData.villeArrivee,
+        format: formData.format,
+        weight: formData.weight,
+        description: formData.description,
+        senderFirstName: formData.senderFirstName,
+        senderLastName: formData.senderLastName,
+        senderPhone: formData.senderPhone,
+        recipientFirstName: formData.recipientFirstName,
+        recipientLastName: formData.recipientLastName,
+        recipientPhone: formData.recipientPhone,
+        relaisDepartName: departRelay?.commerceName || '',
+        relaisDepartAddress: departRelay?.address || '',
+        relaisArriveeName: arriveeRelay?.commerceName || '',
+        relaisArriveeAddress: arriveeRelay?.address || '',
+      };
+      localStorage.setItem(LABEL_STORAGE_KEY, JSON.stringify(current));
+    } catch (error) {
+      console.error('Unable to persist parcel label snapshot:', error);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -450,6 +485,7 @@ function CreateParcelForm({ userId, onCreated, onGoToHistory }: { userId: string
       if (response.ok) {
         const created = await response.json();
         setCreatedParcel(created);
+        saveLabelSnapshot(created);
         toast({ title: 'Colis créé avec succès', description: `Suivi: ${created.trackingNumber}` });
         onCreated();
       } else {
@@ -1033,6 +1069,7 @@ function PaymentTab({ userId }: { userId: string }) {
 
 // Parcel History
 function ParcelHistory({ userId, onTrack }: { userId: string; onTrack: (tn: string) => void }) {
+  const { toast } = useToast();
   const [colis, setColis] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState('all');
@@ -1051,6 +1088,150 @@ function ParcelHistory({ userId, onTrack }: { userId: string; onTrack: (tn: stri
   };
 
   const filtered = filter === 'all' ? colis : colis.filter(c => c.status === filter);
+
+  const printStoredOrLiveLabel = (parcel: any) => {
+    try {
+      const allStored = JSON.parse(localStorage.getItem(LABEL_STORAGE_KEY) || '{}');
+      const saved = allStored[parcel.trackingNumber] || {};
+
+      const villeDepartId = saved.villeDepart || parcel.villeDepart;
+      const villeArriveeId = saved.villeArrivee || parcel.villeArrivee;
+      const villeDepart = WILAYAS.find(w => w.id === villeDepartId)?.name || villeDepartId || '—';
+      const villeArrivee = WILAYAS.find(w => w.id === villeArriveeId)?.name || villeArriveeId || '—';
+      const formatId = saved.format || parcel.format;
+      const format = PARCEL_FORMATS.find(f => f.id === formatId);
+      const dateCreation = new Date(saved.createdAt || parcel.createdAt || new Date().toISOString()).toLocaleDateString('fr-DZ', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
+      const senderFirstName = saved.senderFirstName || '';
+      const senderLastName = saved.senderLastName || '';
+      const senderPhone = saved.senderPhone || '';
+      const recipientFirstName = saved.recipientFirstName || parcel.recipientFirstName || '';
+      const recipientLastName = saved.recipientLastName || parcel.recipientLastName || '';
+      const recipientPhone = saved.recipientPhone || parcel.recipientPhone || '';
+
+      const departRelayName = saved.relaisDepartName || parcel.relaisDepart?.commerceName || '—';
+      const departRelayAddress = saved.relaisDepartAddress || parcel.relaisDepart?.address || '';
+      const arriveeRelayName = saved.relaisArriveeName || parcel.relaisArrivee?.commerceName || '—';
+      const arriveeRelayAddress = saved.relaisArriveeAddress || parcel.relaisArrivee?.address || '';
+
+      const html = `<!DOCTYPE html>
+<html><head>
+  <meta charset="UTF-8" />
+  <title>Étiquette - ${parcel.trackingNumber}</title>
+  <style>
+    @page { size: A4; margin: 15mm; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, Helvetica, sans-serif; background: white; color: #111; }
+    .label { border: 3px solid #111; padding: 18px; }
+    .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #111; padding-bottom: 8px; margin-bottom: 10px; }
+    .brand { font-size: 32px; font-weight: 900; color: #059669; }
+    .tracking-block { text-align: right; }
+    .tracking-label { font-size: 13px; text-transform: uppercase; color: #666; letter-spacing: 1px; }
+    .tracking-number { font-family: 'Courier New', monospace; font-size: 34px; font-weight: 900; letter-spacing: 3px; }
+    .route-banner { background: #059669; color: white; text-align: center; padding: 12px 16px; font-size: 26px; font-weight: 700; letter-spacing: 2px; margin-bottom: 18px; border-radius: 4px; }
+    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 18px; }
+    .info-box { border: 2px solid #ccc; border-radius: 6px; padding: 14px; }
+    .info-box.sender { border-color: #059669; }
+    .info-box.recipient { border-color: #2563eb; }
+    .info-box-title { font-size: 13px; text-transform: uppercase; letter-spacing: 1px; font-weight: 700; margin-bottom: 6px; }
+    .info-box.sender .info-box-title { color: #059669; }
+    .info-box.recipient .info-box-title { color: #2563eb; }
+    .info-name { font-size: 20px; font-weight: 700; }
+    .info-phone { font-size: 16px; color: #444; }
+    .info-city { font-size: 16px; font-weight: 600; }
+    .relay-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 18px; }
+    .relay-box { background: #f9f9f9; border: 1px solid #ddd; border-radius: 6px; padding: 12px 14px; }
+    .relay-box-title { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #999; margin-bottom: 4px; }
+    .relay-name { font-weight: 700; font-size: 16px; }
+    .relay-address { font-size: 14px; color: #555; }
+    .bottom-row { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 8px; }
+    .qr-block { text-align: center; }
+    .qr-block img { width: 140px; height: 140px; }
+    .qr-label { font-size: 12px; color: #888; margin-top: 4px; }
+    .meta-block { font-size: 15px; }
+    .meta-block p { margin-bottom: 6px; }
+    .meta-bold { font-weight: 700; }
+    .withdrawal-box { background: #eff6ff; border: 2px dashed #2563eb; border-radius: 6px; padding: 12px 18px; text-align: center; margin-bottom: 18px; }
+    .withdrawal-label { font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: #2563eb; margin-bottom: 4px; }
+    .withdrawal-code { font-family: 'Courier New', monospace; font-size: 28px; font-weight: 900; color: #1d4ed8; letter-spacing: 5px; }
+    .withdrawal-note { font-size: 12px; color: #3b82f6; margin-top: 4px; }
+    .instructions { background: #fffbeb; border: 1px solid #fbbf24; border-radius: 4px; padding: 10px 14px; font-size: 13px; color: #92400e; line-height: 1.6; }
+    @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+  </style>
+</head>
+<body>
+<div class="label">
+  <div class="header">
+    <div class="brand">SwiftColis ⚡</div>
+    <div class="tracking-block">
+      <div class="tracking-label">N° de suivi</div>
+      <div class="tracking-number">${parcel.trackingNumber}</div>
+    </div>
+  </div>
+  <div class="route-banner">${villeDepart} &rarr; ${villeArrivee}</div>
+  <div class="info-grid">
+    <div class="info-box sender">
+      <div class="info-box-title">&#128228; Expéditeur</div>
+      <div class="info-name">${senderLastName} ${senderFirstName}</div>
+      <div class="info-phone">&#128241; ${senderPhone}</div>
+      <div class="info-city">&#128205; ${villeDepart}</div>
+    </div>
+    <div class="info-box recipient">
+      <div class="info-box-title">&#128229; Destinataire</div>
+      <div class="info-name">${recipientLastName} ${recipientFirstName}</div>
+      <div class="info-phone">&#128241; ${recipientPhone}</div>
+      <div class="info-city">&#128205; ${villeArrivee}</div>
+    </div>
+  </div>
+  <div class="relay-grid">
+    <div class="relay-box">
+      <div class="relay-box-title">Relais dépôt</div>
+      <div class="relay-name">${departRelayName}</div>
+      <div class="relay-address">${departRelayAddress}</div>
+    </div>
+    <div class="relay-box">
+      <div class="relay-box-title">Relais destination</div>
+      <div class="relay-name">${arriveeRelayName}</div>
+      <div class="relay-address">${arriveeRelayAddress}</div>
+    </div>
+  </div>
+  ${(saved.withdrawalCode || parcel.withdrawalCode) ? `
+  <div class="withdrawal-box">
+    <div class="withdrawal-label">&#128273; Code de retrait destinataire</div>
+    <div class="withdrawal-code">${saved.withdrawalCode || parcel.withdrawalCode}</div>
+    <div class="withdrawal-note">À communiquer uniquement au destinataire</div>
+  </div>` : ''}
+  <div class="bottom-row">
+    ${(saved.qrCodeImage || parcel.qrCodeImage) ? `
+    <div class="qr-block">
+      <img src="${saved.qrCodeImage || parcel.qrCodeImage}" alt="QR Code" />
+      <div class="qr-label">Scanner au relais</div>
+    </div>` : '<div></div>'}
+    <div class="meta-block">
+      <p><span class="meta-bold">Format :</span> ${format?.label || formatId || ''}${format ? ` (${format.dimensions})` : ''}</p>
+      ${(saved.weight || parcel.weight) ? `<p><span class="meta-bold">Poids :</span> ${saved.weight || parcel.weight} kg</p>` : ''}
+      ${(saved.description || parcel.description) ? `<p><span class="meta-bold">Contenu :</span> ${saved.description || parcel.description}</p>` : ''}
+      <p><span class="meta-bold">Date :</span> ${dateCreation}</p>
+      <p><span class="meta-bold">Prix :</span> ${saved.prixClient || parcel.prixClient || ''} DA</p>
+    </div>
+  </div>
+  <div class="instructions">
+    &#9888;&#65039; À déposer exclusivement au relais indiqué &bull; Règlement en espèces au dépôt &bull; Conserver ce numéro de suivi
+  </div>
+</div>
+<script>window.onload = function() { window.print(); }<\/script>
+</body></html>`;
+
+      const win = window.open('', '_blank', 'width=900,height=1200');
+      if (win) {
+        win.document.write(html);
+        win.document.close();
+      }
+    } catch (error) {
+      console.error('Error generating label from history:', error);
+      toast({ title: 'Erreur', description: 'Impossible de générer l\'étiquette', variant: 'destructive' });
+    }
+  };
 
   return (
     <Card>
@@ -1108,9 +1289,14 @@ function ParcelHistory({ userId, onTrack }: { userId: string; onTrack: (tn: stri
                   </TableCell>
                   <TableCell className="text-sm text-slate-500">{new Date(c.createdAt).toLocaleDateString('fr-FR')}</TableCell>
                   <TableCell>
-                    <Button size="sm" variant="outline" onClick={() => onTrack(c.trackingNumber)}>
-                      <MapPin className="h-3 w-3 mr-1" />Suivre
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="outline" onClick={() => onTrack(c.trackingNumber)}>
+                        <MapPin className="h-3 w-3 mr-1" />Suivre
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => printStoredOrLiveLabel(c)}>
+                        <Printer className="h-3 w-3 mr-1" />Étiquette
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
