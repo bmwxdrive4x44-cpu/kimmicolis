@@ -38,6 +38,16 @@ function LoginForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!email.trim() || !password) {
+      toast({
+        title: 'Erreur',
+        description: 'Veuillez saisir votre email et votre mot de passe',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -57,7 +67,7 @@ function LoginForm() {
         redirect: false,
       });
 
-      if (result?.error) {
+      if (result?.error || !result?.ok) {
         toast({
           title: 'Erreur',
           description: 'Email ou mot de passe incorrect',
@@ -81,7 +91,7 @@ function LoginForm() {
     } catch {
       toast({
         title: 'Erreur',
-        description: 'Une erreur est survenue',
+        description: 'Impossible de se connecter pour le moment',
         variant: 'destructive',
       });
     } finally {

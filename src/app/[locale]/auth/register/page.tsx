@@ -105,7 +105,22 @@ function RegisterForm() {
       });
 
       const data = await response.json();
-      if (!response.ok) throw new Error(data.details || data.error || 'Erreur lors de l\'inscription');
+      if (!response.ok) {
+        const rawError = `${data?.error || ''} ${data?.details || ''}`.toLowerCase();
+        let message = 'Erreur lors de l\'inscription';
+
+        if (rawError.includes('email already exists')) {
+          message = 'Cet email est déjà utilisé. Essayez de vous connecter ou utilisez une autre adresse.';
+        } else if (rawError.includes('invalid email format')) {
+          message = 'Le format de l\'email est invalide.';
+        } else if (rawError.includes('password too short')) {
+          message = 'Le mot de passe doit contenir au moins 6 caractères.';
+        } else if (rawError.includes('missing required fields')) {
+          message = 'Veuillez remplir tous les champs obligatoires.';
+        }
+
+        throw new Error(message);
+      }
 
       const userId = data.id;
 
