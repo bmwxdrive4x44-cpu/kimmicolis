@@ -98,6 +98,13 @@ model Colis {
   id              String   @id @default(cuid())
   trackingNumber  String   @unique
   clientId        String
+  senderFirstName String?
+  senderLastName  String?
+  senderPhone     String?
+  recipientFirstName String?
+  recipientLastName  String?
+  recipientPhone     String?
+  withdrawalCodeHash String?
   relaisDepartId  String
   relaisArriveeId String
   villeDepart     String

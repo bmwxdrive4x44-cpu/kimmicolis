@@ -355,6 +355,12 @@ function ScanTab({ relaisId, userId, onRefresh }: { relaisId: string | undefined
   const [parcel, setParcel] = useState<any>(null);
   const [isSearching, setIsSearching] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [deliveryCheck, setDeliveryCheck] = useState({
+    recipientFirstName: '',
+    recipientLastName: '',
+    recipientPhone: '',
+    withdrawalCode: '',
+  });
 
   const handleSearch = async () => {
     if (!tracking.trim()) return;
@@ -367,6 +373,12 @@ function ScanTab({ relaisId, userId, onRefresh }: { relaisId: string | undefined
         toast({ title: 'Introuvable', description: data.error || 'Colis non trouvé', variant: 'destructive' });
       } else {
         setParcel(data);
+        setDeliveryCheck({
+          recipientFirstName: '',
+          recipientLastName: '',
+          recipientPhone: '',
+          withdrawalCode: '',
+        });
       }
     } catch {
       toast({ title: 'Erreur réseau', variant: 'destructive' });
@@ -377,12 +389,34 @@ function ScanTab({ relaisId, userId, onRefresh }: { relaisId: string | undefined
 
   const handleAction = async (action: string) => {
     if (!parcel || !relaisId) return;
+
+    if (action === 'deliver') {
+      if (
+        !deliveryCheck.recipientFirstName.trim() ||
+        !deliveryCheck.recipientLastName.trim() ||
+        !deliveryCheck.recipientPhone.trim() ||
+        !deliveryCheck.withdrawalCode.trim()
+      ) {
+        toast({
+          title: 'Vérification requise',
+          description: 'Nom, prénom, téléphone et code de retrait sont obligatoires',
+          variant: 'destructive',
+        });
+        return;
+      }
+    }
+
     setIsUpdating(true);
     try {
       const res = await fetch(`/api/qr/${parcel.trackingNumber}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action, relaisId, userId }),
+        body: JSON.stringify({
+          action,
+          relaisId,
+          userId,
+          ...(action === 'deliver' ? deliveryCheck : {}),
+        }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -488,6 +522,14 @@ function ScanTab({ relaisId, userId, onRefresh }: { relaisId: string | undefined
                   </div>
                 </div>
 
+                {(parcel.recipientFirstName || parcel.recipientLastName || parcel.recipientPhone) && (
+                  <div className="mb-6 rounded-lg border bg-white dark:bg-slate-900 p-4">
+                    <p className="text-xs uppercase tracking-wide text-slate-500 mb-2">Destinataire attendu</p>
+                    <p className="font-semibold">{parcel.recipientLastName} {parcel.recipientFirstName}</p>
+                    <p className="text-sm text-slate-600">{parcel.recipientPhone}</p>
+                  </div>
+                )}
+
                 {/* Barre de progression statuts */}
                 <div className="flex items-center gap-1 overflow-x-auto pb-2 mb-6">
                   {STATUS_FLOW.map((s, idx) => {
@@ -508,6 +550,42 @@ function ScanTab({ relaisId, userId, onRefresh }: { relaisId: string | undefined
 
                 {availableActions.length > 0 ? (
                   <div className="space-y-3">
+                    {currentStatus === 'ARRIVE_RELAIS_DESTINATION' && isArrRelay && (
+                      <div className="rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800 p-4 space-y-3">
+                        <p className="font-semibold text-amber-900 dark:text-amber-100">Double sécurité obligatoire avant remise</p>
+                        <div className="grid gap-3 md:grid-cols-2">
+                          <div className="space-y-1">
+                            <Label>Nom destinataire</Label>
+                            <Input
+                              value={deliveryCheck.recipientLastName}
+                              onChange={(e) => setDeliveryCheck(prev => ({ ...prev, recipientLastName: e.target.value }))}
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label>Prénom destinataire</Label>
+                            <Input
+                              value={deliveryCheck.recipientFirstName}
+                              onChange={(e) => setDeliveryCheck(prev => ({ ...prev, recipientFirstName: e.target.value }))}
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label>Téléphone destinataire</Label>
+                            <Input
+                              value={deliveryCheck.recipientPhone}
+                              onChange={(e) => setDeliveryCheck(prev => ({ ...prev, recipientPhone: e.target.value }))}
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label>Code de retrait (4 ou 6 chiffres)</Label>
+                            <Input
+                              value={deliveryCheck.withdrawalCode}
+                              onChange={(e) => setDeliveryCheck(prev => ({ ...prev, withdrawalCode: e.target.value.replace(/\D/g, '') }))}
+                              maxLength={6}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
                     {availableActions.map((a) => {
                       const Icon = a.icon;
                       return (

@@ -1,6 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { RELAY_BLOCK_THRESHOLD_DA } from '@/lib/constants';
+import { createHash } from 'crypto';
+
+function normalizeName(value: string): string {
+  return value.trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+function normalizePhone(value: string): string {
+  return value.replace(/\s+/g, '').replace(/[^+\d]/g, '');
+}
+
+function hashWithdrawalCode(code: string): string {
+  return createHash('sha256').update(code).digest('hex');
+}
 
 /**
  * POST /api/relais/scan-qr
@@ -23,7 +36,19 @@ import { RELAY_BLOCK_THRESHOLD_DA } from '@/lib/constants';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { trackingNumber, qrData, relaisId, action, cashAmount, photoUrl, actionBy } = body;
+    const {
+      trackingNumber,
+      qrData,
+      relaisId,
+      action,
+      cashAmount,
+      photoUrl,
+      actionBy,
+      recipientFirstName,
+      recipientLastName,
+      recipientPhone,
+      withdrawalCode,
+    } = body;
 
     if (!relaisId) {
       return NextResponse.json({ error: 'relaisId est requis' }, { status: 400 });
@@ -211,8 +236,46 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         );
       }
+
+      if (
+        !recipientFirstName?.trim() ||
+        !recipientLastName?.trim() ||
+        !recipientPhone?.trim() ||
+        !withdrawalCode?.trim()
+      ) {
+        return NextResponse.json(
+          { error: 'Vérification incomplète: nom, prénom, téléphone et code de retrait requis' },
+          { status: 400 }
+        );
+      }
+
+      const expectedFirstName = parcel.recipientFirstName;
+      const expectedLastName = parcel.recipientLastName;
+      const expectedPhone = parcel.recipientPhone;
+      const expectedCodeHash = parcel.withdrawalCodeHash;
+
+      if (!expectedFirstName || !expectedLastName || !expectedPhone || !expectedCodeHash) {
+        return NextResponse.json(
+          { error: 'Ce colis ne contient pas les informations de sécurité nécessaires' },
+          { status: 400 }
+        );
+      }
+
+      const identityMatches =
+        normalizeName(expectedFirstName) === normalizeName(recipientFirstName) &&
+        normalizeName(expectedLastName) === normalizeName(recipientLastName) &&
+        normalizePhone(expectedPhone) === normalizePhone(recipientPhone);
+      const codeMatches = hashWithdrawalCode(String(withdrawalCode).trim()) === expectedCodeHash;
+
+      if (!identityMatches || !codeMatches) {
+        return NextResponse.json(
+          { error: 'Vérification échouée: identité, téléphone ou code de retrait invalide' },
+          { status: 403 }
+        );
+      }
+
       newStatus = 'DELIVERED';
-      notes = 'Colis remis au client';
+      notes = 'Colis remis au client après double vérification identité + code';
       updateData.deliveredAt = new Date();
       if (photoUrl) updateData.photoLivraison = photoUrl;
 

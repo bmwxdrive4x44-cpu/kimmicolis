@@ -1,5 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { createHash } from 'crypto';
+
+function normalizeName(value: string): string {
+  return value.trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+function normalizePhone(value: string): string {
+  return value.replace(/\s+/g, '').replace(/[^+\d]/g, '');
+}
+
+function hashWithdrawalCode(code: string): string {
+  return createHash('sha256').update(code).digest('hex');
+}
 
 // ─── GET: scan QR → fetch parcel info ─────────────────────────────────────────
 export async function GET(
@@ -11,9 +24,23 @@ export async function GET(
 
     const parcel = await db.colis.findUnique({
       where: { trackingNumber: tracking },
-      include: {
+      select: {
+        id: true,
+        trackingNumber: true,
+        villeDepart: true,
+        villeArrivee: true,
+        format: true,
+        prixClient: true,
+        commissionRelais: true,
+        status: true,
+        senderFirstName: true,
+        senderLastName: true,
+        senderPhone: true,
+        recipientFirstName: true,
+        recipientLastName: true,
+        recipientPhone: true,
         client: { select: { name: true, phone: true } },
-        relaisDepart:  { select: { id: true, commerceName: true, ville: true, address: true } },
+        relaisDepart: { select: { id: true, commerceName: true, ville: true, address: true } },
         relaisArrivee: { select: { id: true, commerceName: true, ville: true, address: true } },
         missions: {
           orderBy: { createdAt: 'desc' },
@@ -50,7 +77,17 @@ export async function POST(
   try {
     const { tracking } = await params;
     const body = await request.json();
-    const { action, relaisId, transporteurId, userId, notes: extraNotes } = body;
+    const {
+      action,
+      relaisId,
+      transporteurId,
+      userId,
+      notes: extraNotes,
+      recipientFirstName,
+      recipientLastName,
+      recipientPhone,
+      withdrawalCode,
+    } = body;
 
     const parcel = await db.colis.findUnique({
       where: { trackingNumber: tracking },
@@ -148,8 +185,48 @@ export async function POST(
       if (parcel.status !== 'ARRIVE_RELAIS_DESTINATION') {
         return NextResponse.json({ error: `Le colis n'est pas encore arrivé (statut: ${parcel.status})` }, { status: 400 });
       }
+      if (parcel.relaisArriveeId !== relaisId) {
+        return NextResponse.json({ error: 'Ce relais n\'est pas le relais de destination' }, { status: 403 });
+      }
+      if (
+        !recipientFirstName?.trim() ||
+        !recipientLastName?.trim() ||
+        !recipientPhone?.trim() ||
+        !withdrawalCode?.trim()
+      ) {
+        return NextResponse.json(
+          { error: 'Vérification incomplète: nom, prénom, téléphone et code de retrait requis' },
+          { status: 400 }
+        );
+      }
+
+      const expectedFirstName = parcel.recipientFirstName;
+      const expectedLastName = parcel.recipientLastName;
+      const expectedPhone = parcel.recipientPhone;
+      const expectedCodeHash = parcel.withdrawalCodeHash;
+
+      if (!expectedFirstName || !expectedLastName || !expectedPhone || !expectedCodeHash) {
+        return NextResponse.json(
+          { error: 'Ce colis ne contient pas les informations de sécurité nécessaires' },
+          { status: 400 }
+        );
+      }
+
+      const identityMatches =
+        normalizeName(expectedFirstName) === normalizeName(recipientFirstName) &&
+        normalizeName(expectedLastName) === normalizeName(recipientLastName) &&
+        normalizePhone(expectedPhone) === normalizePhone(recipientPhone);
+      const codeMatches = hashWithdrawalCode(String(withdrawalCode).trim()) === expectedCodeHash;
+
+      if (!identityMatches || !codeMatches) {
+        return NextResponse.json(
+          { error: 'Vérification échouée: identité, téléphone ou code de retrait invalide' },
+          { status: 403 }
+        );
+      }
+
       newStatus = 'LIVRE';
-      notes = 'Colis remis au client — livraison confirmée';
+      notes = 'Colis remis au client après double vérification identité + code';
 
       // Close mission
       await db.mission.updateMany({
@@ -212,7 +289,16 @@ export async function POST(
         entityType: 'COLIS',
         entityId: parcel.id,
         action: `QR_SCAN:${action.toUpperCase()}`,
-        details: JSON.stringify({ tracking, newStatus, prevStatus: parcel.status, ...extraData }),
+        details: JSON.stringify({
+          tracking,
+          newStatus,
+          prevStatus: parcel.status,
+          verificationProvided:
+            action === 'deliver'
+              ? Boolean(recipientFirstName && recipientLastName && recipientPhone && withdrawalCode)
+              : undefined,
+          ...extraData,
+        }),
       },
     });
 

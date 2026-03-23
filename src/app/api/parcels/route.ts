@@ -4,6 +4,21 @@ import { generateTrackingNumber, generateQRData, PLATFORM_COMMISSION, DEFAULT_RE
 import { checkRateLimit, RATE_LIMIT_PRESETS } from '@/lib/ratelimit';
 import { requireRole, verifyJWT } from '@/lib/rbac';
 import { generateQRCodeImage, buildQRCodePayload } from '@/lib/qrcode';
+import { createHash } from 'crypto';
+
+function normalizePhone(value: string): string {
+  return value.replace(/\s+/g, '').replace(/[^+\d]/g, '');
+}
+
+function hashWithdrawalCode(code: string): string {
+  return createHash('sha256').update(code).digest('hex');
+}
+
+function generateWithdrawalCode(length: 4 | 6 = 6): string {
+  const min = length === 4 ? 1000 : 100000;
+  const max = length === 4 ? 9999 : 999999;
+  return String(Math.floor(Math.random() * (max - min + 1)) + min);
+}
 
 // GET all parcels
 export async function GET(request: NextRequest) {
@@ -131,6 +146,13 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const {
       clientId,
+      senderFirstName,
+      senderLastName,
+      senderPhone,
+      recipientFirstName,
+      recipientLastName,
+      recipientPhone,
+      withdrawalCode,
       relaisDepartId,
       relaisArriveeId,
       villeDepart,
@@ -142,6 +164,37 @@ export async function POST(request: NextRequest) {
 
     if (payload.role === 'CLIENT' && clientId !== payload.id) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    if (
+      !senderFirstName?.trim() ||
+      !senderLastName?.trim() ||
+      !senderPhone?.trim() ||
+      !recipientFirstName?.trim() ||
+      !recipientLastName?.trim() ||
+      !recipientPhone?.trim()
+    ) {
+      return NextResponse.json(
+        { error: 'Informations expéditeur/destinataire incomplètes' },
+        { status: 400 }
+      );
+    }
+
+    const normalizedSenderPhone = normalizePhone(senderPhone);
+    const normalizedRecipientPhone = normalizePhone(recipientPhone);
+    if (normalizedSenderPhone.length < 8 || normalizedRecipientPhone.length < 8) {
+      return NextResponse.json(
+        { error: 'Numéro de téléphone invalide' },
+        { status: 400 }
+      );
+    }
+
+    const effectiveWithdrawalCode = String(withdrawalCode ?? generateWithdrawalCode(6));
+    if (!/^\d{4}$|^\d{6}$/.test(effectiveWithdrawalCode)) {
+      return NextResponse.json(
+        { error: 'Le code de retrait doit contenir 4 ou 6 chiffres' },
+        { status: 400 }
+      );
     }
 
     // Get line tariff
@@ -176,6 +229,13 @@ export async function POST(request: NextRequest) {
       data: {
         trackingNumber,
         clientId,
+        senderFirstName: senderFirstName.trim(),
+        senderLastName: senderLastName.trim(),
+        senderPhone: normalizedSenderPhone,
+        recipientFirstName: recipientFirstName.trim(),
+        recipientLastName: recipientLastName.trim(),
+        recipientPhone: normalizedRecipientPhone,
+        withdrawalCodeHash: hashWithdrawalCode(effectiveWithdrawalCode),
         relaisDepartId,
         relaisArriveeId,
         villeDepart,
@@ -204,7 +264,10 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return NextResponse.json(colis);
+    return NextResponse.json({
+      ...colis,
+      withdrawalCode: effectiveWithdrawalCode,
+    });
   } catch (error) {
     console.error('Error creating parcel:', error);
     return NextResponse.json({ error: 'Failed to create parcel' }, { status: 500 });

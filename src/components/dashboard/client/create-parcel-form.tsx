@@ -35,6 +35,13 @@ export function CreateParcelForm({ userId }: CreateParcelFormProps) {
     format: 'PETIT',
     weight: '',
     description: '',
+    senderFirstName: '',
+    senderLastName: '',
+    senderPhone: '',
+    recipientFirstName: '',
+    recipientLastName: '',
+    recipientPhone: '',
+    withdrawalCode: '',
   });
   const [createdParcel, setCreatedParcel] = useState<any>(null);
 
@@ -92,6 +99,16 @@ export function CreateParcelForm({ userId }: CreateParcelFormProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (formData.withdrawalCode && !/^\d{4}$|^\d{6}$/.test(formData.withdrawalCode)) {
+      toast({
+        title: 'Code invalide',
+        description: 'Le code de retrait doit contenir 4 ou 6 chiffres',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -112,7 +129,7 @@ export function CreateParcelForm({ userId }: CreateParcelFormProps) {
       setStep(3);
       toast({
         title: 'Colis créé',
-        description: `Votre colis ${parcel.trackingNumber} a été créé avec succès`,
+        description: `N° ${parcel.trackingNumber} — Code de retrait: ${parcel.withdrawalCode}`,
       });
     } catch (error) {
       toast({
@@ -182,7 +199,8 @@ export function CreateParcelForm({ userId }: CreateParcelFormProps) {
               <li>1. Rendez-vous au point relais de départ avec votre QR code ou numéro de suivi</li>
               <li>2. Déposez votre colis au commerçant</li>
               <li>3. <span className="font-semibold text-foreground">Payez {createdParcel?.prixClient?.toFixed(0) ?? '—'} DA en espèces</span></li>
-              <li>4. Récupérez votre colis au point relais de destination</li>
+              <li>4. <span className="font-semibold text-foreground">Communiquez le code de retrait au destinataire: {createdParcel?.withdrawalCode ?? '—'}</span></li>
+              <li>5. Récupérez votre colis au point relais de destination</li>
             </ol>
           </div>
           <Button onClick={() => router.push('/dashboard/client')} className="bg-emerald-600 hover:bg-emerald-700">
@@ -335,10 +353,58 @@ export function CreateParcelForm({ userId }: CreateParcelFormProps) {
               />
             </div>
 
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Nom expéditeur</Label>
+                <Input value={formData.senderLastName} onChange={(e) => setFormData({ ...formData, senderLastName: e.target.value })} />
+              </div>
+              <div className="space-y-2">
+                <Label>Prénom expéditeur</Label>
+                <Input value={formData.senderFirstName} onChange={(e) => setFormData({ ...formData, senderFirstName: e.target.value })} />
+              </div>
+              <div className="space-y-2">
+                <Label>Téléphone expéditeur</Label>
+                <Input value={formData.senderPhone} onChange={(e) => setFormData({ ...formData, senderPhone: e.target.value })} placeholder="Ex: 0550123456" />
+              </div>
+              <div className="space-y-2">
+                <Label>Nom destinataire</Label>
+                <Input value={formData.recipientLastName} onChange={(e) => setFormData({ ...formData, recipientLastName: e.target.value })} />
+              </div>
+              <div className="space-y-2">
+                <Label>Prénom destinataire</Label>
+                <Input value={formData.recipientFirstName} onChange={(e) => setFormData({ ...formData, recipientFirstName: e.target.value })} />
+              </div>
+              <div className="space-y-2">
+                <Label>Téléphone destinataire</Label>
+                <Input value={formData.recipientPhone} onChange={(e) => setFormData({ ...formData, recipientPhone: e.target.value })} placeholder="Ex: 0660123456" />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Code de retrait (optionnel, 4 ou 6 chiffres)</Label>
+              <Input
+                value={formData.withdrawalCode}
+                onChange={(e) => setFormData({ ...formData, withdrawalCode: e.target.value.replace(/\D/g, '') })}
+                placeholder="Laisser vide pour génération automatique"
+                maxLength={6}
+              />
+            </div>
+
             <Button
               type="submit"
               className="w-full bg-emerald-600 hover:bg-emerald-700"
-              disabled={!formData.villeDepart || !formData.villeArrivee || !formData.relaisDepartId || !formData.relaisArriveeId}
+              disabled={
+                !formData.villeDepart ||
+                !formData.villeArrivee ||
+                !formData.relaisDepartId ||
+                !formData.relaisArriveeId ||
+                !formData.senderFirstName ||
+                !formData.senderLastName ||
+                !formData.senderPhone ||
+                !formData.recipientFirstName ||
+                !formData.recipientLastName ||
+                !formData.recipientPhone
+              }
             >
               Continuer
             </Button>
@@ -378,6 +444,10 @@ export function CreateParcelForm({ userId }: CreateParcelFormProps) {
                 <div className="flex justify-between text-lg font-bold">
                   <span>{t('price.total')}</span>
                   <span className="text-emerald-600">{totalPrice.toFixed(0)} DA</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Code de retrait</span>
+                  <span className="font-semibold">{formData.withdrawalCode || 'Généré automatiquement'}</span>
                 </div>
               </div>
             </div>

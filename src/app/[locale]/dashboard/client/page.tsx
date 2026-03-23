@@ -238,6 +238,13 @@ function CreateParcelForm({ userId, onCreated }: { userId: string; onCreated: ()
     relaisArriveeId: '',
     description: '',
     weight: '',
+    senderFirstName: '',
+    senderLastName: '',
+    senderPhone: '',
+    recipientFirstName: '',
+    recipientLastName: '',
+    recipientPhone: '',
+    withdrawalCode: '',
   });
   const [calculatedPrice, setCalculatedPrice] = useState<any>(null);
 
@@ -282,6 +289,16 @@ function CreateParcelForm({ userId, onCreated }: { userId: string; onCreated: ()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (formData.withdrawalCode && !/^\d{4}$|^\d{6}$/.test(formData.withdrawalCode)) {
+      toast({
+        title: 'Code invalide',
+        description: 'Le code de retrait doit contenir 4 ou 6 chiffres',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -301,6 +318,13 @@ function CreateParcelForm({ userId, onCreated }: { userId: string; onCreated: ()
           format: formData.format,
           description: formData.description,
           weight: formData.weight ? parseFloat(formData.weight) : null,
+          senderFirstName: formData.senderFirstName,
+          senderLastName: formData.senderLastName,
+          senderPhone: formData.senderPhone,
+          recipientFirstName: formData.recipientFirstName,
+          recipientLastName: formData.recipientLastName,
+          recipientPhone: formData.recipientPhone,
+          withdrawalCode: formData.withdrawalCode || undefined,
           prixClient: calculatedPrice?.prixClient || 0,
           commissionPlateforme: calculatedPrice?.commissionPlateforme || 0,
           commissionRelais: calculatedPrice?.commissionRelais || 0,
@@ -311,7 +335,9 @@ function CreateParcelForm({ userId, onCreated }: { userId: string; onCreated: ()
       });
 
       if (response.ok) {
-        toast({ title: 'Colis créé avec succès', description: `N° de suivi: ${trackingNumber}` });
+        const created = await response.json();
+        toast({ title: 'Colis créé avec succès', description: `N° de suivi: ${created.trackingNumber}` });
+        toast({ title: 'Code de retrait', description: `Code destinataire: ${created.withdrawalCode}` });
         setFormData({
           villeDepart: '',
           villeArrivee: '',
@@ -320,6 +346,13 @@ function CreateParcelForm({ userId, onCreated }: { userId: string; onCreated: ()
           relaisArriveeId: '',
           description: '',
           weight: '',
+          senderFirstName: '',
+          senderLastName: '',
+          senderPhone: '',
+          recipientFirstName: '',
+          recipientLastName: '',
+          recipientPhone: '',
+          withdrawalCode: '',
         });
         setStep(1);
         onCreated();
@@ -438,6 +471,43 @@ function CreateParcelForm({ userId, onCreated }: { userId: string; onCreated: ()
                 <Label>Description</Label>
                 <Input value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} placeholder="Description du contenu (optionnel)" />
               </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Nom expéditeur</Label>
+                  <Input value={formData.senderLastName} onChange={(e) => setFormData({ ...formData, senderLastName: e.target.value })} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Prénom expéditeur</Label>
+                  <Input value={formData.senderFirstName} onChange={(e) => setFormData({ ...formData, senderFirstName: e.target.value })} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Téléphone expéditeur</Label>
+                  <Input value={formData.senderPhone} onChange={(e) => setFormData({ ...formData, senderPhone: e.target.value })} placeholder="Ex: 0550123456" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Nom destinataire</Label>
+                  <Input value={formData.recipientLastName} onChange={(e) => setFormData({ ...formData, recipientLastName: e.target.value })} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Prénom destinataire</Label>
+                  <Input value={formData.recipientFirstName} onChange={(e) => setFormData({ ...formData, recipientFirstName: e.target.value })} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Téléphone destinataire</Label>
+                  <Input value={formData.recipientPhone} onChange={(e) => setFormData({ ...formData, recipientPhone: e.target.value })} placeholder="Ex: 0660123456" />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Code de retrait (optionnel, 4 ou 6 chiffres)</Label>
+                <Input
+                  value={formData.withdrawalCode}
+                  onChange={(e) => setFormData({ ...formData, withdrawalCode: e.target.value.replace(/\D/g, '') })}
+                  placeholder="Laisser vide pour génération automatique"
+                  maxLength={6}
+                />
+              </div>
             </div>
           )}
 
@@ -463,13 +533,31 @@ function CreateParcelForm({ userId, onCreated }: { userId: string; onCreated: ()
                     <span>Total à payer</span>
                     <span className="text-emerald-600">{calculatedPrice.prixClient} DA</span>
                   </div>
+                  <div className="flex justify-between">
+                    <span>Code de retrait</span>
+                    <span>{formData.withdrawalCode || 'Généré automatiquement'}</span>
+                  </div>
                 </div>
               </CardContent>
             </Card>
           )}
 
           <div className="flex gap-4">
-            <Button type="submit" disabled={isLoading || !formData.relaisDepartId || !formData.relaisArriveeId} className="bg-emerald-600 hover:bg-emerald-700">
+            <Button
+              type="submit"
+              disabled={
+                isLoading ||
+                !formData.relaisDepartId ||
+                !formData.relaisArriveeId ||
+                !formData.senderFirstName ||
+                !formData.senderLastName ||
+                !formData.senderPhone ||
+                !formData.recipientFirstName ||
+                !formData.recipientLastName ||
+                !formData.recipientPhone
+              }
+              className="bg-emerald-600 hover:bg-emerald-700"
+            >
               {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Package className="h-4 w-4 mr-2" />}
               Créer le colis
             </Button>
