@@ -41,7 +41,6 @@ export function CreateParcelForm({ userId }: CreateParcelFormProps) {
     recipientFirstName: '',
     recipientLastName: '',
     recipientPhone: '',
-    withdrawalCode: '',
   });
   const [createdParcel, setCreatedParcel] = useState<any>(null);
 
@@ -99,15 +98,6 @@ export function CreateParcelForm({ userId }: CreateParcelFormProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (formData.withdrawalCode && !/^\d{4}$|^\d{6}$/.test(formData.withdrawalCode)) {
-      toast({
-        title: 'Code invalide',
-        description: 'Le code de retrait doit contenir 4 ou 6 chiffres',
-        variant: 'destructive',
-      });
-      return;
-    }
 
     setIsLoading(true);
 
@@ -380,15 +370,6 @@ export function CreateParcelForm({ userId }: CreateParcelFormProps) {
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label>Code de retrait (optionnel, 4 ou 6 chiffres)</Label>
-              <Input
-                value={formData.withdrawalCode}
-                onChange={(e) => setFormData({ ...formData, withdrawalCode: e.target.value.replace(/\D/g, '') })}
-                placeholder="Laisser vide pour génération automatique"
-                maxLength={6}
-              />
-            </div>
 
             <Button
               type="submit"
@@ -447,7 +428,7 @@ export function CreateParcelForm({ userId }: CreateParcelFormProps) {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Code de retrait</span>
-                  <span className="font-semibold">{formData.withdrawalCode || 'Généré automatiquement'}</span>
+                  <span className="font-semibold">Généré automatiquement</span>
                 </div>
               </div>
             </div>

@@ -244,7 +244,6 @@ function CreateParcelForm({ userId, onCreated }: { userId: string; onCreated: ()
     recipientFirstName: '',
     recipientLastName: '',
     recipientPhone: '',
-    withdrawalCode: '',
   });
   const [calculatedPrice, setCalculatedPrice] = useState<any>(null);
 
@@ -290,15 +289,6 @@ function CreateParcelForm({ userId, onCreated }: { userId: string; onCreated: ()
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (formData.withdrawalCode && !/^\d{4}$|^\d{6}$/.test(formData.withdrawalCode)) {
-      toast({
-        title: 'Code invalide',
-        description: 'Le code de retrait doit contenir 4 ou 6 chiffres',
-        variant: 'destructive',
-      });
-      return;
-    }
-
     setIsLoading(true);
 
     try {
@@ -324,7 +314,6 @@ function CreateParcelForm({ userId, onCreated }: { userId: string; onCreated: ()
           recipientFirstName: formData.recipientFirstName,
           recipientLastName: formData.recipientLastName,
           recipientPhone: formData.recipientPhone,
-          withdrawalCode: formData.withdrawalCode || undefined,
           prixClient: calculatedPrice?.prixClient || 0,
           commissionPlateforme: calculatedPrice?.commissionPlateforme || 0,
           commissionRelais: calculatedPrice?.commissionRelais || 0,
@@ -352,7 +341,6 @@ function CreateParcelForm({ userId, onCreated }: { userId: string; onCreated: ()
           recipientFirstName: '',
           recipientLastName: '',
           recipientPhone: '',
-          withdrawalCode: '',
         });
         setStep(1);
         onCreated();
@@ -499,15 +487,7 @@ function CreateParcelForm({ userId, onCreated }: { userId: string; onCreated: ()
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label>Code de retrait (optionnel, 4 ou 6 chiffres)</Label>
-                <Input
-                  value={formData.withdrawalCode}
-                  onChange={(e) => setFormData({ ...formData, withdrawalCode: e.target.value.replace(/\D/g, '') })}
-                  placeholder="Laisser vide pour génération automatique"
-                  maxLength={6}
-                />
-              </div>
+
             </div>
           )}
 

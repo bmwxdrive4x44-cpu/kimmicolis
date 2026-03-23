@@ -477,8 +477,170 @@ function ScanTab({ relaisId, userId, onRefresh }: { relaisId: string | undefined
     EN_TRANSPORT: 'Transport', ARRIVE_RELAIS_DESTINATION: 'Arrivé', LIVRE: 'Livré',
   };
 
+  const [receptionTracking, setReceptionTracking] = useState('');
+  const [receptionParcel, setReceptionParcel] = useState<any>(null);
+  const [isReceptionSearching, setIsReceptionSearching] = useState(false);
+  const [isReceptionProcessing, setIsReceptionProcessing] = useState(false);
+
+  const handleReceptionSearch = async () => {
+    if (!receptionTracking.trim()) return;
+    setIsReceptionSearching(true);
+    setReceptionParcel(null);
+    try {
+      const res = await fetch(`/api/qr/${receptionTracking.trim().toUpperCase()}`);
+      const data = await res.json();
+      if (!res.ok) {
+        toast({ title: 'Introuvable', description: data.error || 'Colis non trouvé', variant: 'destructive' });
+      } else {
+        setReceptionParcel(data);
+      }
+    } catch {
+      toast({ title: 'Erreur réseau', variant: 'destructive' });
+    } finally {
+      setIsReceptionSearching(false);
+    }
+  };
+
+  const handleValidateReceptionPayment = async () => {
+    if (!receptionParcel) return;
+    
+    // Step 1: Validate payment
+    setIsReceptionProcessing(true);
+    try {
+      const res1 = await fetch(`/api/qr/${receptionParcel.trackingNumber}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'validate_payment',
+          relaisId,
+          userId,
+        }),
+      });
+      const data1 = await res1.json();
+      if (!res1.ok) {
+        toast({ title: 'Erreur paiement', description: data1.error, variant: 'destructive' });
+        setIsReceptionProcessing(false);
+        return;
+      }
+
+      // Step 2: Deposit
+      const res2 = await fetch(`/api/qr/${receptionParcel.trackingNumber}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'deposit',
+          relaisId,
+          userId,
+        }),
+      });
+      const data2 = await res2.json();
+      if (!res2.ok) {
+        toast({ title: 'Erreur dépôt', description: data2.error, variant: 'destructive' });
+      } else {
+        toast({ title: 'Succès', description: `Réception + Paiement enregistrés — Numéro: ${receptionParcel.trackingNumber}` });
+        setReceptionTracking('');
+        setReceptionParcel(null);
+        onRefresh();
+      }
+    } catch {
+      toast({ title: 'Erreur réseau', variant: 'destructive' });
+    } finally {
+      setIsReceptionProcessing(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
+      {/* Reception & Payment Section */}
+      <Card className="border-2 border-emerald-200 dark:border-emerald-700">
+        <CardHeader className="bg-emerald-50 dark:bg-emerald-950">
+          <CardTitle className="flex items-center gap-2 text-emerald-900 dark:text-emerald-100">
+            <BanknoteIcon className="h-5 w-5" />
+            Réception du Colis + Paiement Espèces
+          </CardTitle>
+          <CardDescription className="text-emerald-700 dark:text-emerald-300">
+            Validez la réception et le paiement en espèces du client
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4 pt-6">
+          <div className="flex gap-2">
+            <Input
+              placeholder="Numéro de suivi du client (ex: SCXXXXXXXXX)"
+              value={receptionTracking}
+              onChange={(e) => setReceptionTracking(e.target.value.toUpperCase())}
+              onKeyDown={(e) => e.key === 'Enter' && handleReceptionSearch()}
+              className="font-mono"
+            />
+            <Button 
+              onClick={handleReceptionSearch} 
+              disabled={isReceptionSearching || !receptionTracking.trim()}
+              className="bg-emerald-600 hover:bg-emerald-700"
+            >
+              {isReceptionSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Scan className="h-4 w-4 mr-2" />}
+              Chercher
+            </Button>
+          </div>
+
+          {receptionParcel && (
+            <div className="border rounded-lg p-4 bg-slate-50 dark:bg-slate-800 space-y-3">
+              <div className="grid gap-3">
+                <div className="flex justify-between">
+                  <span className="text-slate-600 dark:text-slate-400">Numéro de suivi:</span>
+                  <span className="font-mono font-bold">{receptionParcel.trackingNumber}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-600 dark:text-slate-400">Client:</span>
+                  <span className="font-semibold">{receptionParcel.client?.name}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-600 dark:text-slate-400">Format:</span>
+                  <Badge variant="outline">{receptionParcel.format}</Badge>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-600 dark:text-slate-400">De / Pour:</span>
+                  <span className="text-sm">{receptionParcel.villeDepart} → {receptionParcel.villeArrivee}</span>
+                </div>
+                <div className="border-t pt-3 flex justify-between">
+                  <span className="font-semibold">Montant à encaisser:</span>
+                  <span className="text-2xl font-bold text-emerald-600">{receptionParcel.prixClient?.toFixed(0) ?? '—'} DA</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-600 dark:text-slate-400">Statut:</span>
+                  <Badge className={`${PARCEL_STATUS.find(s => s.id === receptionParcel.status)?.color} text-white`}>
+                    {PARCEL_STATUS.find(s => s.id === receptionParcel.status)?.label}
+                  </Badge>
+                </div>
+              </div>
+
+              {receptionParcel.status === 'CREATED' && (
+                <Button 
+                  onClick={handleValidateReceptionPayment} 
+                  disabled={isReceptionProcessing}
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 h-12 text-base"
+                >
+                  {isReceptionProcessing ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      Traitement en cours...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="h-5 w-5 mr-2" />
+                      Valider Réception + Paiement
+                    </>
+                  )}
+                </Button>
+              )}
+              {receptionParcel.status !== 'CREATED' && (
+                <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 rounded text-sm text-blue-700 dark:text-blue-300">
+                  Ce colis ne peut pas être validé à cette étape (Statut: {PARCEL_STATUS.find(s => s.id === receptionParcel.status)?.label})
+                </div>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2"><Scan className="h-5 w-5" />Scanner / Rechercher un colis</CardTitle>
