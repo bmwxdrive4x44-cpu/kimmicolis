@@ -76,6 +76,15 @@ function LoginForm() {
       } else {
         // Fetch session to get user role
         const sessionRes = await fetch('/api/auth/session');
+        if (!sessionRes.ok) {
+          toast({
+            title: 'Connexion réussie',
+            description: 'Session ouverte. Redirection vers votre espace client...',
+          });
+          window.location.href = getDashboardPath('CLIENT');
+          return;
+        }
+
         const sessionData = await sessionRes.json();
         const userRole = sessionData?.user?.role || 'CLIENT';
 
@@ -106,6 +115,13 @@ function LoginForm() {
       description: 'Connexion Google simulée - fonctionnalité MVP',
     });
     setIsLoading(false);
+  };
+
+  const handleForgotPassword = () => {
+    toast({
+      title: 'Mot de passe oublié',
+      description: 'La récupération de mot de passe sera disponible très bientôt.',
+    });
   };
 
   return (
@@ -142,7 +158,7 @@ function LoginForm() {
           </div>
         </div>
         <div className="flex items-center justify-between">
-          <Button variant="link" className="px-0 text-emerald-600">
+          <Button type="button" variant="link" className="px-0 text-emerald-600" onClick={handleForgotPassword}>
             {t('forgotPassword')}
           </Button>
         </div>

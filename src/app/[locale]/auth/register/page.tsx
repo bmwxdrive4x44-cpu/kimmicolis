@@ -158,6 +158,8 @@ function RegisterForm() {
           const transporterError = await transporterResponse.json().catch(() => null);
           throw new Error(transporterError?.error || 'Erreur lors de la création du profil transporteur');
         }
+
+        toast({ title: 'Profil transporteur créé', description: 'Votre demande a été enregistrée avec succès.' });
       }
 
       if (formData.role === 'RELAIS' && formData.commerceName && formData.address && formData.ville) {
@@ -177,6 +179,8 @@ function RegisterForm() {
           const relaisError = await relaisResponse.json().catch(() => null);
           throw new Error(relaisError?.error || 'Erreur lors de la création du point relais');
         }
+
+        toast({ title: 'Profil relais créé', description: 'Votre point relais a été enregistré avec succès.' });
       }
 
       toast({ title: 'Compte créé', description: 'Bienvenue sur SwiftColis!' });
