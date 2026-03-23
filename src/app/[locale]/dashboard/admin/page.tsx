@@ -193,16 +193,19 @@ function OverviewTab({ stats, setActiveTab }: { stats: any; setActiveTab: (tab: 
     (statusCounts.ARRIVE_RELAIS_DESTINATION || 0);
 
   const deliveredCount = statusCounts.LIVRE || 0;
+  const totalParcels = stats?.counts?.parcels || 0;
+  const classifiedCount = createdCount + inTransitCount + deliveredCount;
+  const otherCount = Math.max(totalParcels - classifiedCount, 0);
 
   return (
     <div className="grid gap-6 lg:grid-cols-2">
       <Card className="lg:col-span-2">
         <CardHeader>
           <CardTitle>Synthèse colis</CardTitle>
-          <CardDescription>Vue agrégée cohérente avec le dashboard client</CardDescription>
+          <CardDescription>Créés + en transit + livrés + autres = total colis</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-4">
             <div className="rounded-lg border p-4 bg-slate-50 dark:bg-slate-800/60">
               <div className="flex items-center justify-between">
                 <p className="text-sm text-slate-600 dark:text-slate-400">Créés</p>
@@ -223,6 +226,13 @@ function OverviewTab({ stats, setActiveTab }: { stats: any; setActiveTab: (tab: 
                 <CheckCircle className="h-4 w-4 text-emerald-600" />
               </div>
               <p className="text-2xl font-bold mt-1">{deliveredCount}</p>
+            </div>
+            <div className="rounded-lg border p-4 bg-slate-50 dark:bg-slate-800/60">
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-slate-600 dark:text-slate-400">Autres</p>
+                <AlertCircle className="h-4 w-4 text-slate-400" />
+              </div>
+              <p className="text-2xl font-bold mt-1">{otherCount}</p>
             </div>
           </div>
         </CardContent>
