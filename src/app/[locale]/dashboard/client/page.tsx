@@ -18,6 +18,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { WILAYAS, PARCEL_FORMATS, PARCEL_STATUS, PLATFORM_COMMISSION, DEFAULT_RELAY_COMMISSION, getTariff, generateTrackingNumber, generateQRData } from '@/lib/constants';
 import { Package, Plus, History, MapPin, Loader2, CreditCard, Search, Truck, CheckCircle, Clock, QrCode } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import Image from 'next/image';
 
 // Helper function for role-based dashboard path
 function getRoleBasedDashboardPath(role: string, locale: string): string {
@@ -203,7 +204,11 @@ function ClientDashboardContent() {
           </TabsList>
 
           <TabsContent value="create">
-            <CreateParcelForm userId={session.user.id} onCreated={() => { fetchStats(); setActiveTab('history'); }} />
+            <CreateParcelForm
+              userId={session.user.id}
+              onCreated={fetchStats}
+              onGoToHistory={() => { fetchStats(); setActiveTab('history'); }}
+            />
           </TabsContent>
 
           <TabsContent value="track">
@@ -215,7 +220,10 @@ function ClientDashboardContent() {
           </TabsContent>
 
           <TabsContent value="history">
-            <ParcelHistory userId={session.user.id} />
+            <ParcelHistory
+              userId={session.user.id}
+              onTrack={(tn: string) => { setTrackingNumber(tn); setActiveTab('track'); }}
+            />
           </TabsContent>
         </Tabs>
       </main>
@@ -225,11 +233,11 @@ function ClientDashboardContent() {
 }
 
 // Create Parcel Form
-function CreateParcelForm({ userId, onCreated }: { userId: string; onCreated: () => void }) {
+function CreateParcelForm({ userId, onCreated, onGoToHistory }: { userId: string; onCreated: () => void; onGoToHistory: () => void }) {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [relais, setRelais] = useState<any[]>([]);
-  const [step, setStep] = useState(1);
+  const [createdParcel, setCreatedParcel] = useState<any>(null);
   const [formData, setFormData] = useState({
     villeDepart: '',
     villeArrivee: '',
@@ -252,21 +260,16 @@ function CreateParcelForm({ userId, onCreated }: { userId: string; onCreated: ()
     return `${relay.openTime} - ${relay.closeTime}`;
   };
 
-  useEffect(() => {
-    fetchRelais();
-  }, []);
+  useEffect(() => { fetchRelais(); }, []);
 
   useEffect(() => {
-    if (formData.villeDepart && formData.villeArrivee && formData.format) {
-      calculatePrice();
-    }
+    if (formData.villeDepart && formData.villeArrivee && formData.format) calculatePrice();
   }, [formData.villeDepart, formData.villeArrivee, formData.format]);
 
   const fetchRelais = async () => {
     try {
       const response = await fetch('/api/relais?status=APPROVED');
-      const data = await response.json();
-      setRelais(data);
+      setRelais(await response.json());
     } catch (error) {
       console.error('Error fetching relais:', error);
     }
@@ -276,25 +279,21 @@ function CreateParcelForm({ userId, onCreated }: { userId: string; onCreated: ()
     const tarif = getTariff(formData.villeDepart, formData.villeArrivee, formData.format);
     const commissionRelais = DEFAULT_RELAY_COMMISSION[formData.format as keyof typeof DEFAULT_RELAY_COMMISSION] || 100;
     const commissionPlateforme = Math.round(tarif * PLATFORM_COMMISSION);
-    const prixClient = tarif + commissionRelais + commissionPlateforme;
+    setCalculatedPrice({ tarif, commissionRelais, commissionPlateforme, prixClient: tarif + commissionRelais + commissionPlateforme });
+  };
 
-    setCalculatedPrice({
-      tarif,
-      commissionRelais,
-      commissionPlateforme,
-      prixClient,
-    });
+  const resetForm = () => {
+    setFormData({ villeDepart: '', villeArrivee: '', format: 'PETIT', relaisDepartId: '', relaisArriveeId: '', description: '', weight: '', senderFirstName: '', senderLastName: '', senderPhone: '', recipientFirstName: '', recipientLastName: '', recipientPhone: '' });
+    setCalculatedPrice(null);
+    setCreatedParcel(null);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
     setIsLoading(true);
-
     try {
       const trackingNumber = generateTrackingNumber();
       const qrData = generateQRData(trackingNumber);
-
       const response = await fetch('/api/parcels', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -322,32 +321,14 @@ function CreateParcelForm({ userId, onCreated }: { userId: string; onCreated: ()
           status: 'CREATED',
         }),
       });
-
       if (response.ok) {
         const created = await response.json();
-        toast({ title: 'Colis créé avec succès', description: `N° de suivi: ${created.trackingNumber}` });
-        toast({ title: 'Code de retrait', description: `Code destinataire: ${created.withdrawalCode}` });
-        setFormData({
-          villeDepart: '',
-          villeArrivee: '',
-          format: 'PETIT',
-          relaisDepartId: '',
-          relaisArriveeId: '',
-          description: '',
-          weight: '',
-          senderFirstName: '',
-          senderLastName: '',
-          senderPhone: '',
-          recipientFirstName: '',
-          recipientLastName: '',
-          recipientPhone: '',
-        });
-        setStep(1);
+        setCreatedParcel(created);
         onCreated();
       } else {
-        throw new Error('Failed to create parcel');
+        toast({ title: 'Erreur', description: 'Impossible de créer le colis', variant: 'destructive' });
       }
-    } catch (error) {
+    } catch {
       toast({ title: 'Erreur', description: 'Impossible de créer le colis', variant: 'destructive' });
     } finally {
       setIsLoading(false);
@@ -357,6 +338,63 @@ function CreateParcelForm({ userId, onCreated }: { userId: string; onCreated: ()
   const relaisDepart = relais.filter(r => r.ville === formData.villeDepart);
   const relaisArrivee = relais.filter(r => r.ville === formData.villeArrivee);
 
+  // — Success card after creation
+  if (createdParcel) {
+    return (
+      <Card className="max-w-lg mx-auto">
+        <CardContent className="pt-8 pb-6">
+          <div className="text-center mb-6">
+            <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <CheckCircle className="h-9 w-9 text-emerald-600" />
+            </div>
+            <h2 className="text-2xl font-bold mb-1">Colis créé !</h2>
+            <p className="text-slate-500 text-sm">Déposez le colis au relais et réglez en espèces.</p>
+          </div>
+
+          {/* Numéro de suivi */}
+          <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-4 text-center mb-3">
+            <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">Numéro de suivi</p>
+            <p className="font-mono text-2xl font-bold text-emerald-600">{createdParcel.trackingNumber}</p>
+          </div>
+
+          {/* Code de retrait */}
+          {createdParcel.withdrawalCode && (
+            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg p-4 text-center mb-3">
+              <p className="text-xs text-blue-600 dark:text-blue-400 uppercase tracking-wider mb-1">Code de retrait destinataire</p>
+              <p className="font-mono text-2xl font-bold text-blue-700 dark:text-blue-300">{createdParcel.withdrawalCode}</p>
+              <p className="text-xs text-blue-500 mt-1">À communiquer uniquement au destinataire</p>
+            </div>
+          )}
+
+          {/* QR Code */}
+          {createdParcel.qrCodeImage && (
+            <div className="flex flex-col items-center mb-4">
+              <p className="text-xs text-slate-500 mb-2">QR Code à présenter au relais</p>
+              <div className="p-3 bg-white border rounded-lg shadow-sm">
+                <Image src={createdParcel.qrCodeImage} alt="QR Code colis" width={150} height={150} />
+              </div>
+            </div>
+          )}
+
+          {/* Info relais dépôt */}
+          <div className="rounded-md border border-amber-200 bg-amber-50 dark:bg-amber-950 dark:border-amber-800 p-3 text-sm mb-6">
+            <p className="font-semibold text-amber-800 dark:text-amber-300 mb-0.5">📍 Relais de dépôt</p>
+            <p className="text-amber-700 dark:text-amber-400">{relais.find(r => r.id === formData.relaisDepartId)?.commerceName}</p>
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-3">
+            <Button variant="outline" className="flex-1" onClick={resetForm}>
+              <Plus className="h-4 w-4 mr-2" />Créer un autre colis
+            </Button>
+            <Button className="flex-1 bg-emerald-600 hover:bg-emerald-700" onClick={onGoToHistory}>
+              <History className="h-4 w-4 mr-2" />Voir mon historique
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -364,6 +402,24 @@ function CreateParcelForm({ userId, onCreated }: { userId: string; onCreated: ()
         <CardDescription>Remplissez les informations pour envoyer votre colis</CardDescription>
       </CardHeader>
       <CardContent>
+        {/* Barre de progression */}
+        <div className="flex items-center gap-2 mb-6 text-sm">
+          <div className={`flex items-center gap-1.5 ${formData.villeDepart && formData.villeArrivee ? 'text-emerald-600 font-medium' : 'text-slate-400'}`}>
+            <span className={`w-6 h-6 rounded-full text-xs flex items-center justify-center ${formData.villeDepart && formData.villeArrivee ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-500'}`}>1</span>
+            Itinéraire
+          </div>
+          <div className="flex-1 h-px bg-slate-200" />
+          <div className={`flex items-center gap-1.5 ${formData.relaisDepartId && formData.relaisArriveeId ? 'text-emerald-600 font-medium' : 'text-slate-400'}`}>
+            <span className={`w-6 h-6 rounded-full text-xs flex items-center justify-center ${formData.relaisDepartId && formData.relaisArriveeId ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-500'}`}>2</span>
+            Relais
+          </div>
+          <div className="flex-1 h-px bg-slate-200" />
+          <div className={`flex items-center gap-1.5 ${formData.senderFirstName && formData.recipientFirstName ? 'text-emerald-600 font-medium' : 'text-slate-400'}`}>
+            <span className={`w-6 h-6 rounded-full text-xs flex items-center justify-center ${formData.senderFirstName && formData.recipientFirstName ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-500'}`}>3</span>
+            Colis &amp; identités
+          </div>
+        </div>
+
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Step 1: Route */}
           <div className="space-y-4">
@@ -571,39 +627,47 @@ function TrackingTab({ initialTracking, setTrackingNumber }: { initialTracking: 
   const [tracking, setTracking] = useState(initialTracking);
   const [result, setResult] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [notFound, setNotFound] = useState(false);
 
   const handleSearch = async () => {
-    if (!tracking) return;
+    if (!tracking.trim()) return;
     setIsLoading(true);
+    setNotFound(false);
     try {
-      const response = await fetch(`/api/parcels?tracking=${tracking}`);
+      const response = await fetch(`/api/parcels?tracking=${tracking.trim().toUpperCase()}`);
       const data = await response.json();
-      setResult(data);
+      // API returns array or single object depending on auth context
+      const parcel = Array.isArray(data) ? (data[0] ?? null) : (data?.error ? null : data);
+      setResult(parcel);
+      if (!parcel) setNotFound(true);
     } catch (error) {
       console.error('Error tracking parcel:', error);
+      setNotFound(true);
     } finally {
       setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    if (initialTracking) {
-      handleSearch();
-    }
+    if (initialTracking) handleSearch();
   }, [initialTracking]);
+
+  const statusOrder = ['CREATED', 'PAID_RELAY', 'DEPOSITED_RELAY', 'RECU_RELAIS', 'EN_TRANSPORT', 'ARRIVE_RELAIS_DESTINATION', 'LIVRE'];
+  const currentStatusIndex = result ? statusOrder.indexOf(result.status) : -1;
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>Suivi de colis</CardTitle>
-        <CardDescription>Entrez votre numéro de suivi pour suivre votre colis</CardDescription>
+        <CardDescription>Entrez le numéro de suivi pour localiser votre colis</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         <div className="flex gap-2">
           <Input
             placeholder="SCXXXXXXXXX"
             value={tracking}
-            onChange={(e) => setTracking(e.target.value)}
+            onChange={(e) => { setTracking(e.target.value.toUpperCase()); setTrackingNumber(e.target.value.toUpperCase()); }}
+            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
             className="font-mono"
           />
           <Button onClick={handleSearch} disabled={isLoading}>
@@ -611,69 +675,95 @@ function TrackingTab({ initialTracking, setTrackingNumber }: { initialTracking: 
           </Button>
         </div>
 
-        {result && !result.error && (
-          <div className="space-y-6">
-            {/* Status Timeline */}
-            <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-6">
-              <div className="flex items-center justify-between mb-6">
+        {notFound && (
+          <div className="text-center py-8 text-slate-500">
+            <Package className="h-12 w-12 mx-auto mb-3 opacity-30" />
+            <p>Aucun colis trouvé pour ce numéro de suivi.</p>
+          </div>
+        )}
+
+        {result && (
+          <div className="space-y-4">
+            {/* Header: tracking + statut */}
+            <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-5">
+              <div className="flex items-start justify-between gap-4 mb-4">
                 <div>
-                  <p className="text-sm text-slate-500">Numéro de suivi</p>
-                  <p className="font-mono font-bold text-lg">{result.trackingNumber}</p>
+                  <p className="text-xs text-slate-500 uppercase tracking-wide mb-0.5">Numéro de suivi</p>
+                  <p className="font-mono font-bold text-xl">{result.trackingNumber}</p>
                 </div>
-                <Badge className={`${PARCEL_STATUS.find(s => s.id === result.status)?.color} text-white px-4 py-2`}>
+                <Badge className={`${PARCEL_STATUS.find(s => s.id === result.status)?.color} text-white shrink-0`}>
                   {PARCEL_STATUS.find(s => s.id === result.status)?.label}
                 </Badge>
               </div>
 
               {/* Route */}
-              <div className="flex items-center gap-4 mb-6">
+              <div className="flex items-center gap-3 mb-4">
                 <div className="flex-1">
-                  <p className="text-sm text-slate-500">Départ</p>
-                  <p className="font-semibold">{WILAYAS.find(w => w.id === result.villeDepart)?.name}</p>
+                  <p className="text-xs text-slate-500">Départ</p>
+                  <p className="font-semibold text-sm">{WILAYAS.find(w => w.id === result.villeDepart)?.name || result.villeDepart}</p>
+                  {result.relaisDepart?.commerceName && (
+                    <p className="text-xs text-slate-400">{result.relaisDepart.commerceName}</p>
+                  )}
                 </div>
-                <div className="flex-1 flex justify-center">
-                  <Truck className="h-6 w-6 text-emerald-600" />
-                </div>
+                <Truck className="h-5 w-5 text-emerald-500 shrink-0" />
                 <div className="flex-1 text-right">
-                  <p className="text-sm text-slate-500">Arrivée</p>
-                  <p className="font-semibold">{WILAYAS.find(w => w.id === result.villeArrivee)?.name}</p>
+                  <p className="text-xs text-slate-500">Arrivée</p>
+                  <p className="font-semibold text-sm">{WILAYAS.find(w => w.id === result.villeArrivee)?.name || result.villeArrivee}</p>
+                  {result.relaisArrivee?.commerceName && (
+                    <p className="text-xs text-slate-400">{result.relaisArrivee.commerceName}</p>
+                  )}
                 </div>
               </div>
 
-              {/* Timeline */}
-              <div className="space-y-4">
-                {PARCEL_STATUS.map((status, index) => {
-                  const isActive = PARCEL_STATUS.findIndex(s => s.id === result.status) >= index;
-                  const isCurrent = status.id === result.status;
-                  return (
-                    <div key={status.id} className="flex items-center gap-4">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center ${isActive ? 'bg-emerald-600 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-400'}`}>
-                        {isActive ? <CheckCircle className="h-4 w-4" /> : <Clock className="h-4 w-4" />}
+              {/* Barre de progression statut */}
+              <div className="flex items-center gap-1">
+                {statusOrder.map((s, i) => (
+                  <div
+                    key={s}
+                    className={`flex-1 h-1.5 rounded-full transition-all ${
+                      i <= currentStatusIndex ? 'bg-emerald-500' : 'bg-slate-200 dark:bg-slate-700'
+                    }`}
+                  />
+                ))}
+              </div>
+              <div className="flex justify-between text-xs text-slate-400 mt-1">
+                <span>Créé</span>
+                <span>{PARCEL_STATUS.find(s => s.id === result.status)?.label}</span>
+                <span>Livré</span>
+              </div>
+            </div>
+
+            {/* Historique réel des événements */}
+            {result.trackingHistory && result.trackingHistory.length > 0 && (
+              <div className="bg-white dark:bg-slate-800 border rounded-lg p-4">
+                <p className="text-sm font-semibold mb-3">Historique des événements</p>
+                <div className="space-y-3">
+                  {[...result.trackingHistory].reverse().map((h: any, i: number) => (
+                    <div key={i} className="flex items-start gap-3">
+                      <div className="flex flex-col items-center">
+                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 mt-1 shrink-0" />
+                        {i < result.trackingHistory.length - 1 && <span className="w-0.5 flex-1 bg-slate-200 dark:bg-slate-700 mt-1" style={{minHeight:'16px'}} />}
                       </div>
-                      <div className={isCurrent ? 'font-semibold' : 'text-slate-500'}>
-                        {status.label}
+                      <div className="flex-1 pb-2">
+                        <p className="text-sm font-medium">{PARCEL_STATUS.find(s => s.id === h.status)?.label || h.status}</p>
+                        {h.notes && <p className="text-xs text-slate-500">{h.notes}</p>}
+                        <p className="text-xs text-slate-400">{new Date(h.createdAt).toLocaleString('fr-FR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' })}</p>
                       </div>
                     </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* QR Code */}
-            <div className="flex justify-center">
-              <div className="text-center">
-                <div className="w-32 h-32 bg-white border rounded-lg flex items-center justify-center mb-2">
-                  <QrCode className="h-20 w-20 text-slate-800" />
+                  ))}
                 </div>
-                <p className="text-sm text-slate-500">QR Code</p>
               </div>
-            </div>
-          </div>
-        )}
+            )}
 
-        {result?.error && (
-          <div className="text-center py-8 text-red-500">
-            Colis non trouvé
+            {/* QR Code image si disponible */}
+            {result.qrCodeImage && (
+              <div className="flex flex-col items-center">
+                <p className="text-xs text-slate-500 mb-2">QR Code</p>
+                <div className="p-3 bg-white border rounded-lg shadow-sm">
+                  <Image src={result.qrCodeImage} alt="QR Code" width={120} height={120} />
+                </div>
+              </div>
+            )}
           </div>
         )}
       </CardContent>
@@ -797,19 +887,17 @@ function PaymentTab({ userId }: { userId: string }) {
 }
 
 // Parcel History
-function ParcelHistory({ userId }: { userId: string }) {
+function ParcelHistory({ userId, onTrack }: { userId: string; onTrack: (tn: string) => void }) {
   const [colis, setColis] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [filter, setFilter] = useState('all');
 
-  useEffect(() => {
-    fetchColis();
-  }, [userId]);
+  useEffect(() => { fetchColis(); }, [userId]);
 
   const fetchColis = async () => {
     try {
       const response = await fetch(`/api/parcels?clientId=${userId}`);
-      const data = await response.json();
-      setColis(data);
+      setColis(await response.json());
     } catch (error) {
       console.error('Error fetching parcels:', error);
     } finally {
@@ -817,47 +905,68 @@ function ParcelHistory({ userId }: { userId: string }) {
     }
   };
 
+  const filtered = filter === 'all' ? colis : colis.filter(c => c.status === filter);
+
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Historique de mes colis</CardTitle>
-        <CardDescription>{colis.length} colis</CardDescription>
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div>
+            <CardTitle>Historique de mes colis</CardTitle>
+            <CardDescription>{filtered.length} colis{filter !== 'all' ? ' filtrés' : ''} sur {colis.length}</CardDescription>
+          </div>
+          <Select value={filter} onValueChange={setFilter}>
+            <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Tous les statuts</SelectItem>
+              {PARCEL_STATUS.map(s => (
+                <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </CardHeader>
       <CardContent>
         {isLoading ? (
           <div className="flex justify-center py-8"><Loader2 className="h-8 w-8 animate-spin text-emerald-600" /></div>
-        ) : colis.length === 0 ? (
+        ) : filtered.length === 0 ? (
           <div className="text-center py-8 text-slate-500">
             <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
-            <p>Aucun colis pour le moment</p>
+            <p>{colis.length === 0 ? 'Aucun colis pour le moment' : 'Aucun colis pour ce filtre'}</p>
           </div>
         ) : (
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>N° Suivi</TableHead>
-                <TableHead>Départ</TableHead>
-                <TableHead>Arrivée</TableHead>
+                <TableHead>Trajet</TableHead>
                 <TableHead>Format</TableHead>
                 <TableHead>Prix</TableHead>
                 <TableHead>Statut</TableHead>
                 <TableHead>Date</TableHead>
+                <TableHead></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {colis.map((c) => (
-                <TableRow key={c.id}>
-                  <TableCell className="font-mono font-medium">{c.trackingNumber}</TableCell>
-                  <TableCell>{WILAYAS.find(w => w.id === c.villeDepart)?.name}</TableCell>
-                  <TableCell>{WILAYAS.find(w => w.id === c.villeArrivee)?.name}</TableCell>
+              {filtered.map((c) => (
+                <TableRow key={c.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                  <TableCell className="font-mono font-medium text-sm">{c.trackingNumber}</TableCell>
+                  <TableCell className="text-sm">
+                    {WILAYAS.find(w => w.id === c.villeDepart)?.name} → {WILAYAS.find(w => w.id === c.villeArrivee)?.name}
+                  </TableCell>
                   <TableCell>{PARCEL_FORMATS.find(f => f.id === c.format)?.label}</TableCell>
-                  <TableCell>{c.prixClient} DA</TableCell>
+                  <TableCell className="font-semibold">{c.prixClient} DA</TableCell>
                   <TableCell>
-                    <Badge className={`${PARCEL_STATUS.find(s => s.id === c.status)?.color} text-white`}>
+                    <Badge className={`${PARCEL_STATUS.find(s => s.id === c.status)?.color} text-white text-xs`}>
                       {PARCEL_STATUS.find(s => s.id === c.status)?.label}
                     </Badge>
                   </TableCell>
-                  <TableCell>{new Date(c.createdAt).toLocaleDateString('fr-FR')}</TableCell>
+                  <TableCell className="text-sm text-slate-500">{new Date(c.createdAt).toLocaleDateString('fr-FR')}</TableCell>
+                  <TableCell>
+                    <Button size="sm" variant="outline" onClick={() => onTrack(c.trackingNumber)}>
+                      <MapPin className="h-3 w-3 mr-1" />Suivre
+                    </Button>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
