@@ -11,8 +11,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { WILAYAS, PARCEL_FORMATS, PLATFORM_COMMISSION, DEFAULT_RELAY_COMMISSION } from '@/lib/constants';
-import { Package, Loader2, CreditCard, CheckCircle } from 'lucide-react';
+import { Package, Loader2, CreditCard, CheckCircle, QrCode, Download } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import Image from 'next/image';
 
 interface CreateParcelFormProps {
   userId: string;
@@ -141,6 +142,14 @@ export function CreateParcelForm({ userId }: CreateParcelFormProps) {
     });
   };
 
+  const handleDownloadQR = () => {
+    if (!createdParcel?.qrCodeImage) return;
+    const link = document.createElement('a');
+    link.href = createdParcel.qrCodeImage;
+    link.download = `qr-${createdParcel.trackingNumber}.png`;
+    link.click();
+  };
+
   if (step === 4) {
     return (
       <Card className="max-w-2xl mx-auto">
@@ -149,14 +158,37 @@ export function CreateParcelForm({ userId }: CreateParcelFormProps) {
             <CheckCircle className="h-10 w-10 text-emerald-600" />
           </div>
           <h2 className="text-2xl font-bold mb-2">Colis créé avec succès!</h2>
-          <p className="text-muted-foreground mb-6">
-            Votre numéro de suivi: <Badge className="text-lg">{createdParcel?.trackingNumber}</Badge>
+          <p className="text-muted-foreground mb-4">
+            Votre numéro de suivi: <Badge className="text-base ml-1">{createdParcel?.trackingNumber}</Badge>
           </p>
+
+          {/* QR Code Display */}
+          {createdParcel?.qrCodeImage && (
+            <div className="flex flex-col items-center mb-6">
+              <div className="p-4 bg-white border rounded-xl shadow-sm inline-block">
+                <Image
+                  src={createdParcel.qrCodeImage}
+                  alt={`QR Code ${createdParcel.trackingNumber}`}
+                  width={180}
+                  height={180}
+                  className="block"
+                />
+              </div>
+              <p className="text-xs text-muted-foreground mt-2 mb-3">
+                Présentez ce QR code au point relais de départ
+              </p>
+              <Button variant="outline" size="sm" onClick={handleDownloadQR} className="gap-2">
+                <Download className="h-4 w-4" />
+                Télécharger le QR code
+              </Button>
+            </div>
+          )}
+
           <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-6 mb-6 text-left">
             <h3 className="font-semibold mb-4">Prochaines étapes:</h3>
             <ol className="space-y-2 text-sm text-muted-foreground">
               <li>1. Déposez votre colis au point relais de départ</li>
-              <li>2. Présentez ce numéro de suivi au commerçant</li>
+              <li>2. Présentez le QR code ou ce numéro de suivi au commerçant</li>
               <li>3. Suivez votre colis en temps réel</li>
               <li>4. Récupérez votre colis au point relais de destination</li>
             </ol>
@@ -377,6 +409,24 @@ export function CreateParcelForm({ userId }: CreateParcelFormProps) {
               <h3 className="text-xl font-bold">Colis créé!</h3>
               <p className="text-muted-foreground">Numéro de suivi: {createdParcel.trackingNumber}</p>
             </div>
+
+            {/* Preview QR Code */}
+            {createdParcel?.qrCodeImage && (
+              <div className="flex flex-col items-center">
+                <div className="p-3 bg-white border rounded-lg shadow-sm inline-block">
+                  <Image
+                    src={createdParcel.qrCodeImage}
+                    alt="QR Code colis"
+                    width={120}
+                    height={120}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  <QrCode className="h-3 w-3 inline mr-1" />
+                  QR code généré pour ce colis
+                </p>
+              </div>
+            )}
 
             <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-6">
               <div className="flex justify-between items-center mb-4">

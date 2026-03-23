@@ -3,12 +3,6 @@ import { notFound } from 'next/navigation';
 import { Toaster } from '@/components/ui/sonner';
 import { Providers } from '@/components/providers';
 import '@/app/globals.css';
-import { Inter } from 'next/font/google';
-
-const inter = Inter({ 
-  subsets: ["latin"],
-  variable: "--font-inter",
-});
 
 const locales = ['fr', 'ar', 'en', 'es'] as const;
 type Locale = (typeof locales)[number];
@@ -48,7 +42,7 @@ export default async function LocaleLayout({
   const rtl = isRTL(locale as Locale);
 
   return (
-    <html lang={locale} suppressHydrationWarning className={inter.variable}>
+    <html lang={locale} suppressHydrationWarning>
       <body className="min-h-screen bg-background font-sans antialiased" dir={rtl ? 'rtl' : 'ltr'}>
         <Providers>
           <NextIntlClientProvider messages={messages} locale={locale}>
