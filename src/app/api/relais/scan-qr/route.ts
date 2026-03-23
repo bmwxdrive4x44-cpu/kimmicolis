@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
           );
         }
         newStatus = 'RECU_RELAIS';
-        notes = `Colis reçu au point relais de départ (${parcel.relaisDepart.commerceName})`;
+        notes = `Colis reçu au point relais de départ (${parcel.relaisDepart?.commerceName ?? relaisId})`;
       }
       // Relay destination receives from transporter
       else if (parcel.relaisArriveeId === relaisId) {
@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
           );
         }
         newStatus = 'ARRIVE_RELAIS_DESTINATION';
-        notes = `Colis arrivé au point relais de destination (${parcel.relaisArrivee.commerceName})`;
+        notes = `Colis arrivé au point relais de destination (${parcel.relaisArrivee?.commerceName ?? relaisId})`;
       } else {
         return NextResponse.json(
           { error: 'Ce point relais n\'est pas associé à ce colis' },

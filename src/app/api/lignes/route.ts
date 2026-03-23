@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { requireRole } from '@/lib/rbac';
+import { Prisma } from '@prisma/client';
 
 // GET all lignes (PUBLIC)
 export async function GET(request: NextRequest) {
@@ -9,7 +10,7 @@ export async function GET(request: NextRequest) {
     const villeDepart = searchParams.get('villeDepart');
     const villeArrivee = searchParams.get('villeArrivee');
 
-    const where: any = {};
+    const where: Prisma.LigneWhereInput = {};
     if (villeDepart && villeArrivee) {
       where.OR = [
         { villeDepart, villeArrivee },

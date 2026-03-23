@@ -8,9 +8,17 @@ const globalForPrisma = globalThis as unknown as {
 // The pooler (port 6543) doesn't support prepared statements which Prisma uses
 const databaseUrl = process.env.DATABASE_URL
 
-// During build time without a DATABASE_URL, use a placeholder to avoid constructor errors.
-// The actual DB connection is only established at runtime when real requests are made.
-const resolvedUrl = databaseUrl || 'postgresql://localhost:5432/placeholder?schema=public'
+if (!databaseUrl && process.env.NODE_ENV !== 'test') {
+  // During build time (no DB URL available), we use a placeholder to allow compilation.
+  // At runtime, if DATABASE_URL is missing, queries will fail with a clear connection error.
+  if (typeof window === 'undefined' && process.env.NEXT_PHASE !== 'phase-production-build') {
+    console.warn('[db] DATABASE_URL is not set. Database operations will fail at runtime.');
+  }
+}
+
+// Use placeholder URL during build phase only; runtime requires a real URL.
+const resolvedUrl =
+  databaseUrl || 'postgresql://localhost:5432/placeholder_build_only?schema=public'
 
 export const db =
   globalForPrisma.prisma ??
