@@ -1,0 +1,51 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { db } from '@/lib/db';
+import { requireRole } from '@/lib/rbac';
+
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const auth = await requireRole(request, ['TRANSPORTER', 'ADMIN']);
+  if (!auth.success) return auth.response;
+
+  try {
+    const { id } = await params;
+    const body = await request.json();
+    const { fullName, phone, vehicle, license, experience, regions, description } = body;
+
+    const existing = await db.transporterApplication.findUnique({
+      where: { id },
+      select: { userId: true },
+    });
+
+    if (!existing) {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    }
+
+    if (auth.payload.role !== 'ADMIN' && existing.userId !== auth.payload.id) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    const data: any = {};
+    if (fullName !== undefined) data.fullName = fullName;
+    if (phone !== undefined) data.phone = phone;
+    if (vehicle !== undefined) data.vehicle = vehicle;
+    if (license !== undefined) data.license = license;
+    if (experience !== undefined) data.experience = parseInt(String(experience), 10) || 0;
+    if (regions !== undefined) {
+      data.regions = Array.isArray(regions) ? JSON.stringify(regions) : regions;
+    }
+    if (description !== undefined) data.description = description;
+
+    const updated = await db.transporterApplication.update({
+      where: { id },
+      data,
+    });
+
+    return NextResponse.json(updated);
+  } catch (error) {
+    console.error('Error updating transporter application:', error);
+    return NextResponse.json({ error: 'Failed to update' }, { status: 500 });
+  }
+}

@@ -15,7 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { WILAYAS, PARCEL_STATUS, TRAJET_STATUS } from '@/lib/constants';
-import { Truck, Plus, Package, MapPin, DollarSign, Loader2, CheckCircle, Clock, Route, QrCode, Navigation, Scan, Wallet, ArrowUpFromLine, TrendingUp, History } from 'lucide-react';
+import { Truck, Plus, Package, MapPin, DollarSign, Loader2, CheckCircle, Clock, Route, QrCode, Navigation, Scan, Wallet, ArrowUpFromLine, TrendingUp, History, Save, Pencil, User } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 function getRoleBasedDashboardPath(role: string, locale: string): string {
@@ -992,23 +992,100 @@ function WalletTab({ userId }: { userId: string }) {
 
 // Profil Tab
 function ProfilTab({ userId, userName }: { userId: string; userName: string }) {
+  const { toast } = useToast();
   const [profile, setProfile] = useState<any>(null);
+  const [userData, setUserData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [form, setForm] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    fullName: '',
+    vehicle: '',
+    license: '',
+    experience: '',
+    description: '',
+  });
+  const [passwordForm, setPasswordForm] = useState({ password: '', confirm: '' });
+
+  const fetchData = async () => {
+    setIsLoading(true);
+    try {
+      const [profRes, userRes] = await Promise.all([
+        fetch(`/api/transporters?userId=${userId}`),
+        fetch(`/api/users/${userId}`),
+      ]);
+      const profData = await profRes.json();
+      const uData = await userRes.json();
+      setUserData(uData);
+      const p = Array.isArray(profData) && profData.length > 0 ? profData[0] : null;
+      setProfile(p);
+      setForm({
+        name: uData?.name || '',
+        email: uData?.email || '',
+        phone: uData?.phone || '',
+        fullName: p?.fullName || uData?.name || '',
+        vehicle: p?.vehicle || '',
+        license: p?.license || '',
+        experience: String(p?.experience ?? ''),
+        description: p?.description || '',
+      });
+    } catch (error) {
+      console.error('Error fetching profile:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchProfile = async () => {
-      try {
-        const res = await fetch(`/api/transporters?userId=${userId}`);
-        const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) setProfile(data[0]);
-      } catch (error) {
-        console.error('Error fetching profile:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchProfile();
+    fetchData();
   }, [userId]);
+
+  const handleSave = async () => {
+    if (passwordForm.password && passwordForm.password !== passwordForm.confirm) {
+      toast({ title: 'Erreur', description: 'Les mots de passe ne correspondent pas', variant: 'destructive' });
+      return;
+    }
+    setIsSaving(true);
+    try {
+      const userPayload: any = { name: form.name, email: form.email, phone: form.phone };
+      if (passwordForm.password) userPayload.password = passwordForm.password;
+
+      const userRes = await fetch(`/api/users/${userId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(userPayload),
+      });
+
+      if (profile?.id) {
+        await fetch(`/api/transporters/${profile.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fullName: form.fullName || form.name,
+            phone: form.phone,
+            vehicle: form.vehicle,
+            license: form.license,
+            experience: parseInt(form.experience) || 0,
+            description: form.description,
+          }),
+        });
+      }
+
+      if (userRes.ok) {
+        toast({ title: 'Profil mis à jour' });
+        setIsEditing(false);
+        setPasswordForm({ password: '', confirm: '' });
+        await fetchData();
+      } else {
+        toast({ title: 'Erreur', description: 'Impossible de sauvegarder', variant: 'destructive' });
+      }
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   if (isLoading) return <div className="flex justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-emerald-600" /></div>;
 
@@ -1017,7 +1094,6 @@ function ProfilTab({ userId, userName }: { userId: string; userName: string }) {
     PENDING:  { label: 'En attente de validation', color: 'bg-yellow-100 text-yellow-700 border-yellow-300' },
     REJECTED: { label: 'Refusé', color: 'bg-red-100 text-red-700 border-red-300' },
   };
-
   const s = profile?.status ? statusConfig[profile.status] : null;
 
   return (
@@ -1027,19 +1103,73 @@ function ProfilTab({ userId, userName }: { userId: string; userName: string }) {
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="flex items-center gap-2">
-                <Truck className="h-5 w-5 text-emerald-600" />
-                Mon profil transporteur
+                <User className="h-5 w-5 text-emerald-600" />
+                Mon profil
               </CardTitle>
-              <CardDescription>Informations de votre dossier</CardDescription>
+              <CardDescription>Informations personnelles et professionnelles</CardDescription>
             </div>
-            {s && (
-              <Badge className={`${s.color} border text-sm`}>{s.label}</Badge>
-            )}
+            <div className="flex items-center gap-2">
+              {s && <Badge className={`${s.color} border text-sm`}>{s.label}</Badge>}
+              {!isEditing && (
+                <Button variant="outline" size="sm" onClick={() => setIsEditing(true)}>
+                  <Pencil className="h-4 w-4 mr-1" /> Modifier
+                </Button>
+              )}
+            </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
           {!profile ? (
             <p className="text-slate-500">Aucun profil trouvé.</p>
+          ) : isEditing ? (
+            <div className="space-y-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Nom complet</Label>
+                  <Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value, fullName: e.target.value })} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Téléphone</Label>
+                  <Input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} />
+                </div>
+                <div className="space-y-2 sm:col-span-2">
+                  <Label>Email</Label>
+                  <Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Véhicule</Label>
+                  <Input value={form.vehicle} onChange={e => setForm({ ...form, vehicle: e.target.value })} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Permis</Label>
+                  <Input value={form.license} onChange={e => setForm({ ...form, license: e.target.value })} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Expérience (années)</Label>
+                  <Input type="number" min={0} value={form.experience} onChange={e => setForm({ ...form, experience: e.target.value })} />
+                </div>
+                <div className="space-y-2 sm:col-span-2">
+                  <Label>Description</Label>
+                  <Input value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
+                </div>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Nouveau mot de passe (optionnel)</Label>
+                  <Input type="password" value={passwordForm.password} onChange={e => setPasswordForm({ ...passwordForm, password: e.target.value })} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Confirmer mot de passe</Label>
+                  <Input type="password" value={passwordForm.confirm} onChange={e => setPasswordForm({ ...passwordForm, confirm: e.target.value })} />
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button onClick={handleSave} disabled={isSaving}>
+                  {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Save className="h-4 w-4 mr-1" />} Enregistrer
+                </Button>
+                <Button variant="outline" onClick={() => { setIsEditing(false); fetchData(); }}>Annuler</Button>
+              </div>
+            </div>
           ) : (
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1">
@@ -1047,8 +1177,16 @@ function ProfilTab({ userId, userName }: { userId: string; userName: string }) {
                 <p className="font-medium">{profile.fullName || userName}</p>
               </div>
               <div className="space-y-1">
+                <p className="text-xs text-slate-400 uppercase tracking-wide">Email</p>
+                <p className="font-medium">{userData?.email || '—'}</p>
+              </div>
+              <div className="space-y-1">
                 <p className="text-xs text-slate-400 uppercase tracking-wide">Téléphone</p>
-                <p className="font-medium">{profile.phone || '—'}</p>
+                <p className="font-medium">{profile.phone || userData?.phone || '—'}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs text-slate-400 uppercase tracking-wide">N° RC (CNRC)</p>
+                <p className="font-medium font-mono">{userData?.siret || '—'}</p>
               </div>
               <div className="space-y-1">
                 <p className="text-xs text-slate-400 uppercase tracking-wide">Véhicule</p>
@@ -1062,16 +1200,6 @@ function ProfilTab({ userId, userName }: { userId: string; userName: string }) {
                 <p className="text-xs text-slate-400 uppercase tracking-wide">Expérience</p>
                 <p className="font-medium">{profile.experience || '—'}</p>
               </div>
-              {profile.regions && (
-                <div className="space-y-1">
-                  <p className="text-xs text-slate-400 uppercase tracking-wide">Régions desservies</p>
-                  <div className="flex flex-wrap gap-1">
-                    {(Array.isArray(profile.regions) ? profile.regions : JSON.parse(profile.regions || '[]')).map((r: string) => (
-                      <Badge key={r} variant="outline" className="text-xs">{WILAYAS.find(w => w.id === r)?.name || r}</Badge>
-                    ))}
-                  </div>
-                </div>
-              )}
               {profile.description && (
                 <div className="space-y-1 sm:col-span-2">
                   <p className="text-xs text-slate-400 uppercase tracking-wide">Description</p>

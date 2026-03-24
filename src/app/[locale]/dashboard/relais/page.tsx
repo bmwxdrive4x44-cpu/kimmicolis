@@ -14,7 +14,8 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { WILAYAS, PARCEL_STATUS, RELAIS_STATUS, DEFAULT_RELAY_COMMISSION, RELAY_CASH_ALERT_THRESHOLD } from '@/lib/constants';
-import { Store, Package, QrCode, DollarSign, Loader2, CheckCircle, Clock, Scan, ArrowDownToLine, ArrowUpFromLine, Settings, BarChart3, AlertCircle, Save, AlertTriangle, CreditCard, History, BanknoteIcon } from 'lucide-react';
+import { Store, Package, QrCode, DollarSign, Loader2, CheckCircle, Clock, Scan, ArrowDownToLine, ArrowUpFromLine, Settings, BarChart3, AlertCircle, Save, AlertTriangle, CreditCard, History, BanknoteIcon, User, Pencil } from 'lucide-react';
+import { isAlgerianCommerceRegisterNumber } from '@/lib/validators';
 import { useToast } from '@/hooks/use-toast';
 
 function getRoleBasedDashboardPath(role: string, locale: string): string {
@@ -286,11 +287,12 @@ export default function RelaisDashboard() {
         </Card>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-4 mb-8">
+          <TabsList className="grid w-full grid-cols-5 mb-8">
             <TabsTrigger value="overview"><BarChart3 className="h-4 w-4 mr-1 hidden sm:inline" />Vue d'ensemble</TabsTrigger>
             <TabsTrigger value="scan"><QrCode className="h-4 w-4 mr-1 hidden sm:inline" />Scanner QR</TabsTrigger>
             <TabsTrigger value="cash"><CreditCard className="h-4 w-4 mr-1 hidden sm:inline" />Caisse</TabsTrigger>
             <TabsTrigger value="settings"><Settings className="h-4 w-4 mr-1 hidden sm:inline" />Paramètres</TabsTrigger>
+            <TabsTrigger value="profil"><User className="h-4 w-4 mr-1 hidden sm:inline" />Profil</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview">
@@ -305,9 +307,266 @@ export default function RelaisDashboard() {
           <TabsContent value="settings">
             <SettingsTab relaisInfo={relaisInfo} onUpdate={fetchRelaisInfo} />
           </TabsContent>
+          <TabsContent value="profil">
+            <ProfilRelaisTab userId={session.user.id} relaisInfo={relaisInfo} />
+          </TabsContent>
         </Tabs>
       </main>
       <Footer />
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// Profil Relais Tab
+// ─────────────────────────────────────────────────────────────
+function ProfilRelaisTab({ userId, relaisInfo }: { userId: string; relaisInfo: any }) {
+  const { toast } = useToast();
+  const [isLoadingUser, setIsLoadingUser] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [userData, setUserData] = useState<any>(null);
+  const [form, setForm] = useState({
+    name: '', email: '', phone: '', siret: '',
+    commerceName: '', address: '', ville: '',
+  });
+  const [passwordForm, setPasswordForm] = useState({ password: '', confirm: '' });
+
+  const fetchUserData = async () => {
+    try {
+      const res = await fetch(`/api/users/${userId}`);
+      const data = await res.json();
+      setUserData(data);
+      setForm(prev => ({
+        ...prev,
+        name: data.name || '',
+        email: data.email || '',
+        phone: data.phone || '',
+        siret: data.siret || '',
+      }));
+    } catch (error) {
+      console.error('Error fetching user:', error);
+    } finally {
+      setIsLoadingUser(false);
+    }
+  };
+
+  useEffect(() => { fetchUserData(); }, [userId]);
+
+  useEffect(() => {
+    if (relaisInfo) {
+      setForm(prev => ({
+        ...prev,
+        commerceName: relaisInfo.commerceName || '',
+        address: relaisInfo.address || '',
+        ville: relaisInfo.ville || '',
+      }));
+    }
+  }, [relaisInfo]);
+
+  const handleSave = async () => {
+    if (passwordForm.password && passwordForm.password !== passwordForm.confirm) {
+      toast({ title: 'Erreur', description: 'Les mots de passe ne correspondent pas', variant: 'destructive' });
+      return;
+    }
+    if (form.siret && !isAlgerianCommerceRegisterNumber(form.siret)) {
+      toast({ title: 'Format RC invalide', description: 'Ex : 16/0012345B22', variant: 'destructive' });
+      return;
+    }
+    setIsSaving(true);
+    try {
+      const userPayload: any = { name: form.name, email: form.email, phone: form.phone, siret: form.siret };
+      if (passwordForm.password) userPayload.password = passwordForm.password;
+
+      const userRes = await fetch(`/api/users/${userId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(userPayload),
+      });
+
+      if (relaisInfo?.id) {
+        await fetch(`/api/relais/${relaisInfo.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ commerceName: form.commerceName, address: form.address, ville: form.ville }),
+        });
+      }
+
+      if (userRes.ok) {
+        toast({ title: 'Profil mis à jour' });
+        setIsEditing(false);
+        setPasswordForm({ password: '', confirm: '' });
+        await fetchUserData();
+      } else {
+        const err = await userRes.json().catch(() => ({}));
+        toast({ title: 'Erreur', description: err.error || 'Impossible de sauvegarder', variant: 'destructive' });
+      }
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  if (isLoadingUser) return <div className="flex justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-emerald-600" /></div>;
+
+  const statusConfig: Record<string, { label: string; color: string }> = {
+    APPROVED: { label: 'Approuvé', color: 'bg-green-100 text-green-700 border-green-300' },
+    PENDING:  { label: 'En attente de validation', color: 'bg-yellow-100 text-yellow-700 border-yellow-300' },
+    REJECTED: { label: 'Refusé', color: 'bg-red-100 text-red-700 border-red-300' },
+  };
+  const s = relaisInfo?.status ? statusConfig[relaisInfo.status] : null;
+
+  return (
+    <div className="space-y-6 max-w-2xl">
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <User className="h-5 w-5 text-emerald-600" />
+                Mon profil
+              </CardTitle>
+              <CardDescription>Vos informations personnelles et commerciales</CardDescription>
+            </div>
+            <div className="flex items-center gap-2">
+              {s && <span className={`text-xs border rounded px-2 py-0.5 ${s.color}`}>{s.label}</span>}
+              {!isEditing && (
+                <button
+                  onClick={() => setIsEditing(true)}
+                  className="flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800 border rounded px-3 py-1.5 transition-colors"
+                >
+                  <Pencil className="h-4 w-4" /> Modifier
+                </button>
+              )}
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {isEditing ? (
+            <div className="space-y-6">
+              <div>
+                <p className="text-sm font-semibold text-slate-700 mb-3 pb-1 border-b">Informations personnelles</p>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label>Nom complet</Label>
+                    <Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Téléphone</Label>
+                    <Input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="Ex: 0555123456" />
+                  </div>
+                  <div className="space-y-2 sm:col-span-2">
+                    <Label>Email</Label>
+                    <Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
+                  </div>
+                  <div className="space-y-2 sm:col-span-2">
+                    <Label>N° Registre du commerce (CNRC)</Label>
+                    <Input value={form.siret} onChange={e => setForm({ ...form, siret: e.target.value })} placeholder="Ex: 16/0012345B22" className="font-mono" />
+                    <p className="text-xs text-muted-foreground">Format CNRC : WW/NNNNNNNLAA — ex : <code>16/0012345B22</code></p>
+                  </div>
+                </div>
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-slate-700 mb-3 pb-1 border-b">Informations du commerce</p>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2 sm:col-span-2">
+                    <Label>Nom du commerce</Label>
+                    <Input value={form.commerceName} onChange={e => setForm({ ...form, commerceName: e.target.value })} placeholder="Ex: Épicerie du Centre" />
+                  </div>
+                  <div className="space-y-2 sm:col-span-2">
+                    <Label>Adresse</Label>
+                    <Input value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} placeholder="Ex: 12 Rue Didouche Mourad" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Wilaya</Label>
+                    <Select value={form.ville} onValueChange={v => setForm({ ...form, ville: v })}>
+                      <SelectTrigger><SelectValue placeholder="Sélectionner" /></SelectTrigger>
+                      <SelectContent>
+                        {WILAYAS.map(w => <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-slate-700 mb-3 pb-1 border-b">Changer de mot de passe (optionnel)</p>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label>Nouveau mot de passe</Label>
+                    <Input type="password" value={passwordForm.password} onChange={e => setPasswordForm({ ...passwordForm, password: e.target.value })} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Confirmer le mot de passe</Label>
+                    <Input type="password" value={passwordForm.confirm} onChange={e => setPasswordForm({ ...passwordForm, confirm: e.target.value })} />
+                  </div>
+                </div>
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={handleSave}
+                  disabled={isSaving}
+                  className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded text-sm font-medium disabled:opacity-60 transition-colors"
+                >
+                  {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                  Enregistrer
+                </button>
+                <button
+                  onClick={() => { setIsEditing(false); fetchUserData(); }}
+                  className="px-4 py-2 text-sm border rounded hover:bg-slate-50 transition-colors"
+                >
+                  Annuler
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              <div>
+                <p className="text-sm font-semibold text-slate-700 mb-3 pb-1 border-b">Informations personnelles</p>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-1">
+                    <p className="text-xs text-slate-400 uppercase tracking-wide">Nom complet</p>
+                    <p className="font-medium">{userData?.name || '—'}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs text-slate-400 uppercase tracking-wide">Email</p>
+                    <p className="font-medium">{userData?.email || '—'}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs text-slate-400 uppercase tracking-wide">Téléphone</p>
+                    <p className="font-medium">{userData?.phone || '—'}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs text-slate-400 uppercase tracking-wide">N° RC (CNRC)</p>
+                    <p className="font-medium font-mono">{userData?.siret || '—'}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs text-slate-400 uppercase tracking-wide">Membre depuis</p>
+                    <p className="text-sm text-slate-600">
+                      {userData?.createdAt ? new Date(userData.createdAt).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' }) : '—'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-slate-700 mb-3 pb-1 border-b">Informations du commerce</p>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-1 sm:col-span-2">
+                    <p className="text-xs text-slate-400 uppercase tracking-wide">Nom du commerce</p>
+                    <p className="font-medium">{relaisInfo?.commerceName || '—'}</p>
+                  </div>
+                  <div className="space-y-1 sm:col-span-2">
+                    <p className="text-xs text-slate-400 uppercase tracking-wide">Adresse</p>
+                    <p className="font-medium">{relaisInfo?.address || '—'}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs text-slate-400 uppercase tracking-wide">Wilaya</p>
+                    <p className="font-medium">{WILAYAS.find(w => w.id === relaisInfo?.ville)?.name || relaisInfo?.ville || '—'}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

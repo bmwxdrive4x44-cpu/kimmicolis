@@ -16,7 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { WILAYAS, PARCEL_FORMATS, PARCEL_STATUS, PLATFORM_COMMISSION, DEFAULT_RELAY_COMMISSION, getTariff, generateTrackingNumber, generateQRData } from '@/lib/constants';
-import { Package, Plus, History, MapPin, Loader2, CreditCard, Search, Truck, CheckCircle, Clock, QrCode, Printer } from 'lucide-react';
+import { Package, Plus, History, MapPin, Loader2, CreditCard, Search, Truck, CheckCircle, Clock, QrCode, Printer, User, Pencil, Save } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import Image from 'next/image';
 
@@ -186,7 +186,7 @@ function ClientDashboardContent() {
 
         {/* Main Content Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-4 mb-8">
+          <TabsList className="grid w-full grid-cols-5 mb-8">
             <TabsTrigger value="create" className="flex items-center gap-2">
               <Plus className="h-4 w-4" />
               Créer un colis
@@ -202,6 +202,10 @@ function ClientDashboardContent() {
             <TabsTrigger value="history" className="flex items-center gap-2">
               <History className="h-4 w-4" />
               Historique
+            </TabsTrigger>
+            <TabsTrigger value="profil" className="flex items-center gap-2">
+              <User className="h-4 w-4" />
+              Profil
             </TabsTrigger>
           </TabsList>
 
@@ -226,6 +230,9 @@ function ClientDashboardContent() {
               userId={session.user.id}
               onTrack={(tn: string) => { setTrackingNumber(tn); setActiveTab('track'); }}
             />
+          </TabsContent>
+          <TabsContent value="profil">
+            <ProfilClientTab userId={session.user.id} />
           </TabsContent>
         </Tabs>
       </main>
@@ -1305,6 +1312,165 @@ function ParcelHistory({ userId, onTrack }: { userId: string; onTrack: (tn: stri
         )}
       </CardContent>
     </Card>
+  );
+}
+
+// Profil Tab — Client particulier
+function ProfilClientTab({ userId }: { userId: string }) {
+  const { toast } = useToast();
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [userData, setUserData] = useState<any>(null);
+  const [form, setForm] = useState({ name: '', email: '', phone: '' });
+  const [passwordForm, setPasswordForm] = useState({ password: '', confirm: '' });
+
+  const fetchData = async () => {
+    try {
+      const res = await fetch(`/api/users/${userId}`);
+      const data = await res.json();
+      setUserData(data);
+      setForm({ name: data.name || '', email: data.email || '', phone: data.phone || '' });
+    } catch (error) {
+      console.error('Error fetching user:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchData(); }, [userId]);
+
+  const handleSave = async () => {
+    if (passwordForm.password && passwordForm.password !== passwordForm.confirm) {
+      toast({ title: 'Erreur', description: 'Les mots de passe ne correspondent pas', variant: 'destructive' });
+      return;
+    }
+    setIsSaving(true);
+    try {
+      const payload: any = { name: form.name, email: form.email, phone: form.phone };
+      if (passwordForm.password) payload.password = passwordForm.password;
+      const res = await fetch(`/api/users/${userId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (res.ok) {
+        toast({ title: 'Profil mis à jour' });
+        setIsEditing(false);
+        setPasswordForm({ password: '', confirm: '' });
+        await fetchData();
+      } else {
+        const err = await res.json().catch(() => ({}));
+        toast({ title: 'Erreur', description: err.error || 'Impossible de sauvegarder', variant: 'destructive' });
+      }
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  if (isLoading) return <div className="flex justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-emerald-600" /></div>;
+
+  return (
+    <div className="space-y-6 max-w-2xl">
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <User className="h-5 w-5 text-emerald-600" />
+                Mon profil
+              </CardTitle>
+              <CardDescription>Vos informations personnelles</CardDescription>
+            </div>
+            {!isEditing && (
+              <button
+                onClick={() => setIsEditing(true)}
+                className="flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800 border rounded px-3 py-1.5 transition-colors"
+              >
+                <Pencil className="h-4 w-4" /> Modifier
+              </button>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {isEditing ? (
+            <div className="space-y-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Nom complet</Label>
+                  <Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Téléphone</Label>
+                  <Input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="Ex: 0555123456" />
+                </div>
+                <div className="space-y-2 sm:col-span-2">
+                  <Label>Email</Label>
+                  <Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
+                </div>
+              </div>
+              <hr />
+              <p className="text-sm font-medium text-slate-600">Changer de mot de passe (optionnel)</p>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Nouveau mot de passe</Label>
+                  <Input type="password" value={passwordForm.password} onChange={e => setPasswordForm({ ...passwordForm, password: e.target.value })} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Confirmer le mot de passe</Label>
+                  <Input type="password" value={passwordForm.confirm} onChange={e => setPasswordForm({ ...passwordForm, confirm: e.target.value })} />
+                </div>
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={handleSave}
+                  disabled={isSaving}
+                  className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded text-sm font-medium disabled:opacity-60 transition-colors"
+                >
+                  {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                  Enregistrer
+                </button>
+                <button
+                  onClick={() => {
+                    setIsEditing(false);
+                    setForm({ name: userData?.name || '', email: userData?.email || '', phone: userData?.phone || '' });
+                    setPasswordForm({ password: '', confirm: '' });
+                  }}
+                  className="px-4 py-2 text-sm border rounded hover:bg-slate-50 transition-colors"
+                >
+                  Annuler
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-1">
+                <p className="text-xs text-slate-400 uppercase tracking-wide">Nom complet</p>
+                <p className="font-medium">{userData?.name || '—'}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs text-slate-400 uppercase tracking-wide">Email</p>
+                <p className="font-medium">{userData?.email || '—'}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs text-slate-400 uppercase tracking-wide">Téléphone</p>
+                <p className="font-medium">{userData?.phone || '—'}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs text-slate-400 uppercase tracking-wide">Type de compte</p>
+                <span className="inline-flex items-center gap-1 text-sm border rounded px-2 py-0.5 text-slate-600">Client particulier</span>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs text-slate-400 uppercase tracking-wide">Membre depuis</p>
+                <p className="text-sm text-slate-600">
+                  {userData?.createdAt ? new Date(userData.createdAt).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' }) : '—'}
+                </p>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 }
 
