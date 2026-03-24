@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { requireRole } from '@/lib/rbac';
 
 function parseVillesEtapes(value: unknown): string[] {
   if (!value) return [];
@@ -44,6 +45,9 @@ function serializeVillesEtapes(value: unknown): string | null {
 
 // GET all trajets
 export async function GET(request: NextRequest) {
+  const auth = await requireRole(request, ['TRANSPORTER', 'RELAIS', 'ADMIN']);
+  if (!auth.success) return auth.response;
+
   try {
     const { searchParams } = new URL(request.url);
     const transporteurId = searchParams.get('transporteurId');
@@ -79,6 +83,9 @@ export async function GET(request: NextRequest) {
 
 // POST create trajet
 export async function POST(request: NextRequest) {
+  const auth = await requireRole(request, ['TRANSPORTER', 'ADMIN']);
+  if (!auth.success) return auth.response;
+
   try {
     const body = await request.json();
     const { transporteurId, villeDepart, villeArrivee, villesEtapes, dateDepart, placesColis } = body;

@@ -10,6 +10,20 @@ import { RELAY_BLOCK_THRESHOLD_DA } from '@/lib/constants';
  *
  * Body : { trackingNumber?, qrData?, relaisId? }
  */
+/**
+ * POST /api/relais/scan-depot
+ * Relais de départ scanne le QR pour confirmer la réception physique du colis déposé par le client.
+ *
+ * Si le colis est en statut CREATED (aucun paiement en ligne) :
+ *   → encaissement cash au scan + transition directe vers RECU_RELAIS
+ *   → crée un enregistrement RelaisCash (COLLECTED)
+ *   → incrémente cashCollected du relais
+ *
+ * Si le colis est déjà PAID_RELAY | DEPOSITED_RELAY | PAID :
+ *   → transition simple vers RECU_RELAIS (cash déjà enregistré)
+ *
+ * Body : { trackingNumber?, qrData?, relaisId?, cashAmount? }
+ */
 export async function POST(request: NextRequest) {
   const auth = await requireRole(request, ['RELAIS', 'ADMIN']);
   if (!auth.success) return auth.response;
@@ -73,7 +87,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const validPriorStatuses = ['PAID_RELAY', 'DEPOSITED_RELAY', 'PAID'];
+    const { cashAmount } = body;
+    const validPriorStatuses = ['CREATED', 'PAID_RELAY', 'DEPOSITED_RELAY', 'PAID'];
     if (!validPriorStatuses.includes(parcel.status)) {
       return NextResponse.json(
         { error: `Statut invalide pour cette action: ${parcel.status}. Attendu: ${validPriorStatuses.join(' | ')}` },
@@ -82,9 +97,51 @@ export async function POST(request: NextRequest) {
     }
 
     const newStatus = 'RECU_RELAIS';
-    const notes = `Colis réceptionné au relais de départ ${relais.commerceName}`;
+    let notes = `Colis réceptionné au relais de départ ${relais.commerceName}`;
 
-    await db.colis.update({ where: { id: parcel.id }, data: { status: newStatus } });
+    // Logique cash : si le colis n'est pas encore payé (CREATED), encaisser au scan
+    if (parcel.status === 'CREATED') {
+      const amount = Number(cashAmount) || parcel.prixClient;
+      notes = `Paiement cash encaissé (${amount} DA) et colis réceptionné au relais ${relais.commerceName}`;
+
+      const newTotal = relais.cashCollected + amount;
+      const newUnreversed = newTotal - relais.cashReversed;
+
+      await db.$transaction([
+        db.colis.update({ where: { id: parcel.id }, data: { status: newStatus } }),
+        db.relaisCash.create({
+          data: {
+            relaisId: actingRelaisId!,
+            colisId: parcel.id,
+            type: 'COLLECTED',
+            amount,
+            notes: `Cash encaissé au dépôt pour colis ${tracking}`,
+          },
+        }),
+        db.relais.update({
+          where: { id: actingRelaisId! },
+          data: { cashCollected: newTotal },
+        }),
+      ]);
+
+      // Alerter les admins si seuil atteint
+      if (newUnreversed >= RELAY_BLOCK_THRESHOLD_DA) {
+        const admins = await db.user.findMany({ where: { role: 'ADMIN' } });
+        for (const admin of admins) {
+          await db.notification.create({
+            data: {
+              userId: admin.id,
+              title: '⚠️ Seuil cash relais atteint',
+              message: `Le relais "${relais.commerceName}" a dépassé ${RELAY_BLOCK_THRESHOLD_DA} DA non reversés (${newUnreversed.toFixed(0)} DA).`,
+              type: 'IN_APP',
+            },
+          });
+        }
+      }
+    } else {
+      // Cash déjà enregistré lors d'une étape précédente
+      await db.colis.update({ where: { id: parcel.id }, data: { status: newStatus } });
+    }
 
     await db.trackingHistory.create({
       data: { colisId: parcel.id, status: newStatus, notes },
