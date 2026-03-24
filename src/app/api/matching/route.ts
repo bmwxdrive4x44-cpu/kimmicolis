@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { matchColisToTrajets, getTrajetsWithCapacity } from '@/services/matchingService';
+import { requireRole } from '@/lib/rbac';
 
 // GET matching trajets for a parcel
 export async function GET(request: NextRequest) {
@@ -104,9 +106,58 @@ export async function GET(request: NextRequest) {
     // Sort by score
     scoredMatches.sort((a, b) => b.score - a.score);
 
-    return NextResponse.json(scoredMatches);
+    // Expose capaciteRestante on each result
+    const enriched = scoredMatches.map((t) => ({
+      ...t,
+      capaciteRestante: t.placesColis - t.placesUtilisees,
+    }));
+
+    return NextResponse.json(enriched);
   } catch (error) {
     console.error('Error matching trajets:', error);
     return NextResponse.json({ error: 'Failed to match trajets' }, { status: 500 });
+  }
+}
+
+// POST /api/matching
+// Déclenche le matching automatique d'un colis : trouve le meilleur trajet,
+// crée la mission, décrémente la capacité et met à jour le statut du colis.
+export async function POST(request: NextRequest) {
+  const auth = await requireRole(request, ['CLIENT', 'RELAIS', 'ADMIN']);
+  if (!auth.success) return auth.response;
+
+  try {
+    const body = await request.json();
+    const { colisId } = body;
+
+    if (!colisId) {
+      return NextResponse.json({ error: 'colisId est requis' }, { status: 400 });
+    }
+
+    // Charger le colis
+    const colis = await db.colis.findUnique({
+      where: { id: colisId },
+      select: { id: true, villeDepart: true, villeArrivee: true, clientId: true, status: true },
+    });
+
+    if (!colis) {
+      return NextResponse.json({ error: 'Colis non trouvé' }, { status: 404 });
+    }
+
+    // Guard: un CLIENT ne peut matcher que ses propres colis
+    if (auth.payload.role === 'CLIENT' && colis.clientId !== auth.payload.id) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    const result = await matchColisToTrajets(colis);
+
+    if (!result.success) {
+      return NextResponse.json({ error: result.error }, { status: 422 });
+    }
+
+    return NextResponse.json(result.match, { status: 201 });
+  } catch (error) {
+    console.error('Error auto-matching colis:', error);
+    return NextResponse.json({ error: 'Erreur lors du matching automatique' }, { status: 500 });
   }
 }
