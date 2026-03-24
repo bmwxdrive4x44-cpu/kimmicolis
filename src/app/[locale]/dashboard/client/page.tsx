@@ -48,12 +48,18 @@ function ClientDashboardContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const initialTab = useMemo(() => searchParams.get('track') ? 'track' : 'create', [searchParams]);
+  const initialTab = useMemo(() => {
+    if (searchParams.get('track')) return 'track';
+    const tab = searchParams.get('tab');
+    const allowed = ['create', 'track', 'payment', 'history', 'profil'];
+    return allowed.includes(tab || '') ? (tab as string) : 'create';
+  }, [searchParams]);
   const initialTracking = useMemo(() => searchParams.get('track') || '', [searchParams]);
 
   const [activeTab, setActiveTab] = useState(initialTab);
   const [trackingNumber, setTrackingNumber] = useState(initialTracking);
   const [stats, setStats] = useState({ created: 0, inTransit: 0, delivered: 0, totalSpent: 0 });
+  const [cartCount, setCartCount] = useState(0);
 
   // Debug logging
   useEffect(() => {
@@ -68,6 +74,21 @@ function ClientDashboardContent() {
       update();
     }
   }, [status, session, update]);
+
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    const track = searchParams.get('track') || '';
+
+    if (track) {
+      setTrackingNumber(track);
+      setActiveTab('track');
+      return;
+    }
+
+    if (tab && ['create', 'track', 'payment', 'history', 'profil'].includes(tab)) {
+      setActiveTab(tab);
+    }
+  }, [searchParams]);
 
   // Redirect if wrong role
   useEffect(() => {
@@ -88,10 +109,18 @@ function ClientDashboardContent() {
     }
   }, [session?.user?.id]);
 
+  useEffect(() => {
+    if (activeTab === 'payment' && session?.user?.id) {
+      fetchStats();
+    }
+  }, [activeTab, session?.user?.id]);
+
   const fetchStats = async () => {
     try {
       const response = await fetch(`/api/parcels?clientId=${session?.user?.id}`);
       const parcels = await response.json();
+
+      setCartCount(parcels.filter((p: any) => p.status === 'CREATED').length);
       
       setStats({
         created: parcels.filter((p: any) => ['CREATED', 'PAID', 'PAID_RELAY'].includes(p.status)).length,
@@ -136,9 +165,14 @@ function ClientDashboardContent() {
       <main className="flex-1 container px-4 py-8">
         {/* Welcome Section */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-slate-900 dark:text-white">
-            Mon Espace Client
-          </h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-3xl font-bold text-slate-900 dark:text-white">
+              Mon Espace Client
+            </h1>
+            <Badge variant="outline" className="border-emerald-300 text-emerald-700">
+              Panier: {cartCount}
+            </Badge>
+          </div>
           <p className="text-slate-600 dark:text-slate-400 mt-1">
             Bienvenue, {session.user.name}
           </p>
@@ -197,7 +231,7 @@ function ClientDashboardContent() {
             </TabsTrigger>
             <TabsTrigger value="payment" className="flex items-center gap-2">
               <CreditCard className="h-4 w-4" />
-              Paiement
+              Panier ({cartCount})
             </TabsTrigger>
             <TabsTrigger value="history" className="flex items-center gap-2">
               <History className="h-4 w-4" />
@@ -214,6 +248,7 @@ function ClientDashboardContent() {
               userId={session.user.id}
               onCreated={fetchStats}
               onGoToHistory={() => { fetchStats(); setActiveTab('history'); }}
+              onGoToCart={() => { fetchStats(); setActiveTab('payment'); }}
             />
           </TabsContent>
 
@@ -242,7 +277,7 @@ function ClientDashboardContent() {
 }
 
 // Create Parcel Form
-function CreateParcelForm({ userId, onCreated, onGoToHistory }: { userId: string; onCreated: () => void; onGoToHistory: () => void }) {
+function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart }: { userId: string; onCreated: () => void; onGoToHistory: () => void; onGoToCart: () => void }) {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [relais, setRelais] = useState<any[]>([]);
@@ -563,6 +598,9 @@ function CreateParcelForm({ userId, onCreated, onGoToHistory }: { userId: string
           <div className="flex flex-col sm:flex-row gap-3">
             <Button variant="outline" className="flex-1" onClick={resetForm}>
               <Plus className="h-4 w-4 mr-2" />Créer un autre colis
+            </Button>
+            <Button variant="outline" className="flex-1" onClick={onGoToCart}>
+              <CreditCard className="h-4 w-4 mr-2" />Aller au panier
             </Button>
             <Button className="flex-1 bg-emerald-600 hover:bg-emerald-700" onClick={onGoToHistory}>
               <History className="h-4 w-4 mr-2" />Voir mon historique
@@ -959,7 +997,7 @@ function TrackingTab({ initialTracking, setTrackingNumber }: { initialTracking: 
   );
 }
 
-// Payment Tab - Show parcels awaiting cash payment at relay
+// Panier Tab - Show parcels created but unpaid
 function PaymentTab({ userId }: { userId: string }) {
   const { push } = useRouter();
   const locale = useLocale();
@@ -998,8 +1036,8 @@ function PaymentTab({ userId }: { userId: string }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Paiement au relais</CardTitle>
-        <CardDescription>Colis en attente de paiement en espèces au point relais de départ</CardDescription>
+        <CardTitle>Panier de paiement</CardTitle>
+        <CardDescription>Colis créés mais non payés, conservés pour paiement ultérieur au relais de départ</CardDescription>
       </CardHeader>
       <CardContent>
         {isLoading ? (
@@ -1009,7 +1047,7 @@ function PaymentTab({ userId }: { userId: string }) {
         ) : parcels.length === 0 ? (
           <div className="text-center py-12">
             <Package className="h-16 w-16 mx-auto mb-4 opacity-30" />
-            <p className="text-slate-600 mb-4">Aucun colis en attente de paiement</p>
+            <p className="text-slate-600 mb-4">Votre panier est vide (aucun colis créé en attente de paiement)</p>
             <Button variant="outline" onClick={() => push(`/${locale}/dashboard/client?tab=create`)}>
               Créer un nouveau colis
             </Button>
