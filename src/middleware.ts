@@ -6,12 +6,6 @@ import { routing } from './i18n/routing';
 // next-intl middleware handles locale detection and redirects
 const intlMiddleware = createIntlMiddleware(routing);
 
-const PUBLIC_API_PREFIXES = [
-  '/api/auth',
-  '/api/health',
-  '/api/route',
-];
-
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 

@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { requireRole } from '@/lib/rbac';
-import { RELAY_BLOCK_THRESHOLD_DA } from '@/lib/constants';
+import {
+  getRelaisCashBlockIssue,
+  resolveActingRelais,
+  resolveTrackingNumber,
+} from '@/lib/relais-scan';
 
 /**
  * POST /api/relais/scan-arrivee
@@ -18,44 +22,21 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { trackingNumber, qrData, relaisId } = body;
 
-    let tracking: string | undefined = trackingNumber;
-    if (!tracking && qrData) {
-      try {
-        const parsed = JSON.parse(qrData);
-        tracking = parsed.tracking;
-      } catch {
-        tracking = qrData;
-      }
-    }
+    const tracking = resolveTrackingNumber(trackingNumber, qrData);
     if (!tracking) {
       return NextResponse.json({ error: 'trackingNumber ou qrData requis' }, { status: 400 });
     }
 
-    let actingRelaisId: string | undefined =
-      typeof relaisId === 'string' && relaisId.trim().length > 0 ? relaisId.trim() : undefined;
-
-    if (!actingRelaisId) {
-      const relayFromUser = await db.relais.findUnique({
-        where: { userId: auth.payload.id },
-        select: { id: true },
-      });
-      if (relayFromUser) actingRelaisId = relayFromUser.id;
+    const relaisResult = await resolveActingRelais(auth.payload.id, relaisId);
+    if (!relaisResult.ok) {
+      return NextResponse.json({ error: relaisResult.issue.error }, { status: relaisResult.issue.status });
     }
+    const relais = relaisResult.data;
+    const actingRelaisId = relais.id;
 
-    if (!actingRelaisId) {
-      return NextResponse.json({ error: 'Aucun point relais trouvé pour cet utilisateur' }, { status: 400 });
-    }
-
-    const relais = await db.relais.findUnique({ where: { id: actingRelaisId } });
-    if (!relais) {
-      return NextResponse.json({ error: 'Point relais non trouvé' }, { status: 404 });
-    }
-
-    if (relais.cashCollected - relais.cashReversed >= RELAY_BLOCK_THRESHOLD_DA) {
-      return NextResponse.json(
-        { error: 'Ce point relais a atteint le seuil de cash. Contactez l\'administrateur.' },
-        { status: 403 }
-      );
+    const blockIssue = getRelaisCashBlockIssue(relais);
+    if (blockIssue) {
+      return NextResponse.json({ error: blockIssue.error }, { status: blockIssue.status });
     }
 
     const parcel = await db.colis.findUnique({ where: { trackingNumber: tracking } });

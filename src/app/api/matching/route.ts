@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { matchColisToTrajets, getTrajetsWithCapacity } from '@/services/matchingService';
+import { matchColisToTrajets } from '@/services/matchingService';
 import { requireRole } from '@/lib/rbac';
 
 // GET matching trajets for a parcel
