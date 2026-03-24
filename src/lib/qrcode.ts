@@ -68,3 +68,18 @@ export function buildQRCodePayload(trackingNumber: string): string {
     generated: new Date().toISOString(),
   });
 }
+
+/**
+ * Convenience wrapper: generate QR code image (base64 PNG) for a colis object.
+ * Uses the trackingNumber as the unique identifier encoded in the QR.
+ *
+ * @param colis - Any object containing at least { trackingNumber: string }
+ * @returns base64 data URL string (image/png)
+ */
+export async function generateQRCode(
+  colis: { trackingNumber: string },
+  options: QRCodeOptions = {}
+): Promise<string> {
+  const payload = buildQRCodePayload(colis.trackingNumber);
+  return generateQRCodeImage(payload, options);
+}
