@@ -367,11 +367,12 @@ function RegisterForm() {
                     <Label htmlFor="commerceRegisterNumberTransporter">Numéro du registre du commerce <span className="text-red-500">*</span></Label>
                     <Input
                       id="commerceRegisterNumberTransporter"
-                      placeholder="Ex: RC-16/1234567 B 21"
+                      placeholder="Ex: 16/0012345B22"
                       value={formData.commerceRegisterNumber}
                       onChange={(e) => setFormData({ ...formData, commerceRegisterNumber: e.target.value })}
                       required={formData.role === 'TRANSPORTER'}
                     />
+                    <p className="text-xs text-muted-foreground">Format CNRC : WW/NNNNNNNLAA — ex : <code>16/0012345B22</code> ou <code>RC-16/0012345B22</code> (WW = wilaya, L = type B/C/H/R, AA = année)</p>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="vehicle">Type de véhicule (optionnel)</Label>
@@ -456,11 +457,12 @@ function RegisterForm() {
                   <Label htmlFor="commerceRegisterNumberRelais">Numéro du registre du commerce <span className="text-red-500">*</span></Label>
                   <Input
                     id="commerceRegisterNumberRelais"
-                    placeholder="Ex: RC-16/1234567 B 21"
+                    placeholder="Ex: 16/0012345B22"
                     value={formData.commerceRegisterNumber}
                     onChange={(e) => setFormData({ ...formData, commerceRegisterNumber: e.target.value })}
                     required={formData.role === 'RELAIS'}
                   />
+                  <p className="text-xs text-muted-foreground">Format CNRC : WW/NNNNNNNLAA — ex : <code>16/0012345B22</code> ou <code>RC-16/0012345B22</code> (WW = wilaya, L = type B/C/H/R, AA = année)</p>
                 </div>
 
                 <div className="space-y-2">

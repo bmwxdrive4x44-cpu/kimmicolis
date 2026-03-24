@@ -303,12 +303,13 @@ export default function CompleteProfilePage() {
                     </Label>
                     <Input
                       id="commerceRegisterNumberRelais"
-                      placeholder="Ex: RC-16/1234567 B 21"
+                      placeholder="Ex: 16/0012345B22"
                       value={(formData as any).commerceRegisterNumber}
                       onChange={(e) => setFormData({ ...formData, commerceRegisterNumber: e.target.value })}
                       required
                       className="h-11"
                     />
+                    <p className="text-xs text-muted-foreground">Format CNRC : WW/NNNNNNNLAA — ex : <code>16/0012345B22</code> ou <code>RC-16/0012345B22</code> (WW = wilaya, L = type B/C/H/R, AA = année)</p>
                   </div>
 
                   <div className="space-y-2">
@@ -369,12 +370,13 @@ export default function CompleteProfilePage() {
                       </Label>
                       <Input
                         id="commerceRegisterNumberTransporter"
-                        placeholder="Ex: RC-16/1234567 B 21"
+                        placeholder="Ex: 16/0012345B22"
                         value={(formData as any).commerceRegisterNumber}
                         onChange={(e) => setFormData({ ...formData, commerceRegisterNumber: e.target.value })}
                         required
                         className="h-11"
                       />
+                      <p className="text-xs text-muted-foreground">Format CNRC : WW/NNNNNNNLAA — ex : <code>16/0012345B22</code> ou <code>RC-16/0012345B22</code> (WW = wilaya, L = type B/C/H/R, AA = année)</p>
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="vehicle" className="text-base font-semibold">
