@@ -10,7 +10,7 @@
 
 import { db } from './db';
 
-export type PaymentStatus = 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED' | 'REFUNDED';
+export type PaymentStatus = string;
 
 export interface IPayment {
   id: string;
@@ -19,12 +19,12 @@ export interface IPayment {
   amount: number;
   currency: string;
   status: PaymentStatus;
-  method?: string; // 'CARD', 'EDAHABIA', 'BANK_TRANSFER', etc.
-  transactionRef?: string;
-  errorMessage?: string;
+  method: string | null; // 'CARD', 'EDAHABIA', 'BANK_TRANSFER', etc.
+  transactionRef: string | null;
+  errorMessage: string | null;
   createdAt: Date;
   updatedAt: Date;
-  processedAt?: Date;
+  processedAt: Date | null;
   expiresAt: Date;
 }
 

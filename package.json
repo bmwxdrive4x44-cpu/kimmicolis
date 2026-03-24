@@ -6,6 +6,11 @@
     "dev": "next dev",
     "build": "prisma generate && next build",
     "start": "next start",
+    "local:ensure": "powershell -ExecutionPolicy Bypass -Command \"$port=3000; $url='http://localhost:3000'; $conn=Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue; if(-not $conn){ Start-Process powershell -ArgumentList '-NoExit','-Command','cd C:/Users/Maison/kimmicolis; npm run dev' | Out-Null; Start-Sleep -Seconds 5 }; try { (New-Object System.Net.WebClient).DownloadString($url) | Out-Null; Write-Host 'OK localhost:3000' -ForegroundColor Green } catch { Write-Host 'DOWN localhost:3000' -ForegroundColor Red; exit 1 }\"",
+    "smoke:ci": "powershell -ExecutionPolicy Bypass -File ./smoke-test.ps1 -Ci -StrictExit -ReportPath smoke-test-report.json",
+    "smoke:ci:url": "powershell -ExecutionPolicy Bypass -Command \"$url = if ($env:SMOKE_BASE_URL) { $env:SMOKE_BASE_URL } else { 'http://localhost:3000' }; powershell -ExecutionPolicy Bypass -File ./smoke-test.ps1 -BaseUrl $url -Ci -StrictExit -ReportPath smoke-test-report.json\"",
+    "test:e2e": "playwright test",
+    "test:e2e:headed": "playwright test --headed",
     "lint": "eslint .",
     "db:push": "prisma db push",
     "db:generate": "prisma generate",
@@ -85,6 +90,7 @@
     "zustand": "^5.0.6"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "@tailwindcss/postcss": "^4",
     "@types/bcryptjs": "^3.0.0",
     "@types/react": "^19",

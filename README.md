@@ -1,5 +1,7 @@
 # SwiftColis - Plateforme de Livraison Inter-Wilayas
 
+[![Smoke Test CI](https://github.com/bmwxdrive4x44-cpu/kimmicolis/actions/workflows/smoke-test.yml/badge.svg)](https://github.com/bmwxdrive4x44-cpu/kimmicolis/actions/workflows/smoke-test.yml)
+
 Plateforme de livraison de colis inter-wilayas en Algérie avec gestion des transporteurs, points relais et clients.
 
 ## 🚀 Fonctionnalités
@@ -25,6 +27,39 @@ Plateforme de livraison de colis inter-wilayas en Algérie avec gestion des tran
 - Node.js 18+
 - npm ou bun
 - Une base PostgreSQL (Neon, Supabase, etc.)
+
+## 🧪 CI/CD & Tests Automatisés
+
+Le projet utilise **GitHub Actions** pour l'intégration continue:
+
+- ✅ **Smoke Tests**: Validation E2E du workflow complet (21 phases)
+- ✅ **Auto-trigger**: Sur chaque `push` et `pull_request` vers `main`/`develop`
+- ✅ **Rapports**: Résumés GitHub + commentaires PR + notifications Slack
+- ℹ️ **Politique CI**: les checks `SKIP` sont informatifs et non bloquants; seuls les `FAIL` font échouer la CI
+- 📋 **[Voir documentation CI/CD](.github/CI_CD_SETUP.md)** pour la configuration
+
+## ⏱️ Auto-Matching Planifié
+
+Le matching transporteur peut être exécuté automatiquement pour les colis non assignés:
+
+- **Endpoint cron sécurisé**: `POST /api/matching/auto-assign/cron`
+- **Authentification**: header `x-cron-secret` = `CRON_SECRET`
+- **Planification Vercel**: toutes les 30 minutes via `vercel.json`
+
+**Exemple d'appel manuel (admin/ops):**
+```bash
+curl -X POST https://votre-app.vercel.app/api/matching/auto-assign/cron \
+	-H "x-cron-secret: $CRON_SECRET" \
+	-H "Content-Type: application/json" \
+	-d '{"limit": 100}'
+```
+
+**Tester localement:**
+```bash
+npm run smoke:ci              # Mode CI avec rapport JSON
+npm run smoke:ci:url          # Avec SMOKE_BASE_URL personnalisée
+npx next dev && npm run smoke:ci  # Full integration test
+```
 
 ## 🚀 Installation Locale
 

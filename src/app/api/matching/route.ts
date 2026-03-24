@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { matchColisToTrajets } from '@/services/matchingService';
+import { autoAssignUnmatchedColis, getRankedTrajetsForRoute, matchColisToTrajets } from '@/services/matchingService';
 import { requireRole } from '@/lib/rbac';
 
 // GET matching trajets for a parcel
@@ -34,85 +34,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json([]);
     }
 
-    // Find matching trajets
-    const matchingTrajets = await db.trajet.findMany({
-      where: {
-        status: 'PROGRAMME',
-        dateDepart: { gte: new Date() },
-        OR: [
-          // Direct route
-          {
-            AND: [
-              { villeDepart: departure },
-              { villeArrivee: arrival },
-            ],
-          },
-          // Departure matches, arrival is on route
-          {
-            AND: [
-              { villeDepart: departure },
-              { villesEtapes: { contains: arrival } },
-            ],
-          },
-          // Departure is on route, arrival matches
-          {
-            AND: [
-              { villesEtapes: { contains: departure } },
-              { villeArrivee: arrival },
-            ],
-          },
-          // Both are on route
-          {
-            villesEtapes: { contains: departure },
-          },
-        ],
-      },
-      include: {
-        transporteur: { select: { id: true, name: true, phone: true, email: true } },
-      },
-      orderBy: { dateDepart: 'asc' },
+    const rankedTrajets = await getRankedTrajetsForRoute({
+      villeDepart: departure,
+      villeArrivee: arrival,
     });
 
-    // Score and rank matches, filtering out full trajets
-    const scoredMatches = matchingTrajets
-      .filter((trajet) => trajet.placesColis > trajet.placesUtilisees)
-      .map((trajet) => {
-        let score = 0;
-        
-        // Direct route gets highest score
-        if (trajet.villeDepart === departure && trajet.villeArrivee === arrival) {
-          score = 100;
-        }
-        // Departure matches
-        else if (trajet.villeDepart === departure) {
-          score = 80;
-        }
-        // Arrival matches
-        else if (trajet.villeArrivee === arrival) {
-          score = 70;
-        }
-        // Both on route
-        else {
-          score = 50;
-        }
-
-        // Bonus for available capacity
-        const availableCapacity = trajet.placesColis - trajet.placesUtilisees;
-        score += Math.min(availableCapacity * 2, 20);
-
-        return { ...trajet, score };
-      });
-
-    // Sort by score
-    scoredMatches.sort((a, b) => b.score - a.score);
-
-    // Expose capaciteRestante on each result
-    const enriched = scoredMatches.map((t) => ({
-      ...t,
-      capaciteRestante: t.placesColis - t.placesUtilisees,
-    }));
-
-    return NextResponse.json(enriched);
+    return NextResponse.json(rankedTrajets);
   } catch (error) {
     console.error('Error matching trajets:', error);
     return NextResponse.json({ error: 'Failed to match trajets' }, { status: 500 });
@@ -128,7 +55,20 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { colisId } = body;
+    const { colisId, autoAssignUnmatched = false, limit = 50 } = body;
+
+    if (autoAssignUnmatched === true) {
+      if (auth.payload.role !== 'ADMIN') {
+        return NextResponse.json({ error: 'Forbidden: Admin access required' }, { status: 403 });
+      }
+
+      const result = await autoAssignUnmatchedColis(Number(limit));
+      return NextResponse.json({
+        success: true,
+        message: 'Traitement automatique des colis non assignés terminé',
+        ...result,
+      });
+    }
 
     if (!colisId) {
       return NextResponse.json({ error: 'colisId est requis' }, { status: 400 });

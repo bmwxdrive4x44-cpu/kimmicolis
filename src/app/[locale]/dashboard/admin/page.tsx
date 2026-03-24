@@ -15,6 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { MatchingAutoAssignPanel } from '@/components/dashboard/admin/matching-auto-assign-panel';
 import { WILAYAS, USER_ROLES, PARCEL_STATUS, RELAIS_STATUS, PARCEL_FORMATS } from '@/lib/constants';
 import { Users, Package, Truck, Store, DollarSign, CheckCircle, XCircle, Loader2, Plus, Settings, BarChart3, MapPin, Trash2, Pencil, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -176,14 +177,16 @@ export default function AdminDashboard() {
 
 // Overview Tab
 function OverviewTab({ stats, setActiveTab }: { stats: any; setActiveTab: (tab: string) => void }) {
-  const statusCounts = (stats?.parcelsByStatus || []).reduce((acc: Record<string, number>, item: any) => {
+  const visibleParcelsByStatus = (stats?.parcelsByStatus || []).filter((item: any) => item.status !== 'PAID');
+  const recentVisibleParcels = (stats?.recentParcels || []).filter((p: any) => p.status !== 'PAID');
+
+  const statusCounts = visibleParcelsByStatus.reduce((acc: Record<string, number>, item: any) => {
     acc[item.status] = item.count;
     return acc;
   }, {});
 
   const createdCount =
     (statusCounts.CREATED || 0) +
-    (statusCounts.PAID || 0) +
     (statusCounts.PAID_RELAY || 0);
 
   const inTransitCount =
@@ -244,8 +247,8 @@ function OverviewTab({ stats, setActiveTab }: { stats: any; setActiveTab: (tab: 
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {stats?.parcelsByStatus?.length > 0 ? (
-              stats.parcelsByStatus.map((item: any) => (
+            {visibleParcelsByStatus.length > 0 ? (
+              visibleParcelsByStatus.map((item: any) => (
                 <div key={item.status} className="flex items-center justify-between">
                   <span className="text-sm">{PARCEL_STATUS.find(s => s.id === item.status)?.label || item.status}</span>
                   <Badge variant="secondary">{item.count}</Badge>
@@ -315,8 +318,8 @@ function OverviewTab({ stats, setActiveTab }: { stats: any; setActiveTab: (tab: 
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
-            {stats?.recentParcels?.length > 0 ? (
-              stats.recentParcels.slice(0, 5).map((p: any) => (
+            {recentVisibleParcels.length > 0 ? (
+              recentVisibleParcels.slice(0, 5).map((p: any) => (
                 <div key={p.id} className="flex items-center justify-between text-sm">
                   <div>
                     <span className="font-mono">{p.trackingNumber}</span>
@@ -331,6 +334,8 @@ function OverviewTab({ stats, setActiveTab }: { stats: any; setActiveTab: (tab: 
           </div>
         </CardContent>
       </Card>
+
+      <MatchingAutoAssignPanel />
     </div>
   );
 }
@@ -567,7 +572,8 @@ function ParcelsTab() {
     }
   };
 
-  const safeColis = Array.isArray(colis) ? colis : [];
+  const visibleStatusOptions = PARCEL_STATUS.filter((s) => s.id !== 'PAID');
+  const safeColis = (Array.isArray(colis) ? colis : []).filter((c) => c.status !== 'PAID');
   const filteredColis = filter === 'all' ? safeColis : safeColis.filter(c => c.status === filter);
 
   return (
@@ -582,7 +588,7 @@ function ParcelsTab() {
             <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Tous</SelectItem>
-              {PARCEL_STATUS.map(s => <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>)}
+              {visibleStatusOptions.map(s => <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>

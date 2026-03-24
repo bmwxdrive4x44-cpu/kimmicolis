@@ -46,6 +46,29 @@ export interface MatchColisResult {
   error?: string;
 }
 
+export interface RankedTrajet extends TrajetWithCapacity {
+  score: number;
+  transporterActiveMissions: number;
+  hopDistance: number;
+}
+
+export interface AutoAssignResult {
+  processed: number;
+  assigned: number;
+  skipped: number;
+  errors: Array<{ colisId: string; reason: string }>;
+  matches: Array<{ colisId: string; trajetId: string; missionId: string; score: number }>;
+}
+
+type AutoAssignableColis = {
+  id: string;
+  villeDepart: string;
+  villeArrivee: string;
+  clientId: string;
+  status: string;
+  createdAt: Date;
+};
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -68,6 +91,10 @@ function parseVillesEtapes(value: unknown): string[] {
     return raw.split(',').map((v) => v.trim()).filter(Boolean);
   }
   return [];
+}
+
+function normalizeCity(value: string): string {
+  return value.trim().toLowerCase();
 }
 
 /**
@@ -112,8 +139,9 @@ function isCompatible(
     trajet.villeArrivee,
   ];
 
-  const depIdx = itinerary.indexOf(villeDepart);
-  const arrIdx = itinerary.indexOf(villeArrivee);
+  const normalizedItinerary = itinerary.map(normalizeCity);
+  const depIdx = normalizedItinerary.indexOf(normalizeCity(villeDepart));
+  const arrIdx = normalizedItinerary.indexOf(normalizeCity(villeArrivee));
 
   // Les deux villes doivent être présentes dans l'itinéraire
   if (depIdx === -1 || arrIdx === -1) return false;
@@ -122,27 +150,142 @@ function isCompatible(
   return arrIdx > depIdx;
 }
 
+function getRouteIndexes(
+  trajet: TrajetWithCapacity,
+  villeDepart: string,
+  villeArrivee: string
+): { depIdx: number; arrIdx: number } {
+  const itinerary: string[] = [
+    trajet.villeDepart,
+    ...trajet.villesEtapes,
+    trajet.villeArrivee,
+  ];
+
+  const normalizedItinerary = itinerary.map(normalizeCity);
+
+  return {
+    depIdx: normalizedItinerary.indexOf(normalizeCity(villeDepart)),
+    arrIdx: normalizedItinerary.indexOf(normalizeCity(villeArrivee)),
+  };
+}
+
 /**
  * Calcule un score de pertinence (0–120) pour le tri.
  */
-function scoreMatch(trajet: TrajetWithCapacity, villeDepart: string, villeArrivee: string): number {
+function scoreMatch(
+  trajet: TrajetWithCapacity,
+  villeDepart: string,
+  villeArrivee: string,
+  transporterActiveMissions: number
+): number {
   let score = 0;
 
   // Correspondance directe départ/arrivée → score maximal
-  if (trajet.villeDepart === villeDepart && trajet.villeArrivee === villeArrivee) {
+  if (
+    normalizeCity(trajet.villeDepart) === normalizeCity(villeDepart) &&
+    normalizeCity(trajet.villeArrivee) === normalizeCity(villeArrivee)
+  ) {
     score = 100;
-  } else if (trajet.villeDepart === villeDepart) {
-    score = 80;
-  } else if (trajet.villeArrivee === villeArrivee) {
-    score = 70;
+  } else if (normalizeCity(trajet.villeDepart) === normalizeCity(villeDepart)) {
+    score = 85;
+  } else if (normalizeCity(trajet.villeArrivee) === normalizeCity(villeArrivee)) {
+    score = 75;
   } else {
-    score = 50;
+    score = 60;
   }
 
   // Bonus capacité disponible (max +20)
   score += Math.min(trajet.capaciteRestante * 2, 20);
 
+  // Bonus proximité sur l'itinéraire (plus la distance en étapes est courte, mieux c'est)
+  const { depIdx, arrIdx } = getRouteIndexes(trajet, villeDepart, villeArrivee);
+  const hopDistance = depIdx >= 0 && arrIdx >= 0 ? arrIdx - depIdx : 99;
+  if (hopDistance > 0 && hopDistance < 99) {
+    score += Math.max(20 - (hopDistance - 1) * 5, 0);
+  }
+
+  // Bonus disponibilité transporteur (moins de missions actives = plus disponible)
+  score += Math.max(15 - transporterActiveMissions * 3, 0);
+
+  // Bonus départ proche dans le temps
+  const hoursUntilDeparture = (trajet.dateDepart.getTime() - Date.now()) / (1000 * 60 * 60);
+  if (hoursUntilDeparture <= 24) {
+    score += 8;
+  } else if (hoursUntilDeparture <= 72) {
+    score += 4;
+  }
+
   return score;
+}
+
+async function getActiveMissionCountMap(transporteurIds: string[]): Promise<Map<string, number>> {
+  if (transporteurIds.length === 0) {
+    return new Map<string, number>();
+  }
+
+  const activeMissionCounts = await db.mission.groupBy({
+    by: ['transporteurId'],
+    where: {
+      transporteurId: { in: transporteurIds },
+      status: { in: ['ASSIGNE', 'EN_COURS', 'PICKED_UP'] },
+    },
+    _count: { _all: true },
+  });
+
+  return new Map(activeMissionCounts.map((row) => [row.transporteurId, row._count._all]));
+}
+
+export async function getRankedTrajetsForRoute(params: {
+  villeDepart: string;
+  villeArrivee: string;
+}): Promise<RankedTrajet[]> {
+  const { villeDepart, villeArrivee } = params;
+
+  const rawTrajets = await db.trajet.findMany({
+    where: {
+      status: 'PROGRAMME',
+      dateDepart: { gte: new Date() },
+    },
+    include: {
+      transporteur: { select: { id: true, name: true, phone: true, email: true } },
+    },
+    orderBy: { dateDepart: 'asc' },
+  });
+
+  const trajets = rawTrajets
+    .map(normalizeTrajet)
+    .filter((t) => t.capaciteRestante > 0 && isCompatible(t, villeDepart, villeArrivee));
+
+  if (trajets.length === 0) {
+    return [];
+  }
+
+  const transporteurIds = Array.from(new Set(trajets.map((t) => t.transporteurId)));
+  const activeMissionMap = await getActiveMissionCountMap(transporteurIds);
+
+  return trajets
+    .map((trajet) => {
+      const transporterActiveMissions = activeMissionMap.get(trajet.transporteurId) ?? 0;
+      const { depIdx, arrIdx } = getRouteIndexes(trajet, villeDepart, villeArrivee);
+      const hopDistance = depIdx >= 0 && arrIdx >= 0 ? arrIdx - depIdx : 999;
+
+      return {
+        ...trajet,
+        score: scoreMatch(trajet, villeDepart, villeArrivee, transporterActiveMissions),
+        transporterActiveMissions,
+        hopDistance,
+      } satisfies RankedTrajet;
+    })
+    .sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      if (a.transporterActiveMissions !== b.transporterActiveMissions) {
+        return a.transporterActiveMissions - b.transporterActiveMissions;
+      }
+      if (a.dateDepart.getTime() !== b.dateDepart.getTime()) {
+        return a.dateDepart.getTime() - b.dateDepart.getTime();
+      }
+      return b.capaciteRestante - a.capaciteRestante;
+    });
 }
 
 // ---------------------------------------------------------------------------
@@ -169,9 +312,8 @@ export async function matchColisToTrajets(colis: {
   clientId: string;
   status: string;
 }): Promise<MatchColisResult> {
-  // Guard: ne pas re-matcher un colis déjà assigné ou livré
-  const terminalStatuses = ['ASSIGNED', 'EN_TRANSPORT', 'ARRIVE_RELAIS_DESTINATION', 'LIVRE', 'ANNULE'];
-  if (terminalStatuses.includes(colis.status)) {
+  const eligibleStatuses = ['CREATED', 'PAID', 'PAID_RELAY', 'DEPOSITED_RELAY', 'RECU_RELAIS'];
+  if (!eligibleStatuses.includes(colis.status)) {
     return {
       success: false,
       error: `Le colis est dans un statut non éligible au matching: ${colis.status}`,
@@ -182,7 +324,7 @@ export async function matchColisToTrajets(colis: {
   const existingMission = await db.mission.findFirst({
     where: {
       colisId: colis.id,
-      status: { in: ['ASSIGNE', 'PICKED_UP'] },
+      status: { in: ['ASSIGNE', 'EN_COURS', 'PICKED_UP'] },
     },
   });
   if (existingMission) {
@@ -192,72 +334,94 @@ export async function matchColisToTrajets(colis: {
     };
   }
 
-  // 1. Récupérer les trajets actifs avec capacité disponible
-  const rawTrajets = await db.trajet.findMany({
-    where: {
-      status: 'PROGRAMME',
-      dateDepart: { gte: new Date() },
-    },
-    include: {
-      transporteur: { select: { id: true, name: true, phone: true } },
-    },
-    orderBy: { dateDepart: 'asc' },
+  const rankedTrajets = await getRankedTrajetsForRoute({
+    villeDepart: colis.villeDepart,
+    villeArrivee: colis.villeArrivee,
   });
 
-  // 2. Normaliser et filtrer
-  const trajets = rawTrajets
-    .map(normalizeTrajet)
-    .filter(
-      (t) =>
-        t.capaciteRestante > 0 &&
-        isCompatible(t, colis.villeDepart, colis.villeArrivee)
-    );
-
-  if (trajets.length === 0) {
+  if (rankedTrajets.length === 0) {
     return {
       success: false,
       error: `Aucun trajet disponible pour ${colis.villeDepart} → ${colis.villeArrivee}`,
     };
   }
 
-  // 3. Trier par score décroissant, prendre le meilleur
-  const scored = trajets
-    .map((t) => ({ trajet: t, score: scoreMatch(t, colis.villeDepart, colis.villeArrivee) }))
-    .sort((a, b) => b.score - a.score);
+  const trajet = rankedTrajets[0];
+  const score = trajet.score;
 
-  const { trajet, score } = scored[0];
+  let mission: {
+    id: string;
+    colisId: string;
+    transporteurId: string;
+    trajetId: string | null;
+    status: string;
+    assignedAt: Date;
+    [key: string]: unknown;
+  };
 
-  // 4. Créer la mission (transaction atomique avec décrémentation)
-  const [mission] = await db.$transaction([
-    db.mission.create({
-      data: {
-        colisId: colis.id,
-        transporteurId: trajet.transporteurId,
-        trajetId: trajet.id,
-        status: 'ASSIGNE',
-      },
-    }),
-    // 5. Décrémenter placesUtilisees
-    db.trajet.update({
-      where: { id: trajet.id },
-      data: { placesUtilisees: { increment: 1 } },
-    }),
-    // 6. Mettre à jour le statut du colis
-    db.colis.update({
-      where: { id: colis.id },
-      data: { status: 'RECU_RELAIS' },
-    }),
-  ]);
+  try {
+    mission = await db.$transaction(async (tx) => {
+      const activeMission = await tx.mission.findFirst({
+        where: {
+          colisId: colis.id,
+          status: { in: ['ASSIGNE', 'EN_COURS', 'PICKED_UP'] },
+        },
+      });
+
+      if (activeMission) {
+        throw new Error('Ce colis a déjà une mission active en cours');
+      }
+
+      const reservedCapacity = await tx.trajet.updateMany({
+        where: {
+          id: trajet.id,
+          status: 'PROGRAMME',
+          dateDepart: { gte: new Date() },
+          placesUtilisees: { lt: trajet.placesColis },
+        },
+        data: { placesUtilisees: { increment: 1 } },
+      });
+
+      if (reservedCapacity.count === 0) {
+        throw new Error('Capacité du trajet indisponible, veuillez relancer le matching');
+      }
+
+      const createdMission = await tx.mission.create({
+        data: {
+          colisId: colis.id,
+          transporteurId: trajet.transporteurId,
+          trajetId: trajet.id,
+          status: 'ASSIGNE',
+        },
+      });
+
+      await tx.colis.update({
+        where: { id: colis.id },
+        data: { status: 'RECU_RELAIS' },
+      });
+
+      return createdMission;
+    });
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Erreur lors de l’assignation du colis',
+    };
+  }
 
   // Notifier le client
-  await db.notification.create({
-    data: {
-      userId: colis.clientId,
-      title: 'Votre colis a été assigné',
-      message: `Un transporteur a été trouvé pour votre colis ${colis.villeDepart} → ${colis.villeArrivee}.`,
-      type: 'IN_APP',
-    },
-  });
+  try {
+    await db.notification.create({
+      data: {
+        userId: colis.clientId,
+        title: 'Votre colis a été assigné',
+        message: `Un transporteur a été trouvé pour votre colis ${colis.villeDepart} → ${colis.villeArrivee}.`,
+        type: 'IN_APP',
+      },
+    });
+  } catch (error) {
+    console.error('Notification matching non envoyée:', error);
+  }
 
   return {
     success: true,
@@ -267,6 +431,115 @@ export async function matchColisToTrajets(colis: {
       score,
     },
   };
+}
+
+export async function autoAssignUnmatchedColis(limit = 50): Promise<AutoAssignResult> {
+  const safeLimit = Number.isFinite(limit) ? Math.max(1, Math.min(limit, 200)) : 50;
+
+  const eligibleStatuses = ['CREATED', 'PAID', 'PAID_RELAY', 'DEPOSITED_RELAY', 'RECU_RELAIS'];
+
+  const baseColisWhere = {
+    status: { in: eligibleStatuses },
+    missions: {
+      none: {
+        status: { in: ['ASSIGNE', 'EN_COURS', 'PICKED_UP'] },
+      },
+    },
+  };
+
+  const [pendingEligibleCount, capacityAggregate] = await Promise.all([
+    db.colis.count({ where: baseColisWhere }),
+    db.trajet.aggregate({
+      where: {
+        status: 'PROGRAMME',
+        dateDepart: { gte: new Date() },
+      },
+      _sum: {
+        placesColis: true,
+        placesUtilisees: true,
+      },
+    }),
+  ]);
+
+  const totalPlaces = capacityAggregate._sum.placesColis ?? 0;
+  const usedPlaces = capacityAggregate._sum.placesUtilisees ?? 0;
+  const availableSlots = Math.max(totalPlaces - usedPlaces, 0);
+  const highLoadMode = pendingEligibleCount > availableSlots;
+
+  const getStatusPriority = (status: string): number => {
+    switch (status) {
+      case 'RECU_RELAIS':
+        return 4;
+      case 'DEPOSITED_RELAY':
+        return 3;
+      case 'PAID_RELAY':
+      case 'PAID':
+        return 2;
+      case 'CREATED':
+      default:
+        return 1;
+    }
+  };
+
+  const compareByPriority = (a: AutoAssignableColis, b: AutoAssignableColis): number => {
+    if (highLoadMode) {
+      const ageDiff = a.createdAt.getTime() - b.createdAt.getTime();
+      if (ageDiff !== 0) return ageDiff;
+      return getStatusPriority(b.status) - getStatusPriority(a.status);
+    }
+
+    const statusDiff = getStatusPriority(b.status) - getStatusPriority(a.status);
+    if (statusDiff !== 0) return statusDiff;
+    return a.createdAt.getTime() - b.createdAt.getTime();
+  };
+
+  const colisList = await db.colis.findMany({
+    where: baseColisWhere,
+    select: {
+      id: true,
+      villeDepart: true,
+      villeArrivee: true,
+      clientId: true,
+      status: true,
+      createdAt: true,
+    },
+    orderBy: { createdAt: 'asc' },
+    take: safeLimit,
+  });
+
+  const prioritizedColis = [...colisList].sort(compareByPriority);
+
+  const result: AutoAssignResult = {
+    processed: colisList.length,
+    assigned: 0,
+    skipped: 0,
+    errors: [],
+    matches: [],
+  };
+
+  for (const colis of prioritizedColis) {
+    try {
+      const match = await matchColisToTrajets(colis);
+      if (match.success && match.match) {
+        result.assigned += 1;
+        result.matches.push({
+          colisId: colis.id,
+          trajetId: match.match.trajet.id,
+          missionId: match.match.mission.id,
+          score: match.match.score,
+        });
+      } else {
+        result.skipped += 1;
+      }
+    } catch (error) {
+      result.errors.push({
+        colisId: colis.id,
+        reason: error instanceof Error ? error.message : 'Unknown matching error',
+      });
+    }
+  }
+
+  return result;
 }
 
 // ---------------------------------------------------------------------------

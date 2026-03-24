@@ -5,14 +5,14 @@ export async function GET() {
   try {
     // Get counts using raw SQL
     const usersCount = await db.$queryRaw<[{count: bigint}]>`SELECT COUNT(*) as count FROM "User"`;
-    const parcelsCount = await db.$queryRaw<[{count: bigint}]>`SELECT COUNT(*) as count FROM "Colis"`;
+    const parcelsCount = await db.$queryRaw<[{count: bigint}]>`SELECT COUNT(*) as count FROM "Colis" WHERE status != 'PAID'`;
     const transportersCount = await db.$queryRaw<[{count: bigint}]>`SELECT COUNT(*) as count FROM "User" WHERE role = 'TRANSPORTER'`;
     const relaisCount = await db.$queryRaw<[{count: bigint}]>`SELECT COUNT(*) as count FROM "Relais" WHERE status = 'APPROVED'`;
     const pendingRelaisCount = await db.$queryRaw<[{count: bigint}]>`SELECT COUNT(*) as count FROM "Relais" WHERE status = 'PENDING'`;
 
     // Get parcels by status
     const parcelsByStatus = await db.$queryRaw<Array<{status: string; count: bigint}>>`
-      SELECT status, COUNT(*) as count FROM "Colis" GROUP BY status
+      SELECT status, COUNT(*) as count FROM "Colis" WHERE status != 'PAID' GROUP BY status
     `;
 
     // Get revenue
@@ -24,6 +24,7 @@ export async function GET() {
     const parcelsByCity = await db.$queryRaw<Array<{city: string; count: bigint}>>`
       SELECT "villeArrivee" as city, COUNT(*) as count 
       FROM "Colis" 
+      WHERE status != 'PAID'
       GROUP BY "villeArrivee" 
       ORDER BY count DESC 
       LIMIT 10
@@ -45,6 +46,7 @@ export async function GET() {
              c."prixClient", c."createdAt", c."clientId", u.name as "clientName"
       FROM "Colis" c
       LEFT JOIN "User" u ON c."clientId" = u.id
+            WHERE c.status != 'PAID'
       ORDER BY c."createdAt" DESC
       LIMIT 10
     `;
@@ -53,7 +55,7 @@ export async function GET() {
     const monthlyParcels = await db.$queryRaw<Array<{month: string; count: bigint}>>`
       SELECT TO_CHAR("createdAt", 'YYYY-MM') as month, COUNT(*) as count
       FROM "Colis"
-      WHERE "createdAt" >= NOW() - INTERVAL '6 months'
+      WHERE "createdAt" >= NOW() - INTERVAL '6 months' AND status != 'PAID'
       GROUP BY TO_CHAR("createdAt", 'YYYY-MM')
       ORDER BY month ASC
     `;
