@@ -1,23 +1,38 @@
-import { existsSync, rmSync } from 'node:fs';
-import { join } from 'node:path';
+import { readdirSync, rmSync } from 'node:fs';
+import { basename, join } from 'node:path';
 
 const cwd = process.cwd();
+const ignoredDirs = new Set(['node_modules', '.git', '.next']);
 
-const candidates = [
-  join(cwd, 'middleware.ts'),
-  join(cwd, 'src', 'middleware.ts'),
-  join(cwd, 'src', 'src', 'middleware.ts'),
-];
+function collectMiddlewareFiles(dirPath, found = []) {
+  const entries = readdirSync(dirPath, { withFileTypes: true });
 
-let removed = 0;
-for (const filePath of candidates) {
-  if (existsSync(filePath)) {
-    rmSync(filePath, { force: true });
-    removed += 1;
-    console.log(`[build-guard] Removed residual middleware file: ${filePath}`);
+  for (const entry of entries) {
+    const fullPath = join(dirPath, entry.name);
+
+    if (entry.isDirectory()) {
+      if (ignoredDirs.has(entry.name)) {
+        continue;
+      }
+      collectMiddlewareFiles(fullPath, found);
+      continue;
+    }
+
+    if (entry.isFile() && basename(fullPath) === 'middleware.ts') {
+      found.push(fullPath);
+    }
   }
+
+  return found;
 }
 
-if (removed === 0) {
+const candidates = collectMiddlewareFiles(cwd);
+
+if (candidates.length === 0) {
   console.log('[build-guard] No residual middleware.ts found.');
+} else {
+  for (const filePath of candidates) {
+    rmSync(filePath, { force: true });
+    console.log(`[build-guard] Removed residual middleware file: ${filePath}`);
+  }
 }
