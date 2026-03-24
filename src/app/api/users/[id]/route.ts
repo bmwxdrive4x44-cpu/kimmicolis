@@ -17,6 +17,9 @@ export async function GET(
         id: true,
         email: true,
         name: true,
+        firstName: true,
+        lastName: true,
+        address: true,
         role: true,
         phone: true,
         isActive: true,
@@ -54,11 +57,18 @@ export async function PUT(
     const { id } = await params;
     const body = await request.json();
     
-    const { name, phone, email, password, isActive, siret } = body;
+    const { name, firstName, lastName, address, phone, email, password, isActive, siret } = body;
+
+    const normalizedFirstName = firstName !== undefined ? String(firstName || '').trim() : undefined;
+    const normalizedLastName = lastName !== undefined ? String(lastName || '').trim() : undefined;
+    const normalizedAddress = address !== undefined ? String(address || '').trim() : undefined;
 
     // Build update data
     const updateData: any = {};
     if (name !== undefined) updateData.name = name;
+    if (normalizedFirstName !== undefined) updateData.firstName = normalizedFirstName || null;
+    if (normalizedLastName !== undefined) updateData.lastName = normalizedLastName || null;
+    if (normalizedAddress !== undefined) updateData.address = normalizedAddress || null;
     if (phone !== undefined) updateData.phone = phone;
     if (email !== undefined) updateData.email = email;
     if (isActive !== undefined) updateData.isActive = isActive;
@@ -76,6 +86,11 @@ export async function PUT(
       updateData.password = await hashPassword(password);
     }
 
+    if (name === undefined && normalizedFirstName !== undefined && normalizedLastName !== undefined) {
+      const recomposed = `${normalizedFirstName} ${normalizedLastName}`.trim();
+      if (recomposed) updateData.name = recomposed;
+    }
+
     const user = await db.user.update({
       where: { id },
       data: updateData,
@@ -83,6 +98,9 @@ export async function PUT(
         id: true,
         email: true,
         name: true,
+        firstName: true,
+        lastName: true,
+        address: true,
         role: true,
         phone: true,
         isActive: true,

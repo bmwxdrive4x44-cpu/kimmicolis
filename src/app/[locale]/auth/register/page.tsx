@@ -30,9 +30,11 @@ function RegisterForm() {
 
   const [formData, setFormData] = useState({
     // Common fields
-    name: '',
+    firstName: '',
+    lastName: '',
     email: '',
     phone: '',
+    personalAddress: '',
     password: '',
     confirmPassword: '',
     role: roleFromUrl,
@@ -61,7 +63,7 @@ function RegisterForm() {
   };
 
   const validateForm = () => {
-    if (!formData.name || !formData.email || !formData.password) {
+    if (!formData.firstName || !formData.lastName || !formData.email || !formData.phone || !formData.password) {
       toast({ title: 'Erreur', description: 'Veuillez remplir tous les champs requis', variant: 'destructive' });
       return false;
     }
@@ -104,11 +106,16 @@ function RegisterForm() {
       }
 
       // 1. Create user account
+      const fullName = `${formData.firstName} ${formData.lastName}`.trim();
+
       const response = await fetch('/api/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: formData.name,
+          name: fullName,
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          address: formData.personalAddress,
           email: formData.email,
           phone: formData.phone,
           password: formData.password,
@@ -157,7 +164,7 @@ function RegisterForm() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             userId,
-            fullName: formData.name,
+            fullName,
             phone: formData.phone,
             vehicle: formData.vehicle,
             license: formData.license,
@@ -274,19 +281,36 @@ function RegisterForm() {
             {/* Common Fields */}
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="name">{t('name')}</Label>
+                <Label htmlFor="firstName">Prénom</Label>
                 <div className="relative">
                   <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                   <Input
-                    id="name"
-                    placeholder="Votre nom complet"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    id="firstName"
+                    placeholder="Votre prénom"
+                    value={formData.firstName}
+                    onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
                     className="pl-10"
                     required
                   />
                 </div>
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="lastName">Nom</Label>
+                <div className="relative">
+                  <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="lastName"
+                    placeholder="Votre nom"
+                    value={formData.lastName}
+                    onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                    className="pl-10"
+                    required
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="email">{t('email')}</Label>
                 <div className="relative">
@@ -302,6 +326,15 @@ function RegisterForm() {
                   />
                 </div>
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="personalAddress">Adresse personnelle</Label>
+                <Input
+                  id="personalAddress"
+                  placeholder="Ex: 12 Rue Didouche Mourad"
+                  value={formData.personalAddress}
+                  onChange={(e) => setFormData({ ...formData, personalAddress: e.target.value })}
+                />
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -315,6 +348,7 @@ function RegisterForm() {
                   value={formData.phone}
                   onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                   className="pl-10"
+                  required
                 />
               </div>
             </div>

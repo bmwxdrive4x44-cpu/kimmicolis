@@ -999,9 +999,11 @@ function ProfilTab({ userId, userName }: { userId: string; userName: string }) {
   const [isSaving, setIsSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [form, setForm] = useState({
-    name: '',
+    firstName: '',
+    lastName: '',
     email: '',
     phone: '',
+    personalAddress: '',
     fullName: '',
     vehicle: '',
     license: '',
@@ -1023,9 +1025,11 @@ function ProfilTab({ userId, userName }: { userId: string; userName: string }) {
       const p = Array.isArray(profData) && profData.length > 0 ? profData[0] : null;
       setProfile(p);
       setForm({
-        name: uData?.name || '',
+        firstName: uData?.firstName || '',
+        lastName: uData?.lastName || '',
         email: uData?.email || '',
         phone: uData?.phone || '',
+        personalAddress: uData?.address || '',
         fullName: p?.fullName || uData?.name || '',
         vehicle: p?.vehicle || '',
         license: p?.license || '',
@@ -1050,7 +1054,14 @@ function ProfilTab({ userId, userName }: { userId: string; userName: string }) {
     }
     setIsSaving(true);
     try {
-      const userPayload: any = { name: form.name, email: form.email, phone: form.phone };
+      const userPayload: any = {
+        firstName: form.firstName,
+        lastName: form.lastName,
+        name: `${form.firstName} ${form.lastName}`.trim(),
+        email: form.email,
+        phone: form.phone,
+        address: form.personalAddress,
+      };
       if (passwordForm.password) userPayload.password = passwordForm.password;
 
       const userRes = await fetch(`/api/users/${userId}`, {
@@ -1064,7 +1075,7 @@ function ProfilTab({ userId, userName }: { userId: string; userName: string }) {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            fullName: form.fullName || form.name,
+            fullName: form.fullName || `${form.firstName} ${form.lastName}`.trim(),
             phone: form.phone,
             vehicle: form.vehicle,
             license: form.license,
@@ -1125,8 +1136,12 @@ function ProfilTab({ userId, userName }: { userId: string; userName: string }) {
             <div className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label>Nom complet</Label>
-                  <Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value, fullName: e.target.value })} />
+                  <Label>Prénom</Label>
+                  <Input value={form.firstName} onChange={e => setForm({ ...form, firstName: e.target.value, fullName: `${e.target.value} ${form.lastName}`.trim() })} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Nom</Label>
+                  <Input value={form.lastName} onChange={e => setForm({ ...form, lastName: e.target.value, fullName: `${form.firstName} ${e.target.value}`.trim() })} />
                 </div>
                 <div className="space-y-2">
                   <Label>Téléphone</Label>
@@ -1135,6 +1150,10 @@ function ProfilTab({ userId, userName }: { userId: string; userName: string }) {
                 <div className="space-y-2 sm:col-span-2">
                   <Label>Email</Label>
                   <Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
+                </div>
+                <div className="space-y-2 sm:col-span-2">
+                  <Label>Adresse personnelle</Label>
+                  <Input value={form.personalAddress} onChange={e => setForm({ ...form, personalAddress: e.target.value })} placeholder="Ex: 12 Rue Didouche Mourad" />
                 </div>
                 <div className="space-y-2">
                   <Label>Véhicule</Label>
@@ -1173,8 +1192,12 @@ function ProfilTab({ userId, userName }: { userId: string; userName: string }) {
           ) : (
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1">
-                <p className="text-xs text-slate-400 uppercase tracking-wide">Nom complet</p>
-                <p className="font-medium">{profile.fullName || userName}</p>
+                <p className="text-xs text-slate-400 uppercase tracking-wide">Prénom</p>
+                <p className="font-medium">{userData?.firstName || '—'}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs text-slate-400 uppercase tracking-wide">Nom</p>
+                <p className="font-medium">{userData?.lastName || '—'}</p>
               </div>
               <div className="space-y-1">
                 <p className="text-xs text-slate-400 uppercase tracking-wide">Email</p>
@@ -1187,6 +1210,10 @@ function ProfilTab({ userId, userName }: { userId: string; userName: string }) {
               <div className="space-y-1">
                 <p className="text-xs text-slate-400 uppercase tracking-wide">N° RC (CNRC)</p>
                 <p className="font-medium font-mono">{userData?.siret || '—'}</p>
+              </div>
+              <div className="space-y-1 sm:col-span-2">
+                <p className="text-xs text-slate-400 uppercase tracking-wide">Adresse personnelle</p>
+                <p className="font-medium">{userData?.address || '—'}</p>
               </div>
               <div className="space-y-1">
                 <p className="text-xs text-slate-400 uppercase tracking-wide">Véhicule</p>

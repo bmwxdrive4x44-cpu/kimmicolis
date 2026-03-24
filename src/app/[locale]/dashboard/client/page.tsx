@@ -1322,7 +1322,7 @@ function ProfilClientTab({ userId }: { userId: string }) {
   const [isSaving, setIsSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [userData, setUserData] = useState<any>(null);
-  const [form, setForm] = useState({ name: '', email: '', phone: '' });
+  const [form, setForm] = useState({ firstName: '', lastName: '', email: '', phone: '', address: '' });
   const [passwordForm, setPasswordForm] = useState({ password: '', confirm: '' });
 
   const fetchData = async () => {
@@ -1330,7 +1330,13 @@ function ProfilClientTab({ userId }: { userId: string }) {
       const res = await fetch(`/api/users/${userId}`);
       const data = await res.json();
       setUserData(data);
-      setForm({ name: data.name || '', email: data.email || '', phone: data.phone || '' });
+      setForm({
+        firstName: data.firstName || '',
+        lastName: data.lastName || '',
+        email: data.email || '',
+        phone: data.phone || '',
+        address: data.address || '',
+      });
     } catch (error) {
       console.error('Error fetching user:', error);
     } finally {
@@ -1347,7 +1353,14 @@ function ProfilClientTab({ userId }: { userId: string }) {
     }
     setIsSaving(true);
     try {
-      const payload: any = { name: form.name, email: form.email, phone: form.phone };
+      const payload: any = {
+        firstName: form.firstName,
+        lastName: form.lastName,
+        name: `${form.firstName} ${form.lastName}`.trim(),
+        email: form.email,
+        phone: form.phone,
+        address: form.address,
+      };
       if (passwordForm.password) payload.password = passwordForm.password;
       const res = await fetch(`/api/users/${userId}`, {
         method: 'PUT',
@@ -1397,8 +1410,12 @@ function ProfilClientTab({ userId }: { userId: string }) {
             <div className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label>Nom complet</Label>
-                  <Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
+                  <Label>Prénom</Label>
+                  <Input value={form.firstName} onChange={e => setForm({ ...form, firstName: e.target.value })} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Nom</Label>
+                  <Input value={form.lastName} onChange={e => setForm({ ...form, lastName: e.target.value })} />
                 </div>
                 <div className="space-y-2">
                   <Label>Téléphone</Label>
@@ -1407,6 +1424,10 @@ function ProfilClientTab({ userId }: { userId: string }) {
                 <div className="space-y-2 sm:col-span-2">
                   <Label>Email</Label>
                   <Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
+                </div>
+                <div className="space-y-2 sm:col-span-2">
+                  <Label>Adresse</Label>
+                  <Input value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} placeholder="Ex: 12 Rue Didouche Mourad" />
                 </div>
               </div>
               <hr />
@@ -1433,7 +1454,13 @@ function ProfilClientTab({ userId }: { userId: string }) {
                 <button
                   onClick={() => {
                     setIsEditing(false);
-                    setForm({ name: userData?.name || '', email: userData?.email || '', phone: userData?.phone || '' });
+                    setForm({
+                      firstName: userData?.firstName || '',
+                      lastName: userData?.lastName || '',
+                      email: userData?.email || '',
+                      phone: userData?.phone || '',
+                      address: userData?.address || '',
+                    });
                     setPasswordForm({ password: '', confirm: '' });
                   }}
                   className="px-4 py-2 text-sm border rounded hover:bg-slate-50 transition-colors"
@@ -1445,8 +1472,12 @@ function ProfilClientTab({ userId }: { userId: string }) {
           ) : (
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1">
-                <p className="text-xs text-slate-400 uppercase tracking-wide">Nom complet</p>
-                <p className="font-medium">{userData?.name || '—'}</p>
+                <p className="text-xs text-slate-400 uppercase tracking-wide">Prénom</p>
+                <p className="font-medium">{userData?.firstName || '—'}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs text-slate-400 uppercase tracking-wide">Nom</p>
+                <p className="font-medium">{userData?.lastName || '—'}</p>
               </div>
               <div className="space-y-1">
                 <p className="text-xs text-slate-400 uppercase tracking-wide">Email</p>
@@ -1459,6 +1490,10 @@ function ProfilClientTab({ userId }: { userId: string }) {
               <div className="space-y-1">
                 <p className="text-xs text-slate-400 uppercase tracking-wide">Type de compte</p>
                 <span className="inline-flex items-center gap-1 text-sm border rounded px-2 py-0.5 text-slate-600">Client particulier</span>
+              </div>
+              <div className="space-y-1 sm:col-span-2">
+                <p className="text-xs text-slate-400 uppercase tracking-wide">Adresse</p>
+                <p className="font-medium">{userData?.address || '—'}</p>
               </div>
               <div className="space-y-1">
                 <p className="text-xs text-slate-400 uppercase tracking-wide">Membre depuis</p>

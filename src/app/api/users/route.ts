@@ -22,6 +22,9 @@ export async function GET(request: NextRequest) {
         id: true,
         email: true,
         name: true,
+        firstName: true,
+        lastName: true,
+        address: true,
         role: true,
         phone: true,
         isActive: true,
@@ -47,10 +50,15 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { name, email, password, phone, role, siret } = body;
+    const { name, firstName, lastName, address, email, password, phone, role, siret } = body;
+
+    const normalizedFirstName = String(firstName || '').trim();
+    const normalizedLastName = String(lastName || '').trim();
+    const normalizedAddress = String(address || '').trim();
+    const fullName = String(name || `${normalizedFirstName} ${normalizedLastName}`.trim()).trim();
 
     // Validate required fields
-    if (!name || !email || !password) {
+    if (!fullName || !email || !password) {
       return NextResponse.json({ 
         error: 'Missing required fields',
         details: 'Name, email and password are required' 
@@ -107,7 +115,10 @@ export async function POST(request: NextRequest) {
     // Create user
     const user = await db.user.create({
       data: {
-        name,
+        name: fullName,
+        firstName: normalizedFirstName || null,
+        lastName: normalizedLastName || null,
+        address: normalizedAddress || null,
         email: email.toLowerCase(),
         password: hashedPassword,
         phone: phone || null,
@@ -120,6 +131,9 @@ export async function POST(request: NextRequest) {
       id: user.id,
       email: user.email,
       name: user.name,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      address: user.address,
       role: user.role,
     });
   } catch (error) {

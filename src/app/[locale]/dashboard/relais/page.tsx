@@ -327,7 +327,7 @@ function ProfilRelaisTab({ userId, relaisInfo }: { userId: string; relaisInfo: a
   const [isEditing, setIsEditing] = useState(false);
   const [userData, setUserData] = useState<any>(null);
   const [form, setForm] = useState({
-    name: '', email: '', phone: '', siret: '',
+    firstName: '', lastName: '', email: '', phone: '', personalAddress: '', siret: '',
     commerceName: '', address: '', ville: '',
   });
   const [passwordForm, setPasswordForm] = useState({ password: '', confirm: '' });
@@ -339,9 +339,11 @@ function ProfilRelaisTab({ userId, relaisInfo }: { userId: string; relaisInfo: a
       setUserData(data);
       setForm(prev => ({
         ...prev,
-        name: data.name || '',
+        firstName: data.firstName || '',
+        lastName: data.lastName || '',
         email: data.email || '',
         phone: data.phone || '',
+        personalAddress: data.address || '',
         siret: data.siret || '',
       }));
     } catch (error) {
@@ -375,7 +377,15 @@ function ProfilRelaisTab({ userId, relaisInfo }: { userId: string; relaisInfo: a
     }
     setIsSaving(true);
     try {
-      const userPayload: any = { name: form.name, email: form.email, phone: form.phone, siret: form.siret };
+      const userPayload: any = {
+        firstName: form.firstName,
+        lastName: form.lastName,
+        name: `${form.firstName} ${form.lastName}`.trim(),
+        email: form.email,
+        phone: form.phone,
+        address: form.personalAddress,
+        siret: form.siret,
+      };
       if (passwordForm.password) userPayload.password = passwordForm.password;
 
       const userRes = await fetch(`/api/users/${userId}`, {
@@ -447,8 +457,12 @@ function ProfilRelaisTab({ userId, relaisInfo }: { userId: string; relaisInfo: a
                 <p className="text-sm font-semibold text-slate-700 mb-3 pb-1 border-b">Informations personnelles</p>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
-                    <Label>Nom complet</Label>
-                    <Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
+                    <Label>Prénom</Label>
+                    <Input value={form.firstName} onChange={e => setForm({ ...form, firstName: e.target.value })} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Nom</Label>
+                    <Input value={form.lastName} onChange={e => setForm({ ...form, lastName: e.target.value })} />
                   </div>
                   <div className="space-y-2">
                     <Label>Téléphone</Label>
@@ -457,6 +471,10 @@ function ProfilRelaisTab({ userId, relaisInfo }: { userId: string; relaisInfo: a
                   <div className="space-y-2 sm:col-span-2">
                     <Label>Email</Label>
                     <Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
+                  </div>
+                  <div className="space-y-2 sm:col-span-2">
+                    <Label>Adresse personnelle</Label>
+                    <Input value={form.personalAddress} onChange={e => setForm({ ...form, personalAddress: e.target.value })} placeholder="Ex: 12 Rue Didouche Mourad" />
                   </div>
                   <div className="space-y-2 sm:col-span-2">
                     <Label>N° Registre du commerce (CNRC)</Label>
@@ -523,8 +541,12 @@ function ProfilRelaisTab({ userId, relaisInfo }: { userId: string; relaisInfo: a
                 <p className="text-sm font-semibold text-slate-700 mb-3 pb-1 border-b">Informations personnelles</p>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-1">
-                    <p className="text-xs text-slate-400 uppercase tracking-wide">Nom complet</p>
-                    <p className="font-medium">{userData?.name || '—'}</p>
+                    <p className="text-xs text-slate-400 uppercase tracking-wide">Prénom</p>
+                    <p className="font-medium">{userData?.firstName || '—'}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs text-slate-400 uppercase tracking-wide">Nom</p>
+                    <p className="font-medium">{userData?.lastName || '—'}</p>
                   </div>
                   <div className="space-y-1">
                     <p className="text-xs text-slate-400 uppercase tracking-wide">Email</p>
@@ -537,6 +559,10 @@ function ProfilRelaisTab({ userId, relaisInfo }: { userId: string; relaisInfo: a
                   <div className="space-y-1">
                     <p className="text-xs text-slate-400 uppercase tracking-wide">N° RC (CNRC)</p>
                     <p className="font-medium font-mono">{userData?.siret || '—'}</p>
+                  </div>
+                  <div className="space-y-1 sm:col-span-2">
+                    <p className="text-xs text-slate-400 uppercase tracking-wide">Adresse personnelle</p>
+                    <p className="font-medium">{userData?.address || '—'}</p>
                   </div>
                   <div className="space-y-1">
                     <p className="text-xs text-slate-400 uppercase tracking-wide">Membre depuis</p>

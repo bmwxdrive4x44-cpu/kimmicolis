@@ -17,6 +17,9 @@ model User {
   email         String   @unique
   password      String?
   name          String
+  firstName     String?
+  lastName      String?
+  address       String?
   role          String   // "CLIENT", "TRANSPORTER", "RELAIS", "ADMIN"
   phone         String?
   siret         String?  // For transporters
