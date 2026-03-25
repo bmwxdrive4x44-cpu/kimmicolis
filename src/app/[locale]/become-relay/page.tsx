@@ -30,6 +30,33 @@ const BENEFITS = [
   }
 ];
 
+const RELAY_CONDITIONS = [
+  {
+    title: 'Documents obligatoires',
+    description: 'Pièce d’identité du gérant, informations du commerce, téléphone joignable et adresse complète vérifiable.',
+  },
+  {
+    title: 'Conformité et vérification',
+    description: 'Votre dossier est vérifié par l’équipe SwiftColis avant activation. Seuls les profils conformes sont approuvés.',
+  },
+  {
+    title: 'Caution de sécurité',
+    description: 'Une caution peut être demandée selon le profil de risque et le volume. Elle reste bloquée selon les règles de conformité.',
+  },
+  {
+    title: 'Respect des reversements',
+    description: 'Les montants encaissés doivent être reversés à temps à la plateforme. Les retards répétitifs peuvent entraîner suspension et sanctions.',
+  },
+  {
+    title: 'Qualité de service minimum',
+    description: 'Le relais doit assurer un traitement correct des colis, respecter les scans requis et maintenir un score de conformité satisfaisant.',
+  },
+  {
+    title: 'Suivi et audits',
+    description: 'Un suivi régulier est effectué (écarts de cash, retards, incidents). Les cas critiques sont revus par l’administration.',
+  },
+];
+
 export default function BecomeRelayPage() {
   const handleSignUp = () => {
     document.getElementById('relay-application-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -58,19 +85,19 @@ export default function BecomeRelayPage() {
                   <div className="space-y-3 text-sm text-gray-700 dark:text-gray-300">
                     <div className="flex gap-3">
                       <span className="font-bold text-emerald-600 flex-shrink-0">1.</span>
-                      <p>Créez un compte en quelques secondes avec vos informations personnelles</p>
+                      <p>Créez votre compte et renseignez les informations du commerce (adresse, ville, horaires, contact).</p>
                     </div>
                     <div className="flex gap-3">
                       <span className="font-bold text-emerald-600 flex-shrink-0">2.</span>
-                      <p>Complétez les informations de votre point relais (nom du commerce, adresse, ville)</p>
+                      <p>Soumettez votre dossier avec les justificatifs requis pour vérification.</p>
                     </div>
                     <div className="flex gap-3">
                       <span className="font-bold text-emerald-600 flex-shrink-0">3.</span>
-                      <p>Votre demande est validée par notre équipe (généralement 24h)</p>
+                      <p>Paiement de la caution si demandée, puis validation admin du dossier.</p>
                     </div>
                     <div className="flex gap-3">
                       <span className="font-bold text-emerald-600 flex-shrink-0">4.</span>
-                      <p>Commencez à recevoir et traiter les colis</p>
+                      <p>Activation du relais, démarrage opérationnel et suivi conformité mensuel.</p>
                     </div>
                   </div>
                 </div>
@@ -89,8 +116,8 @@ export default function BecomeRelayPage() {
                 </div>
                 <div className="space-y-2 text-sm text-gray-600 dark:text-gray-400">
                   <p>✓ Inscription gratuite et rapide</p>
-                  <p>✓ Aucun engagement minimum</p>
-                  <p>✓ Commencez à héberger immédiatement</p>
+                  <p>✓ Validation du dossier avant activation</p>
+                  <p>✓ Conditions de conformité transparentes</p>
                 </div>
               </div>
               <div className="relative">
@@ -134,6 +161,37 @@ export default function BecomeRelayPage() {
         </section>
 
         <section className="py-12 md:py-20 bg-slate-50 dark:bg-slate-900/60">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="text-center mb-12">
+              <h2 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-4">
+                Conditions pour devenir relais
+              </h2>
+              <p className="text-xl text-gray-600 dark:text-gray-400">
+                Voici les règles principales à respecter pour une activation et une collaboration durable.
+              </p>
+            </div>
+
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {RELAY_CONDITIONS.map((condition, idx) => (
+                <Card key={idx} className="border bg-white dark:bg-slate-900">
+                  <CardContent className="pt-6 space-y-3">
+                    <div className="flex items-start gap-2">
+                      <CheckCircle className="h-5 w-5 text-emerald-600 mt-0.5" />
+                      <h3 className="text-base font-semibold text-gray-900 dark:text-white">
+                        {condition.title}
+                      </h3>
+                    </div>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
+                      {condition.description}
+                    </p>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="py-12 md:py-20 bg-slate-50 dark:bg-slate-900/60">
           <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center mb-10 space-y-3">
               <h2 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white">
@@ -153,7 +211,7 @@ export default function BecomeRelayPage() {
               Prêt à rejoindre la famille SwiftColis ?
             </h2>
             <p className="text-xl text-emerald-100">
-              Inscription facile, aucune commission cachée, support complet
+              Dossier clair, règles transparentes, support complet
             </p>
             <Button
               onClick={handleSignUp}

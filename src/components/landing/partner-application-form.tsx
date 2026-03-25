@@ -69,7 +69,7 @@ export function PartnerApplicationForm({ role }: PartnerApplicationFormProps) {
         accent: 'emerald',
         icon: Store,
         title: 'Postuler comme point relais',
-        description: 'Déposez votre dossier en ligne. Si vous n\'avez pas de compte, il sera créé automatiquement.',
+        description: 'Déposez votre dossier en ligne. Activation après vérification, conformité opérationnelle et caution possible selon le profil.',
         dashboardPath: `/${locale}/dashboard/relais`,
       }
     : {

@@ -63,7 +63,7 @@ export async function GET(request: NextRequest) {
           0
         );
 
-        const amountToPay = totalCommissionRelais - r.cashReversed;
+        const amountToPay = Math.max(totalCommissionPlateforme - r.cashReversed, 0);
 
         const delayedParcels = r.parcelsDepart.filter((c: any) => {
           if (c.status === 'LIVRE' || c.status === 'ANNULE' || c.status === 'RETOUR') return false;

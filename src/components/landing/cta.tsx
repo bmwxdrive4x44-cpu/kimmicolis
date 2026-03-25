@@ -24,14 +24,14 @@ export function CTA() {
           </h2>
           <p className="text-lg text-slate-400 mb-10 max-w-2xl mx-auto">
             Rejoignez des milliers d'utilisateurs qui font confiance à SwiftColis pour leurs envois 
-            à travers l'Algérie. Créez votre compte gratuit en quelques secondes.
+            à travers l'Algérie. Créez votre compte et déposez votre dossier partenaire en ligne.
           </p>
 
           {/* Benefits */}
           <div className="flex flex-wrap justify-center gap-6 mb-10">
             {[
               'Inscription gratuite',
-              'Sans engagement',
+              'Validation du dossier',
               'Support 7j/7',
             ].map((benefit, i) => (
               <div key={i} className="flex items-center gap-2 text-slate-300">
@@ -40,6 +40,10 @@ export function CTA() {
               </div>
             ))}
           </div>
+
+            <p className="text-sm text-slate-500 mb-8 max-w-2xl mx-auto">
+              Pour les points relais : activation après vérification du dossier, conformité opérationnelle et caution possible selon le profil.
+            </p>
 
           {/* CTA Buttons */}
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16">

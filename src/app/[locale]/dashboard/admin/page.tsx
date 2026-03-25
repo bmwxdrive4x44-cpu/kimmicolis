@@ -961,7 +961,7 @@ function RelaysTab() {
                 <p className="text-2xl font-bold mt-1 text-blue-600">{trackingTotals?.avgComplianceScore || 0}%</p>
               </div>
               <div className="rounded-lg border p-4 bg-orange-50 dark:bg-orange-950/20">
-                <p className="text-sm text-orange-700 dark:text-orange-300">Montant à reverser</p>
+                <p className="text-sm text-orange-700 dark:text-orange-300">Montant dû plateforme</p>
                 <p className="text-2xl font-bold mt-1 text-orange-600">{(trackingTotals?.totalMoneyPending || 0).toFixed(0)} DA</p>
               </div>
             </div>
@@ -1041,7 +1041,7 @@ function RelaysTab() {
                       <div className="rounded-lg bg-slate-50 dark:bg-slate-800/60 p-3"><p className="text-xs text-slate-500">Colis livrés</p><p className="text-xl font-bold text-emerald-600">{relay.metrics?.nbLivres || 0}</p></div>
                       <div className="rounded-lg bg-slate-50 dark:bg-slate-800/60 p-3"><p className="text-xs text-slate-500">Cash encaissé</p><p className="text-xl font-bold">{(relay.metrics?.cashCollected || 0).toFixed(0)} DA</p></div>
                       <div className="rounded-lg bg-slate-50 dark:bg-slate-800/60 p-3"><p className="text-xs text-slate-500">Commission relais</p><p className="text-xl font-bold text-emerald-600">{(relay.metrics?.commissionRelaisTotal || 0).toFixed(0)} DA</p></div>
-                      <div className="rounded-lg bg-slate-50 dark:bg-slate-800/60 p-3"><p className="text-xs text-slate-500">Montant dû plateforme</p><p className="text-xl font-bold text-orange-600">{(relay.metrics?.commissionPlateformeTotal || 0).toFixed(0)} DA</p></div>
+                      <div className="rounded-lg bg-slate-50 dark:bg-slate-800/60 p-3"><p className="text-xs text-slate-500">Montant dû plateforme</p><p className="text-xl font-bold text-orange-600">{(relay.metrics?.amountToPay || 0).toFixed(0)} DA</p></div>
                       <div className="rounded-lg bg-slate-50 dark:bg-slate-800/60 p-3"><p className="text-xs text-slate-500">Montant déjà versé</p><p className="text-xl font-bold">{(relay.metrics?.amountPaid || 0).toFixed(0)} DA</p></div>
                     </div>
 
