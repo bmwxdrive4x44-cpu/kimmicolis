@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useSession } from 'next-auth/react';
 import { useLocale } from 'next-intl';
 import { useRouter } from 'next/navigation';
@@ -14,7 +15,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { WILAYAS, PARCEL_STATUS, RELAIS_STATUS, DEFAULT_RELAY_COMMISSION, RELAY_CASH_ALERT_THRESHOLD } from '@/lib/constants';
-import { Store, Package, QrCode, DollarSign, Loader2, CheckCircle, Clock, Scan, ArrowDownToLine, ArrowUpFromLine, Settings, BarChart3, AlertCircle, Save, AlertTriangle, CreditCard, History, BanknoteIcon, User, Pencil } from 'lucide-react';
+import { Store, Package, QrCode, DollarSign, Loader2, CheckCircle, Clock, Scan, ArrowDownToLine, ArrowUpFromLine, Settings, BarChart3, AlertCircle, Save, AlertTriangle, CreditCard, History, BanknoteIcon, User, Pencil, TrendingUp } from 'lucide-react';
 import { isAlgerianCommerceRegisterNumber } from '@/lib/validators';
 import { useToast } from '@/hooks/use-toast';
 
@@ -287,10 +288,11 @@ export default function RelaisDashboard() {
         </Card>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-5 mb-8">
+          <TabsList className="grid w-full grid-cols-6 mb-8">
             <TabsTrigger value="overview"><BarChart3 className="h-4 w-4 mr-1 hidden sm:inline" />Vue d'ensemble</TabsTrigger>
             <TabsTrigger value="scan"><QrCode className="h-4 w-4 mr-1 hidden sm:inline" />Scanner QR</TabsTrigger>
             <TabsTrigger value="cash"><CreditCard className="h-4 w-4 mr-1 hidden sm:inline" />Caisse</TabsTrigger>
+            <TabsTrigger value="gains"><TrendingUp className="h-4 w-4 mr-1 hidden sm:inline" />Gains</TabsTrigger>
             <TabsTrigger value="settings"><Settings className="h-4 w-4 mr-1 hidden sm:inline" />Paramètres</TabsTrigger>
             <TabsTrigger value="profil"><User className="h-4 w-4 mr-1 hidden sm:inline" />Profil</TabsTrigger>
           </TabsList>
@@ -303,6 +305,9 @@ export default function RelaisDashboard() {
           </TabsContent>
           <TabsContent value="cash">
             <CashTab relaisId={relaisInfo?.id} cashInfo={cashInfo} userId={session.user.id} onRefresh={fetchRelaisInfo} />
+          </TabsContent>
+          <TabsContent value="gains">
+            <GainsTab relaisId={relaisInfo?.id} />
           </TabsContent>
           <TabsContent value="settings">
             <SettingsTab relaisInfo={relaisInfo} onUpdate={fetchRelaisInfo} />
@@ -1540,6 +1545,194 @@ function SettingsTab({ relaisInfo, onUpdate }: { relaisInfo: any; onUpdate: () =
               <p className="text-slate-500">Chargement...</p>
             )}
           </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// Gains Tab — Commissions & historique financier du relais
+// ─────────────────────────────────────────────────────────────
+function GainsTab({ relaisId }: { relaisId: string | undefined }) {
+  const [data, setData] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [filter, setFilter] = useState<'ALL' | 'COLLECTED' | 'REVERSED'>('ALL');
+
+  const fetchData = useCallback(async () => {
+    if (!relaisId) return;
+    setIsLoading(true);
+    try {
+      const res = await fetch(`/api/relais/financials?relaisId=${relaisId}`);
+      if (res.ok) setData(await res.json());
+    } finally {
+      setIsLoading(false);
+    }
+  }, [relaisId]);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  const monthlyData = useMemo(() => {
+    if (!data?.transactions) return [];
+    const months: Record<string, number> = {};
+    const sorted = [...data.transactions]
+      .filter((t: any) => t.type === 'COLLECTED')
+      .sort((a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    sorted.forEach((t: any) => {
+      const d = new Date(t.createdAt);
+      const key = d.toLocaleDateString('fr-FR', { month: 'short', year: '2-digit' });
+      months[key] = (months[key] || 0) + (t.colis?.commissionRelais || 0);
+    });
+    return Object.entries(months).map(([month, amount]) => ({ month, amount: Math.round(amount as number) })).slice(-6);
+  }, [data]);
+
+  const totalCommissions = useMemo(() =>
+    (data?.transactions || [])
+      .filter((t: any) => t.type === 'COLLECTED')
+      .reduce((sum: number, t: any) => sum + (t.colis?.commissionRelais || 0), 0),
+    [data]
+  );
+
+  const filteredTransactions = useMemo(() =>
+    (data?.transactions || []).filter((t: any) => filter === 'ALL' || t.type === filter),
+    [data, filter]
+  );
+
+  if (isLoading) {
+    return <div className="flex justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-emerald-600" /></div>;
+  }
+
+  const blockRisk = data?.blockRiskPercent || 0;
+
+  return (
+    <div className="space-y-6">
+      {/* KPI Cards */}
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Commissions gagnées</CardTitle>
+            <TrendingUp className="h-4 w-4 text-emerald-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-emerald-600">{totalCommissions.toFixed(0)} DA</div>
+            <p className="text-xs text-slate-500">sur tous les colis livrés</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Cash encaissé</CardTitle>
+            <BanknoteIcon className="h-4 w-4 text-blue-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{(data?.totalEncaisse || 0).toFixed(0)} DA</div>
+            <p className="text-xs text-slate-500">{(data?.totalReverse || 0).toFixed(0)} DA reversé</p>
+          </CardContent>
+        </Card>
+        <Card className={blockRisk >= 100 ? 'border-red-400' : blockRisk > 70 ? 'border-orange-400' : ''}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Risque blocage</CardTitle>
+            <AlertTriangle className={`h-4 w-4 ${blockRisk > 70 ? 'text-red-500' : 'text-orange-400'}`} />
+          </CardHeader>
+          <CardContent>
+            <div className={`text-2xl font-bold ${blockRisk > 70 ? 'text-red-600' : blockRisk > 40 ? 'text-orange-500' : 'text-slate-700'}`}>
+              {blockRisk.toFixed(0)}%
+            </div>
+            <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-1.5 mt-2">
+              <div
+                className={`h-1.5 rounded-full transition-all ${blockRisk > 70 ? 'bg-red-500' : blockRisk > 40 ? 'bg-orange-400' : 'bg-emerald-500'}`}
+                style={{ width: `${Math.min(blockRisk, 100)}%` }}
+              />
+            </div>
+            <p className="text-xs text-slate-500 mt-1">Seuil : {(data?.blockThreshold || 0).toFixed(0)} DA</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Monthly bar chart */}
+      {monthlyData.length > 0 ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Commissions mensuelles</CardTitle>
+            <CardDescription>Revenus des 6 derniers mois</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={monthlyData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                <XAxis dataKey="month" tick={{ fontSize: 12 }} />
+                <YAxis tick={{ fontSize: 12 }} unit=" DA" width={72} />
+                <Tooltip formatter={(v: number) => [`${v} DA`, 'Commissions']} />
+                <Bar dataKey="amount" fill="#10b981" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <CardContent className="py-10 text-center text-slate-500">
+            <DollarSign className="h-8 w-8 mx-auto mb-2 text-slate-300" />
+            Aucune commission enregistrée pour le moment
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Transaction history */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <History className="h-5 w-5" />
+              Historique financier
+            </CardTitle>
+            <Select value={filter} onValueChange={(v: 'ALL' | 'COLLECTED' | 'REVERSED') => setFilter(v)}>
+              <SelectTrigger className="w-44">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">Tout</SelectItem>
+                <SelectItem value="COLLECTED">Encaissements</SelectItem>
+                <SelectItem value="REVERSED">Versements</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {filteredTransactions.length === 0 ? (
+            <p className="text-center text-slate-500 py-8">Aucune transaction</p>
+          ) : (
+            <div className="space-y-2">
+              {filteredTransactions.map((tx: any) => (
+                <div key={tx.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${tx.type === 'COLLECTED' ? 'bg-emerald-100 dark:bg-emerald-900/30' : 'bg-blue-100 dark:bg-blue-900/30'}`}>
+                      {tx.type === 'COLLECTED'
+                        ? <ArrowDownToLine className="h-4 w-4 text-emerald-600" />
+                        : <ArrowUpFromLine className="h-4 w-4 text-blue-600" />}
+                    </div>
+                    <div>
+                      <p className="font-semibold text-sm">
+                        {tx.type === 'COLLECTED' ? 'Encaissement client' : 'Versement plateforme'}
+                        {tx.colis && <span className="font-mono text-slate-400 ml-2 text-xs">#{tx.colis.trackingNumber}</span>}
+                      </p>
+                      <p className="text-xs text-slate-400">
+                        {new Date(tx.createdAt).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })}
+                        {tx.colis && <span className="ml-2">{tx.colis.villeDepart} → {tx.colis.villeArrivee}</span>}
+                      </p>
+                      {tx.notes && <p className="text-xs text-slate-400 italic">{tx.notes}</p>}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className={`font-bold ${tx.type === 'COLLECTED' ? 'text-emerald-600' : 'text-blue-600'}`}>
+                      {tx.type === 'COLLECTED' ? '+' : '-'}{tx.amount.toFixed(0)} DA
+                    </p>
+                    {tx.type === 'COLLECTED' && tx.colis?.commissionRelais > 0 && (
+                      <p className="text-xs text-emerald-500">+{tx.colis.commissionRelais} DA comm.</p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
