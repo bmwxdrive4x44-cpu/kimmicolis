@@ -23,6 +23,14 @@ export async function GET(request: NextRequest) {
         parcelsDepart: true,
         parcelsArrivee: true,
         cashTransactions: true,
+        sanctions: {
+          where: {
+            OR: [
+              { endDate: null },
+              { endDate: { gt: new Date() } },
+            ],
+          },
+        },
       },
     });
 
@@ -75,6 +83,15 @@ export async function GET(request: NextRequest) {
         }
         reliabilityScore = Math.max(0, Math.min(100, reliabilityScore));
 
+        const complianceScore = Math.round(r.complianceScore ?? 100);
+        const trustLevel = complianceScore >= 90
+          ? 'excellent'
+          : complianceScore >= 75
+          ? 'good'
+          : complianceScore >= 50
+          ? 'warning'
+          : 'critical';
+
         // Alertes
         const alerts: Array<{ level: 'warning' | 'critical', message: string }> = [];
         if (r.operationalStatus === 'SUSPENDU') {
@@ -85,6 +102,9 @@ export async function GET(request: NextRequest) {
         }
         if (reliabilityScore < 80) {
           alerts.push({ level: 'warning', message: `Score de fiabilité bas: ${reliabilityScore}%` });
+        }
+        if (complianceScore < 75) {
+          alerts.push({ level: 'warning', message: `Score conformité bas: ${complianceScore}%` });
         }
         if (amountToPay > 50000) {
           alerts.push({ level: 'warning', message: `Montant dû important: ${amountToPay.toFixed(0)} DA` });
@@ -99,6 +119,10 @@ export async function GET(request: NextRequest) {
           suspensionReason: r.suspensionReason,
           suspendedAt: r.suspendedAt,
           approvalStatus: r.status,
+          cautionStatus: r.cautionStatus,
+          cautionAmount: r.cautionAmount,
+          activeSanctionsCount: r.sanctions.length,
+          trustLevel,
           contactName: r.user.name,
           phone: r.user.phone,
           email: r.user.email,
@@ -114,6 +138,7 @@ export async function GET(request: NextRequest) {
             amountPaid: r.cashReversed,
             nbDelayed,
             reliabilityScore: Math.round(reliabilityScore),
+            complianceScore,
           },
           alerts,
         };
@@ -149,6 +174,9 @@ export async function GET(request: NextRequest) {
       totalMoneyPending: relaisWithStats.reduce((sum, r) => sum + r.metrics.amountToPay, 0),
       avgReliabilityScore: Math.round(
         relaisWithStats.reduce((sum, r) => sum + r.metrics.reliabilityScore, 0) / Math.max(relaisWithStats.length, 1)
+      ),
+      avgComplianceScore: Math.round(
+        relaisWithStats.reduce((sum, r) => sum + r.metrics.complianceScore, 0) / Math.max(relaisWithStats.length, 1)
       ),
     };
 

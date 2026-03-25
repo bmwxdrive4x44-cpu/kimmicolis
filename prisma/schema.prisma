@@ -61,6 +61,15 @@ model Relais {
   suspendedAt      DateTime? // When suspended
   cashCollected    Float    @default(0)  // Total cash collected from clients
   cashReversed     Float    @default(0)  // Total reversed to platform
+  
+  // Compliance & security fields
+  cautionAmount     Float?               // Caution amount (virtual or real SEPA block)
+  cautionStatus     String   @default("PENDING") // PENDING, BLOCKED, PARTIAL_RELEASED, FULLY_RELEASED, FORFEITED
+  cautionPaidAt     DateTime?
+  activationDate    DateTime?            // When relais became active
+  firstActivityDate DateTime?            // When relais first got deliveries
+  complianceScore   Float    @default(100) // Score 0-100, decreases with violations
+  
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
   
@@ -68,6 +77,8 @@ model Relais {
   parcelsDepart    Colis[]  @relation("RelaisDepart")
   parcelsArrivee   Colis[]  @relation("RelaisArrivee")
   cashTransactions RelaisCash[]
+  sanctions        RelaisSanction[]
+  audits           RelaisAudit[]
 }
 
 // Transporter applications
@@ -254,11 +265,23 @@ model RelaisCash {
   colisId        String
   amount         Float    // Cash amount collected from client
   type           String   // COLLECTED | REVERSED
+  
+  // Audit fields
+  declaredAmount    Float?   // Amount declared by relais
+  verifiedAmount    Float?   // Amount verified by auditor
+  variancePercent   Float?   // (declared - verified) / verified * 100
+  auditDate         DateTime?
+  auditedBy         String?  // Admin user ID who audited
+  
   notes          String?
   createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   relais         Relais   @relation(fields: [relaisId], references: [id])
   colis          Colis    @relation(fields: [colisId], references: [id])
+  
+  @@index([relaisId, createdAt])
+  @@index([auditedBy])
 }
 
 // Dispute / Litige model
@@ -280,6 +303,46 @@ model Dispute {
 
   @@index([colisId])
   @@index([openedById])
+  @@index([status])
+}
+
+// Relay sanctions & compliance violations
+model RelaisSanction {
+  id          String   @id @default(cuid())
+  relaisId    String
+  reason      String   // NON_REVERSAL | HIGH_VARIANCE | MISSING_AUDIT | OPERATOR_ERROR | OTHER
+  type        String   // REDUCTION_VOLUME | SUSPENSION | CAUTION_FORFEIT | WARNING
+  reduction   Float?   // If volume reduction: percentage (0-100)
+  startDate   DateTime @default(now())
+  endDate     DateTime?
+  appliedBy   String   // Admin user ID
+  notes       String?
+  createdAt   DateTime @default(now())
+  
+  relais      Relais   @relation(fields: [relaisId], references: [id])
+  
+  @@index([relaisId, startDate])
+  @@index([endDate])
+}
+
+// Immutable audit log for relais monthly compliance
+model RelaisAudit {
+  id            String   @id @default(cuid())
+  relaisId      String
+  auditDate     DateTime @default(now())
+  declaredTotal Float    // Total cash relais declared
+  verifiedTotal Float    // Total cash actually verified
+  variance      Float    // Percentage variance
+  discrepancies Int      @default(0) // Number of variance discrepancies found
+  status        String   @default("PENDING") // PENDING | COMPLETED | FLAGGED
+  auditedBy     String   // Admin user ID
+  notes         String?
+  createdAt     DateTime @default(now())
+  // Immutable - no updatedAt
+  
+  relais        Relais   @relation(fields: [relaisId], references: [id])
+  
+  @@index([relaisId, auditDate])
   @@index([status])
 }
 

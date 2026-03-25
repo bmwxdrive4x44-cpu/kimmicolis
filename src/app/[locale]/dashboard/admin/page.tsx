@@ -650,6 +650,8 @@ function RelaysTab() {
   const [deleteRelaisId, setDeleteRelaisId] = useState<string | null>(null);
   const [suspensionReasons, setSuspensionReasons] = useState<Record<string, string>>({});
   const [isSaving, setIsSaving] = useState(false);
+  const [isComplianceProcessing, setIsComplianceProcessing] = useState(false);
+  const [isAuditRunning, setIsAuditRunning] = useState(false);
 
   useEffect(() => { fetchRelais(); }, []);
   useEffect(() => { fetchTracking(); }, [trackingSort, trackingFilter]);
@@ -836,6 +838,62 @@ function RelaysTab() {
     }
   };
 
+  const handleProcessCompliance = async (relaisId?: string) => {
+    try {
+      setIsComplianceProcessing(true);
+      const response = await fetch('/api/admin/compliance/process', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(relaisId ? { relaisId } : {}),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data?.error || 'Impossible de lancer le traitement conformité');
+      }
+      toast({
+        title: 'Conformité recalculée',
+        description: `${data?.processedCount || 0} relais traité(s).`,
+      });
+      fetchTracking();
+    } catch (error) {
+      toast({
+        title: 'Erreur conformité',
+        description: error instanceof Error ? error.message : 'Traitement conformité impossible',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsComplianceProcessing(false);
+    }
+  };
+
+  const handleRunMonthlyAudit = async () => {
+    try {
+      setIsAuditRunning(true);
+      const response = await fetch('/api/admin/audit/monthly', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ forceAll: true }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data?.error || 'Impossible de lancer l\'audit mensuel');
+      }
+      toast({
+        title: 'Audit mensuel lancé',
+        description: `${data?.auditedCount || 0} relais audité(s).`,
+      });
+      fetchTracking();
+    } catch (error) {
+      toast({
+        title: 'Erreur audit',
+        description: error instanceof Error ? error.message : 'Audit mensuel impossible',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsAuditRunning(false);
+    }
+  };
+
   const safeRelais = Array.isArray(relais) ? relais : [];
   const filteredRelais = filter === 'all' ? safeRelais : safeRelais.filter(r => r.status === filter);
 
@@ -869,11 +927,19 @@ function RelaysTab() {
                 <Button variant="outline" onClick={fetchTracking} disabled={isTrackingLoading}>
                   <RefreshCw className={`h-4 w-4 mr-2 ${isTrackingLoading ? 'animate-spin' : ''}`} />Actualiser
                 </Button>
+                <Button variant="outline" onClick={() => handleProcessCompliance()} disabled={isComplianceProcessing}>
+                  {isComplianceProcessing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                  Recalcul conformité
+                </Button>
+                <Button onClick={handleRunMonthlyAudit} disabled={isAuditRunning} className="bg-emerald-600 hover:bg-emerald-700">
+                  {isAuditRunning ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                  Audit mensuel
+                </Button>
               </div>
             </div>
           </CardHeader>
           <CardContent>
-            <div className="grid gap-4 md:grid-cols-5">
+            <div className="grid gap-4 md:grid-cols-6">
               <div className="rounded-lg border p-4 bg-slate-50 dark:bg-slate-800/60">
                 <p className="text-sm text-slate-600 dark:text-slate-400">Relais total</p>
                 <p className="text-2xl font-bold mt-1">{trackingTotals?.totalRelais || 0}</p>
@@ -889,6 +955,10 @@ function RelaysTab() {
               <div className="rounded-lg border p-4 bg-slate-50 dark:bg-slate-800/60">
                 <p className="text-sm text-slate-600 dark:text-slate-400">Fiabilité moyenne</p>
                 <p className="text-2xl font-bold mt-1">{trackingTotals?.avgReliabilityScore || 0}%</p>
+              </div>
+              <div className="rounded-lg border p-4 bg-blue-50 dark:bg-blue-950/20">
+                <p className="text-sm text-blue-700 dark:text-blue-300">Conformité moyenne</p>
+                <p className="text-2xl font-bold mt-1 text-blue-600">{trackingTotals?.avgComplianceScore || 0}%</p>
               </div>
               <div className="rounded-lg border p-4 bg-orange-50 dark:bg-orange-950/20">
                 <p className="text-sm text-orange-700 dark:text-orange-300">Montant à reverser</p>
@@ -923,6 +993,11 @@ function RelaysTab() {
                             {RELAIS_STATUS.find(s => s.id === relay.approvalStatus)?.label || relay.approvalStatus}
                           </Badge>
                           <Badge variant="outline">Score {relay.metrics?.reliabilityScore || 0}%</Badge>
+                          <Badge variant="outline">Conformité {relay.metrics?.complianceScore || 0}%</Badge>
+                          <Badge variant="outline">Caution {relay.cautionStatus || 'PENDING'}</Badge>
+                          {relay.activeSanctionsCount > 0 && (
+                            <Badge className="bg-red-100 text-red-700">Sanctions actives: {relay.activeSanctionsCount}</Badge>
+                          )}
                         </div>
                         <p className="text-sm text-slate-600 dark:text-slate-400">{relay.address}, {WILAYAS.find(w => w.id === relay.ville)?.name || relay.ville}</p>
                         <p className="text-xs text-slate-500">{relay.contactName || '-'} · {relay.phone || '-'} · {relay.email || '-'}</p>
@@ -938,6 +1013,10 @@ function RelaysTab() {
                       </div>
 
                       <div className="flex flex-col gap-2 min-w-[280px]">
+                        <Button variant="outline" onClick={() => handleProcessCompliance(relay.id)} disabled={isComplianceProcessing}>
+                          {isComplianceProcessing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                          Appliquer règles
+                        </Button>
                         {relay.operationalStatus === 'SUSPENDU' ? (
                           <Button className="bg-emerald-600 hover:bg-emerald-700" onClick={() => handleOperationalStatusChange(relay.id, 'ACTIF')} disabled={isSaving}>
                             <CheckCircle className="h-4 w-4 mr-2" />Réactiver
@@ -977,6 +1056,12 @@ function RelaysTab() {
                         <div className="flex items-center justify-between"><span className="text-sm text-slate-600 dark:text-slate-400">Score de fiabilité</span><Badge variant="outline">{relay.metrics?.reliabilityScore || 0}%</Badge></div>
                         <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2 mt-3">
                           <div className={`h-2 rounded-full ${(relay.metrics?.reliabilityScore || 0) >= 95 ? 'bg-emerald-500' : (relay.metrics?.reliabilityScore || 0) >= 80 ? 'bg-orange-400' : 'bg-red-500'}`} style={{ width: `${Math.min(relay.metrics?.reliabilityScore || 0, 100)}%` }} />
+                        </div>
+                      </div>
+                      <div className="rounded-lg border p-3">
+                        <div className="flex items-center justify-between"><span className="text-sm text-slate-600 dark:text-slate-400">Score conformité</span><Badge variant="outline">{relay.metrics?.complianceScore || 0}%</Badge></div>
+                        <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2 mt-3">
+                          <div className={`h-2 rounded-full ${(relay.metrics?.complianceScore || 0) >= 90 ? 'bg-emerald-500' : (relay.metrics?.complianceScore || 0) >= 75 ? 'bg-orange-400' : 'bg-red-500'}`} style={{ width: `${Math.min(relay.metrics?.complianceScore || 0, 100)}%` }} />
                         </div>
                       </div>
                     </div>
