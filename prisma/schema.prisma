@@ -77,6 +77,7 @@ model Relais {
   parcelsDepart    Colis[]  @relation("RelaisDepart")
   parcelsArrivee   Colis[]  @relation("RelaisArrivee")
   cashTransactions RelaisCash[]
+  cashPickups      CashPickup[]
   sanctions        RelaisSanction[]
   audits           RelaisAudit[]
 }
@@ -356,4 +357,29 @@ model ActionLog {
   details     String?  // JSON string with extra info
   ipAddress   String?
   createdAt   DateTime @default(now())
+}
+
+// Physical cash pickup from relay to platform
+model CashPickup {
+  id                      String   @id @default(cuid())
+  relaisId                String
+  collectorId             String?
+  expectedAmount          Float
+  collectedAmount         Float?
+  status                  String   @default("REQUESTED") // REQUESTED | ASSIGNED | IN_PROGRESS | CONFIRMED | DISPUTED | CANCELLED
+  scheduledAt             DateTime?
+  startedAt               DateTime?
+  confirmedAt             DateTime?
+  receiptRef              String?  @unique
+  relayValidationCodeHash String?
+  collectorCodeHash       String?
+  proofPhotoUrl           String?
+  notes                   String?
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  relais                  Relais   @relation(fields: [relaisId], references: [id])
+
+  @@index([relaisId, createdAt])
+  @@index([status, scheduledAt])
 }

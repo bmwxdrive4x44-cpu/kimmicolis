@@ -652,9 +652,18 @@ function RelaysTab() {
   const [isSaving, setIsSaving] = useState(false);
   const [isComplianceProcessing, setIsComplianceProcessing] = useState(false);
   const [isAuditRunning, setIsAuditRunning] = useState(false);
+  const [cashPickups, setCashPickups] = useState<any[]>([]);
+  const [isCashPickupsLoading, setIsCashPickupsLoading] = useState(true);
+  const [pickupFilter, setPickupFilter] = useState('ALL');
+  const [pickupCollectors, setPickupCollectors] = useState<Record<string, string>>({});
+  const [pickupAmounts, setPickupAmounts] = useState<Record<string, string>>({});
+  const [pickupRelayCodes, setPickupRelayCodes] = useState<Record<string, string>>({});
+  const [pickupCollectorCodes, setPickupCollectorCodes] = useState<Record<string, string>>({});
+  const [pickupSchedules, setPickupSchedules] = useState<Record<string, string>>({});
 
   useEffect(() => { fetchRelais(); }, []);
   useEffect(() => { fetchTracking(); }, [trackingSort, trackingFilter]);
+  useEffect(() => { fetchCashPickups(); }, [pickupFilter]);
 
   const fetchRelais = async () => {
     try {
@@ -698,6 +707,29 @@ function RelaysTab() {
       });
     } finally {
       setIsTrackingLoading(false);
+    }
+  };
+
+  const fetchCashPickups = async () => {
+    setIsCashPickupsLoading(true);
+    try {
+      const query = pickupFilter !== 'ALL' ? `?status=${pickupFilter}` : '';
+      const response = await fetch(`/api/admin/cash-pickups${query}`);
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data?.error || 'Failed to fetch cash pickups');
+      }
+      setCashPickups(Array.isArray(data?.pickups) ? data.pickups : []);
+    } catch (error) {
+      console.error('Error fetching cash pickups:', error);
+      setCashPickups([]);
+      toast({
+        title: 'Erreur collectes cash',
+        description: error instanceof Error ? error.message : 'Impossible de charger les collectes cash',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsCashPickupsLoading(false);
     }
   };
 
@@ -894,6 +926,104 @@ function RelaysTab() {
     }
   };
 
+  const handleAssignPickup = async (pickupId: string) => {
+    try {
+      setIsSaving(true);
+      const collectorId = pickupCollectors[pickupId]?.trim();
+      if (!collectorId) {
+        throw new Error('collectorId requis');
+      }
+
+      const response = await fetch(`/api/admin/cash-pickups/${pickupId}/assign`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          collectorId,
+          scheduledAt: pickupSchedules[pickupId] || undefined,
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data?.error || 'Impossible d\'assigner la collecte');
+      }
+      toast({ title: 'Collecte assignée' });
+      fetchCashPickups();
+    } catch (error) {
+      toast({
+        title: 'Erreur assignation',
+        description: error instanceof Error ? error.message : 'Assignation impossible',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleStartPickup = async (pickupId: string) => {
+    try {
+      setIsSaving(true);
+      const response = await fetch(`/api/admin/cash-pickups/${pickupId}/start`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data?.error || 'Impossible de démarrer la collecte');
+      }
+      toast({ title: 'Collecte démarrée' });
+      fetchCashPickups();
+    } catch (error) {
+      toast({
+        title: 'Erreur démarrage',
+        description: error instanceof Error ? error.message : 'Démarrage impossible',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleConfirmPickup = async (pickupId: string) => {
+    try {
+      setIsSaving(true);
+      const collectedAmount = Number(pickupAmounts[pickupId] || 0);
+      const relayValidationCode = pickupRelayCodes[pickupId]?.trim();
+      const collectorValidationCode = pickupCollectorCodes[pickupId]?.trim();
+
+      if (!collectedAmount || collectedAmount <= 0) {
+        throw new Error('Montant collecté requis');
+      }
+      if (!relayValidationCode || !collectorValidationCode) {
+        throw new Error('Les deux codes de validation sont requis');
+      }
+
+      const response = await fetch(`/api/admin/cash-pickups/${pickupId}/confirm`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          collectedAmount,
+          relayValidationCode,
+          collectorValidationCode,
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data?.error || 'Impossible de confirmer la collecte');
+      }
+      toast({ title: 'Collecte confirmée' });
+      fetchCashPickups();
+      fetchTracking();
+    } catch (error) {
+      toast({
+        title: 'Erreur confirmation',
+        description: error instanceof Error ? error.message : 'Confirmation impossible',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const safeRelais = Array.isArray(relais) ? relais : [];
   const filteredRelais = filter === 'all' ? safeRelais : safeRelais.filter(r => r.status === filter);
 
@@ -1065,6 +1195,104 @@ function RelaysTab() {
                         </div>
                       </div>
                     </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <CardTitle>Collectes cash physiques</CardTitle>
+                <CardDescription>Demandes de récupération du cash directement dans les points relais</CardDescription>
+              </div>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Select value={pickupFilter} onValueChange={setPickupFilter}>
+                  <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">Tous les statuts</SelectItem>
+                    <SelectItem value="REQUESTED">Demandées</SelectItem>
+                    <SelectItem value="ASSIGNED">Assignées</SelectItem>
+                    <SelectItem value="IN_PROGRESS">En cours</SelectItem>
+                    <SelectItem value="CONFIRMED">Confirmées</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button variant="outline" onClick={fetchCashPickups} disabled={isCashPickupsLoading}>
+                  <RefreshCw className={`h-4 w-4 mr-2 ${isCashPickupsLoading ? 'animate-spin' : ''}`} />Actualiser
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {isCashPickupsLoading ? (
+              <div className="flex justify-center py-8"><Loader2 className="h-8 w-8 animate-spin text-emerald-600" /></div>
+            ) : cashPickups.length === 0 ? (
+              <p className="text-center text-slate-500 py-8">Aucune collecte cash</p>
+            ) : (
+              <div className="space-y-4">
+                {cashPickups.map((pickup) => (
+                  <div key={pickup.id} className="rounded-xl border p-4 space-y-4">
+                    <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+                      <div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="font-semibold">{pickup.relais?.commerceName || 'Relais'}</p>
+                          <Badge variant="outline">{pickup.status}</Badge>
+                          <Badge className="bg-orange-100 text-orange-700">Attendu {Number(pickup.expectedAmount || 0).toFixed(0)} DA</Badge>
+                          {pickup.collectedAmount ? (
+                            <Badge className="bg-emerald-100 text-emerald-700">Collecté {Number(pickup.collectedAmount || 0).toFixed(0)} DA</Badge>
+                          ) : null}
+                        </div>
+                        <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">{pickup.relais?.address}, {WILAYAS.find(w => w.id === pickup.relais?.ville)?.name || pickup.relais?.ville}</p>
+                        <p className="text-xs text-slate-500 mt-1">Créée le {new Date(pickup.createdAt).toLocaleString('fr-FR')}</p>
+                      </div>
+                      <div className="text-sm text-slate-500">
+                        {pickup.receiptRef ? <span>Reçu: {pickup.receiptRef}</span> : null}
+                      </div>
+                    </div>
+
+                    {(pickup.status === 'REQUESTED' || pickup.status === 'ASSIGNED') && (
+                      <div className="grid gap-3 md:grid-cols-3">
+                        <Input
+                          placeholder="ID collecteur"
+                          value={pickupCollectors[pickup.id] || ''}
+                          onChange={(e) => setPickupCollectors((prev) => ({ ...prev, [pickup.id]: e.target.value }))}
+                        />
+                        <Input
+                          type="datetime-local"
+                          value={pickupSchedules[pickup.id] || ''}
+                          onChange={(e) => setPickupSchedules((prev) => ({ ...prev, [pickup.id]: e.target.value }))}
+                        />
+                        <div className="flex gap-2">
+                          <Button variant="outline" onClick={() => handleAssignPickup(pickup.id)} disabled={isSaving}>Assigner</Button>
+                          <Button onClick={() => handleStartPickup(pickup.id)} disabled={isSaving} className="bg-emerald-600 hover:bg-emerald-700">Démarrer</Button>
+                        </div>
+                      </div>
+                    )}
+
+                    {pickup.status === 'IN_PROGRESS' && (
+                      <div className="grid gap-3 md:grid-cols-4">
+                        <Input
+                          type="number"
+                          placeholder="Montant collecté"
+                          value={pickupAmounts[pickup.id] || ''}
+                          onChange={(e) => setPickupAmounts((prev) => ({ ...prev, [pickup.id]: e.target.value }))}
+                        />
+                        <Input
+                          placeholder="Code relais"
+                          value={pickupRelayCodes[pickup.id] || ''}
+                          onChange={(e) => setPickupRelayCodes((prev) => ({ ...prev, [pickup.id]: e.target.value }))}
+                        />
+                        <Input
+                          placeholder="Code collecteur"
+                          value={pickupCollectorCodes[pickup.id] || ''}
+                          onChange={(e) => setPickupCollectorCodes((prev) => ({ ...prev, [pickup.id]: e.target.value }))}
+                        />
+                        <Button onClick={() => handleConfirmPickup(pickup.id)} disabled={isSaving} className="bg-emerald-600 hover:bg-emerald-700">Confirmer</Button>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

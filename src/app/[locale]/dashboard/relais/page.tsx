@@ -1156,18 +1156,28 @@ function ScanTab({ relaisId, userId, onRefresh }: { relaisId: string | undefined
 function CashTab({ relaisId, cashInfo, userId, onRefresh }: { relaisId: string | undefined; cashInfo: any; userId: string; onRefresh: () => void }) {
   const { toast } = useToast();
   const [transactions, setTransactions] = useState<any[]>([]);
+  const [cashPickups, setCashPickups] = useState<any[]>([]);
   const [reverseAmount, setReverseAmount] = useState('');
   const [reverseNotes, setReverseNotes] = useState('');
+  const [pickupAmount, setPickupAmount] = useState('');
+  const [pickupNotes, setPickupNotes] = useState('');
+  const [pickupScheduledAt, setPickupScheduledAt] = useState('');
   const [isReversing, setIsReversing] = useState(false);
+  const [isRequestingPickup, setIsRequestingPickup] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   const fetchTransactions = useCallback(async () => {
     if (!relaisId) return;
     setIsLoading(true);
     try {
-      const res = await fetch(`/api/relais-cash?relaisId=${relaisId}`);
-      const data = await res.json();
-      setTransactions(data.transactions || []);
+      const [cashRes, pickupRes] = await Promise.all([
+        fetch(`/api/relais-cash?relaisId=${relaisId}`),
+        fetch(`/api/relais/cash-pickups?relaisId=${relaisId}`),
+      ]);
+      const cashData = await cashRes.json();
+      const pickupData = await pickupRes.json().catch(() => ({ pickups: [] }));
+      setTransactions(cashData.transactions || []);
+      setCashPickups(pickupData.pickups || []);
     } finally {
       setIsLoading(false);
     }
@@ -1203,6 +1213,54 @@ function CashTab({ relaisId, cashInfo, userId, onRefresh }: { relaisId: string |
       }
     } finally {
       setIsReversing(false);
+    }
+  };
+
+  const handleRequestPickup = async () => {
+    const expectedAmount = parseFloat(pickupAmount);
+    if (!relaisId || !expectedAmount || expectedAmount <= 0) {
+      toast({ title: 'Montant invalide', description: 'Le montant attendu est requis', variant: 'destructive' });
+      return;
+    }
+    if (expectedAmount > cashInfo.balance) {
+      toast({
+        title: 'Montant supérieur au cash disponible',
+        description: `Cash en attente : ${cashInfo.balance.toFixed(0)} DA`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsRequestingPickup(true);
+    try {
+      const res = await fetch('/api/relais/cash-pickups', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          relaisId,
+          expectedAmount,
+          scheduledAt: pickupScheduledAt || undefined,
+          notes: pickupNotes,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data?.error || 'Impossible de demander la collecte');
+      }
+
+      toast({ title: 'Collecte demandée', description: `${expectedAmount.toFixed(0)} DA demandés en collecte physique.` });
+      setPickupAmount('');
+      setPickupNotes('');
+      setPickupScheduledAt('');
+      await fetchTransactions();
+    } catch (error) {
+      toast({
+        title: 'Erreur collecte',
+        description: error instanceof Error ? error.message : 'Demande impossible',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsRequestingPickup(false);
     }
   };
 
@@ -1256,6 +1314,35 @@ function CashTab({ relaisId, cashInfo, userId, onRefresh }: { relaisId: string |
         </Card>
       )}
 
+      {cashInfo.balance > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2"><BanknoteIcon className="h-5 w-5 text-emerald-600" />Demander une collecte physique</CardTitle>
+            <CardDescription>Demandez à SwiftColis de récupérer le cash directement dans votre point relais</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-3">
+              <div className="space-y-2">
+                <Label>Montant attendu (DA)</Label>
+                <Input type="number" placeholder={`Max : ${cashInfo.balance.toFixed(0)} DA`} value={pickupAmount} onChange={(e) => setPickupAmount(e.target.value)} min="1" max={cashInfo.balance} />
+              </div>
+              <div className="space-y-2">
+                <Label>Créneau souhaité</Label>
+                <Input type="datetime-local" value={pickupScheduledAt} onChange={(e) => setPickupScheduledAt(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label>Notes (optionnel)</Label>
+                <Input placeholder="Ex : disponible après 14h" value={pickupNotes} onChange={(e) => setPickupNotes(e.target.value)} />
+              </div>
+            </div>
+            <Button onClick={handleRequestPickup} disabled={isRequestingPickup || !pickupAmount || parseFloat(pickupAmount) <= 0} className="bg-emerald-600 hover:bg-emerald-700">
+              {isRequestingPickup ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <BanknoteIcon className="h-4 w-4 mr-2" />}
+              Demander une collecte
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2"><History className="h-5 w-5" />Historique des transactions</CardTitle>
@@ -1285,6 +1372,42 @@ function CashTab({ relaisId, cashInfo, userId, onRefresh }: { relaisId: string |
                   <p className={`font-bold ${tx.type === 'COLLECTED' ? 'text-emerald-600' : 'text-blue-600'}`}>
                     {tx.type === 'COLLECTED' ? '+' : '-'}{tx.amount.toFixed(0)} DA
                   </p>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><Clock className="h-5 w-5" />Historique des collectes physiques</CardTitle>
+          <CardDescription>Suivez vos demandes de récupération cash et leur avancement</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-emerald-600" /></div>
+          ) : cashPickups.length === 0 ? (
+            <p className="text-center text-slate-500 py-8">Aucune collecte physique demandée</p>
+          ) : (
+            <div className="space-y-3">
+              {cashPickups.map((pickup: any) => (
+                <div key={pickup.id} className="flex items-center justify-between p-3 border rounded-lg">
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-semibold text-sm">Collecte cash</p>
+                      <Badge variant="outline">{pickup.status}</Badge>
+                      <Badge className="bg-orange-100 text-orange-700">{Number(pickup.expectedAmount || 0).toFixed(0)} DA</Badge>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-1">Créée le {new Date(pickup.createdAt).toLocaleString('fr-FR')}</p>
+                    {pickup.scheduledAt ? <p className="text-xs text-slate-500">Créneau : {new Date(pickup.scheduledAt).toLocaleString('fr-FR')}</p> : null}
+                    {pickup.receiptRef ? <p className="text-xs text-slate-500">Reçu : {pickup.receiptRef}</p> : null}
+                    {pickup.notes ? <p className="text-xs text-slate-400">{pickup.notes}</p> : null}
+                  </div>
+                  <div className="text-right">
+                    <p className="font-bold text-emerald-600">{pickup.collectedAmount ? `${Number(pickup.collectedAmount).toFixed(0)} DA` : '—'}</p>
+                    <p className="text-xs text-slate-400">collecté</p>
+                  </div>
                 </div>
               ))}
             </div>
