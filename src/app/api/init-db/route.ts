@@ -1,7 +1,15 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { requireRole } from '@/lib/rbac';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  // Uniquement disponible en environnement de développement local
+  if (process.env.NODE_ENV === 'production') {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
+
+  const auth = await requireRole(request, ['ADMIN']);
+  if (!auth.success) return auth.response;
   try {
     console.log('Initializing database tables with raw SQL...');
 

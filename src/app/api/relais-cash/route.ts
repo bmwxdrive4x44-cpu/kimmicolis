@@ -1,17 +1,36 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { requireRole } from '@/lib/rbac';
 
 /**
  * GET /api/relais-cash?relaisId=...
  * Returns cash ledger for a relay point.
  */
 export async function GET(request: NextRequest) {
+  const auth = await requireRole(request, ['RELAIS', 'ADMIN']);
+  if (!auth.success) return auth.response;
+
   try {
     const { searchParams } = new URL(request.url);
-    const relaisId = searchParams.get('relaisId');
+    let relaisId = searchParams.get('relaisId');
+
+    if (!relaisId && auth.payload.role === 'RELAIS') {
+      const relais = await db.relais.findUnique({ where: { userId: auth.payload.id }, select: { id: true } });
+      if (!relais) {
+        return NextResponse.json({ error: 'Relais introuvable pour cet utilisateur' }, { status: 404 });
+      }
+      relaisId = relais.id;
+    }
 
     if (!relaisId) {
       return NextResponse.json({ error: 'relaisId requis' }, { status: 400 });
+    }
+
+    if (auth.payload.role === 'RELAIS') {
+      const ownedRelais = await db.relais.findFirst({ where: { id: relaisId, userId: auth.payload.id }, select: { id: true } });
+      if (!ownedRelais) {
+        return NextResponse.json({ error: 'Accès interdit à ce relais' }, { status: 403 });
+      }
     }
 
     const [relais, transactions] = await Promise.all([
@@ -55,13 +74,25 @@ export async function GET(request: NextRequest) {
  * Body: { relaisId, amount, notes }
  */
 export async function POST(request: NextRequest) {
+  const auth = await requireRole(request, ['RELAIS', 'ADMIN']);
+  if (!auth.success) return auth.response;
+
   try {
     const body = await request.json();
-    const { relaisId, amount, notes, userId, colisId } = body;
+    const { relaisId, amount, notes, colisId } = body;
 
     if (!relaisId || !amount || amount <= 0) {
       return NextResponse.json({ error: 'relaisId et amount requis' }, { status: 400 });
     }
+
+    if (auth.payload.role === 'RELAIS') {
+      const ownedRelais = await db.relais.findFirst({ where: { id: relaisId, userId: auth.payload.id }, select: { id: true } });
+      if (!ownedRelais) {
+        return NextResponse.json({ error: 'Accès interdit à ce relais' }, { status: 403 });
+      }
+    }
+
+    const actorUserId = auth.payload.id;
 
     const relais = await db.relais.findUnique({ where: { id: relaisId } });
     if (!relais) {
@@ -90,7 +121,7 @@ export async function POST(request: NextRequest) {
       }),
       db.actionLog.create({
         data: {
-          userId,
+          userId: actorUserId,
           entityType: 'RELAIS',
           entityId: relaisId,
           action: 'CASH_REVERSED',

@@ -2,7 +2,17 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { verifyPassword } from '@/lib/auth';
 
+// Endpoint de vérification des identifiants pour les smoke tests CI.
+// Ne doit JAMAIS retourner d'informations sensibles (hash, format, etc.).
 export async function POST(request: Request) {
+  // Accessible uniquement depuis localhost en production
+  const host = (request as any).headers?.get
+    ? (request as any).headers.get('host') ?? ''
+    : '';
+  const isLocal = host.startsWith('localhost') || host.startsWith('127.0.0.1');
+  if (process.env.NODE_ENV === 'production' && !isLocal) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
   try {
     const body = await request.json();
     const { email, password } = body;
@@ -49,22 +59,11 @@ export async function POST(request: Request) {
       email,
       userFound: true,
       passwordMatch: match,
-      storedFormat: user.password.startsWith('$2') ? 'bcrypt' : 'legacy-sha256',
-      storedHash: user.password.substring(0, 20) + '...',
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        role: user.role
-      }
+      storedFormat: user.password.startsWith('$2') ? 'bcrypt' : 'hashed',
     });
 
   } catch (error) {
     console.error('Test login error:', error);
-    return NextResponse.json({
-      success: false,
-      error: 'Server error',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 });
+    return NextResponse.json({ success: false, error: 'Server error' }, { status: 500 });
   }
 }

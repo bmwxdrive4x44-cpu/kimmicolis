@@ -1,17 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { requireRole } from '@/lib/rbac';
 
 /**
  * GET /api/wallet?transporteurId=...
  * Returns the wallet for a given transporter (creates it if missing).
  */
 export async function GET(request: NextRequest) {
+  const auth = await requireRole(request, ['TRANSPORTER', 'ADMIN']);
+  if (!auth.success) return auth.response;
+
   try {
     const { searchParams } = new URL(request.url);
     const transporteurId = searchParams.get('transporteurId');
 
     if (!transporteurId) {
       return NextResponse.json({ error: 'transporteurId requis' }, { status: 400 });
+    }
+
+    if (auth.payload.role === 'TRANSPORTER' && auth.payload.id !== transporteurId) {
+      return NextResponse.json({ error: 'Accès interdit à ce wallet' }, { status: 403 });
     }
 
     const wallet = await db.transporterWallet.upsert({
@@ -53,12 +61,19 @@ export async function GET(request: NextRequest) {
  * Body: { transporteurId, amount }
  */
 export async function POST(request: NextRequest) {
+  const auth = await requireRole(request, ['TRANSPORTER', 'ADMIN']);
+  if (!auth.success) return auth.response;
+
   try {
     const body = await request.json();
     const { transporteurId, amount } = body;
 
     if (!transporteurId || !amount || amount <= 0) {
       return NextResponse.json({ error: 'Paramètres invalides' }, { status: 400 });
+    }
+
+    if (auth.payload.role === 'TRANSPORTER' && auth.payload.id !== transporteurId) {
+      return NextResponse.json({ error: 'Accès interdit à ce wallet' }, { status: 403 });
     }
 
     const wallet = await db.transporterWallet.findUnique({ where: { transporteurId } });

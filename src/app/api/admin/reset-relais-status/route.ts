@@ -9,13 +9,13 @@ export async function GET(request: NextRequest) {
 
   try {
     // Update all relais to PENDING status
-    const result = await db.$executeRawUnsafe(`
-      UPDATE "Relais" SET status = 'PENDING', "updatedAt" = NOW()
-    `);
+    const result = await db.relais.updateMany({
+      data: { status: 'PENDING' },
+    });
 
     return NextResponse.json({
       success: true,
-      message: `Updated ${result} relais records to PENDING status`,
+      message: `Updated ${result.count} relais records to PENDING status`,
       note: 'Admin must now validate each relais manually',
     });
   } catch (error) {

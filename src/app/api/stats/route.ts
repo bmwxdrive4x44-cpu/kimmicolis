@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { db } from '@/lib/db';
+import { requireRole } from '@/lib/rbac';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -11,7 +13,10 @@ const noStoreHeaders = {
   'Surrogate-Control': 'no-store',
 };
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const auth = await requireRole(request, ['ADMIN']);
+  if (!auth.success) return auth.response;
+
   try {
     // Get counts using raw SQL
     const usersCount = await db.$queryRaw<[{count: bigint}]>`SELECT COUNT(*) as count FROM "User"`;

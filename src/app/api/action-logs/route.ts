@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { requireRole } from '@/lib/rbac';
 
 /**
  * GET /api/action-logs?entityId=...&entityType=...&limit=50
  * Returns action logs for anti-fraud audit.
  */
 export async function GET(request: NextRequest) {
+  const auth = await requireRole(request, ['ADMIN']);
+  if (!auth.success) return auth.response;
+
   try {
     const { searchParams } = new URL(request.url);
     const entityId    = searchParams.get('entityId');
@@ -36,6 +40,9 @@ export async function GET(request: NextRequest) {
  * Create a manual action log entry.
  */
 export async function POST(request: NextRequest) {
+  const auth = await requireRole(request, ['ADMIN']);
+  if (!auth.success) return auth.response;
+
   try {
     const body = await request.json();
     const { userId, entityType, entityId, action, details, ipAddress } = body;

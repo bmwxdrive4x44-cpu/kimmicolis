@@ -1,14 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { requireRole } from '@/lib/rbac';
 
 // GET notifications for user
 export async function GET(request: NextRequest) {
+  const auth = await requireRole(request, ['ADMIN', 'CLIENT', 'RELAIS', 'TRANSPORTER']);
+  if (!auth.success) return auth.response;
+
   try {
     const { searchParams } = new URL(request.url);
-    const userId = searchParams.get('userId');
+    const requestedUserId = searchParams.get('userId');
+    const userId = requestedUserId || auth.payload.id;
 
     if (!userId) {
       return NextResponse.json({ error: 'userId required' }, { status: 400 });
+    }
+
+    if (auth.payload.role !== 'ADMIN' && userId !== auth.payload.id) {
+      return NextResponse.json({ error: 'Accès interdit à ces notifications' }, { status: 403 });
     }
 
     const notifications = await db.notification.findMany({
@@ -26,6 +35,9 @@ export async function GET(request: NextRequest) {
 
 // POST create notification
 export async function POST(request: NextRequest) {
+  const auth = await requireRole(request, ['ADMIN']);
+  if (!auth.success) return auth.response;
+
   try {
     const body = await request.json();
     const { userId, title, message, type } = body;
@@ -53,11 +65,17 @@ export async function POST(request: NextRequest) {
 
 // PUT mark as read
 export async function PUT(request: NextRequest) {
+  const auth = await requireRole(request, ['ADMIN', 'CLIENT', 'RELAIS', 'TRANSPORTER']);
+  if (!auth.success) return auth.response;
+
   try {
     const body = await request.json();
     const { id, userId, markAllRead } = body;
 
     if (markAllRead && userId) {
+      if (auth.payload.role !== 'ADMIN' && userId !== auth.payload.id) {
+        return NextResponse.json({ error: 'Accès interdit à ces notifications' }, { status: 403 });
+      }
       await db.notification.updateMany({
         where: { userId, isRead: false },
         data: { isRead: true },
@@ -66,6 +84,12 @@ export async function PUT(request: NextRequest) {
     }
 
     if (id) {
+      if (auth.payload.role !== 'ADMIN') {
+        const owned = await db.notification.findFirst({ where: { id, userId: auth.payload.id }, select: { id: true } });
+        if (!owned) {
+          return NextResponse.json({ error: 'Notification introuvable ou interdite' }, { status: 404 });
+        }
+      }
       const notification = await db.notification.update({
         where: { id },
         data: { isRead: true },
