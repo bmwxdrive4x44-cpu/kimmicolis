@@ -63,28 +63,41 @@ export async function GET() {
     });
     console.log('Transporter created');
 
-    const relaisUser = await db.user.upsert({
-      where: { email: 'relais@demo.dz' },
-      update: { password: relaisPassword, name: 'Relais Centre', role: 'RELAIS', phone: '+213555333333', isActive: true },
+    const relaisAlgerUser = await db.user.upsert({
+      where: { email: 'relais-alger@demo.dz' },
+      update: { password: relaisPassword, name: 'Relais Alger Centre', role: 'RELAIS', phone: '+213555333333', isActive: true },
       create: {
-        email: 'relais@demo.dz',
+        email: 'relais-alger@demo.dz',
         password: relaisPassword,
-        name: 'Relais Centre',
+        name: 'Relais Alger Centre',
         role: 'RELAIS',
         phone: '+213555333333',
         isActive: true,
       },
       select: { id: true },
     });
-    console.log('Relais user created');
+    // Keep legacy email working too
+    await db.user.upsert({
+      where: { email: 'relais@demo.dz' },
+      update: { password: relaisPassword, name: 'Relais Alger Centre', role: 'RELAIS', phone: '+213555333333', isActive: true },
+      create: {
+        email: 'relais@demo.dz',
+        password: relaisPassword,
+        name: 'Relais Alger Centre',
+        role: 'RELAIS',
+        phone: '+213555333333',
+        isActive: true,
+      },
+    });
+    console.log('Relais Alger user created');
 
     await db.relais.upsert({
-      where: { userId: relaisUser.id },
+      where: { userId: relaisAlgerUser.id },
       update: {
-        commerceName: 'Épicerie du Centre',
-        address: '123 Rue Didouche Mourad',
+        commerceName: 'Épicerie du Centre Alger',
+        address: '123 Rue Didouche Mourad, Alger Centre',
         ville: 'alger',
-        status: 'PENDING',
+        status: 'APPROVED',
         operationalStatus: 'ACTIF',
         suspensionReason: null,
         suspendedAt: null,
@@ -93,18 +106,62 @@ export async function GET() {
         commissionGros: 300,
       },
       create: {
-        userId: relaisUser.id,
-        commerceName: 'Épicerie du Centre',
-        address: '123 Rue Didouche Mourad',
+        userId: relaisAlgerUser.id,
+        commerceName: 'Épicerie du Centre Alger',
+        address: '123 Rue Didouche Mourad, Alger Centre',
         ville: 'alger',
-        status: 'PENDING',
+        status: 'APPROVED',
         operationalStatus: 'ACTIF',
         commissionPetit: 100,
         commissionMoyen: 200,
         commissionGros: 300,
       },
     });
-    console.log('Relais created with PENDING status - admin must validate');
+    console.log('Relais Alger created (APPROVED)');
+
+    // Relais Oran — géré par Ahmed Benali
+    const relaisOranUser = await db.user.upsert({
+      where: { email: 'relais-oran@demo.dz' },
+      update: { password: relaisPassword, name: 'Ahmed Benali', role: 'RELAIS', phone: '+213555444444', isActive: true },
+      create: {
+        email: 'relais-oran@demo.dz',
+        password: relaisPassword,
+        name: 'Ahmed Benali',
+        role: 'RELAIS',
+        phone: '+213555444444',
+        isActive: true,
+      },
+      select: { id: true },
+    });
+    console.log('Relais Oran user created');
+
+    await db.relais.upsert({
+      where: { userId: relaisOranUser.id },
+      update: {
+        commerceName: 'Point Relais Oran Benali',
+        address: '45 Boulevard Millénium, Oran',
+        ville: 'oran',
+        status: 'APPROVED',
+        operationalStatus: 'ACTIF',
+        suspensionReason: null,
+        suspendedAt: null,
+        commissionPetit: 100,
+        commissionMoyen: 200,
+        commissionGros: 300,
+      },
+      create: {
+        userId: relaisOranUser.id,
+        commerceName: 'Point Relais Oran Benali',
+        address: '45 Boulevard Millénium, Oran',
+        ville: 'oran',
+        status: 'APPROVED',
+        operationalStatus: 'ACTIF',
+        commissionPetit: 100,
+        commissionMoyen: 200,
+        commissionGros: 300,
+      },
+    });
+    console.log('Relais Oran created (APPROVED)');
 
     // Create transport lines
     const lines = [
@@ -160,10 +217,11 @@ export async function GET() {
       success: true,
       message: 'Database seeded successfully',
       credentials: {
-        admin: { email: 'admin@swiftcolis.dz', password: 'admin123', role: 'ADMIN' },
-        client: { email: 'client@demo.dz', password: 'client123', role: 'CLIENT' },
-        transporter: { email: 'transport@demo.dz', password: 'transport123', role: 'TRANSPORTER' },
-        relais: { email: 'relais@demo.dz', password: 'relais123', role: 'RELAIS' },
+        admin:         { email: 'admin@swiftcolis.dz',  password: 'admin123',     role: 'ADMIN' },
+        client:        { email: 'client@demo.dz',       password: 'client123',    role: 'CLIENT',    name: 'Ahmed Benali (Alger — expéditeur)' },
+        transporter:   { email: 'transport@demo.dz',    password: 'transport123', role: 'TRANSPORTER' },
+        relaisAlger:   { email: 'relais-alger@demo.dz', password: 'relais123',    role: 'RELAIS',    ville: 'alger',  commerceName: 'Épicerie du Centre Alger', status: 'APPROVED' },
+        relaisOran:    { email: 'relais-oran@demo.dz',  password: 'relais123',    role: 'RELAIS',    ville: 'oran',   commerceName: 'Point Relais Oran Benali', status: 'APPROVED' },
       },
     });
   } catch (error) {
