@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { requireRole } from '@/lib/rbac';
+import { syncTransporterWallets } from '@/lib/payout-sync';
 
 /**
  * GET /api/transporteur/gains
@@ -20,6 +21,17 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const transporteurId = searchParams.get('transporteurId') || auth.payload.id;
+
+    await syncTransporterWallets({
+      actorId: auth.payload.id,
+      transporteurId,
+    });
+
+    const wallet = await db.transporterWallet.upsert({
+      where: { transporteurId },
+      update: {},
+      create: { transporteurId },
+    });
 
     // Fetch all missions with parcel info
     const missions = await db.mission.findMany({
@@ -46,18 +58,10 @@ export async function GET(request: NextRequest) {
       orderBy: { assignedAt: 'desc' },
     });
 
-    // Calculate wallet buckets (derived from mission status)
-    let pendingGains = 0;   // In transit (not yet delivered)
-    let availableGains = 0; // Delivered (awaiting withdrawal)
-    const paidGains = 0;    // Paid out tracked at wallet level, not per mission
-
-    missions.forEach((m) => {
-      const gain = m.colis?.netTransporteur || 0;
-      if (m.status === 'LIVRE' || m.completedAt !== null) availableGains += gain;
-      else pendingGains += gain;
-    });
-
-    const totalEarnings = paidGains + availableGains; // Confirmed earnings (excludes pending)
+    const pendingGains = wallet.pendingEarnings;
+    const availableGains = wallet.availableEarnings;
+    const paidGains = wallet.totalWithdrawn;
+    const totalEarnings = wallet.totalEarned;
 
     // Monthly breakdown of completed missions
     const monthlyMap = new Map<string, number>();
