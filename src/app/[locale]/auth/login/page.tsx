@@ -2,7 +2,7 @@
 
 import { Suspense, useState } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
-import { signIn, signOut } from 'next-auth/react';
+import { signIn } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Link } from '@/i18n/routing';
 import { Button } from '@/components/ui/button';
@@ -39,7 +39,9 @@ function LoginForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!email.trim() || !password) {
+    const normalizedEmail = email.trim().toLowerCase();
+
+    if (!normalizedEmail || !password) {
       toast({
         title: 'Erreur',
         description: 'Veuillez saisir votre email et votre mot de passe',
@@ -51,18 +53,8 @@ function LoginForm() {
     setIsLoading(true);
 
     try {
-      // First, completely clear the existing session
-      await signOut({ redirect: false });
-      
-      // Clear any cached session data
-      await fetch('/api/logout', { method: 'POST' });
-      
-      // Small delay to ensure session is cleared
-      await new Promise(resolve => setTimeout(resolve, 300));
-
-      // Now sign in with new credentials
       const result = await signIn('credentials', {
-        email,
+        email: normalizedEmail,
         password,
         redirect: false,
       });
@@ -70,7 +62,9 @@ function LoginForm() {
       if (result?.error || !result?.ok) {
         toast({
           title: 'Erreur',
-          description: 'Email ou mot de passe incorrect',
+          description: result?.error === 'CredentialsSignin'
+            ? 'Email ou mot de passe incorrect'
+            : 'Connexion impossible pour le moment',
           variant: 'destructive',
         });
       } else {
@@ -235,6 +229,13 @@ function LoginLoading() {
   );
 }
 
+const DEV_DEMO_ACCOUNTS = [
+  { role: 'Admin', email: 'admin@swiftcolis.dz', password: 'admin123' },
+  { role: 'Client', email: 'client@demo.dz', password: 'client123' },
+  { role: 'Transporteur', email: 'transport@demo.dz', password: 'transport123' },
+  { role: 'Relais', email: 'relais@demo.dz', password: 'relais123' },
+];
+
 export default function LoginPage() {
   const t = useTranslations('auth.login');
 
@@ -256,6 +257,24 @@ export default function LoginPage() {
           <LoginForm />
         </Suspense>
       </Card>
+
+      {process.env.NODE_ENV !== 'production' && (
+        <Card className="w-full max-w-md mt-4 border-dashed border-emerald-200 bg-emerald-50/60 dark:bg-emerald-950/20">
+          <CardHeader>
+            <CardTitle className="text-base">Comptes de démonstration</CardTitle>
+            <CardDescription>Disponibles automatiquement en développement.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm">
+            {DEV_DEMO_ACCOUNTS.map((account) => (
+              <div key={account.email} className="rounded-md border bg-white/70 dark:bg-slate-900/40 px-3 py-2">
+                <div className="font-semibold">{account.role}</div>
+                <div>{account.email}</div>
+                <div className="text-muted-foreground">{account.password}</div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

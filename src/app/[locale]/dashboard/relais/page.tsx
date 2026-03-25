@@ -288,11 +288,12 @@ export default function RelaisDashboard() {
         </Card>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-6 mb-8">
+          <TabsList className="grid w-full grid-cols-4 lg:grid-cols-7 mb-8">
             <TabsTrigger value="overview"><BarChart3 className="h-4 w-4 mr-1 hidden sm:inline" />Vue d'ensemble</TabsTrigger>
             <TabsTrigger value="scan"><QrCode className="h-4 w-4 mr-1 hidden sm:inline" />Scanner QR</TabsTrigger>
             <TabsTrigger value="cash"><CreditCard className="h-4 w-4 mr-1 hidden sm:inline" />Caisse</TabsTrigger>
             <TabsTrigger value="gains"><TrendingUp className="h-4 w-4 mr-1 hidden sm:inline" />Gains</TabsTrigger>
+            <TabsTrigger value="suivi" className="hidden lg:inline-flex"><BarChart3 className="h-4 w-4 mr-1" />Suivi</TabsTrigger>
             <TabsTrigger value="settings"><Settings className="h-4 w-4 mr-1 hidden sm:inline" />Paramètres</TabsTrigger>
             <TabsTrigger value="profil"><User className="h-4 w-4 mr-1 hidden sm:inline" />Profil</TabsTrigger>
           </TabsList>
@@ -308,6 +309,9 @@ export default function RelaisDashboard() {
           </TabsContent>
           <TabsContent value="gains">
             <GainsTab relaisId={relaisInfo?.id} />
+          </TabsContent>
+          <TabsContent value="suivi">
+            <SuiviTab relaisId={relaisInfo?.id} />
           </TabsContent>
           <TabsContent value="settings">
             <SettingsTab relaisInfo={relaisInfo} onUpdate={fetchRelaisInfo} />
@@ -1733,6 +1737,188 @@ function GainsTab({ relaisId }: { relaisId: string | undefined }) {
               ))}
             </div>
           )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// Suivi Tab — Métriques de performance du relais
+// ─────────────────────────────────────────────────────────────
+function SuiviTab({ relaisId }: { relaisId: string | undefined }) {
+  const [data, setData] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const { toast } = useToast();
+
+  const fetchData = useCallback(async () => {
+    if (!relaisId) return;
+    setIsLoading(true);
+    try {
+      const res = await fetch(`/api/relais/stats`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ relaisId }) });
+      if (res.ok) {
+        const result = await res.json();
+        setData(result);
+      } else {
+        toast({ title: 'Erreur', description: 'Impossible de charger les statistiques', variant: 'destructive' });
+      }
+    } catch (error) {
+      toast({ title: 'Erreur', description: 'Erreur de connexion', variant: 'destructive' });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [relaisId, toast]);
+
+  useEffect(() => { fetchData(); const interval = setInterval(fetchData, 30000); return () => clearInterval(interval); }, [fetchData]);
+
+  if (isLoading) {
+    return <div className="flex items-center justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-slate-400" /></div>;
+  }
+
+  if (!data) {
+    return <Card><CardContent className="py-10 text-center text-slate-500">Impossible de charger les statistiques</CardContent></Card>;
+  }
+
+  const m = data.metrics || {};
+  const scoreColor = m.reliabilityScore >= 95 ? 'text-emerald-600' : m.reliabilityScore >= 80 ? 'text-orange-600' : 'text-red-600';
+  const scoreBg = m.reliabilityScore >= 95 ? 'bg-emerald-50 dark:bg-emerald-900/20' : m.reliabilityScore >= 80 ? 'bg-orange-50 dark:bg-orange-900/20' : 'bg-red-50 dark:bg-red-900/20';
+
+  return (
+    <div className="space-y-6">
+      {/* Score de fiabilité */}
+      <Card className={scoreBg}>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <TrendingUp className="h-5 w-5" />
+            Score de fiabilité
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center gap-8">
+            <div className="flex-1">
+              <div className={`text-5xl font-bold ${scoreColor}`}>{m.reliabilityScore || 0}%</div>
+              <p className="text-sm text-slate-600 dark:text-slate-400 mt-2">
+                {m.reliabilityScore >= 95 ? 'Excellent' : m.reliabilityScore >= 80 ? 'Bon' : m.reliabilityScore >= 60 ? 'À améliorer' : 'Critique'}
+              </p>
+            </div>
+            <div className="flex-1 space-y-3">
+              <div>
+                <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">Colis livrés à temps</p>
+                <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2">
+                  <div className="h-2 rounded-full bg-emerald-500" style={{ width: `${Math.max(0, 100 - m.nbDelayed * 5)}%` }} />
+                </div>
+              </div>
+              <div>
+                <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">Taux de livraison</p>
+                <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2">
+                  <div className="h-2 rounded-full bg-blue-500" style={{ width: `${m.nbLivres > 0 ? (m.nbLivres / (m.nbLivres + m.nbDelayed)) * 100 : 0}%` }} />
+                </div>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Métriques de colis */}
+      <div className="grid gap-4 md:grid-cols-4">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold text-slate-600">Colis déposés</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">{m.nbDeposites || 0}</p>
+            <p className="text-xs text-slate-500 mt-1">Ce mois</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold text-slate-600">Colis livrés</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold text-emerald-600">{m.nbLivres || 0}</p>
+            <p className="text-xs text-slate-500 mt-1">Taux: {m.nbDeposites > 0 ? ((m.nbLivres / m.nbDeposites) * 100).toFixed(0) : 0}%</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold text-slate-600">En retard</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className={`text-2xl font-bold ${m.nbDelayed > 0 ? 'text-orange-600' : 'text-emerald-600'}`}>{m.nbDelayed || 0}</p>
+            <p className="text-xs text-slate-500 mt-1">Colis non livrés</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold text-slate-600">Dernière activité</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm font-mono text-slate-900 dark:text-slate-100">{m.lastActivity ? new Date(m.lastActivity).toLocaleDateString('fr-FR') : '—'}</p>
+            <p className="text-xs text-slate-500 mt-1">{m.lastActivity ? new Date(m.lastActivity).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '—'}</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Métriques financières */}
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold text-slate-600">Cash encaissé</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">{(m.cashCollected || 0).toFixed(0)} DA</p>
+            <p className="text-xs text-slate-500 mt-1">Montant collecté</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold text-slate-600">Commission relais</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold text-emerald-600">{(m.commissionRelaisTotal || 0).toFixed(0)} DA</p>
+            <p className="text-xs text-slate-500 mt-1">Revenus générés</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold text-slate-600">Montant à payer</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className={`text-2xl font-bold ${m.amountToPay > 0 ? 'text-orange-600' : 'text-emerald-600'}`}>{(m.amountToPay || 0).toFixed(0)} DA</p>
+            <p className="text-xs text-slate-500 mt-1">Solde non versé</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Détail des montants */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <DollarSign className="h-5 w-5" />
+            Détail financier
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between p-3 border rounded-lg">
+              <span className="text-sm font-semibold">Montant dû à la plateforme (commission plateforme)</span>
+              <span className="font-mono font-bold text-slate-900 dark:text-slate-100">{(m.commissionPlateformeTotal || 0).toFixed(0)} DA</span>
+            </div>
+            <div className="flex items-center justify-between p-3 border rounded-lg">
+              <span className="text-sm font-semibold">Commission au relais</span>
+              <span className="font-mono font-bold text-emerald-600">+{(m.commissionRelaisTotal || 0).toFixed(0)} DA</span>
+            </div>
+            <div className="flex items-center justify-between p-3 border rounded-lg bg-slate-50 dark:bg-slate-800/50">
+              <span className="text-sm font-bold">Net à verser au relais</span>
+              <span className={`font-mono text-lg font-bold ${m.amountToPay > 0 ? 'text-orange-600' : 'text-emerald-600'}`}>
+                {(m.amountToPay || 0).toFixed(0)} DA
+              </span>
+            </div>
+            <div className="flex items-center justify-between p-3 border rounded-lg">
+              <span className="text-sm text-slate-600 dark:text-slate-400">Montant déjà versé</span>
+              <span className="font-mono font-semibold text-slate-900 dark:text-slate-100">{(m.amountPaid || 0).toFixed(0)} DA</span>
+            </div>
+          </div>
         </CardContent>
       </Card>
     </div>

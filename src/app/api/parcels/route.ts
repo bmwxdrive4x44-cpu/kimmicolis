@@ -189,6 +189,32 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Check if relais are operational
+    const [relaisDepart, relaisArrivee] = await Promise.all([
+      db.relais.findUnique({ where: { id: relaisDepartId }, select: { operationalStatus: true, suspensionReason: true } }),
+      db.relais.findUnique({ where: { id: relaisArriveeId }, select: { operationalStatus: true, suspensionReason: true } }),
+    ]);
+
+    if (!relaisDepart || relaisDepart.operationalStatus === 'SUSPENDU') {
+      return NextResponse.json(
+        { 
+          error: 'Relais de départ suspendu', 
+          details: relaisDepart?.suspensionReason || 'Raison non spécifiée'
+        },
+        { status: 400 }
+      );
+    }
+
+    if (!relaisArrivee || relaisArrivee.operationalStatus === 'SUSPENDU') {
+      return NextResponse.json(
+        { 
+          error: 'Relais d\'arrivée suspendu', 
+          details: relaisArrivee?.suspensionReason || 'Raison non spécifiée'
+        },
+        { status: 400 }
+      );
+    }
+
     const effectiveWithdrawalCode = String(withdrawalCode ?? generateWithdrawalCode(6));
     if (!/^\d{4}$|^\d{6}$/.test(effectiveWithdrawalCode)) {
       return NextResponse.json(

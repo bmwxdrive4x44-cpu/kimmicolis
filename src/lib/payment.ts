@@ -171,12 +171,13 @@ export async function getPaymentStatus(paymentId: string): Promise<IPayment | nu
 }
 
 /**
- * Simulate payment processing
- * In real scenario: webhook from payment provider would call this
+ * Simulate payment processing (CIB / Edahabia / Baridi Mob / SIM_STANDARD)
+ * In production, the gateway (SATIM/Baridi) would call a webhook instead.
  */
 export async function processPayment(
   paymentId: string,
-  successRate: number = 0.95 // 95% success by default
+  successRate: number = 0.95,
+  method?: string // optional: 'CIB' | 'EDAHABIA' | 'BARIDI_MOB' | 'SIM_STANDARD'
 ): Promise<{
   success: boolean;
   payment?: IPayment;
@@ -206,6 +207,9 @@ export async function processPayment(
   const delay = Math.random() * 3000 + 2000;
   await new Promise((resolve) => setTimeout(resolve, delay));
 
+  // If a real payment method is provided, update it on the record
+  const effectiveMethod = method || payment.method || 'SIM_STANDARD';
+
   try {
     const isSuccess = Math.random() < successRate;
 
@@ -214,6 +218,7 @@ export async function processPayment(
         where: { id: paymentId },
         data: {
           status: 'PROCESSING',
+          method: effectiveMethod,
           transactionRef: generateTransactionRef(),
         },
       });

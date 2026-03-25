@@ -43,7 +43,7 @@ export function resolveTrackingNumber(
 export async function resolveActingRelais(
   authUserId: string,
   relaisIdInput: unknown
-): Promise<RelayScanResult<{ id: string; commerceName: string; cashCollected: number; cashReversed: number }>> {
+): Promise<RelayScanResult<{ id: string; commerceName: string; cashCollected: number; cashReversed: number; operationalStatus: string; suspensionReason: string | null }>> {
   let actingRelaisId: string | undefined =
     typeof relaisIdInput === 'string' && relaisIdInput.trim().length > 0
       ? relaisIdInput.trim()
@@ -72,6 +72,8 @@ export async function resolveActingRelais(
       commerceName: true,
       cashCollected: true,
       cashReversed: true,
+      operationalStatus: true,
+      suspensionReason: true,
     },
   });
 

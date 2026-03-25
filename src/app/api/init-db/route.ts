@@ -44,6 +44,9 @@ export async function GET(request: NextRequest) {
         "commissionMoyen" FLOAT DEFAULT 200,
         "commissionGros" FLOAT DEFAULT 300,
         "status" TEXT DEFAULT 'PENDING',
+        "operationalStatus" TEXT DEFAULT 'ACTIF',
+        "suspensionReason" TEXT,
+        "suspendedAt" TIMESTAMP,
         "createdAt" TIMESTAMP DEFAULT NOW(),
         "updatedAt" TIMESTAMP DEFAULT NOW(),
         FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE

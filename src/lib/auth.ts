@@ -5,6 +5,65 @@ import { db } from './db';
 
 const BCRYPT_ROUNDS = 12;
 
+type DemoAccountConfig = {
+  email: string;
+  password: string;
+  name: string;
+  role: 'ADMIN' | 'CLIENT' | 'TRANSPORTER' | 'RELAIS';
+  phone: string;
+  siret?: string;
+  relais?: {
+    commerceName: string;
+    address: string;
+    ville: string;
+    status: string;
+    commissionPetit: number;
+    commissionMoyen: number;
+    commissionGros: number;
+  };
+};
+
+const DEMO_ACCOUNTS: DemoAccountConfig[] = [
+  {
+    email: 'admin@swiftcolis.dz',
+    password: 'admin123',
+    name: 'Admin SwiftColis',
+    role: 'ADMIN',
+    phone: '+213555000000',
+  },
+  {
+    email: 'client@demo.dz',
+    password: 'client123',
+    name: 'Ahmed Benali',
+    role: 'CLIENT',
+    phone: '+213555111111',
+  },
+  {
+    email: 'transport@demo.dz',
+    password: 'transport123',
+    name: 'Karim Transport',
+    role: 'TRANSPORTER',
+    phone: '+213555222222',
+    siret: '12345678901234',
+  },
+  {
+    email: 'relais@demo.dz',
+    password: 'relais123',
+    name: 'Relais Centre',
+    role: 'RELAIS',
+    phone: '+213555333333',
+    relais: {
+      commerceName: 'Epicerie du Centre',
+      address: '123 Rue Didouche Mourad',
+      ville: 'alger',
+      status: 'PENDING',
+      commissionPetit: 100,
+      commissionMoyen: 200,
+      commissionGros: 300,
+    },
+  },
+];
+
 function isBcryptHash(hashedPassword: string): boolean {
   return hashedPassword.startsWith('$2a$') || hashedPassword.startsWith('$2b$') || hashedPassword.startsWith('$2y$');
 }
@@ -19,6 +78,82 @@ async function hashLegacyPassword(password: string): Promise<string> {
 
 async function hashPassword(password: string): Promise<string> {
   return bcrypt.hash(password, BCRYPT_ROUNDS);
+}
+
+async function ensureDevelopmentDemoUser(email: string, password: string) {
+  if (process.env.NODE_ENV === 'production') {
+    return null;
+  }
+
+  const demoAccount = DEMO_ACCOUNTS.find(
+    (account) => account.email === email.toLowerCase() && account.password === password
+  );
+
+  if (!demoAccount) {
+    return null;
+  }
+
+  const hashedPassword = await hashPassword(demoAccount.password);
+  const user = await db.user.upsert({
+    where: { email: demoAccount.email },
+    update: {
+      password: hashedPassword,
+      name: demoAccount.name,
+      role: demoAccount.role,
+      phone: demoAccount.phone,
+      siret: demoAccount.siret,
+      isActive: true,
+    },
+    create: {
+      email: demoAccount.email,
+      password: hashedPassword,
+      name: demoAccount.name,
+      role: demoAccount.role,
+      phone: demoAccount.phone,
+      siret: demoAccount.siret,
+      isActive: true,
+    },
+    select: {
+      id: true,
+      email: true,
+      name: true,
+      role: true,
+      phone: true,
+      relais: {
+        select: {
+          id: true,
+          status: true,
+        },
+      },
+    },
+  });
+
+  if (demoAccount.role === 'RELAIS' && demoAccount.relais) {
+    await db.relais.upsert({
+      where: { userId: user.id },
+      update: {
+        commerceName: demoAccount.relais.commerceName,
+        address: demoAccount.relais.address,
+        ville: demoAccount.relais.ville,
+        status: demoAccount.relais.status,
+        commissionPetit: demoAccount.relais.commissionPetit,
+        commissionMoyen: demoAccount.relais.commissionMoyen,
+        commissionGros: demoAccount.relais.commissionGros,
+      },
+      create: {
+        userId: user.id,
+        commerceName: demoAccount.relais.commerceName,
+        address: demoAccount.relais.address,
+        ville: demoAccount.relais.ville,
+        status: demoAccount.relais.status,
+        commissionPetit: demoAccount.relais.commissionPetit,
+        commissionMoyen: demoAccount.relais.commissionMoyen,
+        commissionGros: demoAccount.relais.commissionGros,
+      },
+    });
+  }
+
+  return user;
 }
 
 export async function verifyPassword(password: string, hashedPassword: string): Promise<boolean> {
@@ -48,7 +183,7 @@ export const authOptions: NextAuthOptions = {
           return null;
         }
 
-        const user = await db.user.findUnique({
+        let user = await db.user.findUnique({
           where: { email: credentials.email.toLowerCase() },
           select: {
             id: true,
@@ -65,6 +200,10 @@ export const authOptions: NextAuthOptions = {
             },
           },
         });
+
+        if (!user) {
+          user = await ensureDevelopmentDemoUser(credentials.email, credentials.password);
+        }
 
         if (!user || !user.password) {
           return null;

@@ -2,6 +2,28 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { requireRole } from '@/lib/rbac';
 
+const NOTIFICATION_DEDUP_WINDOW_MS = 2 * 60 * 1000;
+
+function dedupeNotifications(notifications: any[]) {
+  const kept: any[] = [];
+  const latestBySignature = new Map<string, Date>();
+
+  for (const notification of notifications) {
+    const signature = `${notification.userId}__${notification.type}__${notification.title}__${notification.message}`;
+    const createdAt = new Date(notification.createdAt);
+    const previous = latestBySignature.get(signature);
+
+    if (previous && previous.getTime() - createdAt.getTime() <= NOTIFICATION_DEDUP_WINDOW_MS) {
+      continue;
+    }
+
+    kept.push(notification);
+    latestBySignature.set(signature, createdAt);
+  }
+
+  return kept;
+}
+
 // GET notifications for user
 export async function GET(request: NextRequest) {
   const auth = await requireRole(request, ['ADMIN', 'CLIENT', 'RELAIS', 'TRANSPORTER']);
@@ -23,10 +45,11 @@ export async function GET(request: NextRequest) {
     const notifications = await db.notification.findMany({
       where: { userId },
       orderBy: { createdAt: 'desc' },
-      take: 50,
+      take: 120,
     });
 
-    return NextResponse.json(notifications);
+    const deduped = dedupeNotifications(notifications).slice(0, 50);
+    return NextResponse.json(deduped);
   } catch (error) {
     console.error('Error fetching notifications:', error);
     return NextResponse.json({ error: 'Failed to fetch notifications' }, { status: 500 });

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { createNotificationDedup } from '@/lib/notifications';
 import { requireRole } from '@/lib/rbac';
 
 /**
@@ -153,13 +154,11 @@ export async function POST(request: NextRequest) {
     });
 
     // Notify client
-    await db.notification.create({
-      data: {
-        userId: parcel.clientId,
-        title: 'Mise à jour de votre colis',
-        message: `${notes} — Colis: ${parcel.trackingNumber}`,
-        type: 'IN_APP',
-      },
+    await createNotificationDedup({
+      userId: parcel.clientId,
+      title: 'Mise à jour de votre colis',
+      message: `${notes} — Colis: ${parcel.trackingNumber}`,
+      type: 'IN_APP',
     });
 
     return NextResponse.json({

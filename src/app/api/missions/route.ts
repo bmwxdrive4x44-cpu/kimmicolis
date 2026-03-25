@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { requireRole } from '@/lib/rbac';
+import { createNotificationDedup } from '@/lib/notifications';
 
 // GET missions
 export async function GET(request: NextRequest) {
@@ -100,13 +101,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Notify client
-    await db.notification.create({
-      data: {
-        userId: parcel.clientId,
-        title: 'Transporteur assigné',
-        message: `Un transporteur a été assigné à votre colis ${parcel.trackingNumber}`,
-        type: 'IN_APP',
-      },
+    await createNotificationDedup({
+      userId: parcel.clientId,
+      title: 'Transporteur assigné',
+      message: `Un transporteur a été assigné à votre colis ${parcel.trackingNumber}`,
+      type: 'IN_APP',
     });
 
     return NextResponse.json(mission);

@@ -140,7 +140,7 @@ export async function PUT(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { paymentId, action, reason } = body;
+    const { paymentId, action, reason, method } = body;
 
     if (!paymentId || !action) {
       return NextResponse.json(
@@ -167,7 +167,9 @@ export async function PUT(request: NextRequest) {
 
     // Handle actions
     if (action === 'process') {
-      const result = await processPayment(paymentId);
+      const VALID_METHODS = ['CIB', 'EDAHABIA', 'BARIDI_MOB', 'SIM_STANDARD', 'CASH_RELAY'];
+      const paymentMethod = method && VALID_METHODS.includes(method) ? method : undefined;
+      const result = await processPayment(paymentId, 0.95, paymentMethod);
       if (!result.success) {
         return NextResponse.json(
           { error: result.error, payment: result.payment },

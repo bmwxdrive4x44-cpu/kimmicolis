@@ -14,6 +14,10 @@ jobs:
   smoke-test:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      DATABASE_URL: ${{ fromJSON(toJSON(secrets)).DATABASE_URL }}
+      NEXTAUTH_SECRET: ${{ fromJSON(toJSON(secrets)).NEXTAUTH_SECRET }}
+      SLACK_WEBHOOK_URL: ${{ fromJSON(toJSON(secrets)).SLACK_WEBHOOK_URL }}
 
     steps:
       - name: Checkout code
@@ -30,9 +34,6 @@ jobs:
 
       - name: Build application
         run: npm run build
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
 
       - name: Start production server
         run: |
@@ -41,8 +42,6 @@ jobs:
           sleep 3
         env:
           NODE_ENV: production
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
 
       - name: Wait for server to be ready
         run: |
@@ -122,43 +121,44 @@ jobs:
             })
 
       - name: Notify Slack on failure
-        if: failure() && secrets.SLACK_WEBHOOK_URL
-        uses: slackapi/slack-github-action@v1.25.0
-        with:
-          webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
-          payload: |
-            {
-              "text": "🔴 Smoke Test Failed on ${{ github.repository }}",
-              "blocks": [
-                {
-                  "type": "section",
-                  "text": {
-                    "type": "mrkdwn",
-                    "text": "*Smoke Test Failure*\nRepository: ${{ github.repository }}\nBranch: ${{ github.ref_name }}\nCommit: <${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}|${{ github.sha }}>"
-                  }
-                },
-                {
-                  "type": "section",
-                  "text": {
-                    "type": "mrkdwn",
-                    "text": "Results:\n• PASS: ${{ steps.parse.outputs.pass }}\n• FAIL: ${{ steps.parse.outputs.fail }}\n• SKIP: ${{ steps.parse.outputs.skip }}"
-                  }
-                },
-                {
-                  "type": "actions",
-                  "elements": [
-                    {
-                      "type": "button",
-                      "text": {
-                        "type": "plain_text",
-                        "text": "View Workflow"
-                      },
-                      "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-                    }
-                  ]
+        if: failure() && env.SLACK_WEBHOOK_URL != ''
+        run: |
+          payload=$(cat <<'JSON'
+          {
+            "text": "Smoke Test Failed on ${{ github.repository }}",
+            "blocks": [
+              {
+                "type": "section",
+                "text": {
+                  "type": "mrkdwn",
+                  "text": "*Smoke Test Failure*\nRepository: ${{ github.repository }}\nBranch: ${{ github.ref_name }}\nCommit: <${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}|${{ github.sha }}>"
                 }
-              ]
-            }
+              },
+              {
+                "type": "section",
+                "text": {
+                  "type": "mrkdwn",
+                  "text": "Results:\n• PASS: ${{ steps.parse.outputs.pass }}\n• FAIL: ${{ steps.parse.outputs.fail }}\n• SKIP: ${{ steps.parse.outputs.skip }}"
+                }
+              },
+              {
+                "type": "actions",
+                "elements": [
+                  {
+                    "type": "button",
+                    "text": {
+                      "type": "plain_text",
+                      "text": "View Workflow"
+                    },
+                    "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                  }
+                ]
+              }
+            ]
+          }
+          JSON
+          )
+          curl -X POST -H "Content-type: application/json" --data "$payload" "$SLACK_WEBHOOK_URL"
 
       - name: Fail workflow if tests failed
         if: steps.smoke.outcome == 'failure'

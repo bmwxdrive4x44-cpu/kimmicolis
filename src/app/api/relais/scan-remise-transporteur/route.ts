@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { requireRole } from '@/lib/rbac';
+import { createNotificationDedup } from '@/lib/notifications';
 import {
   getRelaisCashBlockIssue,
   resolveActingRelais,
@@ -33,6 +34,17 @@ export async function POST(request: NextRequest) {
     }
     const relais = relaisResult.data;
     const actingRelaisId = relais.id;
+
+    // Check if relais is operational
+    if (relais.operationalStatus === 'SUSPENDU') {
+      return NextResponse.json(
+        { 
+          error: 'Ce relais est suspendu', 
+          details: relais.suspensionReason || 'Raison non spécifiée'
+        },
+        { status: 400 }
+      );
+    }
 
     const blockIssue = getRelaisCashBlockIssue(relais);
     if (blockIssue) {
@@ -68,13 +80,11 @@ export async function POST(request: NextRequest) {
       data: { colisId: parcel.id, status: newStatus, notes },
     });
 
-    await db.notification.create({
-      data: {
-        userId: parcel.clientId,
-        title: 'Colis en transport',
-        message: `${notes} — Suivi: ${tracking}`,
-        type: 'IN_APP',
-      },
+    await createNotificationDedup({
+      userId: parcel.clientId,
+      title: 'Colis en transport',
+      message: `${notes} — Suivi: ${tracking}`,
+      type: 'IN_APP',
     });
 
     return NextResponse.json({ success: true, newStatus, message: notes });

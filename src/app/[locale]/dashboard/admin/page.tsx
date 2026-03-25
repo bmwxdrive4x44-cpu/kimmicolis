@@ -639,13 +639,20 @@ function ParcelsTab() {
 function RelaysTab() {
   const { toast } = useToast();
   const [relais, setRelais] = useState<any[]>([]);
+  const [trackingRelais, setTrackingRelais] = useState<any[]>([]);
+  const [trackingTotals, setTrackingTotals] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isTrackingLoading, setIsTrackingLoading] = useState(true);
   const [filter, setFilter] = useState('PENDING');
+  const [trackingSort, setTrackingSort] = useState('reliabilityScore');
+  const [trackingFilter, setTrackingFilter] = useState('ALL');
   const [editRelais, setEditRelais] = useState<any>(null);
   const [deleteRelaisId, setDeleteRelaisId] = useState<string | null>(null);
+  const [suspensionReasons, setSuspensionReasons] = useState<Record<string, string>>({});
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => { fetchRelais(); }, []);
+  useEffect(() => { fetchTracking(); }, [trackingSort, trackingFilter]);
 
   const fetchRelais = async () => {
     try {
@@ -668,6 +675,30 @@ function RelaysTab() {
     }
   };
 
+  const fetchTracking = async () => {
+    setIsTrackingLoading(true);
+    try {
+      const response = await fetch(`/api/admin/relais-tracking?sortBy=${trackingSort}&filterStatus=${trackingFilter}`);
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data?.error || 'Failed to fetch relais tracking');
+      }
+      setTrackingRelais(Array.isArray(data?.relais) ? data.relais : []);
+      setTrackingTotals(data?.totals || null);
+    } catch (error) {
+      console.error('Error fetching relais tracking:', error);
+      setTrackingRelais([]);
+      setTrackingTotals(null);
+      toast({
+        title: 'Erreur suivi relais',
+        description: error instanceof Error ? error.message : 'Impossible de charger le suivi des points relais',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsTrackingLoading(false);
+    }
+  };
+
   const handleApprove = async (id: string) => {
     try {
       const response = await fetch(`/api/relais/${id}`, {
@@ -681,6 +712,7 @@ function RelaysTab() {
       }
       toast({ title: 'Relais approuvé', description: 'La validation a été enregistrée.' });
       fetchRelais();
+      fetchTracking();
     } catch (error) {
       toast({
         title: 'Erreur',
@@ -703,6 +735,7 @@ function RelaysTab() {
       }
       toast({ title: 'Relais rejeté', description: 'La décision a été enregistrée.' });
       fetchRelais();
+      fetchTracking();
     } catch (error) {
       toast({
         title: 'Erreur',
@@ -727,12 +760,15 @@ function RelaysTab() {
           commissionMoyen: parseFloat(editRelais.commissionMoyen),
           commissionGros: parseFloat(editRelais.commissionGros),
           status: editRelais.status,
+          operationalStatus: editRelais.operationalStatus || 'ACTIF',
+          suspensionReason: (editRelais.operationalStatus || 'ACTIF') === 'SUSPENDU' ? editRelais.suspensionReason || 'Suspendu par un administrateur' : null,
         }),
       });
       if (response.ok) {
         toast({ title: 'Relais modifié' });
         setEditRelais(null);
         fetchRelais();
+        fetchTracking();
       } else {
         throw new Error('Failed');
       }
@@ -754,6 +790,7 @@ function RelaysTab() {
         toast({ title: 'Relais supprimé' });
         setDeleteRelaisId(null);
         fetchRelais();
+        fetchTracking();
       } else {
         throw new Error('Failed');
       }
@@ -764,11 +801,193 @@ function RelaysTab() {
     }
   };
 
+  const handleOperationalStatusChange = async (relaisId: string, operationalStatus: 'ACTIF' | 'SUSPENDU') => {
+    setIsSaving(true);
+    try {
+      const response = await fetch('/api/admin/relais-tracking', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          relaisId,
+          operationalStatus,
+          suspensionReason: operationalStatus === 'SUSPENDU'
+            ? (suspensionReasons[relaisId]?.trim() || 'Suspendu par un administrateur')
+            : undefined,
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data?.error || 'Impossible de modifier le statut opérationnel');
+      }
+      toast({
+        title: operationalStatus === 'SUSPENDU' ? 'Relais suspendu' : 'Relais réactivé',
+        description: data?.message || 'Le statut opérationnel a été mis à jour.',
+      });
+      fetchTracking();
+      fetchRelais();
+    } catch (error) {
+      toast({
+        title: 'Erreur',
+        description: error instanceof Error ? error.message : 'Impossible de modifier le statut opérationnel',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const safeRelais = Array.isArray(relais) ? relais : [];
   const filteredRelais = filter === 'all' ? safeRelais : safeRelais.filter(r => r.status === filter);
 
   return (
     <>
+      <div className="space-y-6 mb-6">
+        <Card>
+          <CardHeader>
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <CardTitle>Suivi opérationnel des points relais</CardTitle>
+                <CardDescription>Cash encaissé, commissions, retards, score de fiabilité et statut ACTIF / SUSPENDU</CardDescription>
+              </div>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Select value={trackingSort} onValueChange={setTrackingSort}>
+                  <SelectTrigger className="w-52"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="reliabilityScore">Trier par fiabilité</SelectItem>
+                    <SelectItem value="moneyPending">Trier par montant dû</SelectItem>
+                    <SelectItem value="delayCount">Trier par retards</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={trackingFilter} onValueChange={setTrackingFilter}>
+                  <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">Tous</SelectItem>
+                    <SelectItem value="ACTIF">Actifs</SelectItem>
+                    <SelectItem value="SUSPENDU">Suspendus</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button variant="outline" onClick={fetchTracking} disabled={isTrackingLoading}>
+                  <RefreshCw className={`h-4 w-4 mr-2 ${isTrackingLoading ? 'animate-spin' : ''}`} />Actualiser
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4 md:grid-cols-5">
+              <div className="rounded-lg border p-4 bg-slate-50 dark:bg-slate-800/60">
+                <p className="text-sm text-slate-600 dark:text-slate-400">Relais total</p>
+                <p className="text-2xl font-bold mt-1">{trackingTotals?.totalRelais || 0}</p>
+              </div>
+              <div className="rounded-lg border p-4 bg-emerald-50 dark:bg-emerald-950/20">
+                <p className="text-sm text-emerald-700 dark:text-emerald-300">Actifs</p>
+                <p className="text-2xl font-bold mt-1 text-emerald-600">{trackingTotals?.actifRelais || 0}</p>
+              </div>
+              <div className="rounded-lg border p-4 bg-red-50 dark:bg-red-950/20">
+                <p className="text-sm text-red-700 dark:text-red-300">Suspendus</p>
+                <p className="text-2xl font-bold mt-1 text-red-600">{trackingTotals?.suspendedRelais || 0}</p>
+              </div>
+              <div className="rounded-lg border p-4 bg-slate-50 dark:bg-slate-800/60">
+                <p className="text-sm text-slate-600 dark:text-slate-400">Fiabilité moyenne</p>
+                <p className="text-2xl font-bold mt-1">{trackingTotals?.avgReliabilityScore || 0}%</p>
+              </div>
+              <div className="rounded-lg border p-4 bg-orange-50 dark:bg-orange-950/20">
+                <p className="text-sm text-orange-700 dark:text-orange-300">Montant à reverser</p>
+                <p className="text-2xl font-bold mt-1 text-orange-600">{(trackingTotals?.totalMoneyPending || 0).toFixed(0)} DA</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Dashboard admin des relais</CardTitle>
+            <CardDescription>Alertes auto, classement et pilotage opérationnel</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isTrackingLoading ? (
+              <div className="flex justify-center py-8"><Loader2 className="h-8 w-8 animate-spin text-emerald-600" /></div>
+            ) : trackingRelais.length === 0 ? (
+              <p className="text-center text-slate-500 py-8">Aucun relais à afficher</p>
+            ) : (
+              <div className="space-y-4">
+                {trackingRelais.map((relay) => (
+                  <div key={relay.id} className="rounded-xl border p-4 space-y-4">
+                    <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="font-semibold text-lg">{relay.commerceName}</p>
+                          <Badge className={relay.operationalStatus === 'SUSPENDU' ? 'bg-red-600 text-white' : 'bg-emerald-600 text-white'}>
+                            {relay.operationalStatus}
+                          </Badge>
+                          <Badge className={`${RELAIS_STATUS.find(s => s.id === relay.approvalStatus)?.color || 'bg-slate-500'} text-white`}>
+                            {RELAIS_STATUS.find(s => s.id === relay.approvalStatus)?.label || relay.approvalStatus}
+                          </Badge>
+                          <Badge variant="outline">Score {relay.metrics?.reliabilityScore || 0}%</Badge>
+                        </div>
+                        <p className="text-sm text-slate-600 dark:text-slate-400">{relay.address}, {WILAYAS.find(w => w.id === relay.ville)?.name || relay.ville}</p>
+                        <p className="text-xs text-slate-500">{relay.contactName || '-'} · {relay.phone || '-'} · {relay.email || '-'}</p>
+                        {relay.alerts?.length > 0 && (
+                          <div className="flex flex-wrap gap-2 pt-1">
+                            {relay.alerts.map((alert: any, index: number) => (
+                              <Badge key={`${relay.id}-${index}`} variant="outline" className={alert.level === 'critical' ? 'border-red-300 text-red-700' : 'border-orange-300 text-orange-700'}>
+                                <AlertCircle className="h-3 w-3 mr-1" />{alert.message}
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex flex-col gap-2 min-w-[280px]">
+                        {relay.operationalStatus === 'SUSPENDU' ? (
+                          <Button className="bg-emerald-600 hover:bg-emerald-700" onClick={() => handleOperationalStatusChange(relay.id, 'ACTIF')} disabled={isSaving}>
+                            <CheckCircle className="h-4 w-4 mr-2" />Réactiver
+                          </Button>
+                        ) : (
+                          <>
+                            <Input
+                              placeholder="Raison de suspension"
+                              value={suspensionReasons[relay.id] || ''}
+                              onChange={(e) => setSuspensionReasons((prev) => ({ ...prev, [relay.id]: e.target.value }))}
+                            />
+                            <Button variant="destructive" onClick={() => handleOperationalStatusChange(relay.id, 'SUSPENDU')} disabled={isSaving}>
+                              <XCircle className="h-4 w-4 mr-2" />Suspendre
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
+                      <div className="rounded-lg bg-slate-50 dark:bg-slate-800/60 p-3"><p className="text-xs text-slate-500">Colis déposés</p><p className="text-xl font-bold">{relay.metrics?.nbDeposites || 0}</p></div>
+                      <div className="rounded-lg bg-slate-50 dark:bg-slate-800/60 p-3"><p className="text-xs text-slate-500">Colis livrés</p><p className="text-xl font-bold text-emerald-600">{relay.metrics?.nbLivres || 0}</p></div>
+                      <div className="rounded-lg bg-slate-50 dark:bg-slate-800/60 p-3"><p className="text-xs text-slate-500">Cash encaissé</p><p className="text-xl font-bold">{(relay.metrics?.cashCollected || 0).toFixed(0)} DA</p></div>
+                      <div className="rounded-lg bg-slate-50 dark:bg-slate-800/60 p-3"><p className="text-xs text-slate-500">Commission relais</p><p className="text-xl font-bold text-emerald-600">{(relay.metrics?.commissionRelaisTotal || 0).toFixed(0)} DA</p></div>
+                      <div className="rounded-lg bg-slate-50 dark:bg-slate-800/60 p-3"><p className="text-xs text-slate-500">Montant dû plateforme</p><p className="text-xl font-bold text-orange-600">{(relay.metrics?.commissionPlateformeTotal || 0).toFixed(0)} DA</p></div>
+                      <div className="rounded-lg bg-slate-50 dark:bg-slate-800/60 p-3"><p className="text-xs text-slate-500">Montant déjà versé</p><p className="text-xl font-bold">{(relay.metrics?.amountPaid || 0).toFixed(0)} DA</p></div>
+                    </div>
+
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <div className="rounded-lg border p-3">
+                        <div className="flex items-center justify-between"><span className="text-sm text-slate-600 dark:text-slate-400">Retards</span><Badge variant="outline">{relay.metrics?.nbDelayed || 0}</Badge></div>
+                        <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2 mt-3">
+                          <div className={`h-2 rounded-full ${(relay.metrics?.nbDelayed || 0) > 3 ? 'bg-red-500' : (relay.metrics?.nbDelayed || 0) > 0 ? 'bg-orange-400' : 'bg-emerald-500'}`} style={{ width: `${Math.min(((relay.metrics?.nbDelayed || 0) / 10) * 100, 100)}%` }} />
+                        </div>
+                      </div>
+                      <div className="rounded-lg border p-3">
+                        <div className="flex items-center justify-between"><span className="text-sm text-slate-600 dark:text-slate-400">Score de fiabilité</span><Badge variant="outline">{relay.metrics?.reliabilityScore || 0}%</Badge></div>
+                        <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2 mt-3">
+                          <div className={`h-2 rounded-full ${(relay.metrics?.reliabilityScore || 0) >= 95 ? 'bg-emerald-500' : (relay.metrics?.reliabilityScore || 0) >= 80 ? 'bg-orange-400' : 'bg-red-500'}`} style={{ width: `${Math.min(relay.metrics?.reliabilityScore || 0, 100)}%` }} />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -883,6 +1102,22 @@ function RelaysTab() {
                   </SelectContent>
                 </Select>
               </div>
+              <div className="space-y-2">
+                <Label>Statut opérationnel</Label>
+                <Select value={editRelais.operationalStatus || 'ACTIF'} onValueChange={(v) => setEditRelais({ ...editRelais, operationalStatus: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ACTIF">ACTIF</SelectItem>
+                    <SelectItem value="SUSPENDU">SUSPENDU</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {(editRelais.operationalStatus || 'ACTIF') === 'SUSPENDU' && (
+                <div className="space-y-2">
+                  <Label>Raison de suspension</Label>
+                  <Input value={editRelais.suspensionReason || ''} onChange={(e) => setEditRelais({ ...editRelais, suspensionReason: e.target.value })} />
+                </div>
+              )}
             </div>
           )}
           <DialogFooter>

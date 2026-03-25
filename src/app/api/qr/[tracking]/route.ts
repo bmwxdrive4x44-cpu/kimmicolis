@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { createHash } from 'crypto';
+import { createNotificationDedup } from '@/lib/notifications';
 
 function normalizeName(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, ' ');
@@ -357,13 +358,11 @@ export async function POST(
     });
 
     // ── Notify client ────────────────────────────────────────────────────────────
-    await db.notification.create({
-      data: {
-        userId: parcel.clientId,
-        title: 'Mise à jour de votre colis',
-        message: `Colis ${tracking} — ${notes}`,
-        type: 'IN_APP',
-      },
+    await createNotificationDedup({
+      userId: parcel.clientId,
+      title: 'Mise à jour de votre colis',
+      message: `Colis ${tracking} — ${notes}`,
+      type: 'IN_APP',
     });
 
     return NextResponse.json({ success: true, parcel: updatedParcel, message: notes });

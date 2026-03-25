@@ -52,6 +52,8 @@ export async function PUT(
     // Extract all possible fields
     const { 
       status, 
+      operationalStatus,
+      suspensionReason,
       commissionPetit, 
       commissionMoyen, 
       commissionGros,
@@ -88,6 +90,13 @@ export async function PUT(
       }, { status: 403 });
     }
 
+    // OPERATIONAL STATUS CHANGE REQUIRES ADMIN
+    if (operationalStatus !== undefined && !isAdmin) {
+      return NextResponse.json({
+        error: 'Forbidden: only admins can change relay operational status',
+      }, { status: 403 });
+    }
+
     if (!isAdmin && (commissionPetit !== undefined || commissionMoyen !== undefined || commissionGros !== undefined)) {
       return NextResponse.json({
         error: 'Forbidden: only admins can change relay commissions',
@@ -98,6 +107,16 @@ export async function PUT(
     const data: any = {};
     
     if (status !== undefined) data.status = status;
+    if (operationalStatus !== undefined) {
+      data.operationalStatus = operationalStatus;
+      // When suspending, record the suspension time
+      if (operationalStatus === 'SUSPENDU') {
+        data.suspendedAt = new Date();
+      } else if (operationalStatus === 'ACTIF') {
+        data.suspendedAt = null;
+      }
+    }
+    if (suspensionReason !== undefined) data.suspensionReason = suspensionReason;
     if (commissionPetit !== undefined) data.commissionPetit = commissionPetit;
     if (commissionMoyen !== undefined) data.commissionMoyen = commissionMoyen;
     if (commissionGros !== undefined) data.commissionGros = commissionGros;

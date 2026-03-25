@@ -16,7 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { WILAYAS, PARCEL_FORMATS, PARCEL_STATUS, PLATFORM_COMMISSION, DEFAULT_RELAY_COMMISSION, getTariff, generateTrackingNumber, generateQRData } from '@/lib/constants';
-import { Package, Plus, History, MapPin, Loader2, CreditCard, Search, Truck, CheckCircle, Clock, QrCode, Printer, User, Pencil, Save } from 'lucide-react';
+import { Package, Plus, History, MapPin, Loader2, CreditCard, Search, Truck, CheckCircle, Clock, QrCode, Printer, User, Pencil, Save, AlertTriangle, XCircle, MessageSquare, Smartphone, Banknote } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import Image from 'next/image';
 
@@ -51,7 +51,7 @@ function ClientDashboardContent() {
   const initialTab = useMemo(() => {
     if (searchParams.get('track')) return 'track';
     const tab = searchParams.get('tab');
-    const allowed = ['create', 'track', 'payment', 'history', 'profil'];
+    const allowed = ['create', 'track', 'payment', 'history', 'profil', 'litiges'];
     return allowed.includes(tab || '') ? (tab as string) : 'create';
   }, [searchParams]);
   const initialTracking = useMemo(() => searchParams.get('track') || '', [searchParams]);
@@ -85,7 +85,7 @@ function ClientDashboardContent() {
       return;
     }
 
-    if (tab && ['create', 'track', 'payment', 'history', 'profil'].includes(tab)) {
+    if (tab && ['create', 'track', 'payment', 'history', 'profil', 'litiges'].includes(tab)) {
       setActiveTab(tab);
     }
   }, [searchParams]);
@@ -220,7 +220,7 @@ function ClientDashboardContent() {
 
         {/* Main Content Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-5 mb-8">
+          <TabsList className="grid w-full grid-cols-6 mb-8">
             <TabsTrigger value="create" className="flex items-center gap-2">
               <Plus className="h-4 w-4" />
               Créer un colis
@@ -240,6 +240,10 @@ function ClientDashboardContent() {
             <TabsTrigger value="profil" className="flex items-center gap-2">
               <User className="h-4 w-4" />
               Profil
+            </TabsTrigger>
+            <TabsTrigger value="litiges" className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4" />
+              Litiges
             </TabsTrigger>
           </TabsList>
 
@@ -268,6 +272,9 @@ function ClientDashboardContent() {
           </TabsContent>
           <TabsContent value="profil">
             <ProfilClientTab userId={session.user.id} />
+          </TabsContent>
+          <TabsContent value="litiges">
+            <LitigesTab userId={session.user.id} />
           </TabsContent>
         </Tabs>
       </main>
@@ -1004,6 +1011,8 @@ function PaymentTab({ userId }: { userId: string }) {
   const [parcels, setParcels] = useState<any[]>([]);
   const [relaisMap, setRelaisMap] = useState<Record<string, any>>({});
   const [isLoading, setIsLoading] = useState(true);
+  const [payingId, setPayingId] = useState<string | null>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
     fetchData();
@@ -1038,6 +1047,7 @@ function PaymentTab({ userId }: { userId: string }) {
       <CardHeader>
         <CardTitle>Panier de paiement</CardTitle>
         <CardDescription>Colis créés mais non payés, conservés pour paiement ultérieur au relais de départ</CardDescription>
+        <CardDescription>Payez en ligne (CIB, Edahabia, Baridi Mob) ou en espèces au relais de départ</CardDescription>
       </CardHeader>
       <CardContent>
         {isLoading ? (
@@ -1090,17 +1100,35 @@ function PaymentTab({ userId }: { userId: string }) {
                     </div>
                     <div className="bg-white dark:bg-slate-900 rounded p-3 mb-4 border border-blue-100 dark:border-blue-900">
                       <p className="text-sm text-slate-700 dark:text-slate-300">
-                        💳 <span className="font-semibold">Paiement en espèces au point relais de départ</span>
-                        <br />
-                        📍 {relaisDept?.commerceName || 'Relais non disponible'} - {relaisDept?.address}
+                        📍 <span className="font-semibold">Relais de départ:</span> {relaisDept?.commerceName || 'Non disponible'} — {relaisDept?.address}
                       </p>
                     </div>
-                    <Button
-                      onClick={() => push(`/${locale}/dashboard/client?tab=track&track=${parcel.trackingNumber}`)}
-                      className="w-full bg-blue-600 hover:bg-blue-700"
-                    >
-                      Voir les détails
-                    </Button>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button
+                        disabled={payingId === parcel.id}
+                        onClick={async () => {
+                          setPayingId(parcel.id);
+                          try {
+                            const res = await fetch('/api/payments', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ colisId: parcel.id, amount: parcel.prixClient }),
+                            });
+                            const data = await res.json();
+                            if (!res.ok) { toast({ title: 'Erreur', description: data.error, variant: 'destructive' }); return; }
+                            push(`/${locale}/payment/checkout?paymentId=${data.paymentId}`);
+                          } catch { toast({ title: 'Erreur réseau', variant: 'destructive' }); }
+                          finally { setPayingId(null); }
+                        }}
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                      >
+                        {payingId === parcel.id ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <CreditCard className="h-4 w-4 mr-1" />}
+                        Payer en ligne
+                      </Button>
+                      <Button variant="outline" onClick={() => push(`/${locale}/dashboard/client?tab=track&track=${parcel.trackingNumber}`)}>
+                        <Banknote className="h-4 w-4 mr-1" />Voir (espèces)
+                      </Button>
+                    </div>
                   </CardContent>
                 </Card>
               );

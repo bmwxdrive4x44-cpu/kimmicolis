@@ -36,6 +36,8 @@ model User {
   transporterApplication TransporterApplication? @relation("UserTransporterApplication")
   payments            Payment[]
   notifications       Notification[]
+  disputesOpened      Dispute[]  @relation("DisputesOpened")
+  disputesResolved    Dispute[]  @relation("DisputesResolved")
 }
 
 // Relay points
@@ -53,7 +55,10 @@ model Relais {
   commissionPetit  Float    @default(100)
   commissionMoyen  Float    @default(200)
   commissionGros   Float    @default(300)
-  status           String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  status           String   @default("PENDING") // PENDING, APPROVED, REJECTED (approval status)
+  operationalStatus String  @default("ACTIF") // ACTIF, SUSPENDU (operational status)
+  suspensionReason String?  // Reason for suspension if SUSPENDU
+  suspendedAt      DateTime? // When suspended
   cashCollected    Float    @default(0)  // Total cash collected from clients
   cashReversed     Float    @default(0)  // Total reversed to platform
   createdAt        DateTime @default(now())
@@ -136,6 +141,7 @@ model Colis {
   payments        Payment[]
   trackingHistory TrackingHistory[]
   relaisCash      RelaisCash[]
+  disputes        Dispute[]
 }
 
 model Payment {
@@ -253,6 +259,28 @@ model RelaisCash {
 
   relais         Relais   @relation(fields: [relaisId], references: [id])
   colis          Colis    @relation(fields: [colisId], references: [id])
+}
+
+// Dispute / Litige model
+model Dispute {
+  id           String   @id @default(cuid())
+  colisId      String
+  openedById   String
+  reason       String   // LOST | DAMAGED | DELAYED | WRONG_ADDRESS | OTHER
+  description  String
+  status       String   @default("OPEN") // OPEN | UNDER_REVIEW | RESOLVED | CLOSED
+  resolution   String?
+  resolvedById String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  colis        Colis    @relation(fields: [colisId], references: [id])
+  openedBy     User     @relation("DisputesOpened", fields: [openedById], references: [id])
+  resolvedBy   User?    @relation("DisputesResolved", fields: [resolvedById], references: [id])
+
+  @@index([colisId])
+  @@index([openedById])
+  @@index([status])
 }
 
 // Action log for anti-fraud audit trail

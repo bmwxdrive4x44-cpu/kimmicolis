@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { RELAY_BLOCK_THRESHOLD_DA } from '@/lib/constants';
 import { createHash } from 'crypto';
+import { createNotificationDedup } from '@/lib/notifications';
 
 function normalizeName(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, ' ');
@@ -114,6 +115,18 @@ export async function POST(request: NextRequest) {
     if (!relais) {
       return NextResponse.json({ error: 'Point relais non trouvé' }, { status: 404 });
     }
+
+    // Check if relais is operational
+    if (relais.operationalStatus === 'SUSPENDU') {
+      return NextResponse.json(
+        { 
+          error: 'Ce relais est suspendu', 
+          details: relais.suspensionReason || 'Raison non spécifiée'
+        },
+        { status: 400 }
+      );
+    }
+
     // Block check: if cashCollected - cashReversed >= threshold, prevent new operations
     const unreversed = relais.cashCollected - relais.cashReversed;
     if (unreversed >= RELAY_BLOCK_THRESHOLD_DA) {
@@ -335,13 +348,11 @@ export async function POST(request: NextRequest) {
     });
 
     // Notify client
-    await db.notification.create({
-      data: {
-        userId: parcel.clientId,
-        title: 'Mise à jour de votre colis',
-        message: `${notes} — Colis: ${tracking}`,
-        type: 'IN_APP',
-      },
+    await createNotificationDedup({
+      userId: parcel.clientId,
+      title: 'Mise à jour de votre colis',
+      message: `${notes} — Colis: ${tracking}`,
+      type: 'IN_APP',
     });
 
     return NextResponse.json({

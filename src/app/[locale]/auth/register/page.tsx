@@ -3,7 +3,7 @@
 import { useState, Suspense } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { signIn, signOut } from 'next-auth/react';
+import { signIn } from 'next-auth/react';
 import { Link } from '@/i18n/routing';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -99,12 +99,6 @@ function RegisterForm() {
     setIsLoading(true);
 
     try {
-      try {
-        await signOut({ redirect: false });
-      } catch {
-        // ignore
-      }
-
       // 1. Create user account
       const fullName = `${formData.firstName} ${formData.lastName}`.trim();
 

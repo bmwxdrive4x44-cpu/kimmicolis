@@ -42,9 +42,39 @@ export async function PUT(
       isActive 
     } = body;
 
+    const current = await db.ligne.findUnique({ where: { id } });
+    if (!current) {
+      return NextResponse.json({ error: 'Ligne not found' }, { status: 404 });
+    }
+
+    const nextDepart = villeDepart !== undefined ? String(villeDepart).trim() : current.villeDepart;
+    const nextArrivee = villeArrivee !== undefined ? String(villeArrivee).trim() : current.villeArrivee;
+
+    if (nextDepart === nextArrivee) {
+      return NextResponse.json({ error: 'villeDepart et villeArrivee doivent être différentes' }, { status: 400 });
+    }
+
+    const duplicate = await db.ligne.findFirst({
+      where: {
+        id: { not: id },
+        OR: [
+          { villeDepart: nextDepart, villeArrivee: nextArrivee },
+          { villeDepart: nextArrivee, villeArrivee: nextDepart },
+        ],
+      },
+      select: { id: true },
+    });
+
+    if (duplicate) {
+      return NextResponse.json(
+        { error: 'Une ligne identique existe déjà (même paire de villes)' },
+        { status: 409 }
+      );
+    }
+
     const updateData: any = {};
-    if (villeDepart !== undefined) updateData.villeDepart = villeDepart;
-    if (villeArrivee !== undefined) updateData.villeArrivee = villeArrivee;
+    if (villeDepart !== undefined) updateData.villeDepart = nextDepart;
+    if (villeArrivee !== undefined) updateData.villeArrivee = nextArrivee;
     if (tarifPetit !== undefined) updateData.tarifPetit = tarifPetit;
     if (tarifMoyen !== undefined) updateData.tarifMoyen = tarifMoyen;
     if (tarifGros !== undefined) updateData.tarifGros = tarifGros;
