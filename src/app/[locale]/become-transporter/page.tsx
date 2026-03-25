@@ -1,10 +1,8 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
-import { useLocale } from 'next-intl';
-import { Link } from '@/i18n/routing';
 import { Header } from '@/components/layout/header';
 import { Footer } from '@/components/layout/footer';
+import { PartnerApplicationForm } from '@/components/landing/partner-application-form';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Truck, Banknote, TrendingUp, Shield, Award, ArrowRight } from 'lucide-react';
@@ -33,11 +31,8 @@ const BENEFITS = [
 ];
 
 export default function BecomeTransporterPage() {
-  const router = useRouter();
-  const locale = useLocale();
-
   const handleSignUp = () => {
-    router.push(`/${locale}/auth/register?role=TRANSPORTER`);
+    document.getElementById('transporter-application-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
   return (
@@ -91,6 +86,7 @@ export default function BecomeTransporterPage() {
                   </Button>
                   <Button
                     variant="outline"
+                    onClick={handleSignUp}
                     className="px-8 py-6 text-lg"
                   >
                     Conditions
@@ -178,6 +174,20 @@ export default function BecomeTransporterPage() {
                 </CardContent>
               </Card>
             </div>
+          </div>
+        </section>
+
+        <section className="py-12 md:py-20 bg-white dark:bg-slate-900">
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="text-center mb-10 space-y-3">
+              <h2 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white">
+                Déposer votre dossier transporteur
+              </h2>
+              <p className="text-lg text-gray-600 dark:text-gray-400">
+                Créez votre compte et votre dossier d'adhésion transporteur sans quitter cette page.
+              </p>
+            </div>
+            <PartnerApplicationForm role="TRANSPORTER" />
           </div>
         </section>
 
