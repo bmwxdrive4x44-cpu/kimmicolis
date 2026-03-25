@@ -870,19 +870,32 @@ function WalletTab({ userId }: { userId: string }) {
   const { toast } = useToast();
   const [wallet, setWallet] = useState<any>(null);
   const [missions, setMissions] = useState<any[]>([]);
+  const [monthly, setMonthly] = useState<{ month: string; amount: number }[]>([]);
+  const [gainsInfo, setGainsInfo] = useState<{ pending: number; available: number; total: number }>({ pending: 0, available: 0, total: 0 });
   const [withdrawAmount, setWithdrawAmount] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isWithdrawing, setIsWithdrawing] = useState(false);
+  const [missionFilter, setMissionFilter] = useState<'all' | 'LIVRE' | 'ASSIGNE' | 'EN_COURS'>('all');
 
   const fetchWallet = async () => {
     setIsLoading(true);
     try {
-      const res = await fetch(`/api/wallet?transporteurId=${userId}`);
-      const data = await res.json();
-      setWallet(data.wallet);
-      setMissions(data.missions || []);
+      const [walletRes, gainsRes] = await Promise.all([
+        fetch(`/api/wallet?transporteurId=${userId}`),
+        fetch(`/api/transporteur/gains?transporteurId=${userId}`),
+      ]);
+      const walletData = await walletRes.json();
+      const gainsData = await gainsRes.json();
+      setWallet(walletData.wallet);
+      setMissions(gainsData.missions || walletData.missions || []);
+      setMonthly(gainsData.monthly || []);
+      setGainsInfo({
+        pending: gainsData.wallet?.pending ?? 0,
+        available: gainsData.wallet?.available ?? walletData.wallet?.availableEarnings ?? 0,
+        total: gainsData.wallet?.total ?? 0,
+      });
     } catch {
-      // wallet API might not exist yet
+      // silent
     } finally {
       setIsLoading(false);
     }
@@ -893,8 +906,9 @@ function WalletTab({ userId }: { userId: string }) {
   const handleWithdraw = async () => {
     const amount = parseFloat(withdrawAmount);
     if (!amount || amount <= 0) { toast({ title: 'Montant invalide', variant: 'destructive' }); return; }
-    if (wallet && amount > wallet.availableEarnings) {
-      toast({ title: 'Solde insuffisant', description: `Disponible : ${wallet.availableEarnings.toFixed(0)} DA`, variant: 'destructive' });
+    const available = wallet?.availableEarnings ?? 0;
+    if (amount > available) {
+      toast({ title: 'Solde insuffisant', description: `Disponible : ${available.toFixed(0)} DA`, variant: 'destructive' });
       return;
     }
     setIsWithdrawing(true);
@@ -906,52 +920,109 @@ function WalletTab({ userId }: { userId: string }) {
       });
       const data = await res.json();
       if (!res.ok) { toast({ title: 'Erreur', description: data.error, variant: 'destructive' }); }
-      else { toast({ title: 'Retrait enregistré', description: `${amount.toFixed(0)} DA retiré avec succès` }); setWithdrawAmount(''); fetchWallet(); }
+      else {
+        toast({ title: 'Retrait enregistré', description: `${amount.toFixed(0)} DA retiré avec succès` });
+        setWithdrawAmount('');
+        fetchWallet();
+      }
     } finally {
       setIsWithdrawing(false);
     }
   };
+
+  const filteredMissions = missionFilter === 'all' ? missions : missions.filter((m: any) => m.status === missionFilter);
+  const available = wallet?.availableEarnings ?? 0;
+  const withdrawn = wallet?.totalWithdrawn ?? 0;
 
   if (isLoading) return <div className="flex justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-emerald-600" /></div>;
 
   return (
     <div className="space-y-6">
       {/* Solde cards */}
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-4">
         <Card className="bg-gradient-to-br from-yellow-50 to-orange-50 dark:from-yellow-900/20 border-yellow-200">
           <CardContent className="pt-6 text-center">
-            <p className="text-sm text-yellow-700 mb-1">En attente (livraisons en cours)</p>
-            <p className="text-3xl font-bold text-yellow-700">{wallet?.pendingEarnings?.toFixed(0) ?? 0} DA</p>
+            <Clock className="h-5 w-5 text-yellow-600 mx-auto mb-2" />
+            <p className="text-xs text-yellow-700 mb-1">En attente</p>
+            <p className="text-2xl font-bold text-yellow-700">{gainsInfo.pending.toFixed(0)} DA</p>
+            <p className="text-xs text-yellow-500 mt-1">Livraisons en cours</p>
           </CardContent>
         </Card>
         <Card className="bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-900/20 border-emerald-200">
           <CardContent className="pt-6 text-center">
-            <p className="text-sm text-emerald-700 mb-1">Disponible au retrait</p>
-            <p className="text-3xl font-bold text-emerald-700">{wallet?.availableEarnings?.toFixed(0) ?? 0} DA</p>
+            <Wallet className="h-5 w-5 text-emerald-600 mx-auto mb-2" />
+            <p className="text-xs text-emerald-700 mb-1">Disponible</p>
+            <p className="text-2xl font-bold text-emerald-700">{available.toFixed(0)} DA</p>
+            <p className="text-xs text-emerald-500 mt-1">Prêt au retrait</p>
           </CardContent>
         </Card>
         <Card className="bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-900/20 border-blue-200">
           <CardContent className="pt-6 text-center">
-            <p className="text-sm text-blue-700 mb-1">Total retiré</p>
-            <p className="text-3xl font-bold text-blue-700">{wallet?.totalWithdrawn?.toFixed(0) ?? 0} DA</p>
+            <ArrowUpFromLine className="h-5 w-5 text-blue-600 mx-auto mb-2" />
+            <p className="text-xs text-blue-700 mb-1">Total retiré</p>
+            <p className="text-2xl font-bold text-blue-700">{withdrawn.toFixed(0)} DA</p>
+            <p className="text-xs text-blue-500 mt-1">Versements effectués</p>
+          </CardContent>
+        </Card>
+        <Card className="bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 border-purple-200">
+          <CardContent className="pt-6 text-center">
+            <TrendingUp className="h-5 w-5 text-purple-600 mx-auto mb-2" />
+            <p className="text-xs text-purple-700 mb-1">Total gains confirmés</p>
+            <p className="text-2xl font-bold text-purple-700">{gainsInfo.total.toFixed(0)} DA</p>
+            <p className="text-xs text-purple-500 mt-1">Livraisons terminées</p>
           </CardContent>
         </Card>
       </div>
 
       {/* Retrait */}
-      {(wallet?.availableEarnings ?? 0) > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2"><ArrowUpFromLine className="h-5 w-5 text-emerald-600" />Demander un retrait</CardTitle>
-            <CardDescription>Retirez vos gains disponibles</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><ArrowUpFromLine className="h-5 w-5 text-emerald-600" />Demander un retrait</CardTitle>
+          <CardDescription>Solde disponible : <span className="font-semibold text-emerald-700">{available.toFixed(0)} DA</span></CardDescription>
+        </CardHeader>
+        <CardContent>
+          {available <= 0 ? (
+            <p className="text-slate-500 text-sm">Aucun gain disponible pour le moment. Complétez des livraisons pour débloquer vos gains.</p>
+          ) : (
             <div className="flex gap-3 max-w-sm">
-              <Input type="number" placeholder={`Max : ${wallet?.availableEarnings?.toFixed(0)} DA`} value={withdrawAmount} onChange={(e) => setWithdrawAmount(e.target.value)} min="1" max={wallet?.availableEarnings} />
+              <Input
+                type="number"
+                placeholder={`Max : ${available.toFixed(0)} DA`}
+                value={withdrawAmount}
+                onChange={(e) => setWithdrawAmount(e.target.value)}
+                min="100"
+                max={available}
+              />
               <Button onClick={handleWithdraw} disabled={isWithdrawing || !withdrawAmount} className="bg-emerald-600 hover:bg-emerald-700 flex-shrink-0">
                 {isWithdrawing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Wallet className="h-4 w-4 mr-2" />}
                 Retirer
               </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Gains mensuels */}
+      {monthly.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2"><TrendingUp className="h-5 w-5" />Gains mensuels</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {[...monthly].reverse().map(({ month, amount }) => {
+                const maxAmount = Math.max(...monthly.map(m => m.amount), 1);
+                const pct = Math.round((amount / maxAmount) * 100);
+                return (
+                  <div key={month} className="flex items-center gap-3">
+                    <span className="text-sm text-slate-500 w-16 shrink-0">{month}</span>
+                    <div className="flex-1 bg-slate-100 dark:bg-slate-800 rounded-full h-3">
+                      <div className="bg-emerald-500 h-3 rounded-full transition-all" style={{ width: `${pct}%` }} />
+                    </div>
+                    <span className="text-sm font-semibold text-emerald-700 w-20 text-right shrink-0">{amount.toFixed(0)} DA</span>
+                  </div>
+                );
+              })}
             </div>
           </CardContent>
         </Card>
@@ -960,24 +1031,43 @@ function WalletTab({ userId }: { userId: string }) {
       {/* Historique missions */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2"><History className="h-5 w-5" />Historique des missions</CardTitle>
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <CardTitle className="flex items-center gap-2"><History className="h-5 w-5" />Historique des missions ({missions.length})</CardTitle>
+            <Select value={missionFilter} onValueChange={(v: any) => setMissionFilter(v)}>
+              <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Toutes</SelectItem>
+                <SelectItem value="LIVRE">Livrées</SelectItem>
+                <SelectItem value="EN_COURS">En cours</SelectItem>
+                <SelectItem value="ASSIGNE">Assignées</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </CardHeader>
         <CardContent>
-          {missions.length === 0 ? (
-            <p className="text-center text-slate-500 py-8">Aucune mission terminée</p>
+          {filteredMissions.length === 0 ? (
+            <p className="text-center text-slate-500 py-8">Aucune mission</p>
           ) : (
-            <div className="space-y-3">
-              {missions.slice(0, 20).map((m: any) => (
-                <div key={m.id} className="flex items-center justify-between p-3 border rounded-lg">
-                  <div>
-                    <p className="font-semibold text-sm">{m.colis?.villeDepart} → {m.colis?.villeArrivee}</p>
+            <div className="space-y-2">
+              {filteredMissions.slice(0, 30).map((m: any) => (
+                <div key={m.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-semibold text-sm truncate">
+                      {WILAYAS.find(w => w.id === m.colis?.villeDepart)?.name || m.colis?.villeDepart}
+                      {' → '}
+                      {WILAYAS.find(w => w.id === m.colis?.villeArrivee)?.name || m.colis?.villeArrivee}
+                    </p>
                     <p className="text-xs text-slate-500 font-mono">#{m.colis?.trackingNumber}</p>
-                    <p className="text-xs text-slate-400">{new Date(m.updatedAt ?? m.createdAt).toLocaleString('fr-FR')}</p>
+                    <p className="text-xs text-slate-400">
+                      {m.colis?.format}
+                      {' · '}
+                      {new Date(m.completedAt ?? m.updatedAt ?? m.createdAt).toLocaleDateString('fr-FR', { day:'2-digit', month:'2-digit', year:'numeric' })}
+                    </p>
                   </div>
-                  <div className="text-right">
-                    <p className="font-bold text-emerald-600">{m.colis?.netTransporteur?.toFixed(0) ?? 0} DA</p>
-                    <Badge className={`text-xs ${m.status === 'LIVRE' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>
-                      {m.status === 'LIVRE' ? 'Livré' : m.status}
+                  <div className="text-right shrink-0 ml-4">
+                    <p className="font-bold text-emerald-600">{(m.colis?.netTransporteur ?? 0).toFixed(0)} DA</p>
+                    <Badge className={`text-xs mt-1 ${m.status === 'LIVRE' ? 'bg-green-100 text-green-700' : m.status === 'EN_COURS' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'}`}>
+                      {m.status === 'LIVRE' ? 'Livré' : m.status === 'EN_COURS' ? 'En cours' : 'Assignée'}
                     </Badge>
                   </div>
                 </div>
