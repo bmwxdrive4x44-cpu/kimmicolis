@@ -4,6 +4,13 @@ import { db } from '@/lib/db';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
+const noStoreHeaders = {
+  'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0, s-maxage=0',
+  Pragma: 'no-cache',
+  Expires: '0',
+  'Surrogate-Control': 'no-store',
+};
+
 export async function GET() {
   try {
     // Get counts using raw SQL
@@ -94,12 +101,12 @@ export async function GET() {
         month: m.month,
         count: Number(m.count),
       })),
-    });
+    }, { headers: noStoreHeaders });
   } catch (error) {
     console.error('Error fetching stats:', error);
     return NextResponse.json({ 
       error: 'Failed to fetch stats',
       details: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 });
+    }, { status: 500, headers: noStoreHeaders });
   }
 }
