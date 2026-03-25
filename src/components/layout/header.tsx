@@ -14,10 +14,134 @@ import {
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { LanguageSwitcher } from './language-switcher';
-import { Menu, LogOut, LayoutDashboard } from 'lucide-react';
-import { useState } from 'react';
+import { Menu, LogOut, LayoutDashboard, Bell, BellDot, CheckCheck, Package, Truck, AlertCircle, Info } from 'lucide-react';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSession, signOut } from 'next-auth/react';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+
+// ─── Notification Bell ───────────────────────────────────────────────────────
+function NotificationBell({ userId }: { userId: string }) {
+  const [open, setOpen] = useState(false);
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const unreadCount = notifications.filter(n => !n.isRead).length;
+
+  const fetchNotifications = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/notifications?userId=${userId}`);
+      if (res.ok) setNotifications(await res.json());
+    } catch { /* ignore */ }
+  }, [userId]);
+
+  // Initial fetch + polling every 60s
+  useEffect(() => {
+    fetchNotifications();
+    intervalRef.current = setInterval(fetchNotifications, 60_000);
+    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
+  }, [fetchNotifications]);
+
+  const handleOpen = (v: boolean) => {
+    setOpen(v);
+    if (v) fetchNotifications();
+  };
+
+  const markAsRead = async (id: string) => {
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
+    await fetch('/api/notifications', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    });
+  };
+
+  const markAllRead = async () => {
+    setIsLoading(true);
+    setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+    await fetch('/api/notifications', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, markAllRead: true }),
+    });
+    setIsLoading(false);
+  };
+
+  const typeIcon = (type: string, title: string) => {
+    if (type === 'EMAIL') return <Info className="h-4 w-4 text-blue-500 flex-shrink-0" />;
+    if (title?.toLowerCase().includes('colis') || title?.toLowerCase().includes('parcel'))
+      return <Package className="h-4 w-4 text-emerald-500 flex-shrink-0" />;
+    if (title?.toLowerCase().includes('transport') || title?.toLowerCase().includes('mission'))
+      return <Truck className="h-4 w-4 text-orange-500 flex-shrink-0" />;
+    if (title?.toLowerCase().includes('erreur') || title?.toLowerCase().includes('refus'))
+      return <AlertCircle className="h-4 w-4 text-red-500 flex-shrink-0" />;
+    return <Bell className="h-4 w-4 text-slate-400 flex-shrink-0" />;
+  };
+
+  return (
+    <DropdownMenu open={open} onOpenChange={handleOpen}>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" className="relative h-9 w-9">
+          {unreadCount > 0 ? (
+            <BellDot className="h-5 w-5 text-emerald-600" />
+          ) : (
+            <Bell className="h-5 w-5 text-muted-foreground" />
+          )}
+          {unreadCount > 0 && (
+            <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white leading-none">
+              {unreadCount > 9 ? '9+' : unreadCount}
+            </span>
+          )}
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent className="w-80 p-0" align="end">
+        <div className="flex items-center justify-between px-4 py-3 border-b">
+          <p className="font-semibold text-sm">Notifications {unreadCount > 0 && <span className="ml-1 text-xs text-red-500">({unreadCount} non lu{unreadCount > 1 ? 'es' : ''})</span>}</p>
+          {unreadCount > 0 && (
+            <button
+              onClick={markAllRead}
+              disabled={isLoading}
+              className="flex items-center gap-1 text-xs text-emerald-600 hover:text-emerald-700 font-medium"
+            >
+              <CheckCheck className="h-3.5 w-3.5" /> Tout marquer lu
+            </button>
+          )}
+        </div>
+        <ScrollArea className="max-h-96">
+          {notifications.length === 0 ? (
+            <div className="flex flex-col items-center gap-2 py-10 text-center text-slate-400">
+              <Bell className="h-8 w-8 opacity-30" />
+              <p className="text-sm">Aucune notification</p>
+            </div>
+          ) : (
+            <div className="divide-y">
+              {notifications.map(n => (
+                <button
+                  key={n.id}
+                  onClick={() => { if (!n.isRead) markAsRead(n.id); }}
+                  className={`w-full text-left flex items-start gap-3 px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors ${
+                    n.isRead ? 'opacity-60' : 'bg-emerald-50/50 dark:bg-emerald-900/10'
+                  }`}
+                >
+                  <div className="mt-0.5">{typeIcon(n.type, n.title)}</div>
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-sm leading-tight truncate ${n.isRead ? 'font-normal' : 'font-semibold'}`}>{n.title}</p>
+                    <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{n.message}</p>
+                    <p className="text-[11px] text-slate-400 mt-1">
+                      {new Date(n.createdAt).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                  </div>
+                  {!n.isRead && <span className="w-2 h-2 rounded-full bg-emerald-500 mt-1.5 flex-shrink-0" />}
+                </button>
+              ))}
+            </div>
+          )}
+        </ScrollArea>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
 
 function Logo() {
   return (
@@ -135,6 +259,7 @@ export function Header() {
                   {t('common.dashboard')}
                 </Button>
               </Link>
+              <NotificationBell userId={session.user.id} />
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="relative h-9 w-9 rounded-full">
