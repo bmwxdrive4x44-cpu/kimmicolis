@@ -8,6 +8,7 @@ import {
   getPaymentStats,
 } from '@/lib/payment';
 import { requireRole, hasAccess } from '@/lib/rbac';
+import { checkRateLimit, RATE_LIMIT_PRESETS } from '@/lib/ratelimit';
 
 /**
  * GET /api/payments
@@ -76,6 +77,14 @@ export async function GET(request: NextRequest) {
  * Create a new payment session
  */
 export async function POST(request: NextRequest) {
+  const rateCheck = await checkRateLimit(request, RATE_LIMIT_PRESETS.strict);
+  if (rateCheck.limited) {
+    return NextResponse.json(
+      { error: 'Too many requests. Please try again later.', retryAfter: rateCheck.retryAfter },
+      { status: 429, headers: { 'Retry-After': String(rateCheck.retryAfter) } }
+    );
+  }
+
   const auth = await requireRole(request, ['CLIENT']);
   if (!auth.success) return auth.response;
 

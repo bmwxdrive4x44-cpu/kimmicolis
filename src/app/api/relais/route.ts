@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { requireRole } from '@/lib/rbac';
 import { isAlgerianCommerceRegisterNumber, normalizeCommerceRegisterNumber } from '@/lib/validators';
+import { checkRateLimit, RATE_LIMIT_PRESETS } from '@/lib/ratelimit';
 
 // GET all relais or filter by userId
 export async function GET(request: NextRequest) {
@@ -71,6 +72,14 @@ export async function GET(request: NextRequest) {
 
 // POST create relais registration
 export async function POST(request: NextRequest) {
+  const rateCheck = await checkRateLimit(request, RATE_LIMIT_PRESETS.moderate);
+  if (rateCheck.limited) {
+    return NextResponse.json(
+      { error: 'Too many requests. Please try again later.', retryAfter: rateCheck.retryAfter },
+      { status: 429, headers: { 'Retry-After': String(rateCheck.retryAfter) } }
+    );
+  }
+
   try {
     const auth = await requireRole(request, ['RELAIS', 'ADMIN']);
     if (!auth.success) return auth.response;

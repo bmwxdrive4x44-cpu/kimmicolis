@@ -5,6 +5,7 @@ import { requireRole } from '@/lib/rbac';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { isAlgerianCommerceRegisterNumber, normalizeCommerceRegisterNumber } from '@/lib/validators';
+import { checkRateLimit, RATE_LIMIT_PRESETS } from '@/lib/ratelimit';
 
 // GET all users (ADMIN ONLY)
 export async function GET(request: NextRequest) {
@@ -48,6 +49,14 @@ export async function GET(request: NextRequest) {
 
 // POST create user
 export async function POST(request: NextRequest) {
+  const rateCheck = await checkRateLimit(request, RATE_LIMIT_PRESETS.moderate);
+  if (rateCheck.limited) {
+    return NextResponse.json(
+      { error: 'Too many requests. Please try again later.', retryAfter: rateCheck.retryAfter },
+      { status: 429, headers: { 'Retry-After': String(rateCheck.retryAfter) } }
+    );
+  }
+
   try {
     const body = await request.json();
     const { name, firstName, lastName, address, email, password, phone, role, siret } = body;
