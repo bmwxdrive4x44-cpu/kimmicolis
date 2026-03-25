@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { useLocale } from 'next-intl';
 import { useRouter } from 'next/navigation';
@@ -17,7 +17,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { MatchingAutoAssignPanel } from '@/components/dashboard/admin/matching-auto-assign-panel';
 import { WILAYAS, USER_ROLES, PARCEL_STATUS, RELAIS_STATUS, PARCEL_FORMATS } from '@/lib/constants';
-import { Users, Package, Truck, Store, DollarSign, CheckCircle, XCircle, Loader2, Plus, Settings, BarChart3, MapPin, Trash2, Pencil, Eye, EyeOff, AlertCircle } from 'lucide-react';
+import { Users, Package, Truck, Store, DollarSign, CheckCircle, XCircle, Loader2, Plus, Settings, BarChart3, MapPin, Trash2, Pencil, Eye, EyeOff, AlertCircle, ScrollText, RefreshCw, ChevronDown, ChevronRight } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 // Helper function to get the correct dashboard path based on role
@@ -141,12 +141,13 @@ export default function AdminDashboard() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-6 mb-8">
+          <TabsList className="grid w-full grid-cols-7 mb-8">
             <TabsTrigger value="overview"><BarChart3 className="h-4 w-4 mr-2" />Vue d'ensemble</TabsTrigger>
             <TabsTrigger value="users"><Users className="h-4 w-4 mr-2" />Utilisateurs</TabsTrigger>
             <TabsTrigger value="parcels"><Package className="h-4 w-4 mr-2" />Colis</TabsTrigger>
             <TabsTrigger value="relays"><Store className="h-4 w-4 mr-2" />Relais</TabsTrigger>
             <TabsTrigger value="lines"><MapPin className="h-4 w-4 mr-2" />Lignes</TabsTrigger>
+            <TabsTrigger value="audit"><ScrollText className="h-4 w-4 mr-2" />Audit</TabsTrigger>
             <TabsTrigger value="settings"><Settings className="h-4 w-4 mr-2" />Paramètres</TabsTrigger>
           </TabsList>
 
@@ -164,6 +165,9 @@ export default function AdminDashboard() {
           </TabsContent>
           <TabsContent value="lines">
             <LinesTab />
+          </TabsContent>
+          <TabsContent value="audit">
+            <AuditTab />
           </TabsContent>
           <TabsContent value="settings">
             <SettingsTab />
@@ -1206,6 +1210,179 @@ function LinesTab() {
         </DialogContent>
       </Dialog>
     </>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// Audit Tab — Journal des actions (ActionLog)
+// ─────────────────────────────────────────────────────────────
+const ENTITY_TYPES = ['ALL', 'COLIS', 'RELAIS', 'TRANSPORTER', 'USER', 'WALLET'] as const;
+const ACTIONS_MAP: Record<string, string> = {
+  QR_SCAN: 'Scan QR',
+  PAYMENT_VALIDATE: 'Paiement validé',
+  STATUS_CHANGE: 'Changement statut',
+  DEPOSIT: 'Dépôt relais',
+  DELIVERY: 'Livraison',
+  WITHDRAW: 'Retrait portefeuille',
+  CASH_REVERSE: 'Reversement cash',
+  LOGIN: 'Connexion',
+  VALIDATE_RELAIS: 'Validation relais',
+  VALIDATE_TRANSPORTER: 'Validation transporteur',
+};
+const ENTITY_COLORS: Record<string, string> = {
+  COLIS: 'bg-blue-100 text-blue-700',
+  RELAIS: 'bg-emerald-100 text-emerald-700',
+  TRANSPORTER: 'bg-orange-100 text-orange-700',
+  USER: 'bg-purple-100 text-purple-700',
+  WALLET: 'bg-yellow-100 text-yellow-700',
+};
+
+function AuditTab() {
+  const [logs, setLogs] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [entityType, setEntityType] = useState<string>('ALL');
+  const [actionFilter, setActionFilter] = useState<string>('');
+  const [limit, setLimit] = useState(50);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  const fetchLogs = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const params = new URLSearchParams({ limit: String(limit) });
+      if (entityType !== 'ALL') params.set('entityType', entityType);
+      const res = await fetch(`/api/action-logs?${params}`);
+      if (res.ok) {
+        const data = await res.json();
+        const filtered = actionFilter
+          ? data.filter((l: any) => l.action?.toLowerCase().includes(actionFilter.toLowerCase()))
+          : data;
+        setLogs(filtered);
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  }, [entityType, limit, actionFilter]);
+
+  useEffect(() => { fetchLogs(); }, [fetchLogs]);
+
+  const parseDetails = (details: string | null) => {
+    if (!details) return null;
+    try { return JSON.parse(details); } catch { return details; }
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Filters */}
+      <Card>
+        <CardContent className="pt-4">
+          <div className="flex flex-wrap gap-3 items-end">
+            <div className="space-y-1">
+              <Label className="text-xs">Type d'entité</Label>
+              <Select value={entityType} onValueChange={setEntityType}>
+                <SelectTrigger className="w-40">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {ENTITY_TYPES.map(t => (
+                    <SelectItem key={t} value={t}>{t === 'ALL' ? 'Tous' : t}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Filtrer par action</Label>
+              <Input
+                placeholder="Ex: QR_SCAN, WITHDRAW…"
+                value={actionFilter}
+                onChange={e => setActionFilter(e.target.value)}
+                className="w-48"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Limite</Label>
+              <Select value={String(limit)} onValueChange={v => setLimit(Number(v))}>
+                <SelectTrigger className="w-24">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {[50, 100, 200].map(n => <SelectItem key={n} value={String(n)}>{n}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button variant="outline" size="sm" onClick={fetchLogs} disabled={isLoading} className="flex items-center gap-2">
+              <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+              Actualiser
+            </Button>
+            <span className="text-xs text-slate-500 self-end pb-2">{logs.length} entrée{logs.length > 1 ? 's' : ''}</span>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Logs table */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <ScrollText className="h-5 w-5 text-slate-500" />
+            Journal d'audit
+          </CardTitle>
+          <CardDescription>Toutes les actions tracées sur la plateforme</CardDescription>
+        </CardHeader>
+        <CardContent className="p-0">
+          {isLoading ? (
+            <div className="flex justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-emerald-600" /></div>
+          ) : logs.length === 0 ? (
+            <div className="flex flex-col items-center gap-2 py-16 text-slate-400">
+              <ScrollText className="h-10 w-10 opacity-30" />
+              <p className="text-sm">Aucun log trouvé pour ces filtres</p>
+            </div>
+          ) : (
+            <div className="divide-y">
+              {logs.map(log => {
+                const details = parseDetails(log.details);
+                const isExpanded = expandedId === log.id;
+                return (
+                  <div key={log.id} className="px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                    <div className="flex items-start gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-wrap items-center gap-2 mb-1">
+                          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${ENTITY_COLORS[log.entityType] || 'bg-slate-100 text-slate-600'}`}>
+                            {log.entityType}
+                          </span>
+                          <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+                            {ACTIONS_MAP[log.action] || log.action}
+                          </span>
+                          <span className="font-mono text-xs text-slate-400 truncate max-w-[160px]" title={log.entityId}>
+                            #{log.entityId.slice(-8)}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
+                          <span>{new Date(log.createdAt).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                          {log.userId && <span className="font-mono truncate max-w-[100px]" title={log.userId}>user:{log.userId.slice(-6)}</span>}
+                          {log.ipAddress && <span>{log.ipAddress}</span>}
+                        </div>
+                      </div>
+                      {details && (
+                        <button
+                          onClick={() => setExpandedId(isExpanded ? null : log.id)}
+                          className="flex-shrink-0 text-slate-400 hover:text-slate-600 p-1"
+                        >
+                          {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                        </button>
+                      )}
+                    </div>
+                    {isExpanded && details && (
+                      <pre className="mt-2 text-xs bg-slate-100 dark:bg-slate-800 rounded p-3 overflow-x-auto text-slate-700 dark:text-slate-300 whitespace-pre-wrap break-all">
+                        {typeof details === 'string' ? details : JSON.stringify(details, null, 2)}
+                      </pre>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 }
 
