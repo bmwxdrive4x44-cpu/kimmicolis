@@ -1153,10 +1153,11 @@ function ScanTab({ relaisId, userId, onRefresh }: { relaisId: string | undefined
 }
 
 // Cash Tab — Gestion de la caisse
-function CashTab({ relaisId, cashInfo, userId, onRefresh }: { relaisId: string | undefined; cashInfo: any; userId: string; onRefresh: () => void }) {
+function CashTab({ relaisId, cashInfo: initialCashInfo, userId, onRefresh }: { relaisId: string | undefined; cashInfo: any; userId: string; onRefresh: () => void }) {
   const { toast } = useToast();
   const [transactions, setTransactions] = useState<any[]>([]);
   const [cashPickups, setCashPickups] = useState<any[]>([]);
+  const [cashInfo, setCashInfo] = useState(initialCashInfo);
   const [reverseAmount, setReverseAmount] = useState('');
   const [reverseNotes, setReverseNotes] = useState('');
   const [pickupAmount, setPickupAmount] = useState('');
@@ -1165,6 +1166,9 @@ function CashTab({ relaisId, cashInfo, userId, onRefresh }: { relaisId: string |
   const [isReversing, setIsReversing] = useState(false);
   const [isRequestingPickup, setIsRequestingPickup] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Keep local cashInfo in sync when parent updates it (e.g. on initial load)
+  useEffect(() => { setCashInfo(initialCashInfo); }, [initialCashInfo]);
 
   const fetchTransactions = useCallback(async () => {
     if (!relaisId) return;
@@ -1178,6 +1182,15 @@ function CashTab({ relaisId, cashInfo, userId, onRefresh }: { relaisId: string |
       const pickupData = await pickupRes.json().catch(() => ({ pickups: [] }));
       setTransactions(cashData.transactions || []);
       setCashPickups(pickupData.pickups || []);
+      // Update local cash summary from fresh API data (source of truth)
+      if (cashRes.ok) {
+        setCashInfo({
+          cashCollected: cashData.cashCollected ?? 0,
+          cashReversed: cashData.cashReversed ?? 0,
+          balance: cashData.balance ?? 0,
+          totalCommissions: cashData.totalCommissions ?? 0,
+        });
+      }
     } finally {
       setIsLoading(false);
     }

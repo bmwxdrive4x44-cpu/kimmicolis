@@ -50,14 +50,29 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Relais introuvable' }, { status: 404 });
     }
 
-    const balance = relais.cashCollected - relais.cashReversed;
+    // Compute from actual transactions (source of truth) to avoid stale denormalized fields
+    const cashCollected = transactions
+      .filter(t => t.type === 'COLLECTED')
+      .reduce((sum, t) => sum + t.amount, 0);
+    const cashReversed = transactions
+      .filter(t => t.type === 'REVERSED')
+      .reduce((sum, t) => sum + t.amount, 0);
+    const balance = cashCollected - cashReversed;
     const totalCommissions = transactions
       .filter(t => t.type === 'COLLECTED')
       .reduce((sum, t) => sum + (t.colis?.commissionRelais || 0), 0);
 
+    // Sync denormalized fields if out of date
+    if (relais.cashCollected !== cashCollected || relais.cashReversed !== cashReversed) {
+      await db.relais.update({
+        where: { id: relaisId as string },
+        data: { cashCollected, cashReversed },
+      });
+    }
+
     return NextResponse.json({
-      cashCollected: relais.cashCollected,
-      cashReversed: relais.cashReversed,
+      cashCollected,
+      cashReversed,
       balance,
       totalCommissions,
       transactions,
