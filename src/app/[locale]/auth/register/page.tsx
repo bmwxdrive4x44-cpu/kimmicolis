@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
-import { Package, Loader2, Mail, Lock, User, Phone, Store, MapPin, Truck, AlertCircle } from 'lucide-react';
+import { Package, Loader2, Mail, Lock, User, Phone, Store, MapPin, Truck, AlertCircle, Eye, EyeOff, CheckCircle2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { WILAYAS } from '@/lib/constants';
 import { isAlgerianCommerceRegisterNumber, normalizeCommerceRegisterNumber } from '@/lib/validators';
@@ -25,6 +25,8 @@ function RegisterForm() {
   const searchParams = useSearchParams();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<{
     email?: string;
     password?: string;
@@ -253,131 +255,117 @@ function RegisterForm() {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-slate-50 to-emerald-50 dark:from-slate-900 dark:to-slate-800 p-4 py-8">
-      <Link href="/" className="flex items-center gap-2 mb-8">
-        <Package className="h-10 w-10 text-emerald-600" />
-        <span className="text-2xl font-bold bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">
-          SwiftColis
-        </span>
-      </Link>
+      <div className="text-center mb-8">
+        <Link href="/" className="inline-flex items-center gap-2.5 mb-6">
+          <div className="p-2 bg-emerald-600 rounded-xl">
+            <Package className="h-6 w-6 text-white" />
+          </div>
+          <span className="text-2xl font-bold bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">
+            SwiftColis
+          </span>
+        </Link>
+        <h1 className="text-3xl font-bold text-slate-900 dark:text-white">{t('title')}</h1>
+        <p className="mt-2 text-slate-500 dark:text-slate-400">{t('subtitle')}</p>
+      </div>
 
-      <Card className="w-full max-w-2xl shadow-xl">
-        <CardHeader className="text-center">
-          <CardTitle className="text-3xl">{t('title')}</CardTitle>
-          <CardDescription>{t('subtitle')}</CardDescription>
-        </CardHeader>
+      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden">
         <form onSubmit={handleSubmit}>
-          <CardContent className="space-y-6">
-            {/* Role Selection */}
-            <div className="space-y-2">
-              <Label>{t('role.label')}</Label>
-              <Select value={formData.role} onValueChange={(value) => setFormData({ ...formData, role: value })}>
-                <SelectTrigger className="h-11">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="CLIENT">
-                    <div className="flex items-center gap-2">
-                      <span>📦</span>
-                      <span>{t('role.client')}</span>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="TRANSPORTER">
-                    <div className="flex items-center gap-2">
-                      <span>🚚</span>
-                      <span>{t('role.transporter')}</span>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="RELAIS">
-                    <div className="flex items-center gap-2">
-                      <span>🏪</span>
-                      <span>{t('role.relais')}</span>
-                    </div>
-                  </SelectItem>
-                </SelectContent>
-              </Select>
+          {/* Role Selection */}
+          <div className="p-6 border-b border-slate-100 dark:border-slate-800">
+            <Label className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-3 block">
+              {t('role.label')}
+            </Label>
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                { value: 'CLIENT', emoji: '📦', label: t('role.client'), desc: 'Envoyer des colis' },
+                { value: 'TRANSPORTER', emoji: '🚚', label: t('role.transporter'), desc: 'Transporter et livrer' },
+                { value: 'RELAIS', emoji: '🏪', label: t('role.relais'), desc: 'Point de dépôt' },
+              ].map(({ value, emoji, label, desc }) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setFormData({ ...formData, role: value })}
+                  className={`relative flex flex-col items-center gap-2 p-4 rounded-xl border-2 text-center transition-all ${
+                    formData.role === value
+                      ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/30 shadow-sm'
+                      : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 bg-white dark:bg-slate-800/50'
+                  }`}
+                >
+                  {formData.role === value && (
+                    <CheckCircle2 className="absolute top-2 right-2 h-4 w-4 text-emerald-500" />
+                  )}
+                  <span className="text-2xl">{emoji}</span>
+                  <div>
+                    <div className={`text-sm font-semibold ${
+                      formData.role === value ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-700 dark:text-slate-300'
+                    }`}>{label}</div>
+                    <div className="text-xs text-slate-400 mt-0.5 hidden sm:block">{desc}</div>
+                  </div>
+                </button>
+              ))}
             </div>
+          </div>
 
-            <Separator />
+          {/* Common Fields */}
+          <div className="p-6 space-y-5">
+            <h3 className="text-xs font-semibold uppercase tracking-widest text-slate-400">Informations personnelles</h3>
 
             {/* Common Fields */}
             <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="firstName">Prénom</Label>
+              <div className="space-y-1.5">
+                <Label htmlFor="firstName" className="text-sm font-medium text-slate-700 dark:text-slate-300">Prénom</Label>
                 <div className="relative">
-                  <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="firstName"
-                    placeholder="Votre prénom"
-                    value={formData.firstName}
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <Input id="firstName" placeholder="Votre prénom" value={formData.firstName}
                     onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
-                    className="pl-10"
-                    required
-                  />
+                    className="pl-10 h-11 bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700" required />
                 </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="lastName">Nom</Label>
+              <div className="space-y-1.5">
+                <Label htmlFor="lastName" className="text-sm font-medium text-slate-700 dark:text-slate-300">Nom</Label>
                 <div className="relative">
-                  <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="lastName"
-                    placeholder="Votre nom"
-                    value={formData.lastName}
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <Input id="lastName" placeholder="Votre nom" value={formData.lastName}
                     onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
-                    className="pl-10"
-                    required
-                  />
+                    className="pl-10 h-11 bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700" required />
                 </div>
               </div>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="email">{t('email')}</Label>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="email" className="text-sm font-medium text-slate-700 dark:text-slate-300">{t('email')}</Label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="email@exemple.com"
-                    value={formData.email}
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <Input id="email" type="email" placeholder="email@exemple.com" value={formData.email}
                     onChange={(e) => { setFormData({ ...formData, email: e.target.value }); setFieldErrors(p => ({ ...p, email: undefined })); }}
-                    className={`pl-10 ${fieldErrors.email ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
-                    required
-                  />
+                    className={`pl-10 h-11 bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 ${fieldErrors.email ? 'border-red-400' : ''}`}
+                    required />
                 </div>
                 {fieldErrors.email && (
-                  <div className="flex items-center gap-1 text-sm text-red-600 dark:text-red-400">
-                    <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-                    <span>{fieldErrors.email}</span>
+                  <div className="flex items-center gap-1 text-xs text-red-600 dark:text-red-400">
+                    <AlertCircle className="h-3.5 w-3.5 shrink-0" /><span>{fieldErrors.email}</span>
                   </div>
                 )}
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="personalAddress">Adresse personnelle</Label>
-                <Input
-                  id="personalAddress"
-                  placeholder="Ex: 12 Rue Didouche Mourad"
-                  value={formData.personalAddress}
-                  onChange={(e) => setFormData({ ...formData, personalAddress: e.target.value })}
-                />
+              <div className="space-y-1.5">
+                <Label htmlFor="phone" className="text-sm font-medium text-slate-700 dark:text-slate-300">{t('phone')}</Label>
+                <div className="relative">
+                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <Input id="phone" type="tel" placeholder="+213 XX XX XX XX" value={formData.phone}
+                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    className="pl-10 h-11 bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700" required />
+                </div>
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="phone">{t('phone')}</Label>
-              <div className="relative">
-                <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Input
-                  id="phone"
-                  type="tel"
-                  placeholder="+213 XX XX XX XX"
-                  value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  className="pl-10"
-                  required
-                />
-              </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="personalAddress" className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                Adresse personnelle <span className="text-slate-400 font-normal">(optionnel)</span>
+              </Label>
+              <Input id="personalAddress" placeholder="Ex: 12 Rue Didouche Mourad" value={formData.personalAddress}
+                onChange={(e) => setFormData({ ...formData, personalAddress: e.target.value })}
+                className="h-11 bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700" />
             </div>
 
             <div className="grid gap-4 md:grid-cols-2">
@@ -385,217 +373,179 @@ function RegisterForm() {
                 <Label htmlFor="password">{t('password')}</Label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="password"
-                    type="password"
-                    placeholder="••••••••"
+                  <Input id="password" type={showPassword ? 'text' : 'password'} placeholder="••••••••"
                     value={formData.password}
                     onChange={(e) => { setFormData({ ...formData, password: e.target.value }); setFieldErrors(p => ({ ...p, password: undefined })); }}
-                    className={`pl-10 ${fieldErrors.password ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
-                    required
-                  />
+                    className={`pl-10 pr-10 h-11 bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 ${fieldErrors.password ? 'border-red-400' : ''}`}
+                    required />
+                  <button type="button" onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors" tabIndex={-1}>
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
                 </div>
                 {fieldErrors.password && (
-                  <div className="flex items-center gap-1 text-sm text-red-600 dark:text-red-400">
-                    <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-                    <span>{fieldErrors.password}</span>
+                  <div className="flex items-center gap-1 text-xs text-red-600 dark:text-red-400">
+                    <AlertCircle className="h-3.5 w-3.5 shrink-0" /><span>{fieldErrors.password}</span>
                   </div>
                 )}
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="confirmPassword">{t('confirmPassword')}</Label>
+              <div className="space-y-1.5">
+                <Label htmlFor="confirmPassword" className="text-sm font-medium text-slate-700 dark:text-slate-300">{t('confirmPassword')}</Label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="confirmPassword"
-                    type="password"
-                    placeholder="••••••••"
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <Input id="confirmPassword" type={showConfirmPassword ? 'text' : 'password'} placeholder="••••••••"
                     value={formData.confirmPassword}
                     onChange={(e) => { setFormData({ ...formData, confirmPassword: e.target.value }); setFieldErrors(p => ({ ...p, confirmPassword: undefined })); }}
-                    className={`pl-10 ${fieldErrors.confirmPassword ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
-                    required
-                  />
+                    className={`pl-10 pr-10 h-11 bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 ${fieldErrors.confirmPassword ? 'border-red-400' : ''}`}
+                    required />
+                  <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors" tabIndex={-1}>
+                    {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
                 </div>
                 {fieldErrors.confirmPassword && (
-                  <div className="flex items-center gap-1 text-sm text-red-600 dark:text-red-400">
-                    <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-                    <span>{fieldErrors.confirmPassword}</span>
+                  <div className="flex items-center gap-1 text-xs text-red-600 dark:text-red-400">
+                    <AlertCircle className="h-3.5 w-3.5 shrink-0" /><span>{fieldErrors.confirmPassword}</span>
                   </div>
                 )}
               </div>
             </div>
+          </div>
 
             {/* Transporter Fields */}
             {formData.role === 'TRANSPORTER' && (
-              <>
-                <Separator />
-                <div className="space-y-1 mb-4">
-                  <h3 className="font-semibold text-sm uppercase tracking-wide flex items-center gap-2 text-muted-foreground">
-                    <Truck className="h-4 w-4" /> Informations du transporteur
-                  </h3>
+              <div className="p-6 space-y-5 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/20">
+                <h3 className="text-xs font-semibold uppercase tracking-widest text-slate-400 flex items-center gap-2">
+                  <Truck className="h-4 w-4" /> Informations du transporteur
+                </h3>
+                <div className="space-y-1.5">
+                  <Label htmlFor="commerceRegisterNumberTransporter" className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                    Numéro du registre du commerce <span className="text-red-500">*</span>
+                  </Label>
+                  <Input id="commerceRegisterNumberTransporter" placeholder="Ex: 16/0012345B22"
+                    value={formData.commerceRegisterNumber}
+                    onChange={(e) => setFormData({ ...formData, commerceRegisterNumber: e.target.value })}
+                    className="h-11 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700"
+                    required={formData.role === 'TRANSPORTER'} />
+                  <p className="text-xs text-slate-400">Format CNRC : WW/NNNNNNNLAA — ex : <code className="font-mono">16/0012345B22</code></p>
                 </div>
-
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="commerceRegisterNumberTransporter">Numéro du registre du commerce <span className="text-red-500">*</span></Label>
-                    <Input
-                      id="commerceRegisterNumberTransporter"
-                      placeholder="Ex: 16/0012345B22"
-                      value={formData.commerceRegisterNumber}
-                      onChange={(e) => setFormData({ ...formData, commerceRegisterNumber: e.target.value })}
-                      required={formData.role === 'TRANSPORTER'}
-                    />
-                    <p className="text-xs text-muted-foreground">Format CNRC : WW/NNNNNNNLAA — ex : <code>16/0012345B22</code> ou <code>RC-16/0012345B22</code> (WW = wilaya, L = type B/C/H/R, AA = année)</p>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="vehicle">Type de véhicule (optionnel)</Label>
-                    <Input
-                      id="vehicle"
-                      placeholder="Ex: Utilitaire 3.5T"
-                      value={formData.vehicle}
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="vehicle" className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                      Véhicule <span className="text-slate-400 font-normal">(optionnel)</span>
+                    </Label>
+                    <Input id="vehicle" placeholder="Ex: Utilitaire 3.5T" value={formData.vehicle}
                       onChange={(e) => setFormData({ ...formData, vehicle: e.target.value })}
-                    />
+                      className="h-11 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700" />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="license">Numéro de permis (optionnel)</Label>
-                    <Input
-                      id="license"
-                      placeholder="Ex: AB123456"
-                      value={formData.license}
+                  <div className="space-y-1.5">
+                    <Label htmlFor="license" className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                      N° de permis <span className="text-slate-400 font-normal">(optionnel)</span>
+                    </Label>
+                    <Input id="license" placeholder="Ex: AB123456" value={formData.license}
                       onChange={(e) => setFormData({ ...formData, license: e.target.value })}
-                    />
+                      className="h-11 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700" />
                   </div>
                 </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="experience">Années d'expérience</Label>
-                  <Input
-                    id="experience"
-                    type="number"
-                    placeholder="0"
-                    value={formData.experience}
-                    onChange={(e) => setFormData({ ...formData, experience: e.target.value })}
-                    min="0"
-                  />
+                <div className="space-y-1.5">
+                  <Label htmlFor="experience" className="text-sm font-medium text-slate-700 dark:text-slate-300">Années d'expérience</Label>
+                  <Input id="experience" type="number" placeholder="0" value={formData.experience}
+                    onChange={(e) => setFormData({ ...formData, experience: e.target.value })} min="0"
+                    className="h-11 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700" />
                 </div>
-
-                <div className="space-y-2">
-                  <Label>Régions desservies</Label>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3 max-h-48 overflow-y-auto p-2 border rounded-lg">
+                <div className="space-y-1.5">
+                  <Label className="text-sm font-medium text-slate-700 dark:text-slate-300">Régions desservies</Label>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 max-h-48 overflow-y-auto p-3 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800">
                     {WILAYAS.map((wilaya) => (
                       <div key={wilaya.id} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={wilaya.id}
-                          checked={formData.regions.includes(wilaya.id)}
-                          onCheckedChange={(checked) => handleRegionChange(wilaya.id, checked as boolean)}
-                        />
-                        <label htmlFor={wilaya.id} className="text-sm cursor-pointer">
-                          {wilaya.name}
-                        </label>
+                        <Checkbox id={wilaya.id} checked={formData.regions.includes(wilaya.id)}
+                          onCheckedChange={(checked) => handleRegionChange(wilaya.id, checked as boolean)} />
+                        <label htmlFor={wilaya.id} className="text-sm cursor-pointer text-slate-600 dark:text-slate-400">{wilaya.name}</label>
                       </div>
                     ))}
                   </div>
                 </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="description">Description (optionnel)</Label>
-                  <Textarea
-                    id="description"
-                    placeholder="Parlez-nous un peu de vous et de votre expérience..."
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    rows={3}
-                  />
+                <div className="space-y-1.5">
+                  <Label htmlFor="description" className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                    Description <span className="text-slate-400 font-normal">(optionnel)</span>
+                  </Label>
+                  <Textarea id="description" placeholder="Parlez-nous un peu de vous et de votre expérience…"
+                    value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    rows={3} className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 resize-none" />
                 </div>
-              </>
+              </div>
             )}
 
             {/* Relais Fields */}
             {formData.role === 'RELAIS' && (
-              <>
-                <Separator />
-                <div className="space-y-1 mb-4">
-                  <h3 className="font-semibold text-sm uppercase tracking-wide flex items-center gap-2 text-muted-foreground">
-                    <Store className="h-4 w-4" /> Informations du point relais
-                  </h3>
-                </div>
-
-
-
-                <div className="space-y-2">
-                  <Label htmlFor="commerceRegisterNumberRelais">Numéro du registre du commerce <span className="text-red-500">*</span></Label>
-                  <Input
-                    id="commerceRegisterNumberRelais"
-                    placeholder="Ex: 16/0012345B22"
+              <div className="p-6 space-y-5 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/20">
+                <h3 className="text-xs font-semibold uppercase tracking-widest text-slate-400 flex items-center gap-2">
+                  <Store className="h-4 w-4" /> Informations du point relais
+                </h3>
+                <div className="space-y-1.5">
+                  <Label htmlFor="commerceRegisterNumberRelais" className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                    Numéro du registre du commerce <span className="text-red-500">*</span>
+                  </Label>
+                  <Input id="commerceRegisterNumberRelais" placeholder="Ex: 16/0012345B22"
                     value={formData.commerceRegisterNumber}
                     onChange={(e) => setFormData({ ...formData, commerceRegisterNumber: e.target.value })}
-                    required={formData.role === 'RELAIS'}
-                  />
-                  <p className="text-xs text-muted-foreground">Format CNRC : WW/NNNNNNNLAA — ex : <code>16/0012345B22</code> ou <code>RC-16/0012345B22</code> (WW = wilaya, L = type B/C/H/R, AA = année)</p>
+                    className="h-11 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700"
+                    required={formData.role === 'RELAIS'} />
+                  <p className="text-xs text-slate-400">Format CNRC : WW/NNNNNNNLAA — ex : <code className="font-mono">16/0012345B22</code></p>
                 </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="commerceName">Nom du commerce (optionnel)</Label>
+                <div className="space-y-1.5">
+                  <Label htmlFor="commerceName" className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                    Nom du commerce <span className="text-slate-400 font-normal">(optionnel)</span>
+                  </Label>
                   <div className="relative">
-                    <Store className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="commerceName"
-                      placeholder="Ex: Épicerie du Centre"
-                      value={formData.commerceName}
+                    <Store className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                    <Input id="commerceName" placeholder="Ex: Épicerie du Centre" value={formData.commerceName}
                       onChange={(e) => setFormData({ ...formData, commerceName: e.target.value })}
-                      className="pl-10"
-                    />
+                      className="pl-10 h-11 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700" />
                   </div>
                 </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="address">Adresse du point relais <span className="text-red-500">*</span></Label>
-                  <Textarea
-                    id="address"
-                    placeholder="Ex: 123 Rue Didouche Mourad, Alger Centre"
+                <div className="space-y-1.5">
+                  <Label htmlFor="address" className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                    Adresse du point relais <span className="text-red-500">*</span>
+                  </Label>
+                  <Textarea id="address" placeholder="Ex: 123 Rue Didouche Mourad, Alger Centre"
                     value={formData.address}
                     onChange={(e) => { setFormData({ ...formData, address: e.target.value }); setFieldErrors(p => ({ ...p, address: undefined })); }}
-                    rows={2}
-                    className={fieldErrors.address ? 'border-red-500 focus-visible:ring-red-500' : ''}
-                  />
+                    rows={2} className={`resize-none bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 ${fieldErrors.address ? 'border-red-400' : ''}`} />
                   {fieldErrors.address && (
-                    <div className="flex items-center gap-1 text-sm text-red-600 dark:text-red-400">
-                      <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-                      <span>{fieldErrors.address}</span>
+                    <div className="flex items-center gap-1 text-xs text-red-600 dark:text-red-400">
+                      <AlertCircle className="h-3.5 w-3.5 shrink-0" /><span>{fieldErrors.address}</span>
                     </div>
                   )}
                 </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="ville">Ville <span className="text-red-500">*</span></Label>
+                <div className="space-y-1.5">
+                  <Label htmlFor="ville" className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                    Ville <span className="text-red-500">*</span>
+                  </Label>
                   <div className="relative">
-                    <MapPin className="absolute left-3 top-3 h-4 w-4 text-muted-foreground z-10" />
+                    <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 z-10" />
                     <Select value={formData.ville} onValueChange={(value) => { setFormData({ ...formData, ville: value }); setFieldErrors(p => ({ ...p, ville: undefined })); }}>
-                      <SelectTrigger className={`pl-10 ${fieldErrors.ville ? 'border-red-500 focus-visible:ring-red-500' : ''}`}>
+                      <SelectTrigger className={`pl-10 h-11 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 ${fieldErrors.ville ? 'border-red-400' : ''}`}>
                         <SelectValue placeholder="Sélectionnez votre ville" />
                       </SelectTrigger>
                       <SelectContent>
                         {WILAYAS.map((w) => (
-                          <SelectItem key={w.id} value={w.id}>
-                            {w.name}
-                          </SelectItem>
+                          <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
                   {fieldErrors.ville && (
-                    <div className="flex items-center gap-1 text-sm text-red-600 dark:text-red-400">
-                      <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-                      <span>{fieldErrors.ville}</span>
+                    <div className="flex items-center gap-1 text-xs text-red-600 dark:text-red-400">
+                      <AlertCircle className="h-3.5 w-3.5 shrink-0" /><span>{fieldErrors.ville}</span>
                     </div>
                   )}
                 </div>
-              </>
+              </div>
             )}
-          </CardContent>
 
-          <div className="px-6 pb-6 space-y-4">
-            <Button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-lg py-6" disabled={isLoading}>
+          <div className="p-6 border-t border-slate-100 dark:border-slate-800 space-y-4">
+            <Button type="submit" className="w-full h-12 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl shadow-sm transition-all" disabled={isLoading}>
               {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Créer mon compte
             </Button>
@@ -608,7 +558,7 @@ function RegisterForm() {
             </p>
           </div>
         </form>
-      </Card>
+      </div>
     </div>
   );
 }

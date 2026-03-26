@@ -1,5 +1,5 @@
 ﻿{
-    "baseUrl":  "http://localhost:3000",
+    "baseUrl":  "http://localhost:3001",
     "ciMode":  true,
     "strictExit":  true,
     "failOnSkip":  false,
@@ -15,5 +15,5 @@
     "skippedChecks":  [
                           "scan-depot déjà effectué (colis déjà en RECU_RELAIS après matching)"
                       ],
-    "generatedAt":  "2026-03-25T22:06:33.0260814+01:00"
+    "generatedAt":  "2026-03-26T11:22:53.2442196+01:00"
 }

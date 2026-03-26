@@ -54,6 +54,11 @@ export async function POST(request: NextRequest) {
       if (!mission) {
         return NextResponse.json({ error: 'Mission non trouvée' }, { status: 404 });
       }
+
+      if (auth.payload.role === 'TRANSPORTER' && mission.transporteurId !== auth.payload.id) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
+
       parcel = mission.colis;
     } else {
       parcel = await db.colis.findUnique({ where: { trackingNumber: tracking } });

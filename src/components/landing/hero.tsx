@@ -5,7 +5,6 @@ import { Link } from '@/i18n/routing';
 import { Button } from '@/components/ui/button';
 import { Package, Truck, MapPin, Shield, ArrowRight, Search } from 'lucide-react';
 import { useState } from 'react';
-import Image from 'next/image';
 
 export function Hero() {
   const t = useTranslations('landing.hero');
@@ -15,12 +14,10 @@ export function Hero() {
     <section className="relative overflow-hidden">
       {/* Background Image with Overlay */}
       <div className="absolute inset-0 z-0">
-        <Image
+        <img
           src="/images/hero-delivery.png"
           alt="SwiftColis Delivery"
-          fill
-          className="object-cover object-center"
-          priority
+          className="h-full w-full object-cover object-center"
         />
         <div className="absolute inset-0 bg-gradient-to-r from-slate-900/95 via-slate-900/80 to-slate-900/60" />
       </div>

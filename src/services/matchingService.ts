@@ -301,7 +301,7 @@ export async function getRankedTrajetsForRoute(params: {
  *  3. Trie par score décroissant
  *  4. Crée une Mission sur le meilleur trajet
  *  5. Décrémente placesUtilisees sur le trajet
- *  6. Met à jour le statut du colis → ASSIGNED
+ *  6. Conserve le statut actuel du colis (pas de transition métier implicite)
  *
  * @param colis - Doit contenir au minimum { id, villeDepart, villeArrivee, clientId, status }
  */
@@ -393,11 +393,6 @@ export async function matchColisToTrajets(colis: {
           trajetId: trajet.id,
           status: 'ASSIGNE',
         },
-      });
-
-      await tx.colis.update({
-        where: { id: colis.id },
-        data: { status: 'RECU_RELAIS' },
       });
 
       return createdMission;

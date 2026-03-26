@@ -20,7 +20,17 @@ export async function GET(request: NextRequest) {
 
   try {
     const { searchParams } = new URL(request.url);
-    const transporteurId = searchParams.get('transporteurId') || auth.payload.id;
+    const requestedTransporteurId = searchParams.get('transporteurId');
+
+    if (
+      auth.payload.role === 'TRANSPORTER' &&
+      requestedTransporteurId &&
+      requestedTransporteurId !== auth.payload.id
+    ) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    const transporteurId = requestedTransporteurId || auth.payload.id;
 
     await syncTransporterWallets({
       actorId: auth.payload.id,

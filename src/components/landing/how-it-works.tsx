@@ -2,7 +2,6 @@
 
 import { useTranslations } from 'next-intl';
 import { Package, MapPin, CheckCircle, ArrowRight } from 'lucide-react';
-import Image from 'next/image';
 
 export function HowItWorks() {
   const t = useTranslations('landing.howItWorks');
@@ -112,14 +111,15 @@ export function HowItWorks() {
           </div>
           <div className="order-1 lg:order-2 relative">
             <div className="absolute -inset-4 bg-gradient-to-r from-purple-500/20 to-pink-500/20 rounded-3xl blur-2xl" />
-            <div className="relative rounded-2xl overflow-hidden shadow-2xl mx-auto max-w-sm">
-              <Image
+            <div className="relative rounded-2xl overflow-hidden shadow-2xl mx-auto max-w-[320px]">
+              <img
                 src="/images/tracking-app.png"
-                alt="Application de suivi"
-                width={400}
-                height={400}
+                alt="Suivi de colis sur smartphone"
                 className="w-full h-auto object-cover"
               />
+              <div className="absolute bottom-8 left-1/2 flex h-12 w-[72%] -translate-x-1/2 items-center justify-center rounded-2xl bg-emerald-500 text-sm font-semibold text-white shadow-lg shadow-emerald-900/30">
+                Suivi en temps réel
+              </div>
             </div>
           </div>
         </div>

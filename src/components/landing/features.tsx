@@ -2,7 +2,6 @@
 
 import { useTranslations } from 'next-intl';
 import { MapPin, Radio, DollarSign, Shield, Package, Truck } from 'lucide-react';
-import Image from 'next/image';
 
 const icons = {
   network: MapPin,
@@ -57,11 +56,9 @@ export function Features() {
           <div className="relative">
             <div className="absolute -inset-4 bg-gradient-to-r from-emerald-500/20 to-teal-500/20 rounded-3xl blur-2xl" />
             <div className="relative rounded-2xl overflow-hidden shadow-2xl">
-              <Image
+              <img
                 src="/images/relay-service.png"
                 alt="Service de points relais"
-                width={600}
-                height={400}
                 className="w-full h-auto object-cover"
               />
             </div>
