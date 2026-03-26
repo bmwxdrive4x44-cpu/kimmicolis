@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { generateTrackingNumber, generateQRData, PLATFORM_COMMISSION, DEFAULT_RELAY_COMMISSION } from '@/lib/constants';
+import { generateTrackingNumber, generateQRData, PLATFORM_COMMISSION, DEFAULT_RELAY_COMMISSION, PARCEL_FORMATS } from '@/lib/constants';
 import { checkRateLimit, RATE_LIMIT_PRESETS } from '@/lib/ratelimit';
 import { requireRole, verifyJWT } from '@/lib/rbac';
 import { generateQRCodeImage, buildQRCodePayload } from '@/lib/qrcode';
+import { calculateDynamicParcelPricing } from '@/lib/pricing';
 import { createHash } from 'crypto';
 
 function normalizePhone(value: string): string {
@@ -159,6 +160,7 @@ export async function POST(request: NextRequest) {
       villeArrivee,
       format,
       weight,
+      distanceKm,
       description,
     } = body;
 
@@ -233,16 +235,55 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Calculate prices
-    let baseTariff = 400;
-    if (ligne) {
-      baseTariff = format === 'PETIT' ? ligne.tarifPetit : format === 'MOYEN' ? ligne.tarifMoyen : ligne.tarifGros;
-    }
+    // Calculate prices (dynamic if distance is provided, fallback to legacy model otherwise)
+    let prixClient = 0;
+    let netTransporteur = 0;
+    let platformFee = 0;
+    let relayFee = 0;
+    let pricingBreakdown: Record<string, unknown> | null = null;
 
-    const platformFee = baseTariff * PLATFORM_COMMISSION;
-    const relayFee = DEFAULT_RELAY_COMMISSION[format as keyof typeof DEFAULT_RELAY_COMMISSION] || 100;
-    const prixClient = baseTariff + platformFee + relayFee;
-    const netTransporteur = baseTariff - platformFee - relayFee;
+    const parsedWeight = Number(weight ?? 0);
+    const parsedDistanceKm = Number(distanceKm ?? 0);
+    const hasDynamicInputs = Number.isFinite(parsedWeight) && parsedWeight >= 0 && Number.isFinite(parsedDistanceKm) && parsedDistanceKm > 0;
+
+    if (hasDynamicInputs) {
+      const formatMultiplier = PARCEL_FORMATS.find((f) => f.id === format)?.multiplier ?? 1;
+      const dynamic = calculateDynamicParcelPricing({
+        weightKg: parsedWeight,
+        distanceKm: parsedDistanceKm,
+        adminFee: 50,
+        ratePerKg: 120,
+        ratePerKm: 2.5,
+        formatMultiplier,
+        relayDepartureCommissionRate: 0.1,
+        relayArrivalCommissionRate: 0.1,
+        platformMarginRate: 0,
+        roundTo: 10,
+      });
+
+      prixClient = dynamic.clientPrice;
+      netTransporteur = dynamic.netTransporteur;
+      relayFee = dynamic.relayCommissionTotal;
+      platformFee = dynamic.platformMargin;
+      pricingBreakdown = {
+        model: 'dynamic',
+        ...dynamic,
+      };
+    } else {
+      let baseTariff = 400;
+      if (ligne) {
+        baseTariff = format === 'PETIT' ? ligne.tarifPetit : format === 'MOYEN' ? ligne.tarifMoyen : ligne.tarifGros;
+      }
+
+      platformFee = baseTariff * PLATFORM_COMMISSION;
+      relayFee = DEFAULT_RELAY_COMMISSION[format as keyof typeof DEFAULT_RELAY_COMMISSION] || 100;
+      prixClient = baseTariff + platformFee + relayFee;
+      netTransporteur = baseTariff - platformFee - relayFee;
+      pricingBreakdown = {
+        model: 'legacy',
+        baseTariff,
+      };
+    }
 
     // Generate tracking number and QR code
     const trackingNumber = generateTrackingNumber();
@@ -293,6 +334,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       ...colis,
       withdrawalCode: effectiveWithdrawalCode,
+      pricingBreakdown,
     });
   } catch (error) {
     console.error('Error creating parcel:', error);

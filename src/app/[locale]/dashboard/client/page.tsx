@@ -15,7 +15,8 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
-import { WILAYAS, PARCEL_FORMATS, PARCEL_STATUS, PLATFORM_COMMISSION, DEFAULT_RELAY_COMMISSION, getTariff, generateTrackingNumber, generateQRData } from '@/lib/constants';
+import { WILAYAS, PARCEL_FORMATS, PARCEL_STATUS, generateTrackingNumber, generateQRData } from '@/lib/constants';
+import { calculateDynamicParcelPricing } from '@/lib/pricing';
 import { Package, Plus, History, MapPin, Loader2, CreditCard, Search, Truck, CheckCircle, Clock, QrCode, Printer, User, Pencil, Save, AlertTriangle, XCircle, MessageSquare, Smartphone, Banknote } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import Image from 'next/image';
@@ -292,6 +293,7 @@ function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart }: { us
   const [formData, setFormData] = useState({
     villeDepart: '',
     villeArrivee: '',
+    distanceKm: '',
     format: 'PETIT',
     relaisDepartId: '',
     relaisArriveeId: '',
@@ -314,8 +316,9 @@ function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart }: { us
   useEffect(() => { fetchRelais(); }, []);
 
   useEffect(() => {
-    if (formData.villeDepart && formData.villeArrivee && formData.format) calculatePrice();
-  }, [formData.villeDepart, formData.villeArrivee, formData.format]);
+    if (formData.villeDepart && formData.villeArrivee && formData.format && formData.distanceKm) calculatePrice();
+    else setCalculatedPrice(null);
+  }, [formData.villeDepart, formData.villeArrivee, formData.format, formData.weight, formData.distanceKm]);
 
   const fetchRelais = async () => {
     try {
@@ -327,14 +330,33 @@ function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart }: { us
   };
 
   const calculatePrice = () => {
-    const tarif = getTariff(formData.villeDepart, formData.villeArrivee, formData.format);
-    const commissionRelais = DEFAULT_RELAY_COMMISSION[formData.format as keyof typeof DEFAULT_RELAY_COMMISSION] || 100;
-    const commissionPlateforme = Math.round(tarif * PLATFORM_COMMISSION);
-    setCalculatedPrice({ tarif, commissionRelais, commissionPlateforme, prixClient: tarif + commissionRelais + commissionPlateforme });
+    const formatMultiplier = PARCEL_FORMATS.find((f) => f.id === formData.format)?.multiplier ?? 1;
+    const weightKg = Number(formData.weight || 0);
+    const distanceKm = Number(formData.distanceKm || 0);
+
+    if (!Number.isFinite(distanceKm) || distanceKm <= 0 || !Number.isFinite(weightKg) || weightKg < 0) {
+      setCalculatedPrice(null);
+      return;
+    }
+
+    const dynamic = calculateDynamicParcelPricing({
+      weightKg,
+      distanceKm,
+      adminFee: 50,
+      ratePerKg: 120,
+      ratePerKm: 2.5,
+      formatMultiplier,
+      relayDepartureCommissionRate: 0.1,
+      relayArrivalCommissionRate: 0.1,
+      platformMarginRate: 0,
+      roundTo: 10,
+    });
+
+    setCalculatedPrice(dynamic);
   };
 
   const resetForm = () => {
-    setFormData({ villeDepart: '', villeArrivee: '', format: 'PETIT', relaisDepartId: '', relaisArriveeId: '', description: '', weight: '', senderFirstName: '', senderLastName: '', senderPhone: '', recipientFirstName: '', recipientLastName: '', recipientPhone: '' });
+    setFormData({ villeDepart: '', villeArrivee: '', distanceKm: '', format: 'PETIT', relaisDepartId: '', relaisArriveeId: '', description: '', weight: '', senderFirstName: '', senderLastName: '', senderPhone: '', recipientFirstName: '', recipientLastName: '', recipientPhone: '' });
     setCalculatedPrice(null);
     setCreatedParcel(null);
   };
@@ -480,6 +502,7 @@ function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart }: { us
         villeArrivee: formData.villeArrivee,
         format: formData.format,
         weight: formData.weight,
+        distanceKm: formData.distanceKm,
         description: formData.description,
         senderFirstName: formData.senderFirstName,
         senderLastName: formData.senderLastName,
@@ -517,16 +540,17 @@ function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart }: { us
           format: formData.format,
           description: formData.description,
           weight: formData.weight ? parseFloat(formData.weight) : null,
+          distanceKm: formData.distanceKm ? parseFloat(formData.distanceKm) : null,
           senderFirstName: formData.senderFirstName,
           senderLastName: formData.senderLastName,
           senderPhone: formData.senderPhone,
           recipientFirstName: formData.recipientFirstName,
           recipientLastName: formData.recipientLastName,
           recipientPhone: formData.recipientPhone,
-          prixClient: calculatedPrice?.prixClient || 0,
-          commissionPlateforme: calculatedPrice?.commissionPlateforme || 0,
-          commissionRelais: calculatedPrice?.commissionRelais || 0,
-          netTransporteur: calculatedPrice?.tarif || 0,
+          prixClient: calculatedPrice?.clientPrice || 0,
+          commissionPlateforme: calculatedPrice?.platformMargin || 0,
+          commissionRelais: calculatedPrice?.relayCommissionTotal || 0,
+          netTransporteur: calculatedPrice?.transportCost || 0,
           qrCode: qrData,
           status: 'CREATED',
         }),
@@ -738,6 +762,18 @@ function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart }: { us
                 </div>
               </div>
               <div className="space-y-2">
+                <Label>Distance (km)</Label>
+                <Input
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={formData.distanceKm}
+                  onChange={(e) => setFormData({ ...formData, distanceKm: e.target.value })}
+                  placeholder="Ex: 420"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
                 <Label>Description</Label>
                 <Input value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} placeholder="Description du contenu (optionnel)" />
               </div>
@@ -780,20 +816,28 @@ function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart }: { us
                 <h4 className="font-semibold mb-3">Récapitulatif prix</h4>
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
-                    <span>Tarif transport</span>
-                    <span>{calculatedPrice.tarif} DA</span>
+                    <span>Coût transport</span>
+                    <span>{calculatedPrice.transportCost} DA</span>
                   </div>
                   <div className="flex justify-between">
-                    <span>Commission relais</span>
-                    <span>{calculatedPrice.commissionRelais} DA</span>
+                    <span>Commission relais départ</span>
+                    <span>{calculatedPrice.relayDepartureCommission} DA</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Commission relais arrivée</span>
+                    <span>{calculatedPrice.relayArrivalCommission} DA</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Commission plateforme</span>
-                    <span>{calculatedPrice.commissionPlateforme} DA</span>
+                    <span>{calculatedPrice.platformMargin} DA</span>
+                  </div>
+                  <div className="flex justify-between text-slate-600">
+                    <span>Coefficient distance</span>
+                    <span>x{calculatedPrice.distanceCoefficient}</span>
                   </div>
                   <div className="flex justify-between font-bold text-lg pt-2 border-t">
                     <span>Total à payer</span>
-                    <span className="text-emerald-600">{calculatedPrice.prixClient} DA</span>
+                    <span className="text-emerald-600">{calculatedPrice.clientPrice} DA</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Code de retrait</span>
