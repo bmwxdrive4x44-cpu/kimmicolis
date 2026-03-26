@@ -58,14 +58,14 @@ function LoginForm() {
       });
 
       if (result?.error || !result?.ok) {
-        toast({
-          title: 'Erreur',
-          description: result?.error === 'CredentialsSignin'
         setLoginError(
           result?.error === 'CredentialsSignin'
             ? 'Email ou mot de passe incorrect. Vérifiez vos identifiants.'
             : 'Connexion impossible pour le moment. Réessayez.'
-        onst sessionRes = await fetch('/api/auth/session');
+        );
+      } else {
+        // Fetch session to get user role
+        const sessionRes = await fetch('/api/auth/session');
         if (!sessionRes.ok) {
           toast({
             title: 'Connexion réussie',
@@ -88,9 +88,9 @@ function LoginForm() {
         window.location.href = dashboardPath;
       }
     } catch {
-      toast({
-        title: 'Erreur',
-      setLoginError('Impossible de se connecter pour le moment. Réessayez.'etIsLoading(false);
+      setLoginError('Impossible de se connecter pour le moment. Réessayez.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
