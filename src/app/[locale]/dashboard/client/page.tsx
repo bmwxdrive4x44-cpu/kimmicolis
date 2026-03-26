@@ -1575,6 +1575,175 @@ function ProfilClientTab({ userId }: { userId: string }) {
   );
 }
 
+function LitigesTab({ userId }: { userId: string }) {
+  const { toast } = useToast();
+  const [parcels, setParcels] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [selectedColisId, setSelectedColisId] = useState('');
+  const [reason, setReason] = useState('OTHER');
+  const [description, setDescription] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const REASONS: Record<string, string> = {
+    LOST: 'Colis perdu',
+    DAMAGED: 'Colis endommagé',
+    DELAYED: 'Retard excessif',
+    WRONG_ADDRESS: 'Mauvaise adresse',
+    OTHER: 'Autre problème',
+  };
+
+  useEffect(() => {
+    const fetchParcels = async () => {
+      try {
+        const res = await fetch(`/api/parcels?clientId=${userId}`);
+        const data = await res.json();
+        setParcels(Array.isArray(data) ? data : []);
+      } catch {
+        // silent
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchParcels();
+  }, [userId]);
+
+  const disputedParcels = parcels.filter((p) => p.status === 'EN_DISPUTE');
+  const eligibleParcels = parcels.filter((p) =>
+    ['PAID', 'DEPOSITED_RELAY', 'RECU_RELAIS', 'EN_TRANSPORT', 'ARRIVE_RELAIS_DESTINATION'].includes(p.status)
+  );
+
+  const handleSubmitDispute = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedColisId || !description.trim()) return;
+    setIsSubmitting(true);
+    try {
+      const res = await fetch('/api/litiges', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ colisId: selectedColisId, reason, description }),
+      });
+      if (res.ok) {
+        toast({ title: 'Litige ouvert', description: 'Notre équipe va examiner votre demande.' });
+        setShowForm(false);
+        setDescription('');
+        setSelectedColisId('');
+        // Refresh parcels
+        const updated = await fetch(`/api/parcels?clientId=${userId}`);
+        setParcels(Array.isArray(await updated.json()) ? await updated.clone().json() : []);
+      } else {
+        toast({ title: 'Erreur', description: 'Impossible d\'ouvrir le litige.', variant: 'destructive' });
+      }
+    } catch {
+      toast({ title: 'Erreur', description: 'Impossible d\'ouvrir le litige.', variant: 'destructive' });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-bold">Litiges &amp; Réclamations</h2>
+          <p className="text-sm text-slate-500">Signalez un problème avec l'un de vos colis</p>
+        </div>
+        {!showForm && eligibleParcels.length > 0 && (
+          <Button onClick={() => setShowForm(true)} variant="outline" className="border-red-300 text-red-600 hover:bg-red-50">
+            <AlertTriangle className="h-4 w-4 mr-2" />
+            Ouvrir un litige
+          </Button>
+        )}
+      </div>
+
+      {showForm && (
+        <Card className="border-red-200">
+          <CardHeader>
+            <CardTitle className="text-red-700">Nouveau litige</CardTitle>
+            <CardDescription>Sélectionnez le colis concerné et décrivez le problème</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmitDispute} className="space-y-4">
+              <div className="space-y-2">
+                <Label>Colis concerné</Label>
+                <Select value={selectedColisId} onValueChange={setSelectedColisId} required>
+                  <SelectTrigger><SelectValue placeholder="Sélectionner un colis" /></SelectTrigger>
+                  <SelectContent>
+                    {eligibleParcels.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>{p.trackingNumber} — {p.villeDepart} → {p.villeArrivee}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Motif</Label>
+                <Select value={reason} onValueChange={setReason}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(REASONS).map(([k, v]) => (
+                      <SelectItem key={k} value={k}>{v}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Description</Label>
+                <Input
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Décrivez le problème en détail..."
+                  required
+                />
+              </div>
+              <div className="flex gap-3">
+                <Button type="submit" disabled={isSubmitting || !selectedColisId || !description.trim()} className="bg-red-600 hover:bg-red-700">
+                  {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  Soumettre
+                </Button>
+                <Button type="button" variant="outline" onClick={() => setShowForm(false)}>Annuler</Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+      )}
+
+      {disputedParcels.length === 0 && !showForm ? (
+        <Card>
+          <CardContent className="py-12 text-center">
+            <CheckCircle className="h-16 w-16 text-emerald-400 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold mb-2">Aucun litige ouvert</h3>
+            <p className="text-slate-500 text-sm">Tous vos colis se portent bien.</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-4">
+          {disputedParcels.map((p) => (
+            <Card key={p.id} className="border-red-200">
+              <CardContent className="pt-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-mono font-bold">{p.trackingNumber}</p>
+                    <p className="text-sm text-slate-500">{p.villeDepart} → {p.villeArrivee}</p>
+                  </div>
+                  <Badge className="bg-red-100 text-red-700 border-red-300">En litige</Badge>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function LoadingFallback() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
