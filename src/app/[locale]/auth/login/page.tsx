@@ -182,13 +182,6 @@ function LoginLoading() {
   );
 }
 
-const DEV_DEMO_ACCOUNTS = [
-  { role: 'Admin', email: 'admin@swiftcolis.dz', password: 'admin123' },
-  { role: 'Client', email: 'client@demo.dz', password: 'client123' },
-  { role: 'Transporteur', email: 'transport@demo.dz', password: 'transport123' },
-  { role: 'Relais', email: 'relais@demo.dz', password: 'relais123' },
-];
-
 export default function LoginPage() {
   const t = useTranslations('auth.login');
 
@@ -210,24 +203,6 @@ export default function LoginPage() {
           <LoginForm />
         </Suspense>
       </Card>
-
-      {process.env.NODE_ENV !== 'production' && (
-        <Card className="w-full max-w-md mt-4 border-dashed border-emerald-200 bg-emerald-50/60 dark:bg-emerald-950/20">
-          <CardHeader>
-            <CardTitle className="text-base">Comptes de démonstration</CardTitle>
-            <CardDescription>Disponibles automatiquement en développement.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2 text-sm">
-            {DEV_DEMO_ACCOUNTS.map((account) => (
-              <div key={account.email} className="rounded-md border bg-white/70 dark:bg-slate-900/40 px-3 py-2">
-                <div className="font-semibold">{account.role}</div>
-                <div>{account.email}</div>
-                <div className="text-muted-foreground">{account.password}</div>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 }
