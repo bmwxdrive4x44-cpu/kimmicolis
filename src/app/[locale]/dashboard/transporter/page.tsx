@@ -174,10 +174,10 @@ export default function TransporterDashboard() {
             <TrajetsTab userId={session.user.id} />
           </TabsContent>
           <TabsContent value="missions">
-            <MissionsTab userId={session.user.id} />
+            <MissionsTab userId={session.user.id} onRefreshStats={fetchStats} />
           </TabsContent>
           <TabsContent value="scan">
-            <ScanTab />
+            <ScanTab onRefreshStats={fetchStats} />
           </TabsContent>
           <TabsContent value="wallet">
             <WalletTab userId={session.user.id} />
@@ -245,7 +245,7 @@ function OverviewTab({ userId, setActiveTab }: { userId: string; setActiveTab: (
   };
 
   return (
-    <div className="grid gap-6 lg:grid-cols-2">
+    <div className="max-w-5xl mx-auto grid gap-6 lg:grid-cols-2">
       <Card>
         <CardHeader>
           <CardTitle>Missions disponibles</CardTitle>
@@ -424,7 +424,7 @@ function TrajetsTab({ userId }: { userId: string }) {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-4xl mx-auto space-y-6">
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2"><Plus className="h-5 w-5" />Publier un trajet</CardTitle>
@@ -552,7 +552,7 @@ const MISSION_STATUS_LABELS: Record<string, string> = {
 };
 
 // Missions Tab
-function MissionsTab({ userId }: { userId: string }) {
+function MissionsTab({ userId, onRefreshStats }: { userId: string; onRefreshStats?: () => void }) {
   const { toast } = useToast();
   const [missions, setMissions] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -584,6 +584,7 @@ function MissionsTab({ userId }: { userId: string }) {
         const labels: Record<string, string> = { EN_COURS: 'Transport démarré', LIVRE: 'Colis livré au relais' };
         toast({ title: labels[status] || 'Statut mis à jour' });
         fetchMissions();
+        if (status === 'LIVRE') onRefreshStats?.();
       } else {
         toast({ title: 'Erreur lors de la mise à jour', variant: 'destructive' });
       }
@@ -597,6 +598,7 @@ function MissionsTab({ userId }: { userId: string }) {
   const filteredMissions = filter === 'all' ? missions : missions.filter(m => m.status === filter);
 
   return (
+    <div className="max-w-4xl mx-auto">
     <Card>
       <CardHeader>
         <div className="flex items-center justify-between">
@@ -681,11 +683,12 @@ function MissionsTab({ userId }: { userId: string }) {
         )}
       </CardContent>
     </Card>
+    </div>
   );
 }
 
 // Scan Tab
-function ScanTab() {
+function ScanTab({ onRefreshStats }: { onRefreshStats?: () => void }) {
   const { toast } = useToast();
   const [scanResult, setScanResult] = useState<string>('');
   const [parcel, setParcel] = useState<any>(null);
@@ -731,6 +734,7 @@ function ScanTab() {
       if (response.ok) {
         toast({ title: 'Statut mis à jour', description: `Le colis est maintenant: ${PARCEL_STATUS.find(s => s.id === status)?.label}` });
         setParcel({ ...parcel, status });
+        if (status === 'ARRIVE_RELAIS_DESTINATION') onRefreshStats?.();
       } else {
         throw new Error('Failed');
       }
@@ -742,6 +746,7 @@ function ScanTab() {
   };
 
   return (
+    <div className="max-w-2xl mx-auto">
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2"><Scan className="h-5 w-5" />Scanner QR Code</CardTitle>
@@ -864,6 +869,7 @@ function ScanTab() {
         )}
       </CardContent>
     </Card>
+    </div>
   );
 }
 
@@ -939,7 +945,7 @@ function WalletTab({ userId }: { userId: string }) {
   if (isLoading) return <div className="flex justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-emerald-600" /></div>;
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-4xl mx-auto space-y-6">
       {/* Solde cards */}
       <div className="grid gap-4 md:grid-cols-4">
         <Card className="bg-gradient-to-br from-yellow-50 to-orange-50 dark:from-yellow-900/20 border-yellow-200">
@@ -1200,7 +1206,7 @@ function ProfilTab({ userId, userName }: { userId: string; userName: string }) {
   const s = profile?.status ? statusConfig[profile.status] : null;
 
   return (
-    <div className="space-y-6 max-w-2xl">
+    <div className="space-y-6 max-w-2xl mx-auto">
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
