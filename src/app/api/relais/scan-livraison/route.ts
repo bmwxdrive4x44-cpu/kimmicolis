@@ -148,7 +148,6 @@ export async function POST(request: NextRequest) {
     const newStatus = 'LIVRE';
     const notes = `Colis livré au destinataire par le relais ${relais.commerceName} — identité et code vérifiés`;
 
-    // Record commission earned by the arrival relay for this delivery
     const deliveryOps: Parameters<typeof db.$transaction>[0] = [
       db.colis.update({
         where: { id: parcel.id },
@@ -158,22 +157,6 @@ export async function POST(request: NextRequest) {
         data: { colisId: parcel.id, status: newStatus, notes },
       }),
     ];
-
-    // Only add commission record if arrival relay is different from departure relay
-    // (avoid double-counting for same-relay deliveries where COLLECTED already exists)
-    if (parcel.relaisArriveeId !== parcel.relaisDepartId && parcel.commissionRelais > 0) {
-      deliveryOps.push(
-        db.relaisCash.create({
-          data: {
-            relaisId: actingRelaisId,
-            colisId: parcel.id,
-            type: 'COMMISSION_LIVRAISON',
-            amount: parcel.commissionRelais,
-            notes: `Commission livraison colis ${tracking} — ${parcel.commissionRelais} DA`,
-          },
-        }) as any
-      );
-    }
 
     await db.$transaction(deliveryOps);
 

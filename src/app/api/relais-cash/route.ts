@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const [relais, transactions, deliveredParcels] = await Promise.all([
+    const [relais, transactions] = await Promise.all([
       db.relais.findUnique({
         where: { id: relaisId },
         select: { cashCollected: true, cashReversed: true, commissionPetit: true, commissionMoyen: true, commissionGros: true },
@@ -43,11 +43,6 @@ export async function GET(request: NextRequest) {
         include: { colis: { select: { trackingNumber: true, format: true, prixClient: true, commissionRelais: true, status: true } } },
         orderBy: { createdAt: 'desc' },
         take: 100,
-      }),
-      // Parcels delivered by this relay (arrival role) — for commission tracking
-      db.colis.findMany({
-        where: { relaisArriveeId: relaisId as string, status: 'LIVRE' },
-        select: { id: true, commissionRelais: true },
       }),
     ]);
 
@@ -64,21 +59,10 @@ export async function GET(request: NextRequest) {
       .reduce((sum, t) => sum + t.amount, 0);
     const balance = cashCollected - cashReversed;
 
-    // Commissions earned as DEPARTURE relay (cash collected from clients)
-    const departureCommissions = transactions
+    // Commission only on customer drop-off cash (departure relay)
+    const totalCommissions = transactions
       .filter(t => t.type === 'COLLECTED')
       .reduce((sum, t) => sum + (t.colis?.commissionRelais || 0), 0);
-
-    // Commissions earned as ARRIVAL relay (parcels delivered to recipients)
-    // Exclude parcels where this relay was also the departure relay (avoid double-count)
-    const collectedColisIds = new Set(
-      transactions.filter(t => t.type === 'COLLECTED').map(t => t.colisId)
-    );
-    const arrivalCommissions = deliveredParcels
-      .filter(p => !collectedColisIds.has(p.id))
-      .reduce((sum, p) => sum + (p.commissionRelais || 0), 0);
-
-    const totalCommissions = departureCommissions + arrivalCommissions;
 
     // Sync denormalized fields if out of date
     if (relais.cashCollected !== cashCollected || relais.cashReversed !== cashReversed) {
