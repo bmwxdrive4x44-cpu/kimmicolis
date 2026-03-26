@@ -31,6 +31,16 @@ function getRoleBasedDashboardPath(role: string, locale: string): string {
   }
 }
 
+function getArrivalReliabilityBadge(score: number) {
+  if (score >= 90) {
+    return { label: 'Fiabilité arrivée: Excellente', className: 'bg-emerald-600 text-white' };
+  }
+  if (score >= 75) {
+    return { label: 'Fiabilité arrivée: À surveiller', className: 'bg-orange-500 text-white' };
+  }
+  return { label: 'Fiabilité arrivée: Critique', className: 'bg-red-600 text-white' };
+}
+
 export default function AdminDashboard() {
   const { data: session, status } = useSession();
   const locale = useLocale();
@@ -1112,6 +1122,9 @@ function RelaysTab() {
               <div className="space-y-4">
                 {trackingRelais.map((relay) => (
                   <div key={relay.id} className="rounded-xl border p-4 space-y-4">
+                    {(() => {
+                      const arrivalReliability = getArrivalReliabilityBadge(relay.metrics?.complianceScore || 0);
+                      return (
                     <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                       <div className="space-y-2">
                         <div className="flex items-center gap-2 flex-wrap">
@@ -1122,6 +1135,7 @@ function RelaysTab() {
                           <Badge className={`${RELAIS_STATUS.find(s => s.id === relay.approvalStatus)?.color || 'bg-slate-500'} text-white`}>
                             {RELAIS_STATUS.find(s => s.id === relay.approvalStatus)?.label || relay.approvalStatus}
                           </Badge>
+                          <Badge className={arrivalReliability.className}>{arrivalReliability.label}</Badge>
                           <Badge variant="outline">Score {relay.metrics?.reliabilityScore || 0}%</Badge>
                           <Badge variant="outline">Conformité {relay.metrics?.complianceScore || 0}%</Badge>
                           <Badge variant="outline">Caution {relay.cautionStatus || 'PENDING'}</Badge>
@@ -1165,6 +1179,8 @@ function RelaysTab() {
                         )}
                       </div>
                     </div>
+                      );
+                    })()}
 
                     <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
                       <div className="rounded-lg bg-slate-50 dark:bg-slate-800/60 p-3"><p className="text-xs text-slate-500">Colis déposés</p><p className="text-xl font-bold">{relay.metrics?.nbDeposites || 0}</p></div>

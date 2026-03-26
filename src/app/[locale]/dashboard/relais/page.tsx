@@ -28,6 +28,16 @@ function getRoleBasedDashboardPath(role: string, locale: string): string {
   }
 }
 
+function getArrivalReliabilityBadge(score: number) {
+  if (score >= 90) {
+    return { label: 'Fiabilité arrivée: Excellente', className: 'bg-emerald-600 text-white' };
+  }
+  if (score >= 75) {
+    return { label: 'Fiabilité arrivée: À surveiller', className: 'bg-orange-500 text-white' };
+  }
+  return { label: 'Fiabilité arrivée: Critique', className: 'bg-red-600 text-white' };
+}
+
 export default function RelaisDashboard() {
   const { data: session, status } = useSession();
   const locale = useLocale();
@@ -608,6 +618,8 @@ function ProfilRelaisTab({ userId, relaisInfo }: { userId: string; relaisInfo: a
 
 // Overview Tab
 function OverviewTab({ relaisInfo, setActiveTab, cashInfo }: { relaisInfo: any; setActiveTab: (tab: string) => void; cashInfo: any }) {
+  const arrivalReliability = getArrivalReliabilityBadge(relaisInfo?.complianceScore || 0);
+
   return (
     <div className="grid gap-6 lg:grid-cols-2">
       <Card>
@@ -622,6 +634,9 @@ function OverviewTab({ relaisInfo, setActiveTab, cashInfo }: { relaisInfo: any; 
                 <Badge className={`${RELAIS_STATUS.find(s => s.id === relaisInfo.status)?.color} text-white`}>
                   {RELAIS_STATUS.find(s => s.id === relaisInfo.status)?.label}
                 </Badge>
+              </div>
+              <div className="flex justify-between items-center"><span className="text-slate-500">Fiabilité arrivée</span>
+                <Badge className={arrivalReliability.className}>{arrivalReliability.label}</Badge>
               </div>
             </div>
           ) : <p className="text-slate-500 text-center py-4">Chargement...</p>}
