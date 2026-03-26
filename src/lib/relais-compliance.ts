@@ -3,6 +3,11 @@ import { db } from '@/lib/db';
 const REVERSAL_DEADLINE_HOURS = 72;
 const WARNING_OUTSTANDING_AMOUNT = 20000;
 const SUSPEND_OUTSTANDING_AMOUNT = 50000;
+const ARRIVAL_HANDOVER_WARNING_COUNT = 3;
+const ARRIVAL_HANDOVER_SUSPEND_COUNT = 6;
+const ARRIVAL_HANDOVER_STALE_HOURS = 48;
+const ARRIVAL_ISSUE_WARNING_RATE = 0.25;
+const ARRIVAL_ISSUE_SUSPEND_RATE = 0.4;
 
 function clampScore(score: number) {
   return Math.max(0, Math.min(100, score));
@@ -158,6 +163,94 @@ export async function processRelaisCompliance(relaisId: string, actorId: string)
     }
   }
 
+  // Arrival-relay reliability checks (no direct commission incentive on destination side)
+  // 1) parcels stuck too long at destination relay after transporter handover
+  // 2) high issue ratio at destination (RET0UR/EN_DISPUTE)
+  const staleArrivalCutoff = new Date(now.getTime() - ARRIVAL_HANDOVER_STALE_HOURS * 60 * 60 * 1000);
+
+  const [staleArrivalPending, arrivalSummary] = await Promise.all([
+    db.colis.count({
+      where: {
+        relaisArriveeId: relaisId,
+        status: 'ARRIVE_RELAIS_DESTINATION',
+        updatedAt: { lte: staleArrivalCutoff },
+      },
+    }),
+    db.colis.groupBy({
+      by: ['status'],
+      where: {
+        relaisArriveeId: relaisId,
+      },
+      _count: { _all: true },
+    }),
+  ]);
+
+  const arrivalCounts = arrivalSummary.reduce<Record<string, number>>((acc, row) => {
+    acc[row.status] = row._count._all;
+    return acc;
+  }, {});
+
+  const deliveredArrival = arrivalCounts['LIVRE'] || 0;
+  const issueArrival = (arrivalCounts['RETOUR'] || 0) + (arrivalCounts['EN_DISPUTE'] || 0);
+  const totalResolvedArrival = deliveredArrival + issueArrival;
+  const arrivalIssueRate = totalResolvedArrival > 0 ? issueArrival / totalResolvedArrival : 0;
+
+  if (staleArrivalPending >= ARRIVAL_HANDOVER_SUSPEND_COUNT) {
+    await createSanctionIfNotExists({
+      relaisId,
+      reason: 'OPERATOR_ERROR',
+      type: 'SUSPENSION',
+      appliedBy: actorId,
+      notes: `Auto-suspension: ${staleArrivalPending} parcels pending destination handover for > ${ARRIVAL_HANDOVER_STALE_HOURS}h`,
+    });
+
+    updates.operationalStatus = 'SUSPENDU';
+    updates.suspensionReason = `Négligence relais arrivée: ${staleArrivalPending} colis non remis > ${ARRIVAL_HANDOVER_STALE_HOURS}h`;
+    updates.suspendedAt = now;
+    nextScore -= 25;
+    actions.push(`sanction:SUSPENSION(arrival_stale_${staleArrivalPending})`);
+  } else if (staleArrivalPending >= ARRIVAL_HANDOVER_WARNING_COUNT) {
+    await createSanctionIfNotExists({
+      relaisId,
+      reason: 'OPERATOR_ERROR',
+      type: 'WARNING',
+      appliedBy: actorId,
+      notes: `Auto-warning: ${staleArrivalPending} parcels pending destination handover for > ${ARRIVAL_HANDOVER_STALE_HOURS}h`,
+    });
+
+    nextScore -= 10;
+    actions.push(`sanction:WARNING(arrival_stale_${staleArrivalPending})`);
+  }
+
+  if (totalResolvedArrival >= 10) {
+    if (arrivalIssueRate >= ARRIVAL_ISSUE_SUSPEND_RATE) {
+      await createSanctionIfNotExists({
+        relaisId,
+        reason: 'OPERATOR_ERROR',
+        type: 'SUSPENSION',
+        appliedBy: actorId,
+        notes: `Auto-suspension: destination issue rate ${(arrivalIssueRate * 100).toFixed(1)}%`,
+      });
+
+      updates.operationalStatus = 'SUSPENDU';
+      updates.suspensionReason = `Fiabilité relais arrivée insuffisante (${(arrivalIssueRate * 100).toFixed(1)}%)`;
+      updates.suspendedAt = now;
+      nextScore -= 20;
+      actions.push(`sanction:SUSPENSION(arrival_issue_rate_${(arrivalIssueRate * 100).toFixed(1)}%)`);
+    } else if (arrivalIssueRate >= ARRIVAL_ISSUE_WARNING_RATE) {
+      await createSanctionIfNotExists({
+        relaisId,
+        reason: 'OPERATOR_ERROR',
+        type: 'WARNING',
+        appliedBy: actorId,
+        notes: `Auto-warning: destination issue rate ${(arrivalIssueRate * 100).toFixed(1)}%`,
+      });
+
+      nextScore -= 8;
+      actions.push(`sanction:WARNING(arrival_issue_rate_${(arrivalIssueRate * 100).toFixed(1)}%)`);
+    }
+  }
+
   if (relais.sanctions.length > 0) {
     nextScore -= 5;
     actions.push('score:-5(active_sanctions)');
@@ -213,6 +306,9 @@ export async function processRelaisCompliance(relaisId: string, actorId: string)
       details: JSON.stringify({
         outstandingAmount,
         hasOverdueReversal,
+        staleArrivalPending,
+        arrivalIssueRate,
+        totalResolvedArrival,
         updates,
         actions,
       }),
