@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
-import { Package, Loader2, Mail, Lock, User, Phone, Store, MapPin, Truck } from 'lucide-react';
+import { Package, Loader2, Mail, Lock, User, Phone, Store, MapPin, Truck, AlertCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { WILAYAS } from '@/lib/constants';
 import { isAlgerianCommerceRegisterNumber, normalizeCommerceRegisterNumber } from '@/lib/validators';
@@ -25,6 +25,13 @@ function RegisterForm() {
   const searchParams = useSearchParams();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<{
+    email?: string;
+    password?: string;
+    confirmPassword?: string;
+    address?: string;
+    ville?: string;
+  }>({});
 
   const roleFromUrl = searchParams.get('role') || 'CLIENT';
 
@@ -63,19 +70,27 @@ function RegisterForm() {
   };
 
   const validateForm = () => {
-    if (!formData.firstName || !formData.lastName || !formData.email || !formData.phone || !formData.password) {
+    const errors: typeof fieldErrors = {};
+
+    if (!formData.firstName || !formData.lastName || !formData.phone) {
       toast({ title: 'Erreur', description: 'Veuillez remplir tous les champs requis', variant: 'destructive' });
       return false;
     }
 
-    if (formData.password !== formData.confirmPassword) {
-      toast({ title: 'Erreur', description: 'Les mots de passe ne correspondent pas', variant: 'destructive' });
-      return false;
+    if (!formData.email) {
+      errors.email = 'L\'adresse email est obligatoire.';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      errors.email = 'Le format de l\'email est invalide.';
     }
 
-    if (formData.password.length < 6) {
-      toast({ title: 'Erreur', description: 'Le mot de passe doit contenir au moins 6 caractères', variant: 'destructive' });
-      return false;
+    if (!formData.password) {
+      errors.password = 'Le mot de passe est obligatoire.';
+    } else if (formData.password.length < 6) {
+      errors.password = 'Le mot de passe doit contenir au moins 6 caractères.';
+    }
+
+    if (formData.password && formData.password !== formData.confirmPassword) {
+      errors.confirmPassword = 'Les mots de passe ne correspondent pas.';
     }
 
     if ((formData.role === 'TRANSPORTER' || formData.role === 'RELAIS') && !formData.commerceRegisterNumber.trim()) {
@@ -88,7 +103,21 @@ function RegisterForm() {
       return false;
     }
 
-    // Other role-specific fields can still be completed later
+    if (formData.role === 'RELAIS') {
+      if (!formData.address.trim()) {
+        errors.address = 'L\'adresse du point relais est obligatoire.';
+      }
+      if (!formData.ville) {
+        errors.ville = 'La ville est obligatoire.';
+      }
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      return false;
+    }
+
+    setFieldErrors({});
     return true;
   };
 
@@ -121,19 +150,19 @@ function RegisterForm() {
       const data = await response.json();
       if (!response.ok) {
         const rawError = `${data?.error || ''} ${data?.details || ''}`.toLowerCase();
-        let message = 'Erreur lors de l\'inscription';
 
         if (rawError.includes('email already exists')) {
-          message = 'Cet email est déjà utilisé. Essayez de vous connecter ou utilisez une autre adresse.';
+          setFieldErrors(prev => ({ ...prev, email: 'Cet email est déjà utilisé. Connectez-vous ou utilisez une autre adresse.' }));
+          throw new Error('Cet email est déjà utilisé.');
         } else if (rawError.includes('invalid email format')) {
-          message = 'Le format de l\'email est invalide.';
+          setFieldErrors(prev => ({ ...prev, email: 'Le format de l\'email est invalide.' }));
+          throw new Error('Email invalide.');
         } else if (rawError.includes('password too short')) {
-          message = 'Le mot de passe doit contenir au moins 6 caractères.';
-        } else if (rawError.includes('missing required fields')) {
-          message = 'Veuillez remplir tous les champs obligatoires.';
+          setFieldErrors(prev => ({ ...prev, password: 'Le mot de passe doit contenir au moins 6 caractères.' }));
+          throw new Error();
+        } else {
+          throw new Error(data?.error || 'Erreur lors de l\'inscription');
         }
-
-        throw new Error(message);
       }
 
       const userId = data.id;
@@ -177,7 +206,7 @@ function RegisterForm() {
         toast({ title: 'Profil transporteur créé', description: 'Votre demande a été enregistrée avec succès.' });
       }
 
-      if (formData.role === 'RELAIS' && formData.commerceName && formData.address && formData.ville && formData.commerceRegisterNumber.trim()) {
+      if (formData.role === 'RELAIS' && formData.commerceRegisterNumber.trim()) {
         const relaisResponse = await fetch('/api/relais', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -201,11 +230,9 @@ function RegisterForm() {
 
       toast({ title: 'Compte créé', description: 'Bienvenue sur SwiftColis!' });
 
-      // If RELAIS or TRANSPORTER without details, redirect to completion page
-      if ((formData.role === 'RELAIS' && !formData.commerceName) || 
-          (formData.role === 'TRANSPORTER' && !formData.vehicle) ||
-          ((formData.role === 'RELAIS' || formData.role === 'TRANSPORTER') && !formData.commerceRegisterNumber.trim())) {
-        window.location.href = `/${locale}/complete-profile/${formData.role === 'TRANSPORTER' ? 'transporter' : 'relais'}`;
+      // If TRANSPORTER without vehicle details, redirect to completion page
+      if (formData.role === 'TRANSPORTER' && !formData.vehicle) {
+        window.location.href = `/${locale}/complete-profile/transporter`;
       } else {
         const dashboardPath = `/${locale}/dashboard/${
           formData.role === 'TRANSPORTER' ? 'transporter' : formData.role === 'RELAIS' ? 'relais' : 'client'
@@ -314,11 +341,17 @@ function RegisterForm() {
                     type="email"
                     placeholder="email@exemple.com"
                     value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    className="pl-10"
+                    onChange={(e) => { setFormData({ ...formData, email: e.target.value }); setFieldErrors(p => ({ ...p, email: undefined })); }}
+                    className={`pl-10 ${fieldErrors.email ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
                     required
                   />
                 </div>
+                {fieldErrors.email && (
+                  <div className="flex items-center gap-1 text-sm text-red-600 dark:text-red-400">
+                    <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                    <span>{fieldErrors.email}</span>
+                  </div>
+                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="personalAddress">Adresse personnelle</Label>
@@ -357,11 +390,17 @@ function RegisterForm() {
                     type="password"
                     placeholder="••••••••"
                     value={formData.password}
-                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    className="pl-10"
+                    onChange={(e) => { setFormData({ ...formData, password: e.target.value }); setFieldErrors(p => ({ ...p, password: undefined })); }}
+                    className={`pl-10 ${fieldErrors.password ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
                     required
                   />
                 </div>
+                {fieldErrors.password && (
+                  <div className="flex items-center gap-1 text-sm text-red-600 dark:text-red-400">
+                    <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                    <span>{fieldErrors.password}</span>
+                  </div>
+                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="confirmPassword">{t('confirmPassword')}</Label>
@@ -372,11 +411,17 @@ function RegisterForm() {
                     type="password"
                     placeholder="••••••••"
                     value={formData.confirmPassword}
-                    onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-                    className="pl-10"
+                    onChange={(e) => { setFormData({ ...formData, confirmPassword: e.target.value }); setFieldErrors(p => ({ ...p, confirmPassword: undefined })); }}
+                    className={`pl-10 ${fieldErrors.confirmPassword ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
                     required
                   />
                 </div>
+                {fieldErrors.confirmPassword && (
+                  <div className="flex items-center gap-1 text-sm text-red-600 dark:text-red-400">
+                    <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                    <span>{fieldErrors.confirmPassword}</span>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -475,11 +520,7 @@ function RegisterForm() {
                   </h3>
                 </div>
 
-                <div>
-                  <p className="text-sm text-slate-600 dark:text-slate-400 mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                    Les détails du point relais sont optionnels à l'inscription. Vous pourrez les ajouter après.
-                  </p>
-                </div>
+
 
                 <div className="space-y-2">
                   <Label htmlFor="commerceRegisterNumberRelais">Numéro du registre du commerce <span className="text-red-500">*</span></Label>
@@ -508,22 +549,29 @@ function RegisterForm() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="address">Adresse (optionnel)</Label>
+                  <Label htmlFor="address">Adresse du point relais <span className="text-red-500">*</span></Label>
                   <Textarea
                     id="address"
                     placeholder="Ex: 123 Rue Didouche Mourad, Alger Centre"
                     value={formData.address}
-                    onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                    onChange={(e) => { setFormData({ ...formData, address: e.target.value }); setFieldErrors(p => ({ ...p, address: undefined })); }}
                     rows={2}
+                    className={fieldErrors.address ? 'border-red-500 focus-visible:ring-red-500' : ''}
                   />
+                  {fieldErrors.address && (
+                    <div className="flex items-center gap-1 text-sm text-red-600 dark:text-red-400">
+                      <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                      <span>{fieldErrors.address}</span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="ville">Ville (optionnel)</Label>
+                  <Label htmlFor="ville">Ville <span className="text-red-500">*</span></Label>
                   <div className="relative">
                     <MapPin className="absolute left-3 top-3 h-4 w-4 text-muted-foreground z-10" />
-                    <Select value={formData.ville} onValueChange={(value) => setFormData({ ...formData, ville: value })}>
-                      <SelectTrigger className="pl-10">
+                    <Select value={formData.ville} onValueChange={(value) => { setFormData({ ...formData, ville: value }); setFieldErrors(p => ({ ...p, ville: undefined })); }}>
+                      <SelectTrigger className={`pl-10 ${fieldErrors.ville ? 'border-red-500 focus-visible:ring-red-500' : ''}`}>
                         <SelectValue placeholder="Sélectionnez votre ville" />
                       </SelectTrigger>
                       <SelectContent>
@@ -535,6 +583,12 @@ function RegisterForm() {
                       </SelectContent>
                     </Select>
                   </div>
+                  {fieldErrors.ville && (
+                    <div className="flex items-center gap-1 text-sm text-red-600 dark:text-red-400">
+                      <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                      <span>{fieldErrors.ville}</span>
+                    </div>
+                  )}
                 </div>
               </>
             )}
