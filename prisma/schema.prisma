@@ -129,7 +129,6 @@ model Colis {
   relaisArriveeId String
   villeDepart     String
   villeArrivee    String
-  format          String   // PETIT, MOYEN, GROS
   weight          Float?
   description     String?
   prixClient      Float

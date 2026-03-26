@@ -28,7 +28,7 @@ interface PaymentData {
   colisId: string;
   expiresAt: string;
   transactionRef?: string | null;
-  colis?: { trackingNumber: string; villeDepart: string; villeArrivee: string; format: string };
+  colis?: { trackingNumber: string; villeDepart: string; villeArrivee: string; weight?: number | null };
 }
 
 function formatCardNumber(value: string): string {
@@ -181,7 +181,7 @@ function CheckoutContent() {
                   <p className="text-sm text-slate-600 dark:text-slate-400">Montant à payer</p>
                   <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-300">{payment.amount.toFixed(2)} DA</p>
                   {payment.colis && (
-                    <p className="text-xs text-slate-500 mt-1">Colis {payment.colis.format} · {payment.colis.villeDepart} → {payment.colis.villeArrivee}</p>
+                    <p className="text-xs text-slate-500 mt-1">Colis {payment.colis.weight ? `${payment.colis.weight} kg` : ''} · {payment.colis.villeDepart} → {payment.colis.villeArrivee}</p>
                   )}
                 </div>
                 <Badge variant="outline" className="text-emerald-700 border-emerald-300">{payment.currency}</Badge>

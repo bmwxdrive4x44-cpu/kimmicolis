@@ -86,7 +86,7 @@ export function ParcelHistory({ userId }: ParcelHistoryProps) {
                 </div>
                 <div className="flex items-center gap-2">
                   <Package className="h-4 w-4 text-muted-foreground" />
-                  <span>{parcel.format} - {parcel.prixClient?.toFixed(0)} DA</span>
+                  <span>{parcel.weight ? `${parcel.weight} kg` : 'Poids non renseigné'} - {parcel.prixClient?.toFixed(0)} DA</span>
                 </div>
               </div>
             </div>

@@ -654,20 +654,20 @@ function OverviewTab({ relaisInfo, setActiveTab, cashInfo }: { relaisInfo: any; 
       </Card>
 
       <Card>
-        <CardHeader><CardTitle>Commissions par format</CardTitle></CardHeader>
+        <CardHeader><CardTitle>Commissions relais historiques</CardTitle></CardHeader>
         <CardContent>
           <div className="grid gap-4 md:grid-cols-3">
             <div className="p-4 border rounded-lg text-center">
               <p className="text-2xl font-bold">{relaisInfo?.commissionPetit || DEFAULT_RELAY_COMMISSION.PETIT} DA</p>
-              <p className="text-xs text-slate-500 mt-1">Petit</p>
+              <p className="text-xs text-slate-500 mt-1">Legacy petit</p>
             </div>
             <div className="p-4 border rounded-lg text-center">
               <p className="text-2xl font-bold">{relaisInfo?.commissionMoyen || DEFAULT_RELAY_COMMISSION.MOYEN} DA</p>
-              <p className="text-xs text-slate-500 mt-1">Moyen</p>
+              <p className="text-xs text-slate-500 mt-1">Legacy moyen</p>
             </div>
             <div className="p-4 border rounded-lg text-center">
               <p className="text-2xl font-bold">{relaisInfo?.commissionGros || DEFAULT_RELAY_COMMISSION.GROS} DA</p>
-              <p className="text-xs text-slate-500 mt-1">Gros</p>
+              <p className="text-xs text-slate-500 mt-1">Legacy gros</p>
             </div>
           </div>
         </CardContent>
@@ -978,8 +978,8 @@ function ScanTab({ relaisId, userId, onRefresh }: { relaisId: string | undefined
                   <span className="font-semibold">{receptionParcel.client?.name}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-600 dark:text-slate-400">Format:</span>
-                  <Badge variant="outline">{receptionParcel.format}</Badge>
+                  <span className="text-slate-600 dark:text-slate-400">Poids:</span>
+                  <Badge variant="outline">{receptionParcel.weight ? `${receptionParcel.weight} kg` : 'Non renseigné'}</Badge>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-600 dark:text-slate-400">De / Pour:</span>
@@ -1068,7 +1068,7 @@ function ScanTab({ relaisId, userId, onRefresh }: { relaisId: string | undefined
 
                 <div className="grid gap-4 md:grid-cols-3 mb-6 text-sm">
                   <div><p className="text-slate-500 mb-1">Client</p><p className="font-semibold">{parcel.client?.name}</p><p>{parcel.client?.phone}</p></div>
-                  <div><p className="text-slate-500 mb-1">Format / Prix</p><p className="font-semibold">{parcel.format}</p><p className="text-emerald-700 font-bold">{parcel.prixClient} DA</p></div>
+                  <div><p className="text-slate-500 mb-1">Poids / Prix</p><p className="font-semibold">{parcel.weight ? `${parcel.weight} kg` : 'Non renseigné'}</p><p className="text-emerald-700 font-bold">{parcel.prixClient} DA</p></div>
                   <div>
                     <p className="text-slate-500 mb-1">Commission relais</p>
                     <p className="font-bold text-emerald-600">{parcel.commissionRelais} DA</p>

@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
             villeDepart: true,
             villeArrivee: true,
             status: true,
-            format: true,
+            weight: true,
             prixClient: true,
           },
         },

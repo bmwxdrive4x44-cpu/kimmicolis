@@ -266,7 +266,7 @@ function OverviewTab({ userId, setActiveTab }: { userId: string; setActiveTab: (
                       {WILAYAS.find(w => w.id === m.colis?.villeArrivee)?.name || m.colis?.villeArrivee}
                     </p>
                     <p className="text-xs text-slate-400">
-                      {m.colis?.format} · Relais: {m.colis?.relaisDepart?.commerceName || '—'}
+                      {(m.colis?.weight ? `${m.colis.weight} kg` : 'Poids non renseigné')} · Relais: {m.colis?.relaisDepart?.commerceName || '—'}
                     </p>
                     {m.colis?.netTransporteur > 0 && (
                       <p className="text-xs font-semibold text-emerald-600 mt-0.5">{m.colis.netTransporteur} DA</p>
@@ -635,7 +635,7 @@ function MissionsTab({ userId }: { userId: string }) {
                         {WILAYAS.find(w => w.id === m.colis?.villeArrivee)?.name || m.colis?.villeArrivee}
                       </p>
                       <p className="text-xs text-slate-400">
-                        {m.colis?.format}
+                        {(m.colis?.weight ? `${m.colis.weight} kg` : 'Poids non renseigné')}
                         {m.colis?.netTransporteur > 0 ? ` · ${m.colis.netTransporteur} DA` : ''}
                       </p>
                       {(m.colis?.relaisDepart || m.colis?.relaisArrivee) && (
@@ -773,7 +773,7 @@ function ScanTab() {
                     {' → '}
                     {WILAYAS.find(w => w.id === parcel.villeArrivee)?.name || parcel.villeArrivee}
                   </p>
-                  <p className="text-xs text-slate-400">Format : {parcel.format}</p>
+                  <p className="text-xs text-slate-400">Poids : {parcel.weight ? `${parcel.weight} kg` : 'Non renseigné'}</p>
                 </div>
                 <Badge className={`${PARCEL_STATUS.find(s => s.id === parcel.status)?.color} text-white shrink-0`}>
                   {PARCEL_STATUS.find(s => s.id === parcel.status)?.label}
@@ -1059,7 +1059,7 @@ function WalletTab({ userId }: { userId: string }) {
                     </p>
                     <p className="text-xs text-slate-500 font-mono">#{m.colis?.trackingNumber}</p>
                     <p className="text-xs text-slate-400">
-                      {m.colis?.format}
+                      {(m.colis?.weight ? `${m.colis.weight} kg` : 'Poids non renseigné')}
                       {' · '}
                       {new Date(m.completedAt ?? m.updatedAt ?? m.createdAt).toLocaleDateString('fr-FR', { day:'2-digit', month:'2-digit', year:'numeric' })}
                     </p>

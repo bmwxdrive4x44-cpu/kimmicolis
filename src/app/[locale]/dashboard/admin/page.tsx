@@ -16,7 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { MatchingAutoAssignPanel } from '@/components/dashboard/admin/matching-auto-assign-panel';
-import { WILAYAS, USER_ROLES, PARCEL_STATUS, RELAIS_STATUS, PARCEL_FORMATS } from '@/lib/constants';
+import { WILAYAS, USER_ROLES, PARCEL_STATUS, RELAIS_STATUS } from '@/lib/constants';
 import { Users, Package, Truck, Store, DollarSign, CheckCircle, XCircle, Loader2, Plus, Settings, BarChart3, MapPin, Trash2, Pencil, Eye, EyeOff, AlertCircle, ScrollText, RefreshCw, ChevronDown, ChevronRight } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -618,7 +618,7 @@ function ParcelsTab() {
                 <TableHead>Client</TableHead>
                 <TableHead>Départ</TableHead>
                 <TableHead>Arrivée</TableHead>
-                <TableHead>Format</TableHead>
+                <TableHead>Poids</TableHead>
                 <TableHead>Prix</TableHead>
                 <TableHead>Statut</TableHead>
               </TableRow>
@@ -630,7 +630,7 @@ function ParcelsTab() {
                   <TableCell>{c.client?.name || '-'}</TableCell>
                   <TableCell>{WILAYAS.find(w => w.id === c.villeDepart)?.name || c.villeDepart}</TableCell>
                   <TableCell>{WILAYAS.find(w => w.id === c.villeArrivee)?.name || c.villeArrivee}</TableCell>
-                  <TableCell>{PARCEL_FORMATS.find(f => f.id === c.format)?.label || c.format}</TableCell>
+                  <TableCell>{c.weight ? `${c.weight} kg` : '—'}</TableCell>
                   <TableCell>{c.prixClient} DA</TableCell>
                   <TableCell>
                     <Badge className={PARCEL_STATUS.find(s => s.id === c.status)?.color || 'bg-gray-500'}>{PARCEL_STATUS.find(s => s.id === c.status)?.label || c.status}</Badge>
@@ -1960,6 +1960,12 @@ function SettingsTab() {
     commissionPetit: '100',
     commissionMoyen: '200',
     commissionGros: '300',
+    pricingAdminFee: '50',
+    pricingRatePerKg: '120',
+    pricingRatePerKm: '2.5',
+    pricingRelayDepartureRate: '0.1',
+    pricingRelayArrivalRate: '0.1',
+    pricingRoundTo: '10',
   });
 
   useEffect(() => {
@@ -1979,6 +1985,12 @@ function SettingsTab() {
         commissionPetit: String(data.commissionPetit || 100),
         commissionMoyen: String(data.commissionMoyen || 200),
         commissionGros: String(data.commissionGros || 300),
+        pricingAdminFee: String(data.pricingAdminFee || 50),
+        pricingRatePerKg: String(data.pricingRatePerKg || 120),
+        pricingRatePerKm: String(data.pricingRatePerKm || 2.5),
+        pricingRelayDepartureRate: String(data.pricingRelayDepartureRate || 0.1),
+        pricingRelayArrivalRate: String(data.pricingRelayArrivalRate || 0.1),
+        pricingRoundTo: String(data.pricingRoundTo || 10),
       });
     } catch (error) {
       console.error('Error fetching settings:', error);
@@ -2003,6 +2015,12 @@ function SettingsTab() {
           commissionPetit: parseFloat(settings.commissionPetit),
           commissionMoyen: parseFloat(settings.commissionMoyen),
           commissionGros: parseFloat(settings.commissionGros),
+          pricingAdminFee: parseFloat(settings.pricingAdminFee),
+          pricingRatePerKg: parseFloat(settings.pricingRatePerKg),
+          pricingRatePerKm: parseFloat(settings.pricingRatePerKm),
+          pricingRelayDepartureRate: parseFloat(settings.pricingRelayDepartureRate),
+          pricingRelayArrivalRate: parseFloat(settings.pricingRelayArrivalRate),
+          pricingRoundTo: parseFloat(settings.pricingRoundTo),
         }),
       });
       
@@ -2040,34 +2058,39 @@ function SettingsTab() {
                 />
                 <p className="text-xs text-slate-500">Pourcentage prélevé sur chaque transaction</p>
               </div>
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
+                Les anciens réglages de commission par format sont désormais dépréciés. La tarification active repose sur le poids, la distance estimée et les commissions dynamiques ci-dessous.
+              </div>
+
               <div className="space-y-4">
-                <Label>Commissions relais par format (DA)</Label>
-                <div className="grid gap-4 md:grid-cols-3 max-w-lg">
+                <Label>Tarification dynamique colis</Label>
+                <div className="grid gap-4 md:grid-cols-2 max-w-2xl">
                   <div className="space-y-2">
-                    <Label className="text-sm">Petit</Label>
-                    <Input 
-                      type="number" 
-                      value={settings.commissionPetit}
-                      onChange={(e) => setSettings({ ...settings, commissionPetit: e.target.value })}
-                    />
+                    <Label className="text-sm">Frais admin fixes (DA)</Label>
+                    <Input type="number" step="1" value={settings.pricingAdminFee} onChange={(e) => setSettings({ ...settings, pricingAdminFee: e.target.value })} />
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-sm">Moyen</Label>
-                    <Input 
-                      type="number" 
-                      value={settings.commissionMoyen}
-                      onChange={(e) => setSettings({ ...settings, commissionMoyen: e.target.value })}
-                    />
+                    <Label className="text-sm">Tarif par kg (DA)</Label>
+                    <Input type="number" step="1" value={settings.pricingRatePerKg} onChange={(e) => setSettings({ ...settings, pricingRatePerKg: e.target.value })} />
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-sm">Gros</Label>
-                    <Input 
-                      type="number" 
-                      value={settings.commissionGros}
-                      onChange={(e) => setSettings({ ...settings, commissionGros: e.target.value })}
-                    />
+                    <Label className="text-sm">Tarif par km (DA)</Label>
+                    <Input type="number" step="0.1" value={settings.pricingRatePerKm} onChange={(e) => setSettings({ ...settings, pricingRatePerKm: e.target.value })} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-sm">Arrondi (DA)</Label>
+                    <Input type="number" step="1" value={settings.pricingRoundTo} onChange={(e) => setSettings({ ...settings, pricingRoundTo: e.target.value })} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-sm">Commission relais départ (taux)</Label>
+                    <Input type="number" step="0.01" value={settings.pricingRelayDepartureRate} onChange={(e) => setSettings({ ...settings, pricingRelayDepartureRate: e.target.value })} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-sm">Commission relais arrivée (taux)</Label>
+                    <Input type="number" step="0.01" value={settings.pricingRelayArrivalRate} onChange={(e) => setSettings({ ...settings, pricingRelayArrivalRate: e.target.value })} />
                   </div>
                 </div>
+                <p className="text-xs text-slate-500">Exemple: 0.10 = 10%.</p>
               </div>
               <Button 
                 onClick={handleSave} 

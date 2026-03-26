@@ -1,59 +1,64 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { PLATFORM_COMMISSION, DEFAULT_RELAY_COMMISSION } from '@/lib/constants';
+import { calculateDynamicParcelPricing, estimateDistanceKmByWilayas } from '@/lib/pricing';
 
 /**
  * POST /api/parcels/calculate-price
- * Calculate the price for a parcel based on route and format.
- * Used by the client dashboard before creating a parcel.
+ * Calculate the price for a parcel based on route and weight.
  */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { villeDepart, villeArrivee, format } = body;
+    const { villeDepart, villeArrivee, weight } = body;
 
-    if (!villeDepart || !villeArrivee || !format) {
+    if (!villeDepart || !villeArrivee || weight === undefined || weight === null) {
       return NextResponse.json(
-        { error: 'Missing required fields: villeDepart, villeArrivee, format' },
+        { error: 'Missing required fields: villeDepart, villeArrivee, weight' },
         { status: 400 }
       );
     }
 
-    // Find the tariff for this route
-    const ligne = await db.ligne.findFirst({
+    const parsedWeight = Number(weight);
+    if (!Number.isFinite(parsedWeight) || parsedWeight <= 0) {
+      return NextResponse.json({ error: 'weight must be a positive number' }, { status: 400 });
+    }
+
+    const settings = await db.setting.findMany({
       where: {
-        OR: [
-          { villeDepart, villeArrivee },
-          { villeDepart: villeArrivee, villeArrivee: villeDepart },
-        ],
-        isActive: true,
+        key: {
+          in: [
+            'pricingAdminFee',
+            'pricingRatePerKg',
+            'pricingRatePerKm',
+            'pricingRelayDepartureRate',
+            'pricingRelayArrivalRate',
+            'pricingRoundTo',
+          ],
+        },
       },
     });
 
-    let baseTariff = 400; // default
-    if (ligne) {
-      baseTariff =
-        format === 'PETIT'
-          ? ligne.tarifPetit
-          : format === 'MOYEN'
-          ? ligne.tarifMoyen
-          : ligne.tarifGros;
-    }
+    const config = new Map(settings.map((setting) => [setting.key, setting.value]));
+    const getNumber = (key: string, fallback: number) => {
+      const value = Number(config.get(key));
+      return Number.isFinite(value) ? value : fallback;
+    };
 
-    const platformFee = baseTariff * PLATFORM_COMMISSION;
-    const relayFee =
-      DEFAULT_RELAY_COMMISSION[format as keyof typeof DEFAULT_RELAY_COMMISSION] || 100;
-    const prixClient = baseTariff + platformFee + relayFee;
-    const netTransporteur = baseTariff - platformFee - relayFee;
+    const estimatedDistanceKm = estimateDistanceKmByWilayas(villeDepart, villeArrivee);
+    const pricing = calculateDynamicParcelPricing({
+      weightKg: parsedWeight,
+      distanceKm: estimatedDistanceKm,
+      adminFee: getNumber('pricingAdminFee', 50),
+      ratePerKg: getNumber('pricingRatePerKg', 120),
+      ratePerKm: getNumber('pricingRatePerKm', 2.5),
+      relayDepartureCommissionRate: getNumber('pricingRelayDepartureRate', 0.1),
+      relayArrivalCommissionRate: getNumber('pricingRelayArrivalRate', 0.1),
+      roundTo: getNumber('pricingRoundTo', 10),
+    });
 
     return NextResponse.json({
-      baseTariff,
-      platformFee,
-      relayFee,
-      prixClient,
-      netTransporteur,
-      ligneId: ligne?.id ?? null,
-      hasLine: !!ligne,
+      ...pricing,
+      estimatedDistanceKm,
     });
   } catch (error) {
     console.error('Error calculating price:', error);

@@ -30,7 +30,7 @@ export async function GET(
         trackingNumber: true,
         villeDepart: true,
         villeArrivee: true,
-        format: true,
+        weight: true,
         prixClient: true,
         commissionRelais: true,
         status: true,

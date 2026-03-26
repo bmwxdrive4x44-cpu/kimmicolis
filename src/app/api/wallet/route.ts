@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
         colis: {
           select: {
             trackingNumber: true,
-            format: true,
+            weight: true,
             netTransporteur: true,
             status: true,
             villeDepart: true,

@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { generateTrackingNumber, generateQRData, PLATFORM_COMMISSION, DEFAULT_RELAY_COMMISSION, PARCEL_FORMATS } from '@/lib/constants';
+import { generateTrackingNumber, generateQRData } from '@/lib/constants';
 import { checkRateLimit, RATE_LIMIT_PRESETS } from '@/lib/ratelimit';
 import { requireRole, verifyJWT } from '@/lib/rbac';
 import { generateQRCodeImage, buildQRCodePayload } from '@/lib/qrcode';
-import { calculateDynamicParcelPricing } from '@/lib/pricing';
+import { calculateDynamicParcelPricing, estimateDistanceKmByWilayas } from '@/lib/pricing';
 import { createHash } from 'crypto';
 
 function normalizePhone(value: string): string {
@@ -19,6 +19,34 @@ function generateWithdrawalCode(length: 4 | 6 = 6): string {
   const min = length === 4 ? 1000 : 100000;
   const max = length === 4 ? 9999 : 999999;
   return String(Math.floor(Math.random() * (max - min + 1)) + min);
+}
+
+async function getPricingConfig() {
+  const keys = [
+    'pricingAdminFee',
+    'pricingRatePerKg',
+    'pricingRatePerKm',
+    'pricingRelayDepartureRate',
+    'pricingRelayArrivalRate',
+    'pricingRoundTo',
+  ];
+
+  const settings = await db.setting.findMany({ where: { key: { in: keys } } });
+  const map = new Map(settings.map((s) => [s.key, s.value]));
+
+  const getNumber = (key: string, fallback: number) => {
+    const value = Number(map.get(key));
+    return Number.isFinite(value) ? value : fallback;
+  };
+
+  return {
+    adminFee: getNumber('pricingAdminFee', 50),
+    ratePerKg: getNumber('pricingRatePerKg', 120),
+    ratePerKm: getNumber('pricingRatePerKm', 2.5),
+    relayDepartureRate: getNumber('pricingRelayDepartureRate', 0.1),
+    relayArrivalRate: getNumber('pricingRelayArrivalRate', 0.1),
+    roundTo: getNumber('pricingRoundTo', 10),
+  };
 }
 
 // GET all parcels
@@ -39,7 +67,7 @@ export async function GET(request: NextRequest) {
           trackingNumber: true,
           villeDepart: true,
           villeArrivee: true,
-          format: true,
+          weight: true,
           status: true,
           createdAt: true,
           relaisDepart: {
@@ -158,9 +186,7 @@ export async function POST(request: NextRequest) {
       relaisArriveeId,
       villeDepart,
       villeArrivee,
-      format,
       weight,
-      distanceKm,
       description,
     } = body;
 
@@ -187,6 +213,14 @@ export async function POST(request: NextRequest) {
     if (normalizedSenderPhone.length < 8 || normalizedRecipientPhone.length < 8) {
       return NextResponse.json(
         { error: 'Numéro de téléphone invalide' },
+        { status: 400 }
+      );
+    }
+
+    const parsedWeight = Number(weight ?? 0);
+    if (!Number.isFinite(parsedWeight) || parsedWeight <= 0) {
+      return NextResponse.json(
+        { error: 'Le poids du colis est obligatoire et doit être supérieur à 0 kg' },
         { status: 400 }
       );
     }
@@ -225,65 +259,31 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get line tariff
-    const ligne = await db.ligne.findFirst({
-      where: {
-        OR: [
-          { villeDepart, villeArrivee },
-          { villeDepart: villeArrivee, villeArrivee: villeDepart },
-        ],
-      },
+    // Calculate prices: distance auto-estimated from departure/arrival wilayas
+    const estimatedDistanceKm = estimateDistanceKmByWilayas(villeDepart, villeArrivee);
+    const pricingConfig = await getPricingConfig();
+    const dynamic = calculateDynamicParcelPricing({
+      weightKg: parsedWeight,
+      distanceKm: estimatedDistanceKm,
+      adminFee: pricingConfig.adminFee,
+      ratePerKg: pricingConfig.ratePerKg,
+      ratePerKm: pricingConfig.ratePerKm,
+      formatMultiplier: 1,
+      relayDepartureCommissionRate: pricingConfig.relayDepartureRate,
+      relayArrivalCommissionRate: pricingConfig.relayArrivalRate,
+      platformMarginRate: 0,
+      roundTo: pricingConfig.roundTo,
     });
 
-    // Calculate prices (dynamic if distance is provided, fallback to legacy model otherwise)
-    let prixClient = 0;
-    let netTransporteur = 0;
-    let platformFee = 0;
-    let relayFee = 0;
-    let pricingBreakdown: Record<string, unknown> | null = null;
-
-    const parsedWeight = Number(weight ?? 0);
-    const parsedDistanceKm = Number(distanceKm ?? 0);
-    const hasDynamicInputs = Number.isFinite(parsedWeight) && parsedWeight >= 0 && Number.isFinite(parsedDistanceKm) && parsedDistanceKm > 0;
-
-    if (hasDynamicInputs) {
-      const formatMultiplier = PARCEL_FORMATS.find((f) => f.id === format)?.multiplier ?? 1;
-      const dynamic = calculateDynamicParcelPricing({
-        weightKg: parsedWeight,
-        distanceKm: parsedDistanceKm,
-        adminFee: 50,
-        ratePerKg: 120,
-        ratePerKm: 2.5,
-        formatMultiplier,
-        relayDepartureCommissionRate: 0.1,
-        relayArrivalCommissionRate: 0.1,
-        platformMarginRate: 0,
-        roundTo: 10,
-      });
-
-      prixClient = dynamic.clientPrice;
-      netTransporteur = dynamic.netTransporteur;
-      relayFee = dynamic.relayCommissionTotal;
-      platformFee = dynamic.platformMargin;
-      pricingBreakdown = {
-        model: 'dynamic',
-        ...dynamic,
-      };
-    } else {
-      let baseTariff = 400;
-      if (ligne) {
-        baseTariff = format === 'PETIT' ? ligne.tarifPetit : format === 'MOYEN' ? ligne.tarifMoyen : ligne.tarifGros;
-      }
-
-      platformFee = baseTariff * PLATFORM_COMMISSION;
-      relayFee = DEFAULT_RELAY_COMMISSION[format as keyof typeof DEFAULT_RELAY_COMMISSION] || 100;
-      prixClient = baseTariff + platformFee + relayFee;
-      netTransporteur = baseTariff - platformFee - relayFee;
-      pricingBreakdown = {
-        model: 'legacy',
-        baseTariff,
-      };
-    }
+    const prixClient = dynamic.clientPrice;
+    const netTransporteur = dynamic.netTransporteur;
+    const relayFee = dynamic.relayCommissionTotal;
+    const platformFee = dynamic.platformMargin;
+    const pricingBreakdown: Record<string, unknown> = {
+      model: 'dynamic',
+      ...dynamic,
+      estimatedDistanceKm,
+    };
 
     // Generate tracking number and QR code
     const trackingNumber = generateTrackingNumber();
@@ -307,8 +307,7 @@ export async function POST(request: NextRequest) {
         relaisArriveeId,
         villeDepart,
         villeArrivee,
-        format,
-        weight,
+        weight: parsedWeight,
         description,
         prixClient,
         commissionPlateforme: platformFee,

@@ -15,8 +15,8 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
-import { WILAYAS, PARCEL_FORMATS, PARCEL_STATUS, generateTrackingNumber, generateQRData } from '@/lib/constants';
-import { calculateDynamicParcelPricing } from '@/lib/pricing';
+import { WILAYAS, PARCEL_STATUS, generateTrackingNumber, generateQRData } from '@/lib/constants';
+import { calculateDynamicParcelPricing, estimateDistanceKmByWilayas } from '@/lib/pricing';
 import { Package, Plus, History, MapPin, Loader2, CreditCard, Search, Truck, CheckCircle, Clock, QrCode, Printer, User, Pencil, Save, AlertTriangle, XCircle, MessageSquare, Smartphone, Banknote } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import Image from 'next/image';
@@ -289,12 +289,18 @@ function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart }: { us
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [relais, setRelais] = useState<any[]>([]);
+  const [pricingConfig, setPricingConfig] = useState({
+    pricingAdminFee: 50,
+    pricingRatePerKg: 120,
+    pricingRatePerKm: 2.5,
+    pricingRelayDepartureRate: 0.1,
+    pricingRelayArrivalRate: 0.1,
+    pricingRoundTo: 10,
+  });
   const [createdParcel, setCreatedParcel] = useState<any>(null);
   const [formData, setFormData] = useState({
     villeDepart: '',
     villeArrivee: '',
-    distanceKm: '',
-    format: 'PETIT',
     relaisDepartId: '',
     relaisArriveeId: '',
     description: '',
@@ -313,12 +319,15 @@ function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart }: { us
     return `${relay.openTime} - ${relay.closeTime}`;
   };
 
-  useEffect(() => { fetchRelais(); }, []);
+  useEffect(() => {
+    fetchRelais();
+    fetchPricingSettings();
+  }, []);
 
   useEffect(() => {
-    if (formData.villeDepart && formData.villeArrivee && formData.format && formData.distanceKm) calculatePrice();
+    if (formData.villeDepart && formData.villeArrivee && formData.weight) calculatePrice();
     else setCalculatedPrice(null);
-  }, [formData.villeDepart, formData.villeArrivee, formData.format, formData.weight, formData.distanceKm]);
+  }, [formData.villeDepart, formData.villeArrivee, formData.weight, pricingConfig]);
 
   const fetchRelais = async () => {
     try {
@@ -329,10 +338,27 @@ function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart }: { us
     }
   };
 
+  const fetchPricingSettings = async () => {
+    try {
+      const response = await fetch('/api/settings');
+      const data = await response.json();
+      if (!response.ok) return;
+      setPricingConfig({
+        pricingAdminFee: Number(data.pricingAdminFee || 50),
+        pricingRatePerKg: Number(data.pricingRatePerKg || 120),
+        pricingRatePerKm: Number(data.pricingRatePerKm || 2.5),
+        pricingRelayDepartureRate: Number(data.pricingRelayDepartureRate || 0.1),
+        pricingRelayArrivalRate: Number(data.pricingRelayArrivalRate || 0.1),
+        pricingRoundTo: Number(data.pricingRoundTo || 10),
+      });
+    } catch {
+      // keep defaults
+    }
+  };
+
   const calculatePrice = () => {
-    const formatMultiplier = PARCEL_FORMATS.find((f) => f.id === formData.format)?.multiplier ?? 1;
     const weightKg = Number(formData.weight || 0);
-    const distanceKm = Number(formData.distanceKm || 0);
+    const distanceKm = estimateDistanceKmByWilayas(formData.villeDepart, formData.villeArrivee);
 
     if (!Number.isFinite(distanceKm) || distanceKm <= 0 || !Number.isFinite(weightKg) || weightKg < 0) {
       setCalculatedPrice(null);
@@ -342,21 +368,21 @@ function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart }: { us
     const dynamic = calculateDynamicParcelPricing({
       weightKg,
       distanceKm,
-      adminFee: 50,
-      ratePerKg: 120,
-      ratePerKm: 2.5,
-      formatMultiplier,
-      relayDepartureCommissionRate: 0.1,
-      relayArrivalCommissionRate: 0.1,
+      adminFee: pricingConfig.pricingAdminFee,
+      ratePerKg: pricingConfig.pricingRatePerKg,
+      ratePerKm: pricingConfig.pricingRatePerKm,
+      formatMultiplier: 1,
+      relayDepartureCommissionRate: pricingConfig.pricingRelayDepartureRate,
+      relayArrivalCommissionRate: pricingConfig.pricingRelayArrivalRate,
       platformMarginRate: 0,
-      roundTo: 10,
+      roundTo: pricingConfig.pricingRoundTo,
     });
 
     setCalculatedPrice(dynamic);
   };
 
   const resetForm = () => {
-    setFormData({ villeDepart: '', villeArrivee: '', distanceKm: '', format: 'PETIT', relaisDepartId: '', relaisArriveeId: '', description: '', weight: '', senderFirstName: '', senderLastName: '', senderPhone: '', recipientFirstName: '', recipientLastName: '', recipientPhone: '' });
+    setFormData({ villeDepart: '', villeArrivee: '', relaisDepartId: '', relaisArriveeId: '', description: '', weight: '', senderFirstName: '', senderLastName: '', senderPhone: '', recipientFirstName: '', recipientLastName: '', recipientPhone: '' });
     setCalculatedPrice(null);
     setCreatedParcel(null);
   };
@@ -367,7 +393,6 @@ function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart }: { us
     const arriveeRelay = relais.find((r: any) => r.id === formData.relaisArriveeId);
     const villeDepart = WILAYAS.find(w => w.id === formData.villeDepart)?.name || formData.villeDepart;
     const villeArrivee = WILAYAS.find(w => w.id === formData.villeArrivee)?.name || formData.villeArrivee;
-    const format = PARCEL_FORMATS.find(f => f.id === formData.format);
     const dateCreation = new Date().toLocaleDateString('fr-DZ', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
     const html = `<!DOCTYPE html>
@@ -466,7 +491,6 @@ function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart }: { us
       <div class="qr-label">Scanner au relais</div>
     </div>` : '<div></div>'}
     <div class="meta-block">
-      <p><span class="meta-bold">Format :</span> ${format?.label || formData.format}${format ? ` (${format.dimensions})` : ''}</p>
       ${formData.weight ? `<p><span class="meta-bold">Poids :</span> ${formData.weight} kg</p>` : ''}
       ${formData.description ? `<p><span class="meta-bold">Contenu :</span> ${formData.description}</p>` : ''}
       <p><span class="meta-bold">Date :</span> ${dateCreation}</p>
@@ -500,9 +524,7 @@ function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart }: { us
         createdAt: created.createdAt || new Date().toISOString(),
         villeDepart: formData.villeDepart,
         villeArrivee: formData.villeArrivee,
-        format: formData.format,
         weight: formData.weight,
-        distanceKm: formData.distanceKm,
         description: formData.description,
         senderFirstName: formData.senderFirstName,
         senderLastName: formData.senderLastName,
@@ -537,10 +559,8 @@ function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart }: { us
           relaisArriveeId: formData.relaisArriveeId,
           villeDepart: formData.villeDepart,
           villeArrivee: formData.villeArrivee,
-          format: formData.format,
           description: formData.description,
           weight: formData.weight ? parseFloat(formData.weight) : null,
-          distanceKm: formData.distanceKm ? parseFloat(formData.distanceKm) : null,
           senderFirstName: formData.senderFirstName,
           senderLastName: formData.senderLastName,
           senderPhone: formData.senderPhone,
@@ -742,37 +762,20 @@ function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart }: { us
                 <span className="w-6 h-6 rounded-full bg-emerald-600 text-white text-sm flex items-center justify-center">3</span>
                 Détails du colis
               </h3>
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label>Format</Label>
-                  <Select value={formData.format} onValueChange={(v) => setFormData({ ...formData, format: v })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {PARCEL_FORMATS.map(f => (
-                        <SelectItem key={f.id} value={f.id}>
-                          {f.label} ({f.dimensions})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Poids (kg) - Optionnel</Label>
-                  <Input type="number" step="0.1" value={formData.weight} onChange={(e) => setFormData({ ...formData, weight: e.target.value })} placeholder="Ex: 2.5" />
-                </div>
-              </div>
               <div className="space-y-2">
-                <Label>Distance (km)</Label>
-                <Input
-                  type="number"
-                  min="1"
-                  step="1"
-                  value={formData.distanceKm}
-                  onChange={(e) => setFormData({ ...formData, distanceKm: e.target.value })}
-                  placeholder="Ex: 420"
-                  required
-                />
+                <Label>Poids (kg)</Label>
+                <Input type="number" min="0.1" step="0.1" value={formData.weight} onChange={(e) => setFormData({ ...formData, weight: e.target.value })} placeholder="Ex: 2.5" required />
               </div>
+              {formData.villeDepart && formData.villeArrivee && (
+                <p className="text-xs text-slate-500">
+                  Distance estimée automatiquement: {estimateDistanceKmByWilayas(formData.villeDepart, formData.villeArrivee)} km
+                </p>
+              )}
+              {calculatedPrice && (
+                <p className="text-sm font-semibold text-emerald-700">
+                  Montant estimé: {calculatedPrice.clientPrice} DA
+                </p>
+              )}
               <div className="space-y-2">
                 <Label>Description</Label>
                 <Input value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} placeholder="Description du contenu (optionnel)" />
@@ -870,6 +873,7 @@ function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart }: { us
                 isLoading ||
                 !formData.relaisDepartId ||
                 !formData.relaisArriveeId ||
+                !formData.weight ||
                 !formData.senderFirstName ||
                 !formData.senderLastName ||
                 !formData.senderPhone ||
@@ -1119,8 +1123,8 @@ function PaymentTab({ userId }: { userId: string }) {
                         <p className="font-mono font-bold text-sm">{parcel.trackingNumber}</p>
                       </div>
                       <div>
-                        <p className="text-sm text-muted-foreground">Format</p>
-                        <p className="font-semibold">{parcel.format}</p>
+                        <p className="text-sm text-muted-foreground">Poids</p>
+                        <p className="font-semibold">{parcel.weight ? `${parcel.weight} kg` : '—'}</p>
                       </div>
                       <div>
                         <p className="text-sm text-muted-foreground">Itinéraire</p>
@@ -1215,8 +1219,6 @@ function ParcelHistory({ userId, onTrack }: { userId: string; onTrack: (tn: stri
       const villeArriveeId = saved.villeArrivee || parcel.villeArrivee;
       const villeDepart = WILAYAS.find(w => w.id === villeDepartId)?.name || villeDepartId || '—';
       const villeArrivee = WILAYAS.find(w => w.id === villeArriveeId)?.name || villeArriveeId || '—';
-      const formatId = saved.format || parcel.format;
-      const format = PARCEL_FORMATS.find(f => f.id === formatId);
       const dateCreation = new Date(saved.createdAt || parcel.createdAt || new Date().toISOString()).toLocaleDateString('fr-DZ', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
       const senderFirstName = saved.senderFirstName || '';
@@ -1325,7 +1327,6 @@ function ParcelHistory({ userId, onTrack }: { userId: string; onTrack: (tn: stri
       <div class="qr-label">Scanner au relais</div>
     </div>` : '<div></div>'}
     <div class="meta-block">
-      <p><span class="meta-bold">Format :</span> ${format?.label || formatId || ''}${format ? ` (${format.dimensions})` : ''}</p>
       ${(saved.weight || parcel.weight) ? `<p><span class="meta-bold">Poids :</span> ${saved.weight || parcel.weight} kg</p>` : ''}
       ${(saved.description || parcel.description) ? `<p><span class="meta-bold">Contenu :</span> ${saved.description || parcel.description}</p>` : ''}
       <p><span class="meta-bold">Date :</span> ${dateCreation}</p>
@@ -1383,7 +1384,7 @@ function ParcelHistory({ userId, onTrack }: { userId: string; onTrack: (tn: stri
               <TableRow>
                 <TableHead>N° Suivi</TableHead>
                 <TableHead>Trajet</TableHead>
-                <TableHead>Format</TableHead>
+                <TableHead>Poids</TableHead>
                 <TableHead>Prix</TableHead>
                 <TableHead>Statut</TableHead>
                 <TableHead>Date</TableHead>
@@ -1397,7 +1398,7 @@ function ParcelHistory({ userId, onTrack }: { userId: string; onTrack: (tn: stri
                   <TableCell className="text-sm">
                     {WILAYAS.find(w => w.id === c.villeDepart)?.name} → {WILAYAS.find(w => w.id === c.villeArrivee)?.name}
                   </TableCell>
-                  <TableCell>{PARCEL_FORMATS.find(f => f.id === c.format)?.label}</TableCell>
+                  <TableCell>{c.weight ? `${c.weight} kg` : '—'}</TableCell>
                   <TableCell className="font-semibold">{c.prixClient} DA</TableCell>
                   <TableCell>
                     <Badge className={`${PARCEL_STATUS.find(s => s.id === c.status)?.color} text-white text-xs`}>

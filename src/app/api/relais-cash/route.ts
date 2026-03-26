@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
       }),
       db.relaisCash.findMany({
         where: { relaisId },
-        include: { colis: { select: { trackingNumber: true, format: true, prixClient: true, commissionRelais: true, status: true } } },
+        include: { colis: { select: { trackingNumber: true, weight: true, prixClient: true, commissionRelais: true, status: true } } },
         orderBy: { createdAt: 'desc' },
         take: 100,
       }),

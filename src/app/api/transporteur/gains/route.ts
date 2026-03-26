@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
             trackingNumber: true,
             villeDepart: true,
             villeArrivee: true,
-            format: true,
+            weight: true,
             prixClient: true,
             netTransporteur: true,
             commissionPlateforme: true,

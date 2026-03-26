@@ -74,7 +74,6 @@ export async function GET(request: NextRequest) {
         "relaisArriveeId" TEXT NOT NULL,
         "villeDepart" TEXT NOT NULL,
         "villeArrivee" TEXT NOT NULL,
-        "format" TEXT NOT NULL,
         "weight" FLOAT,
         "description" TEXT,
         "prixClient" FLOAT NOT NULL,

@@ -133,8 +133,8 @@ export function TrackingMap({ initialTracking = '' }: TrackingMapProps) {
                     <Package className="h-5 w-5 text-blue-600" />
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">Format</p>
-                    <p className="font-medium">{parcel.format}</p>
+                    <p className="text-sm text-muted-foreground">Poids</p>
+                    <p className="font-medium">{parcel.weight ? `${parcel.weight} kg` : 'Non renseigné'}</p>
                   </div>
                 </div>
 
