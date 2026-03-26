@@ -17,7 +17,11 @@ export async function GET(
       return NextResponse.json({ error: 'Ligne not found' }, { status: 404 });
     }
 
-    return NextResponse.json(ligne);
+    return NextResponse.json({
+      ...ligne,
+      tarifPoids: ligne.tarifPetit,
+      tarifKm: ligne.tarifMoyen,
+    });
   } catch (error) {
     console.error('Error fetching ligne:', error);
     return NextResponse.json({ error: 'Failed to fetch ligne' }, { status: 500 });
@@ -38,6 +42,8 @@ export async function PUT(
       villeArrivee, 
       tarifPetit, 
       tarifMoyen, 
+      tarifPoids,
+      tarifKm,
       tarifGros, 
       isActive 
     } = body;
@@ -72,11 +78,14 @@ export async function PUT(
       );
     }
 
+    const nextTarifPoids = tarifPoids ?? tarifPetit;
+    const nextTarifKm = tarifKm ?? tarifMoyen;
+
     const updateData: any = {};
     if (villeDepart !== undefined) updateData.villeDepart = nextDepart;
     if (villeArrivee !== undefined) updateData.villeArrivee = nextArrivee;
-    if (tarifPetit !== undefined) updateData.tarifPetit = tarifPetit;
-    if (tarifMoyen !== undefined) updateData.tarifMoyen = tarifMoyen;
+    if (nextTarifPoids !== undefined) updateData.tarifPetit = Number(nextTarifPoids);
+    if (nextTarifKm !== undefined) updateData.tarifMoyen = Number(nextTarifKm);
     if (tarifGros !== undefined) updateData.tarifGros = tarifGros;
     if (isActive !== undefined) updateData.isActive = isActive;
 
@@ -85,7 +94,11 @@ export async function PUT(
       data: updateData,
     });
 
-    return NextResponse.json(ligne);
+    return NextResponse.json({
+      ...ligne,
+      tarifPoids: ligne.tarifPetit,
+      tarifKm: ligne.tarifMoyen,
+    });
   } catch (error) {
     console.error('Error updating ligne:', error);
     return NextResponse.json({ 

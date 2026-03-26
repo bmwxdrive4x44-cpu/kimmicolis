@@ -16,7 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { WILAYAS, PARCEL_STATUS, generateTrackingNumber, generateQRData } from '@/lib/constants';
-import { calculateDynamicParcelPricing, estimateDistanceKmByWilayas } from '@/lib/pricing';
+import { calculateDynamicParcelPricing, estimateSafeDistanceKmByWilayas } from '@/lib/pricing';
 import { Package, Plus, History, MapPin, Loader2, CreditCard, Search, Truck, CheckCircle, Clock, QrCode, Printer, User, Pencil, Save, AlertTriangle, XCircle, MessageSquare, Smartphone, Banknote } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import Image from 'next/image';
@@ -358,9 +358,9 @@ function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart }: { us
 
   const calculatePrice = () => {
     const weightKg = Number(formData.weight || 0);
-    const distanceKm = estimateDistanceKmByWilayas(formData.villeDepart, formData.villeArrivee);
+    const distanceKm = estimateSafeDistanceKmByWilayas(formData.villeDepart, formData.villeArrivee);
 
-    if (!Number.isFinite(distanceKm) || distanceKm <= 0 || !Number.isFinite(weightKg) || weightKg < 0) {
+    if (!Number.isFinite(distanceKm) || distanceKm <= 0 || !Number.isFinite(weightKg) || weightKg <= 0) {
       setCalculatedPrice(null);
       return;
     }
@@ -593,6 +593,12 @@ function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart }: { us
 
   const relaisDepart = relais.filter(r => r.ville === formData.villeDepart);
   const relaisArrivee = relais.filter(r => r.ville === formData.villeArrivee);
+  const selectedRelayDepart = relais.find((r: any) => r.id === formData.relaisDepartId);
+  const selectedRelayArrivee = relais.find((r: any) => r.id === formData.relaisArriveeId);
+  const estimatedDistanceKm =
+    formData.villeDepart && formData.villeArrivee
+      ? estimateSafeDistanceKmByWilayas(formData.villeDepart, formData.villeArrivee)
+      : null;
 
   // — Success card after creation
   if (createdParcel) {
@@ -663,14 +669,15 @@ function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart }: { us
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Créer un nouveau colis</CardTitle>
-        <CardDescription>Remplissez les informations pour envoyer votre colis</CardDescription>
+    <div className="mx-auto w-full max-w-4xl">
+    <Card className="border-slate-200 shadow-sm">
+      <CardHeader className="pb-4 text-center">
+        <CardTitle className="text-2xl">Créer un nouveau colis</CardTitle>
+        <CardDescription className="mx-auto max-w-2xl">Un formulaire plus simple, centré sur l'essentiel.</CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-6 px-4 sm:px-6">
         {/* Barre de progression */}
-        <div className="flex items-center gap-2 mb-6 text-sm">
+        <div className="mx-auto flex max-w-2xl items-center gap-2 text-sm">
           <div className={`flex items-center gap-1.5 ${formData.villeDepart && formData.villeArrivee ? 'text-emerald-600 font-medium' : 'text-slate-400'}`}>
             <span className={`w-6 h-6 rounded-full text-xs flex items-center justify-center ${formData.villeDepart && formData.villeArrivee ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-500'}`}>1</span>
             Itinéraire
@@ -687,27 +694,27 @@ function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart }: { us
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="mx-auto max-w-3xl space-y-5">
           {/* Step 1: Route */}
-          <div className="space-y-4">
-            <h3 className="font-semibold flex items-center gap-2">
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
+            <h3 className="mb-4 flex items-center gap-2 font-semibold">
               <span className="w-6 h-6 rounded-full bg-emerald-600 text-white text-sm flex items-center justify-center">1</span>
               Itinéraire
             </h3>
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-3 md:grid-cols-2">
               <div className="space-y-2">
-                <Label>Ville de départ</Label>
+                <Label className="text-sm">Départ</Label>
                 <Select value={formData.villeDepart} onValueChange={(v) => setFormData({ ...formData, villeDepart: v, relaisDepartId: '' })}>
-                  <SelectTrigger><SelectValue placeholder="Sélectionner" /></SelectTrigger>
+                  <SelectTrigger className="h-10"><SelectValue placeholder="Sélectionner" /></SelectTrigger>
                   <SelectContent>
                     {WILAYAS.map(w => <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Ville d'arrivée</Label>
+                <Label className="text-sm">Arrivée</Label>
                 <Select value={formData.villeArrivee} onValueChange={(v) => setFormData({ ...formData, villeArrivee: v, relaisArriveeId: '' })}>
-                  <SelectTrigger><SelectValue placeholder="Sélectionner" /></SelectTrigger>
+                  <SelectTrigger className="h-10"><SelectValue placeholder="Sélectionner" /></SelectTrigger>
                   <SelectContent>
                     {WILAYAS.map(w => <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>)}
                   </SelectContent>
@@ -718,37 +725,51 @@ function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart }: { us
 
           {/* Step 2: Relay Points */}
           {formData.villeDepart && formData.villeArrivee && (
-            <div className="space-y-4">
-              <h3 className="font-semibold flex items-center gap-2">
+            <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
+              <h3 className="mb-4 flex items-center gap-2 font-semibold">
                 <span className="w-6 h-6 rounded-full bg-emerald-600 text-white text-sm flex items-center justify-center">2</span>
                 Points relais
               </h3>
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label>Point relais départ</Label>
+              <div className="grid gap-3 lg:grid-cols-2">
+                <div className="min-w-0 space-y-2">
+                  <Label className="text-sm">Relais départ</Label>
                   <Select value={formData.relaisDepartId} onValueChange={(v) => setFormData({ ...formData, relaisDepartId: v })}>
-                    <SelectTrigger><SelectValue placeholder="Sélectionner" /></SelectTrigger>
+                    <SelectTrigger className="h-10 w-full min-w-0"><SelectValue placeholder="Sélectionner" /></SelectTrigger>
                     <SelectContent>
                       {relaisDepart.map(r => (
-                        <SelectItem key={r.id} value={r.id}>{r.commerceName} - {r.address} ({formatRelayHours(r)})</SelectItem>
+                        <SelectItem key={r.id} value={r.id}>{r.commerceName}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
+                  {selectedRelayDepart && (
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                      <p className="truncate font-medium text-slate-800">{selectedRelayDepart.commerceName}</p>
+                      <p className="mt-1 break-words">{selectedRelayDepart.address}</p>
+                      <p className="mt-1 text-slate-500">Horaires : {formatRelayHours(selectedRelayDepart)}</p>
+                    </div>
+                  )}
                   <p className="text-xs text-slate-600 dark:text-slate-400">
                     Dépôt obligatoire dans ce relais uniquement (aucun dépôt possible dans un autre relais, même ville).
                   </p>
                   {relaisDepart.length === 0 && <p className="text-sm text-orange-500">Aucun relais disponible dans cette ville</p>}
                 </div>
-                <div className="space-y-2">
-                  <Label>Point relais destination</Label>
+                <div className="min-w-0 space-y-2">
+                  <Label className="text-sm">Relais arrivée</Label>
                   <Select value={formData.relaisArriveeId} onValueChange={(v) => setFormData({ ...formData, relaisArriveeId: v })}>
-                    <SelectTrigger><SelectValue placeholder="Sélectionner" /></SelectTrigger>
+                    <SelectTrigger className="h-10 w-full min-w-0"><SelectValue placeholder="Sélectionner" /></SelectTrigger>
                     <SelectContent>
                       {relaisArrivee.map(r => (
-                        <SelectItem key={r.id} value={r.id}>{r.commerceName} - {r.address} ({formatRelayHours(r)})</SelectItem>
+                        <SelectItem key={r.id} value={r.id}>{r.commerceName}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
+                  {selectedRelayArrivee && (
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                      <p className="truncate font-medium text-slate-800">{selectedRelayArrivee.commerceName}</p>
+                      <p className="mt-1 break-words">{selectedRelayArrivee.address}</p>
+                      <p className="mt-1 text-slate-500">Horaires : {formatRelayHours(selectedRelayArrivee)}</p>
+                    </div>
+                  )}
                   {relaisArrivee.length === 0 && <p className="text-sm text-orange-500">Aucun relais disponible dans cette ville</p>}
                 </div>
               </div>
@@ -757,55 +778,61 @@ function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart }: { us
 
           {/* Step 3: Package Details */}
           {formData.relaisDepartId && formData.relaisArriveeId && (
-            <div className="space-y-4">
-              <h3 className="font-semibold flex items-center gap-2">
+            <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
+              <h3 className="mb-4 flex items-center gap-2 font-semibold">
                 <span className="w-6 h-6 rounded-full bg-emerald-600 text-white text-sm flex items-center justify-center">3</span>
                 Détails du colis
               </h3>
-              <div className="space-y-2">
-                <Label>Poids (kg)</Label>
-                <Input type="number" min="0.1" step="0.1" value={formData.weight} onChange={(e) => setFormData({ ...formData, weight: e.target.value })} placeholder="Ex: 2.5" required />
+              <div className="grid gap-3 md:grid-cols-[180px_1fr] md:items-end">
+                <div className="space-y-2">
+                  <Label className="text-sm">Poids (kg)</Label>
+                  <Input className="h-10" type="number" min="0.1" step="0.1" value={formData.weight} onChange={(e) => setFormData({ ...formData, weight: e.target.value })} placeholder="2.5" required />
+                </div>
+                {calculatedPrice && (
+                  <div className="rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+                    <p className="text-xs uppercase tracking-wide text-emerald-700">Montant estimé</p>
+                    <p className="text-2xl font-bold">{calculatedPrice.clientPrice} DA</p>
+                  </div>
+                )}
               </div>
-              {formData.villeDepart && formData.villeArrivee && (
+              {estimatedDistanceKm && (
                 <p className="text-xs text-slate-500">
-                  Distance estimée automatiquement: {estimateDistanceKmByWilayas(formData.villeDepart, formData.villeArrivee)} km
-                </p>
-              )}
-              {calculatedPrice && (
-                <p className="text-sm font-semibold text-emerald-700">
-                  Montant estimé: {calculatedPrice.clientPrice} DA
+                  Distance estimée automatiquement: {estimatedDistanceKm} km
                 </p>
               )}
               <div className="space-y-2">
-                <Label>Description</Label>
-                <Input value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} placeholder="Description du contenu (optionnel)" />
+                <Label className="text-sm">Description</Label>
+                <Input className="h-10" value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} placeholder="Contenu du colis (optionnel)" />
               </div>
 
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="rounded-xl bg-slate-50 p-4">
+                <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Coordonnées</p>
+                <div className="grid gap-3 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label>Nom expéditeur</Label>
-                  <Input value={formData.senderLastName} onChange={(e) => setFormData({ ...formData, senderLastName: e.target.value })} />
+                  <Label className="text-sm">Nom expéditeur</Label>
+                  <Input className="h-10" value={formData.senderLastName} onChange={(e) => setFormData({ ...formData, senderLastName: e.target.value })} />
                 </div>
                 <div className="space-y-2">
-                  <Label>Prénom expéditeur</Label>
-                  <Input value={formData.senderFirstName} onChange={(e) => setFormData({ ...formData, senderFirstName: e.target.value })} />
+                  <Label className="text-sm">Prénom expéditeur</Label>
+                  <Input className="h-10" value={formData.senderFirstName} onChange={(e) => setFormData({ ...formData, senderFirstName: e.target.value })} />
                 </div>
                 <div className="space-y-2">
-                  <Label>Téléphone expéditeur</Label>
-                  <Input value={formData.senderPhone} onChange={(e) => setFormData({ ...formData, senderPhone: e.target.value })} placeholder="Ex: 0550123456" />
+                  <Label className="text-sm">Tél. expéditeur</Label>
+                  <Input className="h-10" value={formData.senderPhone} onChange={(e) => setFormData({ ...formData, senderPhone: e.target.value })} placeholder="0550123456" />
                 </div>
                 <div className="space-y-2">
-                  <Label>Nom destinataire</Label>
-                  <Input value={formData.recipientLastName} onChange={(e) => setFormData({ ...formData, recipientLastName: e.target.value })} />
+                  <Label className="text-sm">Nom destinataire</Label>
+                  <Input className="h-10" value={formData.recipientLastName} onChange={(e) => setFormData({ ...formData, recipientLastName: e.target.value })} />
                 </div>
                 <div className="space-y-2">
-                  <Label>Prénom destinataire</Label>
-                  <Input value={formData.recipientFirstName} onChange={(e) => setFormData({ ...formData, recipientFirstName: e.target.value })} />
+                  <Label className="text-sm">Prénom destinataire</Label>
+                  <Input className="h-10" value={formData.recipientFirstName} onChange={(e) => setFormData({ ...formData, recipientFirstName: e.target.value })} />
                 </div>
                 <div className="space-y-2">
-                  <Label>Téléphone destinataire</Label>
-                  <Input value={formData.recipientPhone} onChange={(e) => setFormData({ ...formData, recipientPhone: e.target.value })} placeholder="Ex: 0660123456" />
+                  <Label className="text-sm">Tél. destinataire</Label>
+                  <Input className="h-10" value={formData.recipientPhone} onChange={(e) => setFormData({ ...formData, recipientPhone: e.target.value })} placeholder="0660123456" />
                 </div>
+              </div>
               </div>
 
 
@@ -814,45 +841,21 @@ function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart }: { us
 
           {/* Price Summary */}
           {calculatedPrice && (
-            <Card className="bg-slate-50 dark:bg-slate-800">
+            <Card className="mx-auto max-w-2xl border-emerald-100 bg-slate-50 dark:bg-slate-800">
               <CardContent className="py-4">
-                <h4 className="font-semibold mb-3">Récapitulatif prix</h4>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span>Coût transport</span>
-                    <span>{calculatedPrice.transportCost} DA</span>
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <h4 className="font-semibold">Montant à payer</h4>
+                    <p className="text-xs text-slate-500">Le montant final sera confirmé au dépôt du colis.</p>
                   </div>
-                  <div className="flex justify-between">
-                    <span>Commission relais départ</span>
-                    <span>{calculatedPrice.relayDepartureCommission} DA</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Commission relais arrivée</span>
-                    <span>{calculatedPrice.relayArrivalCommission} DA</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Commission plateforme</span>
-                    <span>{calculatedPrice.platformMargin} DA</span>
-                  </div>
-                  <div className="flex justify-between text-slate-600">
-                    <span>Coefficient distance</span>
-                    <span>x{calculatedPrice.distanceCoefficient}</span>
-                  </div>
-                  <div className="flex justify-between font-bold text-lg pt-2 border-t">
-                    <span>Total à payer</span>
-                    <span className="text-emerald-600">{calculatedPrice.clientPrice} DA</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Code de retrait</span>
-                    <span>{formData.withdrawalCode || 'Généré automatiquement'}</span>
-                  </div>
+                  <p className="text-2xl font-bold text-emerald-600">{calculatedPrice.clientPrice} DA</p>
                 </div>
               </CardContent>
             </Card>
           )}
 
           {formData.relaisDepartId && (
-            <div className="rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-950 dark:border-amber-700 p-3 text-sm">
+            <div className="mx-auto max-w-2xl rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm dark:border-amber-700 dark:bg-amber-950">
               <p className="font-semibold text-amber-800 dark:text-amber-300">
                 ⚠️ Relais de dépôt obligatoire
               </p>
@@ -866,7 +869,7 @@ function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart }: { us
             </div>
           )}
 
-          <div className="flex gap-4">
+          <div className="mx-auto flex max-w-md gap-3">
             <Button
               type="submit"
               disabled={
@@ -881,7 +884,7 @@ function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart }: { us
                 !formData.recipientLastName ||
                 !formData.recipientPhone
               }
-              className="bg-emerald-600 hover:bg-emerald-700"
+              className="h-11 flex-1 bg-emerald-600 hover:bg-emerald-700"
             >
               {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Package className="h-4 w-4 mr-2" />}
               Créer le colis
@@ -890,6 +893,7 @@ function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart }: { us
         </form>
       </CardContent>
     </Card>
+    </div>
   );
 }
 
@@ -1148,8 +1152,13 @@ function PaymentTab({ userId }: { userId: string }) {
                     </div>
                     <div className="bg-white dark:bg-slate-900 rounded p-3 mb-4 border border-blue-100 dark:border-blue-900">
                       <p className="text-sm text-slate-700 dark:text-slate-300">
-                        📍 <span className="font-semibold">Relais de départ:</span> {relaisDept?.commerceName || 'Non disponible'} — {relaisDept?.address}
+                        📍 <span className="font-semibold">Relais de départ:</span> {relaisDept?.commerceName || 'Non disponible'}
                       </p>
+                      {relaisDept?.address && (
+                        <p className="mt-1 text-sm text-slate-600 dark:text-slate-400 break-words">
+                          {relaisDept.address}
+                        </p>
+                      )}
                     </div>
                     <div className="grid grid-cols-2 gap-2">
                       <Button

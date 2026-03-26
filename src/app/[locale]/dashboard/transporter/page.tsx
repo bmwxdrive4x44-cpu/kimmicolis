@@ -782,16 +782,18 @@ function ScanTab() {
 
               {/* Relais */}
               {(parcel.relaisDepart || parcel.relaisArrivee) && (
-                <div className="grid grid-cols-2 gap-3 text-xs">
-                  <div className="p-2 bg-white dark:bg-slate-700 rounded border">
+                <div className="grid gap-3 text-xs lg:grid-cols-2">
+                  <div className="min-w-0 p-2 bg-white dark:bg-slate-700 rounded border">
                     <p className="font-semibold text-slate-700 dark:text-slate-200 mb-0.5">Relais départ</p>
-                    <p>{parcel.relaisDepart?.commerceName}</p>
-                    <p className="text-slate-400">{parcel.relaisDepart?.ville} · {parcel.relaisDepart?.address}</p>
+                    <p className="truncate">{parcel.relaisDepart?.commerceName}</p>
+                    <p className="text-slate-400">{parcel.relaisDepart?.ville}</p>
+                    <p className="text-slate-400 break-words">{parcel.relaisDepart?.address}</p>
                   </div>
-                  <div className="p-2 bg-white dark:bg-slate-700 rounded border">
+                  <div className="min-w-0 p-2 bg-white dark:bg-slate-700 rounded border">
                     <p className="font-semibold text-slate-700 dark:text-slate-200 mb-0.5">Relais arrivée</p>
-                    <p>{parcel.relaisArrivee?.commerceName}</p>
-                    <p className="text-slate-400">{parcel.relaisArrivee?.ville} · {parcel.relaisArrivee?.address}</p>
+                    <p className="truncate">{parcel.relaisArrivee?.commerceName}</p>
+                    <p className="text-slate-400">{parcel.relaisArrivee?.ville}</p>
+                    <p className="text-slate-400 break-words">{parcel.relaisArrivee?.address}</p>
                   </div>
                 </div>
               )}

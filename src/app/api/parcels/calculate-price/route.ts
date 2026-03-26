@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { calculateDynamicParcelPricing, estimateDistanceKmByWilayas } from '@/lib/pricing';
+import { calculateDynamicParcelPricing, estimateSafeDistanceKmByWilayas } from '@/lib/pricing';
 
 /**
  * POST /api/parcels/calculate-price
@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
       return Number.isFinite(value) ? value : fallback;
     };
 
-    const estimatedDistanceKm = estimateDistanceKmByWilayas(villeDepart, villeArrivee);
+    const estimatedDistanceKm = estimateSafeDistanceKmByWilayas(villeDepart, villeArrivee);
     const pricing = calculateDynamicParcelPricing({
       weightKg: parsedWeight,
       distanceKm: estimatedDistanceKm,

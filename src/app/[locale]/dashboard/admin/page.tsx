@@ -1143,7 +1143,7 @@ function RelaysTab() {
                             <Badge className="bg-red-100 text-red-700">Sanctions actives: {relay.activeSanctionsCount}</Badge>
                           )}
                         </div>
-                        <p className="text-sm text-slate-600 dark:text-slate-400">{relay.address}, {WILAYAS.find(w => w.id === relay.ville)?.name || relay.ville}</p>
+                        <p className="text-sm text-slate-600 dark:text-slate-400 break-words">{relay.address}, {WILAYAS.find(w => w.id === relay.ville)?.name || relay.ville}</p>
                         <p className="text-xs text-slate-500">{relay.contactName || '-'} · {relay.phone || '-'} · {relay.email || '-'}</p>
                         {relay.alerts?.length > 0 && (
                           <div className="flex flex-wrap gap-2 pt-1">
@@ -1491,7 +1491,7 @@ function LinesTab() {
   const [deleteLigneId, setDeleteLigneId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState({
-    villeDepart: '', villeArrivee: '', tarifPetit: '500', tarifMoyen: '750', tarifGros: '1000',
+    villeDepart: '', villeArrivee: '', tarifPoids: '120', tarifKm: '2.5',
   });
 
   useEffect(() => { fetchLignes(); }, []);
@@ -1525,15 +1525,15 @@ function LinesTab() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ...formData,
-          tarifPetit: parseFloat(formData.tarifPetit),
-          tarifMoyen: parseFloat(formData.tarifMoyen),
-          tarifGros: parseFloat(formData.tarifGros),
+          villeDepart: formData.villeDepart,
+          villeArrivee: formData.villeArrivee,
+          tarifPoids: parseFloat(formData.tarifPoids),
+          tarifKm: parseFloat(formData.tarifKm),
         }),
       });
       toast({ title: 'Ligne créée' });
       fetchLignes();
-      setFormData({ villeDepart: '', villeArrivee: '', tarifPetit: '500', tarifMoyen: '750', tarifGros: '1000' });
+      setFormData({ villeDepart: '', villeArrivee: '', tarifPoids: '120', tarifKm: '2.5' });
     } catch {
       toast({ title: 'Erreur', variant: 'destructive' });
     } finally {
@@ -1551,9 +1551,8 @@ function LinesTab() {
         body: JSON.stringify({
           villeDepart: editLigne.villeDepart,
           villeArrivee: editLigne.villeArrivee,
-          tarifPetit: parseFloat(editLigne.tarifPetit),
-          tarifMoyen: parseFloat(editLigne.tarifMoyen),
-          tarifGros: parseFloat(editLigne.tarifGros),
+          tarifPoids: parseFloat(editLigne.tarifPoids ?? editLigne.tarifPetit),
+          tarifKm: parseFloat(editLigne.tarifKm ?? editLigne.tarifMoyen),
           isActive: editLigne.isActive,
         }),
       });
@@ -1625,16 +1624,12 @@ function LinesTab() {
               </div>
               <div className="grid gap-4 md:grid-cols-3">
                 <div className="space-y-2">
-                  <Label>Tarif Petit (DA)</Label>
-                  <Input type="number" value={formData.tarifPetit} onChange={(e) => setFormData({ ...formData, tarifPetit: e.target.value })} />
+                  <Label>Tarif par poids (DA/kg)</Label>
+                  <Input type="number" step="0.1" value={formData.tarifPoids} onChange={(e) => setFormData({ ...formData, tarifPoids: e.target.value })} />
                 </div>
                 <div className="space-y-2">
-                  <Label>Tarif Moyen (DA)</Label>
-                  <Input type="number" value={formData.tarifMoyen} onChange={(e) => setFormData({ ...formData, tarifMoyen: e.target.value })} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Tarif Gros (DA)</Label>
-                  <Input type="number" value={formData.tarifGros} onChange={(e) => setFormData({ ...formData, tarifGros: e.target.value })} />
+                  <Label>Tarif par distance (DA/km)</Label>
+                  <Input type="number" step="0.1" value={formData.tarifKm} onChange={(e) => setFormData({ ...formData, tarifKm: e.target.value })} />
                 </div>
               </div>
               <Button type="submit" disabled={isCreating} className="bg-emerald-600 hover:bg-emerald-700">
@@ -1658,9 +1653,8 @@ function LinesTab() {
                   <TableRow>
                     <TableHead>Départ</TableHead>
                     <TableHead>Arrivée</TableHead>
-                    <TableHead>Petit</TableHead>
-                    <TableHead>Moyen</TableHead>
-                    <TableHead>Gros</TableHead>
+                    <TableHead>Poids (DA/kg)</TableHead>
+                    <TableHead>Distance (DA/km)</TableHead>
                     <TableHead>Statut</TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow>
@@ -1670,9 +1664,8 @@ function LinesTab() {
                     <TableRow key={ligne.id}>
                       <TableCell>{WILAYAS.find(w => w.id === ligne.villeDepart)?.name}</TableCell>
                       <TableCell>{WILAYAS.find(w => w.id === ligne.villeArrivee)?.name}</TableCell>
-                      <TableCell>{ligne.tarifPetit} DA</TableCell>
-                      <TableCell>{ligne.tarifMoyen} DA</TableCell>
-                      <TableCell>{ligne.tarifGros} DA</TableCell>
+                      <TableCell>{ligne.tarifPoids ?? ligne.tarifPetit} DA</TableCell>
+                      <TableCell>{ligne.tarifKm ?? ligne.tarifMoyen} DA</TableCell>
                       <TableCell>
                         <Badge className={ligne.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}>
                           {ligne.isActive ? 'Actif' : 'Inactif'}
@@ -1725,18 +1718,14 @@ function LinesTab() {
                   </Select>
                 </div>
               </div>
-              <div className="grid gap-4 md:grid-cols-3">
+              <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label>Tarif Petit (DA)</Label>
-                  <Input type="number" value={editLigne.tarifPetit} onChange={(e) => setEditLigne({ ...editLigne, tarifPetit: e.target.value })} />
+                  <Label>Tarif par poids (DA/kg)</Label>
+                  <Input type="number" step="0.1" value={editLigne.tarifPoids ?? editLigne.tarifPetit} onChange={(e) => setEditLigne({ ...editLigne, tarifPoids: e.target.value })} />
                 </div>
                 <div className="space-y-2">
-                  <Label>Tarif Moyen (DA)</Label>
-                  <Input type="number" value={editLigne.tarifMoyen} onChange={(e) => setEditLigne({ ...editLigne, tarifMoyen: e.target.value })} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Tarif Gros (DA)</Label>
-                  <Input type="number" value={editLigne.tarifGros} onChange={(e) => setEditLigne({ ...editLigne, tarifGros: e.target.value })} />
+                  <Label>Tarif par distance (DA/km)</Label>
+                  <Input type="number" step="0.1" value={editLigne.tarifKm ?? editLigne.tarifMoyen} onChange={(e) => setEditLigne({ ...editLigne, tarifKm: e.target.value })} />
                 </div>
               </div>
               <div className="flex items-center gap-2">

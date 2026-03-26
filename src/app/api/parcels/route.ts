@@ -4,7 +4,7 @@ import { generateTrackingNumber, generateQRData } from '@/lib/constants';
 import { checkRateLimit, RATE_LIMIT_PRESETS } from '@/lib/ratelimit';
 import { requireRole, verifyJWT } from '@/lib/rbac';
 import { generateQRCodeImage, buildQRCodePayload } from '@/lib/qrcode';
-import { calculateDynamicParcelPricing, estimateDistanceKmByWilayas } from '@/lib/pricing';
+import { calculateDynamicParcelPricing, estimateSafeDistanceKmByWilayas } from '@/lib/pricing';
 import { createHash } from 'crypto';
 
 function normalizePhone(value: string): string {
@@ -260,7 +260,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Calculate prices: distance auto-estimated from departure/arrival wilayas
-    const estimatedDistanceKm = estimateDistanceKmByWilayas(villeDepart, villeArrivee);
+    const estimatedDistanceKm = estimateSafeDistanceKmByWilayas(villeDepart, villeArrivee);
     const pricingConfig = await getPricingConfig();
     const dynamic = calculateDynamicParcelPricing({
       weightKg: parsedWeight,

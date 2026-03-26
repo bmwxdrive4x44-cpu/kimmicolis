@@ -157,3 +157,9 @@ export function estimateDistanceKmByWilayas(villeDepart: string, villeArrivee: s
   // Majoration simple pour refléter la distance routière vs distance à vol d'oiseau
   return Math.max(10, Math.round(greatCircleKm * 1.2));
 }
+
+export function estimateSafeDistanceKmByWilayas(villeDepart: string, villeArrivee: string, minKm = 10): number {
+  const estimated = estimateDistanceKmByWilayas(villeDepart, villeArrivee);
+  if (!Number.isFinite(estimated)) return minKm;
+  return Math.max(minKm, Math.round(estimated));
+}
