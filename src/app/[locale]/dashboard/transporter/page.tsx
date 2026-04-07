@@ -40,6 +40,29 @@ function getRoleBasedDashboardPath(role: string, locale: string): string {
   }
 }
 
+function asArray<T = any>(value: unknown): T[] {
+  return Array.isArray(value) ? value : [];
+}
+
+function parseStoredStringArray(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item).trim()).filter(Boolean);
+  }
+
+  if (typeof value === 'string' && value.trim()) {
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) {
+        return parsed.map((item) => String(item).trim()).filter(Boolean);
+      }
+    } catch {
+      return [];
+    }
+  }
+
+  return [];
+}
+
 export default function TransporterDashboard() {
   const { data: session, status } = useSession();
   const locale = useLocale();
@@ -111,8 +134,10 @@ export default function TransporterDashboard() {
         fetch(`/api/trajets?transporteurId=${session?.user?.id}`),
         fetch(`/api/missions?transporteurId=${session?.user?.id}`),
       ]);
-      const trajets = await trajetsRes.json();
-      const missions = await missionsRes.json();
+      const trajetsData = await trajetsRes.json().catch(() => null);
+      const missionsData = await missionsRes.json().catch(() => null);
+      const trajets = asArray<any>(trajetsData);
+      const missions = asArray<any>(missionsData);
       
       setStats({
         trajets: trajets.length,
@@ -528,7 +553,8 @@ function TrajetsTab({ userId }: { userId: string }) {
   const fetchTrajets = async () => {
     try {
       const response = await fetch(`/api/trajets?transporteurId=${userId}`);
-      setTrajets(await response.json());
+      const data = await response.json().catch(() => null);
+      setTrajets(asArray<any>(data));
     } catch (error) {
       console.error('Error:', error);
     } finally {
@@ -903,7 +929,8 @@ function MissionsTab({ userId, onRefreshStats }: { userId: string; onRefreshStat
   const fetchMissions = async () => {
     try {
       const response = await fetch(`/api/missions?transporteurId=${userId}`);
-      setMissions(await response.json());
+      const data = await response.json().catch(() => null);
+      setMissions(asArray<any>(data));
     } catch (error) {
       console.error('Error:', error);
     } finally {
@@ -1188,7 +1215,7 @@ function ScanTab({ onRefreshStats }: { onRefreshStats?: () => void }) {
               </div>
 
               {/* Historique tracking */}
-              {parcel.trackingHistory && parcel.trackingHistory.length > 0 && (
+              {Array.isArray(parcel.trackingHistory) && parcel.trackingHistory.length > 0 && (
                 <div>
                   <p className="text-xs font-semibold text-slate-600 dark:text-slate-300 mb-2">Historique</p>
                   <div className="space-y-1">
@@ -1231,15 +1258,15 @@ function WalletTab({ userId }: { userId: string }) {
         fetch(`/api/wallet?transporteurId=${userId}`),
         fetch(`/api/transporteur/gains?transporteurId=${userId}`),
       ]);
-      const walletData = await walletRes.json();
-      const gainsData = await gainsRes.json();
-      setWallet(walletData.wallet);
-      setMissions(gainsData.missions || walletData.missions || []);
-      setMonthly(gainsData.monthly || []);
+      const walletData = await walletRes.json().catch(() => ({}));
+      const gainsData = await gainsRes.json().catch(() => ({}));
+      setWallet(walletData?.wallet ?? null);
+      setMissions(asArray<any>(gainsData?.missions ?? walletData?.missions));
+      setMonthly(asArray<{ month: string; amount: number }>(gainsData?.monthly));
       setGainsInfo({
-        pending: gainsData.wallet?.pending ?? 0,
-        available: gainsData.wallet?.available ?? walletData.wallet?.availableEarnings ?? 0,
-        total: gainsData.wallet?.total ?? 0,
+        pending: gainsData?.wallet?.pending ?? 0,
+        available: gainsData?.wallet?.available ?? walletData?.wallet?.availableEarnings ?? 0,
+        total: gainsData?.wallet?.total ?? 0,
       });
     } catch {
       // silent
@@ -1478,8 +1505,8 @@ function AutoAssignTab({ userId }: { userId: string }) {
           acceptsCOD: prefsData.acceptsCOD ?? true,
           acceptsPriority: prefsData.acceptsPriority ?? true,
           acceptsBulk: prefsData.acceptsBulk ?? false,
-          preferredCities: prefsData.preferredCities ? JSON.parse(prefsData.preferredCities) : [],
-          excludedCities: prefsData.excludedCities ? JSON.parse(prefsData.excludedCities) : [],
+          preferredCities: parseStoredStringArray(prefsData.preferredCities),
+          excludedCities: parseStoredStringArray(prefsData.excludedCities),
           scoreWeightDistance: prefsData.scoreWeightDistance ?? 30,
           scoreWeightCapacity: prefsData.scoreWeightCapacity ?? 25,
           scoreWeightTiming: prefsData.scoreWeightTiming ?? 20,

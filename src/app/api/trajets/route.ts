@@ -173,7 +173,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(trajets.map(normalizeTrajet));
   } catch (error) {
     console.error('Error fetching trajets:', error);
-    return NextResponse.json({ error: 'Failed to fetch trajets' }, { status: 500 });
+    return NextResponse.json([]);
   }
 }
 

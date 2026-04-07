@@ -86,12 +86,13 @@ async function getPricingConfig() {
 
 // GET all parcels
 export async function GET(request: NextRequest) {
+  const { searchParams } = new URL(request.url);
+  const available = searchParams.get('available'); // "true" = show available for transport
+
   try {
-    const { searchParams } = new URL(request.url);
     const clientId = searchParams.get('clientId');
     const status = searchParams.get('status');
     const tracking = searchParams.get('tracking');
-    const available = searchParams.get('available'); // "true" = show available for transport
 
     // Public tracking lookup: limited data only
     if (tracking && !clientId && !status && available !== 'true') {
@@ -198,6 +199,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(parcels);
   } catch (error) {
     console.error('Error fetching parcels:', error);
+
+    if (available === 'true') {
+      return NextResponse.json([]);
+    }
+
     return NextResponse.json({ error: 'Failed to fetch parcels' }, { status: 500 });
   }
 }
