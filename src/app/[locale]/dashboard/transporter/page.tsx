@@ -905,7 +905,7 @@ const MISSION_STATUS_LABELS: Record<string, string> = {
 };
 
 // Missions Tab
-function MissionsTab({ userId, onRefreshStats }: { userId: string; onRefreshStats?: () => void }) {
+function MissionsTab({ userId, onRefreshStats }: { userId: string; onRefreshStats?: (background?: boolean) => void }) {
   const { toast } = useToast();
   const [missions, setMissions] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -919,12 +919,12 @@ function MissionsTab({ userId, onRefreshStats }: { userId: string; onRefreshStat
 
     const intervalId = window.setInterval(() => {
       fetchMissions();
-      onRefreshStats?.();
+      onRefreshStats?.(true);
     }, 15000);
 
     const handleFocus = () => {
       fetchMissions();
-      onRefreshStats?.();
+      onRefreshStats?.(true);
     };
 
     window.addEventListener('focus', handleFocus);
@@ -958,7 +958,7 @@ function MissionsTab({ userId, onRefreshStats }: { userId: string; onRefreshStat
         const labels: Record<string, string> = { EN_COURS: 'Transport démarré', LIVRE: 'Colis livré au relais' };
         toast({ title: labels[status] || 'Statut mis à jour' });
         fetchMissions();
-        if (status === 'LIVRE') onRefreshStats?.();
+        if (status === 'LIVRE') onRefreshStats?.(true);
       } else {
         toast({ title: 'Erreur lors de la mise à jour', variant: 'destructive' });
       }
@@ -1062,7 +1062,7 @@ function MissionsTab({ userId, onRefreshStats }: { userId: string; onRefreshStat
 }
 
 // Scan Tab
-function ScanTab({ onRefreshStats }: { onRefreshStats?: () => void }) {
+function ScanTab({ onRefreshStats }: { onRefreshStats?: (background?: boolean) => void }) {
   const { toast } = useToast();
   const [scanResult, setScanResult] = useState<string>('');
   const [parcel, setParcel] = useState<any>(null);
@@ -1108,7 +1108,7 @@ function ScanTab({ onRefreshStats }: { onRefreshStats?: () => void }) {
       if (response.ok) {
         toast({ title: 'Statut mis à jour', description: `Le colis est maintenant: ${PARCEL_STATUS.find(s => s.id === status)?.label}` });
         setParcel({ ...parcel, status });
-        if (status === 'ARRIVE_RELAIS_DESTINATION') onRefreshStats?.();
+        if (status === 'ARRIVE_RELAIS_DESTINATION') onRefreshStats?.(true);
       } else {
         throw new Error('Failed');
       }
