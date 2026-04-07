@@ -68,13 +68,13 @@ export async function GET(
   }
 }
 
-// PUT update parcel status
+// PUT update parcel status (ADMIN exception only)
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const auth = await requireRole(request, ['CLIENT', 'RELAIS', 'TRANSPORTER', 'ADMIN']);
+    const auth = await requireRole(request, ['ADMIN']);
     if (!auth.success) return auth.response;
 
     const { id } = await params;
@@ -88,13 +88,6 @@ export async function PUT(
 
     if (!existingParcel) {
       return NextResponse.json({ error: 'Parcel not found' }, { status: 404 });
-    }
-
-    if (auth.payload.role === 'CLIENT') {
-      const allowedStatuses = ['PAID'];
-      if (existingParcel.clientId !== auth.payload.id || !allowedStatuses.includes(status)) {
-        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-      }
     }
 
     const parcel = await db.colis.update({
@@ -113,6 +106,7 @@ export async function PUT(
           status,
           location,
           notes,
+          userId: auth.payload.id,
         },
       });
 
@@ -162,7 +156,7 @@ export async function PATCH(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const editableStatuses = new Set(['CREATED', 'PENDING_PAYMENT', 'ANNULE']);
+    const editableStatuses = new Set(['CREATED', 'PENDING_PAYMENT']);
     if (!editableStatuses.has(existingParcel.status)) {
       return NextResponse.json(
         { error: 'Ce colis ne peut plus être modifié après paiement.' },
@@ -237,6 +231,7 @@ export async function PATCH(
       data: {
         colisId: id,
         status: existingParcel.status,
+        userId: auth.payload.id,
         notes: body.weight !== undefined
           ? `Données colis modifiées avant paiement (poids/tarif mis à jour)`
           : 'Données colis modifiées avant paiement',
@@ -278,7 +273,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const deletableStatuses = new Set(['CREATED', 'PENDING_PAYMENT', 'ANNULE']);
+    const deletableStatuses = new Set(['CREATED', 'PENDING_PAYMENT']);
     if (!deletableStatuses.has(existingParcel.status)) {
       return NextResponse.json(
         { error: 'Ce colis est déjà payé ou en cours de traitement: suppression impossible.' },

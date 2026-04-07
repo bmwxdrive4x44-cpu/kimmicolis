@@ -7,6 +7,7 @@ import { evaluateImplicitProEligibility } from '@/lib/pro-eligibility';
 import {
   getRelaisCashBlockIssue,
   resolveActingRelais,
+  resolveQrSecurityPayload,
   resolveTrackingNumber,
 } from '@/lib/relais-scan';
 
@@ -49,7 +50,9 @@ export async function POST(request: NextRequest) {
       recipientLastName,
       recipientPhone,
       withdrawalCode,
+      photoUrl,
     } = body;
+    const qrSecurity = resolveQrSecurityPayload(qrData);
 
     // Validate verification fields are present
     if (
@@ -95,9 +98,35 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: blockIssue.error }, { status: blockIssue.status });
     }
 
-    const parcel = await db.colis.findUnique({ where: { trackingNumber: tracking } });
+    const parcel = qrSecurity.parcelId
+      ? await db.colis.findUnique({ where: { id: qrSecurity.parcelId } })
+      : await db.colis.findUnique({ where: { trackingNumber: tracking } });
     if (!parcel) {
       return NextResponse.json({ error: 'Colis non trouvé' }, { status: 404 });
+    }
+
+    if (qrSecurity.token && parcel.qrToken && qrSecurity.token !== parcel.qrToken) {
+      return NextResponse.json({ error: 'QR invalide (token mismatch)' }, { status: 403 });
+    }
+
+    const eventId =
+      (typeof body.eventId === 'string' && body.eventId.trim().length > 0 ? body.eventId.trim() : null) ||
+      request.headers.get('x-event-id') ||
+      `DELIVERY:${parcel.id}:${actingRelaisId}`;
+
+    const actionLogDb = db as typeof db & {
+      actionLog: {
+        findFirst(args: Record<string, unknown>): Promise<{ id: string } | null>;
+        create(args: Record<string, unknown>): Promise<unknown>;
+      };
+    };
+
+    const existingEvent = await actionLogDb.actionLog.findFirst({
+      where: { eventId, scope: 'DELIVERY', entityId: parcel.id },
+      select: { id: true },
+    });
+    if (existingEvent) {
+      return NextResponse.json({ success: true, idempotent: true, eventId, newStatus: parcel.status });
     }
 
     if (parcel.relaisArriveeId !== actingRelaisId) {
@@ -152,10 +181,38 @@ export async function POST(request: NextRequest) {
     await db.$transaction([
       db.colis.update({
         where: { id: parcel.id },
-        data: { status: newStatus, deliveredAt: new Date() },
+        data: { status: newStatus, deliveredAt: new Date(), custody: 'RELAIS_DEST' },
       }),
       db.trackingHistory.create({
-        data: { colisId: parcel.id, status: newStatus, notes },
+        data: { colisId: parcel.id, status: newStatus, notes, userId: auth.payload.id, relaisId: actingRelaisId },
+      }),
+      db.deliveryProof.upsert({
+        where: { colisId: parcel.id },
+        update: {
+          receiverName: `${recipientFirstName} ${recipientLastName}`.trim(),
+          codeVerified: true,
+          photoUrl: typeof photoUrl === 'string' ? photoUrl : null,
+          relaisId: actingRelaisId,
+          deliveredById: auth.payload.id,
+        },
+        create: {
+          colisId: parcel.id,
+          receiverName: `${recipientFirstName} ${recipientLastName}`.trim(),
+          codeVerified: true,
+          photoUrl: typeof photoUrl === 'string' ? photoUrl : null,
+          relaisId: actingRelaisId,
+          deliveredById: auth.payload.id,
+        },
+      }),
+      actionLogDb.actionLog.create({
+        data: {
+          eventId,
+          scope: 'DELIVERY',
+          userId: auth.payload.id,
+          entityType: 'COLIS',
+          entityId: parcel.id,
+          action: 'DELIVERY_SCAN',
+        },
       }),
     ]);
 

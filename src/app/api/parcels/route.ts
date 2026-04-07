@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { generateTrackingNumber, generateQRData } from '@/lib/constants';
+import { generateTrackingNumber } from '@/lib/constants';
 import { checkRateLimit, RATE_LIMIT_PRESETS } from '@/lib/ratelimit';
 import { requireRole, verifyJWT } from '@/lib/rbac';
-import { generateQRCodeImage, buildQRCodePayload } from '@/lib/qrcode';
+import { generateQRCodeImage } from '@/lib/qrcode';
 import { calculateDynamicParcelPricing, estimateSafeDistanceKmByWilayas } from '@/lib/pricing';
 import { evaluateImplicitProEligibility } from '@/lib/pro-eligibility';
 import { getImplicitLoyaltyConfig } from '@/lib/loyalty-config';
-import { createHash } from 'crypto';
+import { createHash, randomBytes } from 'crypto';
 import { findActiveLineByCities } from '@/lib/logistics';
 
 function normalizePhone(value: string): string {
@@ -389,15 +389,14 @@ export async function POST(request: NextRequest) {
       finalClientPrice: prixClient,
     };
 
-    // Generate tracking number and QR code
+    // Generate tracking number and secure QR token
     const trackingNumber = generateTrackingNumber();
-    const requestOrigin = new URL(request.url).origin;
-    const qrCode = generateQRData(trackingNumber, requestOrigin);
-    const qrPayload = buildQRCodePayload(trackingNumber, requestOrigin);
-    const qrCodeImage = await generateQRCodeImage(qrPayload);
+    const qrToken = randomBytes(24).toString('hex');
+    const expectedDeliveryAt = new Date(Date.now() + 72 * 60 * 60 * 1000);
+    const placeholderQrPayload = JSON.stringify({ token: qrToken });
 
     // Create parcel
-    const colis = await db.colis.create({
+    const createdColis = await db.colis.create({
       data: {
         trackingNumber,
         clientId,
@@ -419,10 +418,27 @@ export async function POST(request: NextRequest) {
         commissionPlateforme: platformFee,
         commissionRelais: relayFee,
         netTransporteur,
-        qrCode,
-        qrCodeImage,
+        qrCode: placeholderQrPayload,
+        qrToken,
+        custody: 'CLIENT',
         status: 'CREATED',
         dateLimit: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+        expectedDeliveryAt,
+      },
+    });
+
+    const secureQrPayload = JSON.stringify({
+      parcelId: createdColis.id,
+      token: qrToken,
+      tracking: trackingNumber,
+    });
+    const qrCodeImage = await generateQRCodeImage(secureQrPayload);
+
+    const colis = await db.colis.update({
+      where: { id: createdColis.id },
+      data: {
+        qrCode: secureQrPayload,
+        qrCodeImage,
       },
     });
 
@@ -432,6 +448,7 @@ export async function POST(request: NextRequest) {
         colisId: colis.id,
         status: 'CREATED',
         location: villeDepart,
+        userId: payload.id,
         notes: `Colis créé (impression ${normalizedLabelPrintMode === 'RELAY' ? 'au relais' : 'à domicile'}) et placé dans la file d'attente de la ligne ${activeLine.villeDepart} → ${activeLine.villeArrivee}`,
       },
     });

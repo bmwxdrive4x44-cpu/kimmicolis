@@ -26,6 +26,24 @@ export function resolveTrackingNumber(
   return extractTrackingFromQrPayload(qrData);
 }
 
+export function resolveQrSecurityPayload(
+  qrData: unknown
+): { parcelId?: string; token?: string } {
+  if (typeof qrData !== 'string') return {};
+  const raw = qrData.trim();
+  if (!raw) return {};
+
+  try {
+    const parsed = JSON.parse(raw) as { parcelId?: unknown; token?: unknown };
+    return {
+      parcelId: typeof parsed.parcelId === 'string' && parsed.parcelId.trim() ? parsed.parcelId.trim() : undefined,
+      token: typeof parsed.token === 'string' && parsed.token.trim() ? parsed.token.trim() : undefined,
+    };
+  } catch {
+    return {};
+  }
+}
+
 /**
  * Résout le relais actif à partir de `relaisId` (si fourni) ou du `userId` authentifié.
  */

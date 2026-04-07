@@ -7,6 +7,7 @@ import { matchColisToTrajets } from '@/services/matchingService';
 import {
   getRelaisCashBlockIssue,
   resolveActingRelais,
+  resolveQrSecurityPayload,
   resolveTrackingNumber,
 } from '@/lib/relais-scan';
 
@@ -31,6 +32,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { trackingNumber, qrData, relaisId } = body;
+    const qrSecurity = resolveQrSecurityPayload(qrData);
 
     const tracking = resolveTrackingNumber(trackingNumber, qrData);
     if (!tracking) {
@@ -60,9 +62,35 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: blockIssue.error }, { status: blockIssue.status });
     }
 
-    const parcel = await db.colis.findUnique({ where: { trackingNumber: tracking } });
+    const parcel = qrSecurity.parcelId
+      ? await db.colis.findUnique({ where: { id: qrSecurity.parcelId } })
+      : await db.colis.findUnique({ where: { trackingNumber: tracking } });
     if (!parcel) {
       return NextResponse.json({ error: 'Colis non trouvé' }, { status: 404 });
+    }
+
+    if (qrSecurity.token && parcel.qrToken && qrSecurity.token !== parcel.qrToken) {
+      return NextResponse.json({ error: 'QR invalide (token mismatch)' }, { status: 403 });
+    }
+
+    const eventId =
+      (typeof body.eventId === 'string' && body.eventId.trim().length > 0 ? body.eventId.trim() : null) ||
+      request.headers.get('x-event-id') ||
+      `QR_DEPOSIT:${parcel.id}:${actingRelaisId}`;
+
+    const actionLogDb = db as typeof db & {
+      actionLog: {
+        findFirst(args: Record<string, unknown>): Promise<{ id: string } | null>;
+        create(args: Record<string, unknown>): Promise<unknown>;
+      };
+    };
+
+    const existingEvent = await actionLogDb.actionLog.findFirst({
+      where: { eventId, scope: 'QR', entityId: parcel.id },
+      select: { id: true },
+    });
+    if (existingEvent) {
+      return NextResponse.json({ success: true, idempotent: true, eventId, newStatus: parcel.status });
     }
 
     if (parcel.relaisDepartId !== actingRelaisId) {
@@ -93,7 +121,7 @@ export async function POST(request: NextRequest) {
       const newUnreversed = newTotal - relais.cashReversed;
 
       await db.$transaction([
-        db.colis.update({ where: { id: parcel.id }, data: { status: newStatus } }),
+        db.colis.update({ where: { id: parcel.id }, data: { status: newStatus, custody: 'RELAIS_DEPART' } }),
         db.relaisCash.create({
           data: {
             relaisId: actingRelaisId,
@@ -125,11 +153,22 @@ export async function POST(request: NextRequest) {
       }
     } else {
       // Cash déjà enregistré lors d'une étape précédente
-      await db.colis.update({ where: { id: parcel.id }, data: { status: newStatus } });
+      await db.colis.update({ where: { id: parcel.id }, data: { status: newStatus, custody: 'RELAIS_DEPART' } });
     }
 
     await db.trackingHistory.create({
-      data: { colisId: parcel.id, status: newStatus, notes },
+      data: { colisId: parcel.id, status: newStatus, notes, userId: auth.payload.id, relaisId: actingRelaisId },
+    });
+
+    await actionLogDb.actionLog.create({
+      data: {
+        eventId,
+        scope: 'QR',
+        userId: auth.payload.id,
+        entityType: 'COLIS',
+        entityId: parcel.id,
+        action: 'QR_SCAN_DEPOT',
+      },
     });
 
     await createNotificationDedup({

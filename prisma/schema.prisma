@@ -236,13 +236,17 @@ model Colis {
   commissionPlateforme Float
   commissionRelais Float
   netTransporteur Float
-  status          String   @default("CREATED") // CREATED | PENDING_PAYMENT | PAID | READY_FOR_DEPOSIT | PAID_RELAY | DEPOSITED_RELAY | WAITING_PICKUP | EN_TRANSPORT | ARRIVE_RELAIS_DESTINATION | LIVRE | ANNULE | RETOUR | EN_DISPUTE
+  status          String   @default("CREATED") // CREATED | PENDING_PAYMENT | PAID | READY_FOR_DEPOSIT | PAID_RELAY | DEPOSITED_RELAY | RECU_RELAIS | WAITING_PICKUP | EN_TRANSPORT | ARRIVE_RELAIS_DESTINATION | LIVRE | ANNULE | RETOUR | EN_DISPUTE | REFUSE_RELAIS | COLIS_PERDU | COLIS_ENDOMMAGE | ABSENT_DESTINATAIRE
   qrCode          String   // QR code data
+  qrToken         String?  @unique // token sécurisé embarqué dans le QR (anti-replay)
+  custody         String   @default("CLIENT") // CLIENT | RELAIS_DEPART | TRANSPORTEUR | RELAIS_DEST
   qrCodeImage     String?  // QR code image URL
   photoProof      String?  // JSON array of proof photo URLs
   isPriority      Boolean  @default(false) // true for pro client parcels
   dateCreation    DateTime @default(now())
   dateLimit       DateTime?
+  expectedDeliveryAt DateTime? // date cible SLA
+  delayed         Boolean  @default(false)   // true si SLA dépassé
   deliveredAt     DateTime?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -256,6 +260,7 @@ model Colis {
   trackingHistory TrackingHistory[]
   relaisCash      RelaisCash[]
   disputes        Dispute[]
+  deliveryProof   DeliveryProof?
 }
 
 model Payment {
@@ -326,6 +331,8 @@ model TrackingHistory {
   location    String?
   notes       String?
   createdAt   DateTime @default(now())
+  userId      String?  // acteur qui a déclenché la transition
+  relaisId    String?  // relais concerné si applicable
   
   colis       Colis    @relation(fields: [colisId], references: [id])
 }
@@ -454,6 +461,8 @@ model RelaisAudit {
 // Action log for anti-fraud audit trail
 model ActionLog {
   id          String   @id @default(cuid())
+  eventId     String?  @unique // clé idempotence (webhook/scan/livraison)
+  scope       String?  // PAYMENT | QR | DELIVERY
   userId      String?  // Who performed the action
   entityType  String   // COLIS | RELAIS | TRANSPORTER | USER
   entityId    String
@@ -461,6 +470,21 @@ model ActionLog {
   details     String?  // JSON string with extra info
   ipAddress   String?
   createdAt   DateTime @default(now())
+
+  @@index([entityType, entityId, action])
+}
+
+model DeliveryProof {
+  id            String   @id @default(cuid())
+  colisId       String   @unique
+  receiverName  String
+  codeVerified  Boolean  @default(true)
+  photoUrl      String?
+  relaisId      String?
+  deliveredById String?
+  createdAt     DateTime @default(now())
+
+  colis         Colis    @relation(fields: [colisId], references: [id])
 }
 
 // Physical cash pickup from relay to platform

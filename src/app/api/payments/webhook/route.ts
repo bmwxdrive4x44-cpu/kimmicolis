@@ -72,9 +72,8 @@ export async function POST(request: NextRequest) {
 
   const existingEvent = await db.actionLog.findFirst({
     where: {
-      entityType: 'PAYMENT',
-      entityId: paymentId,
-      action: `PAYMENT_WEBHOOK:${eventId}`,
+      scope: 'PAYMENT',
+      eventId,
     },
     select: { id: true },
   });
@@ -126,6 +125,8 @@ export async function POST(request: NextRequest) {
       if (lockedPayment.status === 'COMPLETED') {
         await tx.actionLog.create({
           data: {
+            eventId,
+            scope: 'PAYMENT',
             entityType: 'PAYMENT',
             entityId: paymentId,
             action: `PAYMENT_WEBHOOK:${eventId}`,
@@ -147,14 +148,24 @@ export async function POST(request: NextRequest) {
       });
 
       if (canTransition(lockedPayment.colis.status, 'READY_FOR_DEPOSIT')) {
+        const nextStatus = applyTransition(lockedPayment.colis.status, 'READY_FOR_DEPOSIT');
         await tx.colis.update({
           where: { id: lockedPayment.colisId },
-          data: { status: applyTransition(lockedPayment.colis.status, 'READY_FOR_DEPOSIT') },
+          data: { status: nextStatus },
+        });
+        await tx.trackingHistory.create({
+          data: {
+            colisId: lockedPayment.colisId,
+            status: nextStatus,
+            notes: `Paiement confirmé via webhook (${payload.provider || 'PSP'})`,
+          },
         });
       }
 
       await tx.actionLog.create({
         data: {
+          eventId,
+          scope: 'PAYMENT',
           entityType: 'PAYMENT',
           entityId: paymentId,
           action: `PAYMENT_WEBHOOK:${eventId}`,
@@ -209,14 +220,24 @@ export async function POST(request: NextRequest) {
     }
 
     if (canTransition(lockedPayment.colis.status, 'CREATED')) {
+      const nextStatus = applyTransition(lockedPayment.colis.status, 'CREATED');
       await tx.colis.update({
         where: { id: lockedPayment.colisId },
-        data: { status: applyTransition(lockedPayment.colis.status, 'CREATED') },
+        data: { status: nextStatus },
+      });
+      await tx.trackingHistory.create({
+        data: {
+          colisId: lockedPayment.colisId,
+          status: nextStatus,
+          notes: `Paiement échoué via webhook (${payload.provider || 'PSP'})`,
+        },
       });
     }
 
     await tx.actionLog.create({
       data: {
+        eventId,
+        scope: 'PAYMENT',
         entityType: 'PAYMENT',
         entityId: paymentId,
         action: `PAYMENT_WEBHOOK:${eventId}`,

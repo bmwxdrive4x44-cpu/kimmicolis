@@ -99,9 +99,10 @@ export async function POST(request: NextRequest) {
 
     const existingEvent = await db.actionLog.findFirst({
       where: {
+        scope: 'DELIVERY',
         entityType: 'COLIS',
         entityId: parcel.id,
-        action: `DELIVERY_EVENT:${effectiveEventId}`,
+        eventId: effectiveEventId,
       },
       select: { id: true },
     });
@@ -136,6 +137,7 @@ export async function POST(request: NextRequest) {
       newParcelStatus = applyTransition(parcel.status === 'ASSIGNED' || parcel.status === 'RECU_RELAIS' ? 'DEPOSITED_RELAY' : parcel.status, 'PICKED_UP');
       newMissionStatus = 'PICKED_UP';
       notes = 'Colis pris en charge par le transporteur';
+      parcelUpdateData.custody = 'TRANSPORTEUR';
     }
 
     // ──────────────────────────────────────────────
@@ -161,6 +163,7 @@ export async function POST(request: NextRequest) {
       newMissionStatus = 'COMPLETED';
       notes = 'Colis livré au relais de destination par le transporteur';
       missionUpdateData.completedAt = new Date();
+      parcelUpdateData.custody = 'RELAIS_DEST';
     } else {
       return NextResponse.json({ error: `Action inconnue: ${effectiveAction}` }, { status: 400 });
     }
@@ -186,6 +189,7 @@ export async function POST(request: NextRequest) {
         status: newParcelStatus,
         location: location ?? null,
         notes,
+        userId: auth.payload.id,
       },
     });
 
@@ -199,6 +203,8 @@ export async function POST(request: NextRequest) {
 
     await db.actionLog.create({
       data: {
+        eventId: effectiveEventId,
+        scope: 'DELIVERY',
         userId: auth.payload.id,
         entityType: 'COLIS',
         entityId: parcel.id,
