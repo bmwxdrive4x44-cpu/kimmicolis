@@ -2094,12 +2094,14 @@ function GainsTab({ relaisId }: { relaisId: string | undefined }) {
 // ─────────────────────────────────────────────────────────────
 function SuiviTab({ relaisId }: { relaisId: string | undefined }) {
   const [data, setData] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
   const { toast } = useToast();
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (background = false) => {
     if (!relaisId) return;
-    setIsLoading(true);
+    if (!background) {
+      setIsInitialLoading(true);
+    }
     try {
       const res = await fetch(`/api/relais/stats`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ relaisId }) });
       if (res.ok) {
@@ -2111,13 +2113,21 @@ function SuiviTab({ relaisId }: { relaisId: string | undefined }) {
     } catch (error) {
       toast({ title: 'Erreur', description: 'Erreur de connexion', variant: 'destructive' });
     } finally {
-      setIsLoading(false);
+      if (!background) {
+        setIsInitialLoading(false);
+      }
     }
   }, [relaisId, toast]);
 
-  useEffect(() => { fetchData(); const interval = setInterval(fetchData, 30000); return () => clearInterval(interval); }, [fetchData]);
+  useEffect(() => {
+    fetchData(false);
+    const interval = setInterval(() => {
+      fetchData(true);
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [fetchData]);
 
-  if (isLoading) {
+  if (isInitialLoading) {
     return <div className="flex items-center justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-slate-400" /></div>;
   }
 

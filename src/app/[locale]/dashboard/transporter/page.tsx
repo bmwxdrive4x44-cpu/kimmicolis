@@ -70,7 +70,7 @@ export default function TransporterDashboard() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState('overview');
   const [stats, setStats] = useState({ trajets: 0, missions: 0, completed: 0, earnings: 0 });
-  const [isLoading, setIsLoading] = useState(true);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [hasProfile, setHasProfile] = useState(false);
 
   useEffect(() => {
@@ -109,7 +109,7 @@ export default function TransporterDashboard() {
 
   useEffect(() => {
     if (session?.user?.id && hasProfile) {
-      fetchStats();
+      fetchStats(false);
     }
   }, [session?.user?.id, hasProfile]);
 
@@ -117,11 +117,11 @@ export default function TransporterDashboard() {
     if (!session?.user?.id || !hasProfile) return;
 
     const intervalId = window.setInterval(() => {
-      fetchStats();
+      fetchStats(true);
     }, 15000);
 
     const handleFocus = () => {
-      fetchStats();
+      fetchStats(true);
     };
 
     window.addEventListener('focus', handleFocus);
@@ -131,8 +131,10 @@ export default function TransporterDashboard() {
     };
   }, [session?.user?.id, hasProfile]);
 
-  const fetchStats = async () => {
-    setIsLoading(true);
+  const fetchStats = async (background = false) => {
+    if (!background) {
+      setIsInitialLoading(true);
+    }
     try {
       const [trajetsRes, missionsRes] = await Promise.all([
         fetch(`/api/trajets?transporteurId=${session?.user?.id}`),
@@ -152,11 +154,13 @@ export default function TransporterDashboard() {
     } catch (error) {
       console.error('Error fetching stats:', error);
     } finally {
-      setIsLoading(false);
+      if (!background) {
+        setIsInitialLoading(false);
+      }
     }
   };
 
-  if (status === 'loading' || (isLoading && hasProfile)) {
+  if (status === 'loading' || (isInitialLoading && hasProfile)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
         <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
