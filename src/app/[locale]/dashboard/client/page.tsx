@@ -28,6 +28,7 @@ import {
 import { WILAYAS, PARCEL_STATUS, generateTrackingNumber, generateQRData } from '@/lib/constants';
 import { parseLocaleFloat } from '@/lib/utils';
 import { calculateDynamicParcelPricing, estimateSafeDistanceKmByWilayas } from '@/lib/pricing';
+import { normalizeRole } from '@/lib/roles';
 import { Package, Plus, History, MapPin, Loader2, CreditCard, Search, Truck, CheckCircle, Clock, QrCode, Printer, User, Pencil, Save, AlertTriangle, XCircle, MessageSquare, Smartphone, Banknote, Building2, Trash2, CircleHelp } from 'lucide-react';
 import { PRO_DISCOUNT_TIERS, getProBatchDiscountRate, getProBatchDiscountTier } from '@/lib/pricing';
 import { useToast } from '@/hooks/use-toast';
@@ -144,16 +145,16 @@ function ClientDashboardContent() {
 
   // Redirect if wrong role
   useEffect(() => {
-    if (status === 'authenticated' && session?.user?.role && session.user.role !== 'CLIENT') {
-      const paths: Record<string, string> = {
-        'ADMIN': `/${locale}/dashboard/admin`,
-        'TRANSPORTER': `/${locale}/dashboard/transporter`,
-        'RELAIS': `/${locale}/dashboard/relais`,
-      };
-      const path = paths[session.user.role] || `/${locale}/dashboard/client`;
-      window.location.href = path;
+    if (status === 'authenticated' && session?.user?.role) {
+      const userRole = normalizeRole(session.user.role);
+      if (userRole !== 'CLIENT') {
+        const path = getRoleBasedDashboardPath(userRole, locale);
+        if (path !== window.location.pathname) {
+          router.replace(path);
+        }
+      }
     }
-  }, [status, session, locale]);
+  }, [status, session, locale, router]);
 
   useEffect(() => {
     const timeoutRef = setTimeout(() => {

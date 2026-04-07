@@ -27,6 +27,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { WILAYAS, PARCEL_STATUS, RELAIS_STATUS, DEFAULT_RELAY_COMMISSION, RELAY_CASH_ALERT_THRESHOLD } from '@/lib/constants';
 import { parseLocaleFloat } from '@/lib/utils';
 import { extractTrackingFromQrPayload } from '@/lib/qr-payload';
+import { normalizeRole } from '@/lib/roles';
 import { Store, Package, QrCode, DollarSign, Loader2, CheckCircle, Clock, Scan, ArrowDownToLine, ArrowUpFromLine, Settings, BarChart3, AlertCircle, Save, AlertTriangle, CreditCard, History, BanknoteIcon, User, Pencil, TrendingUp, Printer, CircleHelp } from 'lucide-react';
 import { isAlgerianCommerceRegisterNumber } from '@/lib/validators';
 import { QrCameraScanner } from '@/components/ui/qr-camera-scanner';
@@ -131,14 +132,12 @@ export default function RelaisDashboard() {
   // Fetch relais info when session is ready
   useEffect(() => {
     if (status === 'authenticated' && session?.user?.id) {
-      if (session.user.role !== 'RELAIS') {
-        const paths: Record<string, string> = {
-          'ADMIN': `/${locale}/dashboard/admin`,
-          'TRANSPORTER': `/${locale}/dashboard/transporter`,
-          'ENSEIGNE': `/${locale}/dashboard/enseigne`,
-          'CLIENT': `/${locale}/dashboard/client`,
-        };
-        window.location.href = paths[session.user.role] || `/${locale}/dashboard/client`;
+      const userRole = normalizeRole(session.user.role);
+      if (userRole !== 'RELAIS') {
+        const targetPath = getRoleBasedDashboardPath(userRole, locale);
+        if (targetPath !== window.location.pathname) {
+          router.replace(targetPath);
+        }
         return;
       }
       fetchRelaisInfo();
@@ -170,7 +169,7 @@ export default function RelaisDashboard() {
   }
 
   // Wrong role
-  if (session.user.role !== 'RELAIS') {
+  if (normalizeRole(session.user.role) !== 'RELAIS') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
         <div className="text-center">

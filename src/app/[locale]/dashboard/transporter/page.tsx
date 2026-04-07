@@ -27,6 +27,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { WILAYAS, PARCEL_STATUS, TRAJET_STATUS } from '@/lib/constants';
 import { parseLocaleFloat } from '@/lib/utils';
+import { normalizeRole } from '@/lib/roles';
 import { Truck, Plus, Package, MapPin, DollarSign, Loader2, CheckCircle, Clock, Route, QrCode, Navigation, Scan, Wallet, ArrowUpFromLine, TrendingUp, History, Save, Pencil, User, Zap, Settings, BarChart2, AlertCircle, RefreshCw, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -75,8 +76,11 @@ export default function TransporterDashboard() {
   useEffect(() => {
     if (status === 'unauthenticated') {
       router.push(`/${locale}/auth/login`);
-    } else if (status === 'authenticated' && session?.user?.role !== 'TRANSPORTER') {
-      router.push(getRoleBasedDashboardPath(session.user.role, locale));
+    } else if (status === 'authenticated' && session?.user?.role) {
+      const userRole = normalizeRole(session.user.role);
+      if (userRole !== 'TRANSPORTER') {
+        router.replace(getRoleBasedDashboardPath(userRole, locale));
+      }
     }
   }, [status, session, router, locale]);
 
@@ -160,7 +164,7 @@ export default function TransporterDashboard() {
     );
   }
 
-  if (!session?.user || session.user.role !== 'TRANSPORTER' || !hasProfile) {
+  if (!session?.user || normalizeRole(session.user.role) !== 'TRANSPORTER' || !hasProfile) {
     return null;
   }
 
