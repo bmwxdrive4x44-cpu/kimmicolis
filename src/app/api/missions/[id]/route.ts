@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { requireRole } from '@/lib/rbac';
+import { evaluateImplicitProEligibility } from '@/lib/pro-eligibility';
 
 // GET single mission
 export async function GET(
@@ -84,6 +85,15 @@ export async function PUT(
           notes: notes || 'Transport en cours',
         },
       });
+
+      const parcel = await db.colis.findUnique({ where: { id: mission.colisId }, select: { clientId: true } });
+      if (parcel?.clientId) {
+        try {
+          await evaluateImplicitProEligibility(parcel.clientId);
+        } catch (eligibilityError) {
+          console.error('[implicit-pro] mission EN_COURS evaluation failed:', eligibilityError);
+        }
+      }
     }
 
     if (status === 'LIVRE') {
@@ -99,6 +109,15 @@ export async function PUT(
           notes: notes || 'Colis arrivé au relais de destination',
         },
       });
+
+      const parcel = await db.colis.findUnique({ where: { id: mission.colisId }, select: { clientId: true } });
+      if (parcel?.clientId) {
+        try {
+          await evaluateImplicitProEligibility(parcel.clientId);
+        } catch (eligibilityError) {
+          console.error('[implicit-pro] mission LIVRE evaluation failed:', eligibilityError);
+        }
+      }
     }
 
     return NextResponse.json(mission);

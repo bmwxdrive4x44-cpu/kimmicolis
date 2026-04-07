@@ -6,7 +6,7 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
+  provider = "postgresql"
   url       = env("DATABASE_URL")
   directUrl = env("DIRECT_DATABASE_URL")
 }
@@ -20,11 +20,16 @@ model User {
   firstName     String?
   lastName      String?
   address       String?
-  role          String   // "CLIENT", "TRANSPORTER", "RELAIS", "ADMIN"
+  role          String   // "CLIENT", "TRANSPORTER", "RELAIS", "ENSEIGNE", "ADMIN"
   phone         String?
   siret         String?  // For transporters
   image         String?
   isActive      Boolean  @default(true)
+  clientType    String   @default("STANDARD") // STANDARD | PRO
+  eligibleProImplicit Boolean @default(false)
+  eligibleProSince  DateTime?
+  proLastEvaluatedAt DateTime?
+  weeklyValidShipments Int @default(0)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   
@@ -33,11 +38,60 @@ model User {
   trajets             Trajet[]        @relation("TransporterTrajets")
   missions            Mission[]       @relation("TransporterMissions")
   relais              Relais?         @relation("UserRelais")
+  enseigne            Enseigne?       @relation("UserEnseigne")
   transporterApplication TransporterApplication? @relation("UserTransporterApplication")
+  transporterPreferences TransporterPreferences? @relation("UserTransporterPreferences")
   payments            Payment[]
   notifications       Notification[]
+  passwordResetTokens PasswordResetToken[]
   disputesOpened      Dispute[]  @relation("DisputesOpened")
   disputesResolved    Dispute[]  @relation("DisputesResolved")
+}
+
+model Enseigne {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  businessName    String
+  legalName       String?
+  website         String?
+  logoUrl         String?
+  monthlyVolume   Int      @default(0)
+  billingEmail    String?
+  operationalCity String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user            User     @relation("UserEnseigne", fields: [userId], references: [id])
+
+  @@index([businessName])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+}
+
+model ContactMessage {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  subject   String
+  message   String
+  isRead    Boolean  @default(false)
+  repliedAt    DateTime?
+  replyContent String?
+  createdAt    DateTime  @default(now())
+
+  @@index([createdAt])
+  @@index([isRead])
 }
 
 // Relay points
@@ -100,6 +154,49 @@ model TransporterApplication {
   user            User     @relation("UserTransporterApplication", fields: [userId], references: [id])
 }
 
+// Transporter preferences for intelligent auto-assignment
+model TransporterPreferences {
+  id                    String   @id @default(cuid())
+  userId                String   @unique
+  
+  // Preferred cities/routes (JSON array)
+  preferredCities       String?  // JSON array of preferred departure/arrival cities
+  preferredRoutes       String?  // JSON array of preferred routes {villeDepart, villeArrivee}
+  excludedCities        String?  // JSON array of cities to avoid
+  
+  // Assignment preferences
+  autoAssignEnabled     Boolean  @default(false) // Enable auto-assignment
+  autoAssignSchedule    String?  // CRON expression or predefined schedule (DAILY_8AM, WEEKLY, MANUAL)
+  maxDailyMissions      Int      @default(10) // Maximum missions per day
+  maxActiveParallel     Int      @default(5)  // Max concurrent active missions
+  
+  // Parcel preferences
+  maxWeightKg           Float?   // Maximum weight accepted (kg)
+  maxDimensionCm        Float?   // Maximum dimension (cm) 
+  acceptsCOD            Boolean  @default(true) // Accept cash-on-delivery
+  acceptsPriority       Boolean  @default(true) // Accept priority parcels
+  acceptsBulk           Boolean  @default(false) // Accept bulk shipments
+  
+  // Scoring preferences (weights 0-100)
+  scoreWeightDistance   Int      @default(30)  // Priority: route distance
+  scoreWeightCapacity   Int      @default(25)  // Priority: available capacity
+  scoreWeightTiming     Int      @default(20)  // Priority: departure timing
+  scoreWeightEarnings   Int      @default(25)  // Priority: earnings potential
+  
+  // Availability windows (JSON)
+  availabilityWindows   String?  // JSON array of {dayOfWeek, startTime, endTime}
+  
+  // Learning data
+  lastAssignmentCheck   DateTime? // Last time auto-assign was triggered
+  successRate           Float    @default(100) // Completion success rate (%)
+  avgRating             Float?   // Average customer rating
+  
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  
+  user                 User     @relation("UserTransporterPreferences", fields: [userId], references: [id])
+}
+
 // Transport lines with pricing
 model Ligne {
   id              String   @id @default(cuid())
@@ -111,6 +208,9 @@ model Ligne {
   isActive        Boolean  @default(true)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+
+  colis           Colis[]
+  trajets         Trajet[]
 }
 
 // Parcels/Packages
@@ -118,6 +218,7 @@ model Colis {
   id              String   @id @default(cuid())
   trackingNumber  String   @unique
   clientId        String
+  lineId          String?
   senderFirstName String?
   senderLastName  String?
   senderPhone     String?
@@ -135,10 +236,11 @@ model Colis {
   commissionPlateforme Float
   commissionRelais Float
   netTransporteur Float
-  status          String   @default("CREATED") // CREATED | PAID_RELAY | DEPOSITED_RELAY | EN_TRANSPORT | ARRIVE_RELAIS_DESTINATION | LIVRE | ANNULE | RETOUR | EN_DISPUTE
+  status          String   @default("CREATED") // CREATED | PENDING_PAYMENT | PAID | READY_FOR_DEPOSIT | PAID_RELAY | DEPOSITED_RELAY | WAITING_PICKUP | EN_TRANSPORT | ARRIVE_RELAIS_DESTINATION | LIVRE | ANNULE | RETOUR | EN_DISPUTE
   qrCode          String   // QR code data
   qrCodeImage     String?  // QR code image URL
   photoProof      String?  // JSON array of proof photo URLs
+  isPriority      Boolean  @default(false) // true for pro client parcels
   dateCreation    DateTime @default(now())
   dateLimit       DateTime?
   deliveredAt     DateTime?
@@ -146,6 +248,7 @@ model Colis {
   updatedAt       DateTime @updatedAt
   
   client          User     @relation("ClientParcels", fields: [clientId], references: [id])
+  line            Ligne?   @relation(fields: [lineId], references: [id])
   relaisDepart    Relais   @relation("RelaisDepart", fields: [relaisDepartId], references: [id])
   relaisArrivee   Relais   @relation("RelaisArrivee", fields: [relaisArriveeId], references: [id])
   missions        Mission[]
@@ -182,6 +285,7 @@ model Payment {
 model Trajet {
   id              String   @id @default(cuid())
   transporteurId  String
+  lineId          String?
   villeDepart     String
   villeArrivee    String
   villesEtapes    String?  // JSON array of intermediate cities
@@ -193,6 +297,7 @@ model Trajet {
   updatedAt       DateTime @updatedAt
   
   transporteur    User     @relation("TransporterTrajets", fields: [transporteurId], references: [id])
+  line            Ligne?   @relation(fields: [lineId], references: [id])
   missions        Mission[]
 }
 

@@ -1,3 +1,40 @@
+// ─── Professional client degressive pricing ───────────────────────────────
+export interface ProDiscountTier {
+  minCount: number;
+  maxCount: number;
+  discountRate: number; // 0.05 = 5%
+  label: string;
+}
+
+export const PRO_DISCOUNT_TIERS: ProDiscountTier[] = [
+  { minCount: 5,  maxCount: 9,        discountRate: 0.05, label: '5–9 colis → -5%' },
+  { minCount: 10, maxCount: 19,       discountRate: 0.10, label: '10–19 colis → -10%' },
+  { minCount: 20, maxCount: 29,       discountRate: 0.20, label: '20–29 colis → -20%' },
+  { minCount: 30, maxCount: Infinity, discountRate: 0.30, label: '30+ colis → -30%' },
+];
+
+/**
+ * Returns the discount rate (0–0.30) for a given batch size.
+ * Returns 0 for < 5 parcels (no discount).
+ */
+export function getProBatchDiscountRate(parcelCount: number): number {
+  const tier = PRO_DISCOUNT_TIERS.find(
+    (t) => parcelCount >= t.minCount && parcelCount <= t.maxCount
+  );
+  return tier?.discountRate ?? 0;
+}
+
+/**
+ * Returns the active tier label, or null if no discount applies.
+ */
+export function getProBatchDiscountTier(parcelCount: number): ProDiscountTier | null {
+  return PRO_DISCOUNT_TIERS.find(
+    (t) => parcelCount >= t.minCount && parcelCount <= t.maxCount
+  ) ?? null;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 export interface DistanceCoefficientRule {
   maxDistanceKm: number;
   coefficient: number;

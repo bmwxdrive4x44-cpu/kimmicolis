@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { requireRole } from '@/lib/rbac';
 import { createHash } from 'crypto';
 import { createNotificationDedup } from '@/lib/notifications';
+import { evaluateImplicitProEligibility } from '@/lib/pro-eligibility';
 import {
   getRelaisCashBlockIssue,
   resolveActingRelais,
@@ -148,7 +149,7 @@ export async function POST(request: NextRequest) {
     const newStatus = 'LIVRE';
     const notes = `Colis livré au destinataire par le relais ${relais.commerceName} — identité et code vérifiés`;
 
-    const deliveryOps: Parameters<typeof db.$transaction>[0] = [
+    await db.$transaction([
       db.colis.update({
         where: { id: parcel.id },
         data: { status: newStatus, deliveredAt: new Date() },
@@ -156,9 +157,7 @@ export async function POST(request: NextRequest) {
       db.trackingHistory.create({
         data: { colisId: parcel.id, status: newStatus, notes },
       }),
-    ];
-
-    await db.$transaction(deliveryOps);
+    ]);
 
     await createNotificationDedup({
       userId: parcel.clientId,
@@ -166,6 +165,12 @@ export async function POST(request: NextRequest) {
       message: `${notes} — Suivi: ${tracking}`,
       type: 'IN_APP',
     });
+
+    try {
+      await evaluateImplicitProEligibility(parcel.clientId);
+    } catch (eligibilityError) {
+      console.error('[implicit-pro] scan-livraison evaluation failed:', eligibilityError);
+    }
 
     return NextResponse.json({ success: true, newStatus, message: notes });
   } catch (error) {

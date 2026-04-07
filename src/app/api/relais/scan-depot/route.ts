@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { requireRole } from '@/lib/rbac';
 import { RELAY_BLOCK_THRESHOLD_DA } from '@/lib/constants';
 import { createNotificationDedup } from '@/lib/notifications';
+import { matchColisToTrajets } from '@/services/matchingService';
 import {
   getRelaisCashBlockIssue,
   resolveActingRelais,
@@ -138,7 +139,70 @@ export async function POST(request: NextRequest) {
       type: 'IN_APP',
     });
 
-    return NextResponse.json({ success: true, newStatus, message: notes });
+    let matching: { attempted: boolean; matched: boolean; error: string | null } = {
+      attempted: true,
+      matched: false,
+      error: null,
+    };
+
+    try {
+      const matchingResult = await matchColisToTrajets({
+        id: parcel.id,
+        lineId: parcel.lineId,
+        villeDepart: parcel.villeDepart,
+        villeArrivee: parcel.villeArrivee,
+        clientId: parcel.clientId,
+        status: newStatus,
+      });
+      matching = {
+        attempted: true,
+        matched: matchingResult.success,
+        error: matchingResult.success ? null : matchingResult.error ?? null,
+      };
+
+      if (!matchingResult.success) {
+        const admins = await db.user.findMany({
+          where: { role: 'ADMIN' },
+          select: { id: true },
+        });
+
+        await Promise.all(
+          admins.map((admin) =>
+            createNotificationDedup({
+              userId: admin.id,
+              title: 'Alerte matching relais',
+              message: `Aucun transporteur trouvé après dépôt du colis ${tracking} (${parcel.villeDepart} → ${parcel.villeArrivee}) au relais ${relais.commerceName}. Raison: ${matchingResult.error || 'inconnue'}.`,
+              type: 'IN_APP',
+            })
+          )
+        );
+      }
+    } catch (matchingError) {
+      console.error('[scan-depot] matching after deposit failed:', matchingError);
+      matching = {
+        attempted: true,
+        matched: false,
+        error: matchingError instanceof Error ? matchingError.message : 'Erreur de matching',
+      };
+
+      const admins = await db.user.findMany({
+        where: { role: 'ADMIN' },
+        select: { id: true },
+      });
+
+      await Promise.all(
+        admins.map((admin) =>
+          createNotificationDedup({
+            userId: admin.id,
+            title: 'Alerte matching relais',
+            message: `Erreur de matching après dépôt du colis ${tracking} (${parcel.villeDepart} → ${parcel.villeArrivee}) au relais ${relais.commerceName}.`,
+            type: 'IN_APP',
+          })
+        )
+      );
+    }
+
+    return NextResponse.json({ success: true, newStatus, message: notes, matching });
   } catch (error) {
     console.error('[scan-depot] Error:', error);
     return NextResponse.json({ error: 'Erreur lors du scan de dépôt' }, { status: 500 });

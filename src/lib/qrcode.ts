@@ -4,6 +4,7 @@
  */
 
 import QRCode from 'qrcode';
+import { buildParcelQrPayload } from '@/lib/qr-payload';
 
 export interface QRCodeOptions {
   width?: number;
@@ -61,12 +62,8 @@ export async function generateQRCodeSVG(
  * Generate the QR code data string for a tracking number.
  * This creates a JSON payload that relais and transporters scan.
  */
-export function buildQRCodePayload(trackingNumber: string): string {
-  return JSON.stringify({
-    tracking: trackingNumber,
-    platform: 'SwiftColis',
-    generated: new Date().toISOString(),
-  });
+export function buildQRCodePayload(trackingNumber: string, baseUrl?: string): string {
+  return buildParcelQrPayload(trackingNumber, baseUrl);
 }
 
 /**

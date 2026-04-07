@@ -2,7 +2,8 @@
 
 import { useTranslations } from 'next-intl';
 import { Link } from '@/i18n/routing';
-import { Package, Mail, Phone, MapPin, Facebook, Instagram, Twitter, Clock, Shield } from 'lucide-react';
+import { BrandLogo } from '@/components/brand-logo';
+import { Mail, Phone, MapPin, Facebook, Instagram, Twitter, Clock, Shield } from 'lucide-react';
 
 export function Footer() {
   const t = useTranslations();
@@ -19,12 +20,7 @@ export function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12">
           {/* Brand */}
           <div className="space-y-6">
-            <Link href="/" className="flex items-center gap-2">
-              <div className="p-2 rounded-lg bg-gradient-to-r from-emerald-500 to-teal-500">
-                <Package className="h-6 w-6 text-white" />
-              </div>
-              <span className="text-xl font-bold text-white">SwiftColis</span>
-            </Link>
+            <BrandLogo variant="dark" />
             <p className="text-sm text-slate-400 leading-relaxed">
               La première plateforme de livraison inter-wilayas en Algérie. 
               Connectez-vous à un réseau de transporteurs et points relais vérifiés.
@@ -56,6 +52,12 @@ export function Footer() {
                 </Link>
               </li>
               <li>
+                <Link href="/faq" className="text-sm text-slate-400 hover:text-emerald-400 transition-colors flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500/50" />
+                  FAQ
+                </Link>
+              </li>
+              <li>
                 <Link href="/dashboard/client" className="text-sm text-slate-400 hover:text-emerald-400 transition-colors flex items-center gap-2">
                   <div className="w-1.5 h-1.5 rounded-full bg-emerald-500/50" />
                   {t('nav.createParcel')}
@@ -68,9 +70,21 @@ export function Footer() {
                 </Link>
               </li>
               <li>
+                <Link href="/become-enseigne" className="text-sm text-slate-400 hover:text-emerald-400 transition-colors flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500/50" />
+                  Devenir Enseigne
+                </Link>
+              </li>
+              <li>
                 <Link href="/become-transporter" className="text-sm text-slate-400 hover:text-emerald-400 transition-colors flex items-center gap-2">
                   <div className="w-1.5 h-1.5 rounded-full bg-emerald-500/50" />
                   {t('nav.becomeTransporter')}
+                </Link>
+              </li>
+              <li>
+                <Link href="/contact" className="text-sm text-slate-400 hover:text-emerald-400 transition-colors flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500/50" />
+                  Nous contacter
                 </Link>
               </li>
             </ul>
@@ -163,6 +177,9 @@ export function Footer() {
               <a href="#" className="text-xs text-slate-500 hover:text-slate-300 transition-colors">
                 Conditions d'utilisation
               </a>
+              <Link href="/faq" className="text-xs text-slate-500 hover:text-slate-300 transition-colors">
+                FAQ
+              </Link>
               <a href="#" className="text-xs text-slate-500 hover:text-slate-300 transition-colors">
                 Politique de confidentialité
               </a>

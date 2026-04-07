@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSession } from 'next-auth/react';
 import { useLocale } from 'next-intl';
 import { useRouter } from 'next/navigation';
@@ -11,13 +11,24 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { MatchingAutoAssignPanel } from '@/components/dashboard/admin/matching-auto-assign-panel';
+import {
+  DashboardHero,
+  DashboardMetricCard,
+  DashboardPanel,
+  DashboardShell,
+  DashboardStatsGrid,
+  dashboardTabsListClass,
+  getDashboardTabsTriggerClass,
+} from '@/components/dashboard/dashboard-shell';
 import { WILAYAS, USER_ROLES, PARCEL_STATUS, RELAIS_STATUS } from '@/lib/constants';
-import { Users, Package, Truck, Store, DollarSign, CheckCircle, XCircle, Loader2, Plus, Settings, BarChart3, MapPin, Trash2, Pencil, Eye, EyeOff, AlertCircle, ScrollText, RefreshCw, ChevronDown, ChevronRight } from 'lucide-react';
+import { parseLocaleFloat } from '@/lib/utils';
+import { Users, Package, Truck, Store, DollarSign, CheckCircle, XCircle, Loader2, Plus, Settings, BarChart3, MapPin, Trash2, Pencil, Eye, EyeOff, AlertCircle, ScrollText, RefreshCw, ChevronDown, ChevronRight, Award, PlayCircle, Mail, MailOpen, Reply, Inbox } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 // Helper function to get the correct dashboard path based on role
@@ -26,6 +37,7 @@ function getRoleBasedDashboardPath(role: string, locale: string): string {
     case 'ADMIN': return `/${locale}/dashboard/admin`;
     case 'TRANSPORTER': return `/${locale}/dashboard/transporter`;
     case 'RELAIS': return `/${locale}/dashboard/relais`;
+    case 'ENSEIGNE': return `/${locale}/dashboard/enseigne`;
     case 'CLIENT':
     default: return `/${locale}/dashboard/client`;
   }
@@ -48,6 +60,7 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('overview');
   const [stats, setStats] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -61,7 +74,18 @@ export default function AdminDashboard() {
   useEffect(() => {
     if (session?.user?.role === 'ADMIN') {
       fetchStats();
+      void fetchUnreadMessagesCount();
     }
+  }, [session?.user?.role]);
+
+  useEffect(() => {
+    if (session?.user?.role !== 'ADMIN') return;
+
+    const interval = setInterval(() => {
+      void fetchUnreadMessagesCount();
+    }, 30000);
+
+    return () => clearInterval(interval);
   }, [session?.user?.role]);
 
   const fetchStats = async () => {
@@ -76,6 +100,17 @@ export default function AdminDashboard() {
       setIsLoading(false);
     }
   };
+
+  const fetchUnreadMessagesCount = useCallback(async () => {
+    try {
+      const res = await fetch('/api/admin/messages?filter=unread&page=1');
+      if (!res.ok) return;
+      const data = await res.json();
+      setUnreadMessagesCount(typeof data?.total === 'number' ? data.total : 0);
+    } catch {
+      // Ignore transient failures; MessagesTab can still refresh this count.
+    }
+  }, []);
 
   if (status === 'loading' || isLoading) {
     return (
@@ -92,97 +127,79 @@ export default function AdminDashboard() {
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-900">
       <Header />
-      <main className="flex-1 container px-4 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold">Administration SwiftColis</h1>
-          <p className="text-slate-600 dark:text-slate-400 mt-1">Bienvenue, {session?.user?.name}</p>
-        </div>
+      <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8">
+        <DashboardShell tone="admin" className="mx-auto max-w-7xl">
+          <DashboardHero
+            tone="admin"
+            eyebrow="Centre de pilotage"
+            title="Administration SwiftColis"
+            description="Surveillez la plateforme, arbitrez les flux sensibles et pilotez les opérations depuis une interface plus nette, plus dense et plus lisible."
+            meta={
+              <>
+                <Badge variant="outline" className="border-white/70 bg-white/70 text-slate-700">Connecté: {session?.user?.name}</Badge>
+                <Badge variant="outline" className="border-white/70 bg-white/70 text-slate-700">{stats?.counts?.pendingRelais || 0} relais à valider</Badge>
+              </>
+            }
+          />
 
-        {/* Stats Cards */}
-        <div className="grid gap-4 md:grid-cols-5 mb-8">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Utilisateurs</CardTitle>
-              <Users className="h-4 w-4 text-slate-400" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats?.counts?.users || 0}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Colis</CardTitle>
-              <Package className="h-4 w-4 text-slate-400" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats?.counts?.parcels || 0}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Transporteurs</CardTitle>
-              <Truck className="h-4 w-4 text-slate-400" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats?.counts?.transporters || 0}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Points relais</CardTitle>
-              <Store className="h-4 w-4 text-slate-400" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats?.counts?.relais || 0}</div>
-              {stats?.counts?.pendingRelais > 0 && (
-                <p className="text-xs text-orange-500">{stats.counts.pendingRelais} en attente</p>
-              )}
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Revenus</CardTitle>
-              <DollarSign className="h-4 w-4 text-slate-400" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{(stats?.revenue || 0).toFixed(0)} DA</div>
-            </CardContent>
-          </Card>
-        </div>
+          <DashboardStatsGrid className="xl:grid-cols-5">
+            <DashboardMetricCard tone="admin" label="Utilisateurs" value={stats?.counts?.users || 0} icon={<Users className="h-5 w-5" />} />
+            <DashboardMetricCard tone="admin" label="Colis" value={stats?.counts?.parcels || 0} icon={<Package className="h-5 w-5" />} />
+            <DashboardMetricCard tone="admin" label="Transporteurs" value={stats?.counts?.transporters || 0} icon={<Truck className="h-5 w-5" />} />
+            <DashboardMetricCard tone="admin" label="Points relais" value={stats?.counts?.relais || 0} icon={<Store className="h-5 w-5" />} detail={stats?.counts?.pendingRelais > 0 ? `${stats.counts.pendingRelais} en attente` : 'Aucun dossier en attente'} />
+            <DashboardMetricCard tone="admin" label="Revenus" value={`${(stats?.revenue || 0).toFixed(0)} DA`} icon={<DollarSign className="h-5 w-5" />} />
+          </DashboardStatsGrid>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-7 mb-8">
-            <TabsTrigger value="overview"><BarChart3 className="h-4 w-4 mr-2" />Vue d'ensemble</TabsTrigger>
-            <TabsTrigger value="users"><Users className="h-4 w-4 mr-2" />Utilisateurs</TabsTrigger>
-            <TabsTrigger value="parcels"><Package className="h-4 w-4 mr-2" />Colis</TabsTrigger>
-            <TabsTrigger value="relays"><Store className="h-4 w-4 mr-2" />Relais</TabsTrigger>
-            <TabsTrigger value="lines"><MapPin className="h-4 w-4 mr-2" />Lignes</TabsTrigger>
-            <TabsTrigger value="audit"><ScrollText className="h-4 w-4 mr-2" />Audit</TabsTrigger>
-            <TabsTrigger value="settings"><Settings className="h-4 w-4 mr-2" />Paramètres</TabsTrigger>
-          </TabsList>
+          <DashboardPanel tone="admin">
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
+              <TabsList className={`${dashboardTabsListClass} grid grid-cols-2 lg:grid-cols-9`}>
+                <TabsTrigger value="overview" className={getDashboardTabsTriggerClass('admin')}><BarChart3 className="h-4 w-4 mr-2" />Vue d'ensemble</TabsTrigger>
+                <TabsTrigger value="users" className={getDashboardTabsTriggerClass('admin')}><Users className="h-4 w-4 mr-2" />Utilisateurs</TabsTrigger>
+                <TabsTrigger value="parcels" className={getDashboardTabsTriggerClass('admin')}><Package className="h-4 w-4 mr-2" />Colis</TabsTrigger>
+                <TabsTrigger value="relays" className={getDashboardTabsTriggerClass('admin')}><Store className="h-4 w-4 mr-2" />Relais</TabsTrigger>
+                <TabsTrigger value="lines" className={getDashboardTabsTriggerClass('admin')}><MapPin className="h-4 w-4 mr-2" />Lignes</TabsTrigger>
+                <TabsTrigger value="loyalty" className={getDashboardTabsTriggerClass('admin')}><Award className="h-4 w-4 mr-2" />Fidélité</TabsTrigger>
+                <TabsTrigger value="audit" className={getDashboardTabsTriggerClass('admin')}><ScrollText className="h-4 w-4 mr-2" />Audit</TabsTrigger>
+                <TabsTrigger value="messages" className={getDashboardTabsTriggerClass('admin')}>
+                  <Inbox className="h-4 w-4 mr-2" />
+                  Messages
+                  {unreadMessagesCount > 0 && (
+                    <Badge className="ml-2 bg-red-500 px-1.5 py-0 text-[10px] text-white">{unreadMessagesCount}</Badge>
+                  )}
+                </TabsTrigger>
+                <TabsTrigger value="settings" className={getDashboardTabsTriggerClass('admin')}><Settings className="h-4 w-4 mr-2" />Paramètres</TabsTrigger>
+              </TabsList>
 
-          <TabsContent value="overview">
-            <OverviewTab stats={stats} setActiveTab={setActiveTab} />
-          </TabsContent>
-          <TabsContent value="users">
-            <UsersTab />
-          </TabsContent>
-          <TabsContent value="parcels">
-            <ParcelsTab />
-          </TabsContent>
-          <TabsContent value="relays">
-            <RelaysTab />
-          </TabsContent>
-          <TabsContent value="lines">
-            <LinesTab />
-          </TabsContent>
-          <TabsContent value="audit">
-            <AuditTab />
-          </TabsContent>
-          <TabsContent value="settings">
-            <SettingsTab />
-          </TabsContent>
-        </Tabs>
+              <TabsContent value="overview">
+                <OverviewTab stats={stats} setActiveTab={setActiveTab} />
+              </TabsContent>
+              <TabsContent value="users">
+                <UsersTab />
+              </TabsContent>
+              <TabsContent value="parcels">
+                <ParcelsTab />
+              </TabsContent>
+              <TabsContent value="relays">
+                <RelaysTab />
+              </TabsContent>
+              <TabsContent value="lines">
+                <LinesTab />
+              </TabsContent>
+              <TabsContent value="loyalty">
+                <LoyaltyTab />
+              </TabsContent>
+              <TabsContent value="audit">
+                <AuditTab />
+              </TabsContent>
+              <TabsContent value="messages">
+                <MessagesTab onUnreadCountChange={setUnreadMessagesCount} />
+              </TabsContent>
+              <TabsContent value="settings">
+                <SettingsTab />
+              </TabsContent>
+            </Tabs>
+          </DashboardPanel>
+        </DashboardShell>
       </main>
       <Footer />
     </div>
@@ -399,6 +416,7 @@ function UsersTab() {
           phone: editUser.phone,
           email: editUser.email,
           isActive: editUser.isActive,
+          clientType: editUser.clientType,
         }),
       });
       if (response.ok) {
@@ -412,6 +430,25 @@ function UsersTab() {
       toast({ title: 'Erreur', description: 'Impossible de modifier l\'utilisateur', variant: 'destructive' });
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleTogglePro = async (userId: string, currentType: string) => {
+    const newType = currentType === 'PRO' ? 'STANDARD' : 'PRO';
+    try {
+      const response = await fetch(`/api/users/${userId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clientType: newType }),
+      });
+      if (response.ok) {
+        toast({ title: `Client ${newType === 'PRO' ? 'passé en PRO' : 'repassé en STANDARD'}` });
+        fetchUsers();
+      } else {
+        throw new Error('Failed');
+      }
+    } catch {
+      toast({ title: 'Erreur', description: 'Impossible de modifier le type client', variant: 'destructive' });
     }
   };
 
@@ -439,6 +476,71 @@ function UsersTab() {
   const safeUsers = Array.isArray(users) ? users : [];
   const filteredUsers = filter === 'all' ? safeUsers : safeUsers.filter(u => u.role === filter);
 
+  const getWilayaName = (value?: string | null) => {
+    if (!value) return null;
+    return WILAYAS.find((wilaya) => wilaya.id === value)?.name || value;
+  };
+
+  const getApprovalStatusLabel = (value?: string | null) => {
+    switch (value) {
+      case 'APPROVED':
+        return 'Approuvé';
+      case 'REJECTED':
+        return 'Refusé';
+      case 'PENDING':
+        return 'En attente';
+      default:
+        return value || null;
+    }
+  };
+
+  const getAddressLines = (user: any) => {
+    if (user.role === 'RELAIS') {
+      return [user.relais?.address, getWilayaName(user.relais?.ville)].filter(Boolean);
+    }
+
+    if (user.role === 'ENSEIGNE') {
+      return [user.address, getWilayaName(user.enseigne?.operationalCity)].filter(Boolean);
+    }
+
+    return [user.address].filter(Boolean);
+  };
+
+  const getRoleDetails = (user: any) => {
+    if (user.role === 'RELAIS') {
+      return {
+        title: user.relais?.commerceName || 'Point relais',
+        meta: [getApprovalStatusLabel(user.relais?.status), user.relais?.operationalStatus].filter(Boolean),
+      };
+    }
+
+    if (user.role === 'ENSEIGNE') {
+      return {
+        title: user.enseigne?.businessName || 'Enseigne',
+        meta: [user.enseigne?.billingEmail, getWilayaName(user.enseigne?.operationalCity)].filter(Boolean),
+      };
+    }
+
+    if (user.role === 'TRANSPORTER') {
+      return {
+        title: user.transporterApplication?.vehicle || 'Transporteur',
+        meta: [getApprovalStatusLabel(user.transporterApplication?.status), user.siret].filter(Boolean),
+      };
+    }
+
+    if (user.role === 'CLIENT') {
+      return {
+        title: user.clientType === 'PRO' ? 'Client professionnel' : 'Client particulier',
+        meta: [user.siret].filter(Boolean),
+      };
+    }
+
+    return {
+      title: USER_ROLES.find((role) => role.id === user.role)?.label || user.role,
+      meta: [user.siret].filter(Boolean),
+    };
+  };
+
   return (
     <>
       <Card>
@@ -465,10 +567,11 @@ function UsersTab() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Nom</TableHead>
-                  <TableHead>Email</TableHead>
+                  <TableHead>Contact</TableHead>
                   <TableHead>Rôle</TableHead>
-                  <TableHead>Téléphone</TableHead>
+                  <TableHead>Adresse</TableHead>
                   <TableHead>Statut</TableHead>
+                  <TableHead>Type</TableHead>
                   <TableHead>Inscription</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
@@ -476,14 +579,63 @@ function UsersTab() {
               <TableBody>
                 {filteredUsers.map((user) => (
                   <TableRow key={user.id}>
-                    <TableCell className="font-medium">{user.name}</TableCell>
-                    <TableCell>{user.email}</TableCell>
-                    <TableCell><Badge variant="outline">{USER_ROLES.find(r => r.id === user.role)?.label}</Badge></TableCell>
-                    <TableCell>{user.phone || '-'}</TableCell>
                     <TableCell>
-                      <Badge className={user.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}>
-                        {user.isActive ? 'Actif' : 'Inactif'}
-                      </Badge>
+                      <div className="space-y-1">
+                        <p className="font-medium">{user.name}</p>
+                        {getRoleDetails(user).title && getRoleDetails(user).title !== user.name ? (
+                          <p className="text-xs text-slate-500">{getRoleDetails(user).title}</p>
+                        ) : null}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="space-y-1 text-sm">
+                        <p>{user.email}</p>
+                        <p className="text-xs text-slate-500">{user.phone || 'Téléphone non renseigné'}</p>
+                      </div>
+                    </TableCell>
+                    <TableCell><Badge variant="outline">{USER_ROLES.find(r => r.id === user.role)?.label || user.role}</Badge></TableCell>
+                    <TableCell>
+                      <div className="space-y-1 text-sm max-w-xs">
+                        {getAddressLines(user).length > 0 ? (
+                          getAddressLines(user).map((line, index) => (
+                            <p key={`${user.id}-address-${index}`} className={index === 0 ? 'text-slate-900 dark:text-slate-100' : 'text-xs text-slate-500'}>
+                              {line}
+                            </p>
+                          ))
+                        ) : (
+                          <span className="text-xs text-slate-400">Adresse non renseignée</span>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="space-y-1">
+                        <Badge className={user.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}>
+                          {user.isActive ? 'Actif' : 'Inactif'}
+                        </Badge>
+                        {getRoleDetails(user).meta.map((detail: string, index: number) => (
+                          <p key={`${user.id}-meta-${index}`} className="text-xs text-slate-500">{detail}</p>
+                        ))}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {user.role === 'CLIENT' ? (
+                        <button
+                          onClick={() => handleTogglePro(user.id, user.clientType || 'STANDARD')}
+                          className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold transition-colors ${
+                            user.clientType === 'PRO'
+                              ? 'bg-violet-600 text-white hover:bg-violet-700'
+                              : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                          }`}
+                          title={user.clientType === 'PRO' ? 'Révoquer le statut PRO' : 'Passer en PRO'}
+                        >
+                          {user.clientType === 'PRO' ? '★ PRO' : 'STANDARD'}
+                        </button>
+                      ) : (
+                        <div className="space-y-1">
+                          <span className="text-xs text-slate-400">—</span>
+                          {user.siret ? <p className="text-xs text-slate-500">RC: {user.siret}</p> : null}
+                        </div>
+                      )}
                     </TableCell>
                     <TableCell>{new Date(user.createdAt).toLocaleDateString('fr-FR')}</TableCell>
                     <TableCell>
@@ -528,6 +680,17 @@ function UsersTab() {
                 <input type="checkbox" id="isActive" checked={editUser.isActive} onChange={(e) => setEditUser({ ...editUser, isActive: e.target.checked })} />
                 <Label htmlFor="isActive">Compte actif</Label>
               </div>
+              {editUser.role === 'CLIENT' && (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="isPro"
+                    checked={editUser.clientType === 'PRO'}
+                    onChange={(e) => setEditUser({ ...editUser, clientType: e.target.checked ? 'PRO' : 'STANDARD' })}
+                  />
+                  <Label htmlFor="isPro">Client professionnel (PRO)</Label>
+                </div>
+              )}
             </div>
           )}
           <DialogFooter>
@@ -800,9 +963,9 @@ function RelaysTab() {
           commerceName: editRelais.commerceName,
           address: editRelais.address,
           ville: editRelais.ville,
-          commissionPetit: parseFloat(editRelais.commissionPetit),
-          commissionMoyen: parseFloat(editRelais.commissionMoyen),
-          commissionGros: parseFloat(editRelais.commissionGros),
+          commissionPetit: parseLocaleFloat(editRelais.commissionPetit),
+          commissionMoyen: parseLocaleFloat(editRelais.commissionMoyen),
+          commissionGros: parseLocaleFloat(editRelais.commissionGros),
           status: editRelais.status,
           operationalStatus: editRelais.operationalStatus || 'ACTIF',
           suspensionReason: (editRelais.operationalStatus || 'ACTIF') === 'SUSPENDU' ? editRelais.suspensionReason || 'Suspendu par un administrateur' : null,
@@ -1035,7 +1198,36 @@ function RelaysTab() {
   };
 
   const safeRelais = Array.isArray(relais) ? relais : [];
-  const filteredRelais = filter === 'all' ? safeRelais : safeRelais.filter(r => r.status === filter);
+  const dedupedRelais = Array.from(
+    safeRelais.reduce((acc: Map<string, any>, current: any) => {
+      const key = current.userId || current.id;
+      const prev = acc.get(key);
+
+      if (!prev) {
+        acc.set(key, current);
+        return acc;
+      }
+
+      const prevScore = (prev.status === 'APPROVED' ? 3 : prev.status === 'PENDING' ? 2 : 1);
+      const currentScore = (current.status === 'APPROVED' ? 3 : current.status === 'PENDING' ? 2 : 1);
+      if (currentScore > prevScore) {
+        acc.set(key, current);
+        return acc;
+      }
+
+      if (currentScore === prevScore) {
+        const prevUpdatedAt = prev.updatedAt ? new Date(prev.updatedAt).getTime() : 0;
+        const currentUpdatedAt = current.updatedAt ? new Date(current.updatedAt).getTime() : 0;
+        if (currentUpdatedAt > prevUpdatedAt) {
+          acc.set(key, current);
+        }
+      }
+
+      return acc;
+    }, new Map<string, any>()).values()
+  );
+
+  const filteredRelais = filter === 'all' ? dedupedRelais : dedupedRelais.filter(r => r.status === filter);
 
   return (
     <>
@@ -1322,7 +1514,7 @@ function RelaysTab() {
           <div className="flex items-center justify-between">
             <div>
               <CardTitle>Validation des points relais</CardTitle>
-              <CardDescription>{safeRelais.filter(r => r.status === 'PENDING').length} demandes en attente</CardDescription>
+              <CardDescription>{dedupedRelais.filter(r => r.status === 'PENDING').length} demandes en attente</CardDescription>
             </div>
             <Select value={filter} onValueChange={setFilter}>
               <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
@@ -1485,6 +1677,7 @@ function RelaysTab() {
 function LinesTab() {
   const { toast } = useToast();
   const [lignes, setLignes] = useState<any[]>([]);
+  const [availableLineCities, setAvailableLineCities] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
   const [editLigne, setEditLigne] = useState<any>(null);
@@ -1494,7 +1687,47 @@ function LinesTab() {
     villeDepart: '', villeArrivee: '', tarifPoids: '120', tarifKm: '2.5',
   });
 
-  useEffect(() => { fetchLignes(); }, []);
+  const normalizeCityKey = useCallback((value: string) =>
+    value
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, ''), []);
+
+  const cityValueToWilayaId = useCallback((value: string) => {
+    const raw = String(value || '').trim();
+    if (!raw) return '';
+
+    const byId = WILAYAS.find((wilaya) => wilaya.id === raw);
+    if (byId) return byId.id;
+
+    const normalizedRaw = normalizeCityKey(raw);
+    const byName = WILAYAS.find((wilaya) => normalizeCityKey(wilaya.name) === normalizedRaw);
+    return byName?.id || '';
+  }, [normalizeCityKey]);
+
+  const getCityLabel = useCallback((value: string) => {
+    const id = cityValueToWilayaId(value);
+    const byId = id ? WILAYAS.find((wilaya) => wilaya.id === id) : null;
+    return byId?.name || value || '—';
+  }, [cityValueToWilayaId]);
+
+  useEffect(() => {
+    void fetchLignes();
+    void fetchAvailableLineCities();
+  }, []);
+
+  const lineCityOptions = useMemo(() => {
+    if (availableLineCities.length === 0) return [];
+    return WILAYAS.filter((wilaya) => availableLineCities.includes(wilaya.id));
+  }, [availableLineCities]);
+
+  const editLineCityOptions = useMemo(() => {
+    const ids = new Set(availableLineCities);
+    if (editLigne?.villeDepart) ids.add(editLigne.villeDepart);
+    if (editLigne?.villeArrivee) ids.add(editLigne.villeArrivee);
+    return WILAYAS.filter((wilaya) => ids.has(wilaya.id));
+  }, [availableLineCities, editLigne]);
 
   const fetchLignes = async () => {
     try {
@@ -1517,25 +1750,94 @@ function LinesTab() {
     }
   };
 
+  const fetchAvailableLineCities = async () => {
+    try {
+      const response = await fetch('/api/relais?status=APPROVED');
+      const data = await response.json();
+      if (!response.ok || !Array.isArray(data)) {
+        return;
+      }
+
+      const uniqueCities = Array.from(new Set(
+        data
+          .filter((relay: any) => relay.operationalStatus === 'ACTIF')
+          .map((relay: any) => cityValueToWilayaId(String(relay.ville || '').trim()))
+          .filter(Boolean)
+      ));
+
+      setAvailableLineCities(uniqueCities);
+    } catch {
+      setAvailableLineCities([]);
+    }
+  };
+
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!formData.villeDepart || !formData.villeArrivee) {
+      toast({ title: 'Champs manquants', description: 'Sélectionnez la ville de départ et la ville d\'arrivée.', variant: 'destructive' });
+      return;
+    }
+    if (formData.villeDepart === formData.villeArrivee) {
+      toast({ title: 'Villes identiques', description: 'La ville de départ et d\'arrivée doivent être différentes.', variant: 'destructive' });
+      return;
+    }
+
+    const poids = parseLocaleFloat(formData.tarifPoids);
+    const km = parseLocaleFloat(formData.tarifKm);
+    
+    if (!Number.isFinite(poids) || poids <= 0) {
+      toast({ title: 'Tarif poids invalide', description: 'Entrez un montant positif en DA/kg.', variant: 'destructive' });
+      return;
+    }
+    if (!Number.isFinite(km) || km <= 0) {
+      toast({ title: 'Tarif distance invalide', description: 'Entrez un montant positif en DA/km.', variant: 'destructive' });
+      return;
+    }
+
     setIsCreating(true);
     try {
-      await fetch('/api/lignes', {
+      const response = await fetch('/api/lignes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           villeDepart: formData.villeDepart,
           villeArrivee: formData.villeArrivee,
-          tarifPoids: parseFloat(formData.tarifPoids),
-          tarifKm: parseFloat(formData.tarifKm),
+          tarifPoids: parseLocaleFloat(formData.tarifPoids),
+          tarifKm: parseLocaleFloat(formData.tarifKm),
         }),
       });
-      toast({ title: 'Ligne créée' });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        const deparName = getCityLabel(formData.villeDepart);
+        const arriveName = getCityLabel(formData.villeArrivee);
+        
+        let title = 'Erreur création';
+        let description = data?.error || `Erreur ${response.status}`;
+        
+        if (response.status === 409) {
+          title = 'Ligne déjà existante';
+          description = `La route ${deparName} → ${arriveName} existe déjà.`;
+        }
+        
+        toast({
+          title,
+          description,
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      toast({
+        title: 'Ligne créée',
+        description: `${getCityLabel(formData.villeDepart)} → ${getCityLabel(formData.villeArrivee)}`,
+      });
       fetchLignes();
       setFormData({ villeDepart: '', villeArrivee: '', tarifPoids: '120', tarifKm: '2.5' });
-    } catch {
-      toast({ title: 'Erreur', variant: 'destructive' });
+    } catch (err) {
+      toast({ title: 'Erreur réseau', description: err instanceof Error ? err.message : 'Impossible de contacter le serveur.', variant: 'destructive' });
     } finally {
       setIsCreating(false);
     }
@@ -1551,20 +1853,21 @@ function LinesTab() {
         body: JSON.stringify({
           villeDepart: editLigne.villeDepart,
           villeArrivee: editLigne.villeArrivee,
-          tarifPoids: parseFloat(editLigne.tarifPoids ?? editLigne.tarifPetit),
-          tarifKm: parseFloat(editLigne.tarifKm ?? editLigne.tarifMoyen),
+          tarifPoids: parseLocaleFloat(editLigne.tarifPoids ?? editLigne.tarifPetit),
+          tarifKm: parseLocaleFloat(editLigne.tarifKm ?? editLigne.tarifMoyen),
           isActive: editLigne.isActive,
         }),
       });
+      const data = await response.json();
       if (response.ok) {
         toast({ title: 'Ligne modifiée' });
         setEditLigne(null);
         fetchLignes();
       } else {
-        throw new Error('Failed');
+        toast({ title: 'Erreur', description: data?.error || 'Impossible de modifier la ligne', variant: 'destructive' });
       }
-    } catch {
-      toast({ title: 'Erreur', description: 'Impossible de modifier la ligne', variant: 'destructive' });
+    } catch (err) {
+      toast({ title: 'Erreur réseau', description: err instanceof Error ? err.message : 'Impossible de contacter le serveur.', variant: 'destructive' });
     } finally {
       setIsSaving(false);
     }
@@ -1577,15 +1880,16 @@ function LinesTab() {
       const response = await fetch(`/api/lignes/${deleteLigneId}`, {
         method: 'DELETE',
       });
+      const data = await response.json().catch(() => ({}));
       if (response.ok) {
         toast({ title: 'Ligne supprimée' });
         setDeleteLigneId(null);
         fetchLignes();
       } else {
-        throw new Error('Failed');
+        toast({ title: 'Erreur', description: data?.error || 'Impossible de supprimer la ligne', variant: 'destructive' });
       }
-    } catch {
-      toast({ title: 'Erreur', description: 'Impossible de supprimer la ligne', variant: 'destructive' });
+    } catch (err) {
+      toast({ title: 'Erreur réseau', description: err instanceof Error ? err.message : 'Impossible de contacter le serveur.', variant: 'destructive' });
     } finally {
       setIsSaving(false);
     }
@@ -1608,7 +1912,7 @@ function LinesTab() {
                   <Select value={formData.villeDepart} onValueChange={(v) => setFormData({ ...formData, villeDepart: v })}>
                     <SelectTrigger><SelectValue placeholder="Sélectionner" /></SelectTrigger>
                     <SelectContent>
-                      {WILAYAS.map(w => <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>)}
+                      {lineCityOptions.map(w => <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
@@ -1617,11 +1921,14 @@ function LinesTab() {
                   <Select value={formData.villeArrivee} onValueChange={(v) => setFormData({ ...formData, villeArrivee: v })}>
                     <SelectTrigger><SelectValue placeholder="Sélectionner" /></SelectTrigger>
                     <SelectContent>
-                      {WILAYAS.map(w => <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>)}
+                      {lineCityOptions.map(w => <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
               </div>
+              {lineCityOptions.length === 0 ? (
+                <p className="text-sm text-amber-600">Aucune ville n'est disponible tant qu'aucun relais actif et approuvé n'existe.</p>
+              ) : null}
               <div className="grid gap-4 md:grid-cols-3">
                 <div className="space-y-2">
                   <Label>Tarif par poids (DA/kg)</Label>
@@ -1632,7 +1939,21 @@ function LinesTab() {
                   <Input type="number" step="0.1" value={formData.tarifKm} onChange={(e) => setFormData({ ...formData, tarifKm: e.target.value })} />
                 </div>
               </div>
-              <Button type="submit" disabled={isCreating} className="bg-emerald-600 hover:bg-emerald-700">
+              <Button 
+                type="submit" 
+                disabled={
+                  isCreating || 
+                  !formData.villeDepart || 
+                  !formData.villeArrivee || 
+                  formData.villeDepart === formData.villeArrivee ||
+                  !formData.tarifPoids ||
+                  !formData.tarifKm ||
+                  lineCityOptions.length < 2 ||
+                  parseLocaleFloat(formData.tarifPoids) <= 0 ||
+                  parseLocaleFloat(formData.tarifKm) <= 0
+                } 
+                className="bg-emerald-600 hover:bg-emerald-700"
+              >
                 {isCreating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
                 Créer la ligne
               </Button>
@@ -1662,8 +1983,8 @@ function LinesTab() {
                 <TableBody>
                   {safeLignes.map((ligne) => (
                     <TableRow key={ligne.id}>
-                      <TableCell>{WILAYAS.find(w => w.id === ligne.villeDepart)?.name}</TableCell>
-                      <TableCell>{WILAYAS.find(w => w.id === ligne.villeArrivee)?.name}</TableCell>
+                      <TableCell>{getCityLabel(ligne.villeDepart)}</TableCell>
+                      <TableCell>{getCityLabel(ligne.villeArrivee)}</TableCell>
                       <TableCell>{ligne.tarifPoids ?? ligne.tarifPetit} DA</TableCell>
                       <TableCell>{ligne.tarifKm ?? ligne.tarifMoyen} DA</TableCell>
                       <TableCell>
@@ -1704,7 +2025,7 @@ function LinesTab() {
                   <Select value={editLigne.villeDepart} onValueChange={(v) => setEditLigne({ ...editLigne, villeDepart: v })}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      {WILAYAS.map(w => <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>)}
+                      {editLineCityOptions.map(w => <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
@@ -1713,7 +2034,7 @@ function LinesTab() {
                   <Select value={editLigne.villeArrivee} onValueChange={(v) => setEditLigne({ ...editLigne, villeArrivee: v })}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      {WILAYAS.map(w => <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>)}
+                      {editLineCityOptions.map(w => <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
@@ -1774,6 +2095,7 @@ const ACTIONS_MAP: Record<string, string> = {
   QR_SCAN: 'Scan QR',
   PAYMENT_VALIDATE: 'Paiement validé',
   STATUS_CHANGE: 'Changement statut',
+  PRINTER_STATUS_CHANGE: 'Changement statut imprimante',
   DEPOSIT: 'Dépôt relais',
   DELIVERY: 'Livraison',
   WITHDRAW: 'Retrait portefeuille',
@@ -1797,6 +2119,13 @@ function AuditTab() {
   const [actionFilter, setActionFilter] = useState<string>('');
   const [limit, setLimit] = useState(50);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  const applyQuickActionFilter = (value: string, scopedEntityType?: string) => {
+    setActionFilter(value);
+    if (scopedEntityType) {
+      setEntityType(scopedEntityType);
+    }
+  };
 
   const fetchLogs = useCallback(async () => {
     setIsLoading(true);
@@ -1850,6 +2179,30 @@ function AuditTab() {
                 onChange={e => setActionFilter(e.target.value)}
                 className="w-48"
               />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Raccourcis</Label>
+              <div className="flex gap-2">
+                <Button
+                  variant={actionFilter === 'PRINTER_STATUS_CHANGE' && entityType === 'RELAIS' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => applyQuickActionFilter('PRINTER_STATUS_CHANGE', 'RELAIS')}
+                  className={actionFilter === 'PRINTER_STATUS_CHANGE' && entityType === 'RELAIS' ? 'bg-emerald-600 hover:bg-emerald-700' : ''}
+                >
+                  Imprimantes
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    applyQuickActionFilter('');
+                    setEntityType('ALL');
+                  }}
+                  disabled={!actionFilter && entityType === 'ALL'}
+                >
+                  Réinitialiser
+                </Button>
+              </div>
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Limite</Label>
@@ -1939,11 +2292,312 @@ function AuditTab() {
   );
 }
 
+// ─── Messages Tab ────────────────────────────────────────────────────────────
+function MessagesTab({ onUnreadCountChange }: { onUnreadCountChange?: (count: number) => void }) {
+  const [messages, setMessages] = useState<any[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [filter, setFilter] = useState<'all' | 'unread' | 'read'>('all');
+  const [isLoading, setIsLoading] = useState(false);
+  const [selected, setSelected] = useState<any | null>(null);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [replyText, setReplyText] = useState('');
+  const [isSendingReply, setIsSendingReply] = useState(false);
+  const { toast } = useToast();
+
+  const syncUnreadCount = useCallback(async () => {
+    if (!onUnreadCountChange) return;
+    try {
+      const res = await fetch('/api/admin/messages?filter=unread&page=1');
+      if (!res.ok) return;
+      const data = await res.json();
+      onUnreadCountChange(typeof data?.total === 'number' ? data.total : 0);
+    } catch {
+      // Keep UI responsive even if this secondary request fails.
+    }
+  }, [onUnreadCountChange]);
+
+  const fetchMessages = useCallback(async () => {
+    setIsLoading(true);
+    setFetchError(null);
+    try {
+      const params = new URLSearchParams({ filter, page: String(page) });
+      const res = await fetch(`/api/admin/messages?${params}`);
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        setFetchError(`HTTP ${res.status} — ${body.error ?? 'Erreur inconnue'}`);
+        return;
+      }
+      const data = await res.json();
+      setMessages(data.messages);
+      setTotal(data.total);
+      await syncUnreadCount();
+    } catch (err) {
+      setFetchError('Requête échouée (réseau ou serveur)');
+      toast({ title: 'Erreur', description: 'Impossible de charger les messages.', variant: 'destructive' });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [filter, page, syncUnreadCount, toast]);
+
+  useEffect(() => {
+    fetchMessages();
+  }, [fetchMessages]);
+
+  const markRead = async (msg: any, isRead: boolean) => {
+    await fetch('/api/admin/messages', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: msg.id, isRead }),
+    });
+    setMessages((prev) => prev.map((m) => (m.id === msg.id ? { ...m, isRead } : m)));
+    if (selected?.id === msg.id) setSelected({ ...msg, isRead });
+    void syncUnreadCount();
+  };
+
+  const deleteMsg = async (id: string) => {
+    await fetch(`/api/admin/messages?id=${id}`, { method: 'DELETE' });
+    setMessages((prev) => prev.filter((m) => m.id !== id));
+    setTotal((t) => t - 1);
+    if (selected?.id === id) setSelected(null);
+    void syncUnreadCount();
+  };
+
+  const selectMessage = (msg: any) => {
+    setSelected(msg);
+    setReplyText('');
+    if (!msg.isRead) void markRead(msg, true);
+  };
+
+  const sendReply = async () => {
+    if (!selected || !replyText.trim()) return;
+    setIsSendingReply(true);
+    try {
+      const res = await fetch('/api/admin/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: selected.id, reply: replyText }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast({ title: 'Erreur', description: data.error ?? `HTTP ${res.status}`, variant: 'destructive' });
+        return;
+      }
+      const desc = data.emailSent ? `Email envoyé à ${selected.email}` : `Réponse enregistrée (email non envoyé — vérifier RESEND_API_KEY)`;
+      toast({ title: 'Réponse envoyée', description: desc });
+      setReplyText('');
+      const savedReply = replyText.trim();
+      setMessages((prev) => prev.map((m) => m.id === selected.id ? { ...m, isRead: true, repliedAt: new Date().toISOString(), replyContent: savedReply } : m));
+      setSelected((s: any) => s ? { ...s, isRead: true, repliedAt: new Date().toISOString(), replyContent: savedReply } : s);
+      void syncUnreadCount();
+    } catch (err) {
+      toast({ title: 'Erreur réseau', description: String(err), variant: 'destructive' });
+    } finally {
+      setIsSendingReply(false);
+    }
+  };
+
+  const unreadCount = messages.filter((m) => !m.isRead).length;
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between pb-3">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <Inbox className="h-5 w-5 text-violet-500" />
+              Messages de contact
+              {unreadCount > 0 && <Badge className="ml-1 bg-red-500 text-white">{unreadCount} non lus</Badge>}
+            </CardTitle>
+            <CardDescription>{total} message{total !== 1 ? 's' : ''} au total</CardDescription>
+          </div>
+          <div className="flex items-center gap-2">
+            <Select
+              value={filter}
+              onValueChange={(v) => {
+                setFilter(v as 'all' | 'unread' | 'read');
+                setPage(1);
+              }}
+            >
+              <SelectTrigger className="w-36">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tous</SelectItem>
+                <SelectItem value="unread">Non lus</SelectItem>
+                <SelectItem value="read">Lus</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button variant="outline" size="sm" onClick={fetchMessages} disabled={isLoading}>
+              <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          {isLoading ? (
+            <div className="flex justify-center py-10">
+              <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
+            </div>
+          ) : fetchError ? (
+            <div className="flex flex-col items-center gap-2 py-12 text-red-500">
+              <p className="text-sm font-semibold">Erreur de chargement</p>
+              <p className="text-xs font-mono bg-red-50 dark:bg-red-950/30 px-3 py-1 rounded">{fetchError}</p>
+              <Button size="sm" variant="outline" className="mt-2" onClick={fetchMessages}>Réessayer</Button>
+            </div>
+          ) : messages.length === 0 ? (
+            <div className="flex flex-col items-center gap-2 py-12 text-slate-400">
+              <Inbox className="h-12 w-12 opacity-30" />
+              <p className="text-sm">Aucun message</p>
+            </div>
+          ) : (
+            <div className="divide-y">
+              {messages.map((msg) => (
+                <div
+                  key={msg.id}
+                  onClick={() => selectMessage(msg)}
+                  className={`cursor-pointer px-5 py-4 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/50 ${
+                    !msg.isRead ? 'bg-violet-50/60 dark:bg-violet-900/10' : ''
+                  } ${selected?.id === msg.id ? 'ring-2 ring-inset ring-violet-400/50' : ''}`}
+                >
+                  <div className="flex items-start gap-4">
+                    <div className="mt-1">
+                      {msg.isRead ? <MailOpen className="h-5 w-5 text-slate-400" /> : <Mail className="h-5 w-5 text-violet-500" />}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className={`text-sm ${!msg.isRead ? 'font-semibold text-slate-900 dark:text-slate-100' : 'font-medium text-slate-700 dark:text-slate-300'}`}>
+                          {msg.name}
+                        </span>
+                        <span className="text-xs text-slate-400">{msg.email}</span>
+                        {!msg.isRead && <Badge className="bg-violet-500 px-1.5 py-0 text-[10px] text-white">Nouveau</Badge>}
+                      </div>
+                      <p className="truncate text-sm text-slate-600 dark:text-slate-400">{msg.subject}</p>
+                      <p className="mt-0.5 line-clamp-1 text-xs text-slate-400">{msg.message}</p>
+                    </div>
+                    <div className="shrink-0 space-y-1 text-right">
+                      <p className="text-xs text-slate-400">
+                        {new Date(msg.createdAt).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })}
+                      </p>
+                      <div className="flex justify-end gap-1">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 w-7 p-0 text-slate-400 hover:text-slate-700"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void markRead(msg, !msg.isRead);
+                          }}
+                          title={msg.isRead ? 'Marquer non lu' : 'Marquer lu'}
+                        >
+                          {msg.isRead ? <Mail className="h-3.5 w-3.5" /> : <MailOpen className="h-3.5 w-3.5" />}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 w-7 p-0 text-red-400 hover:text-red-600"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void deleteMsg(msg.id);
+                          }}
+                          title="Supprimer"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          {total > 20 && (
+            <div className="flex items-center justify-between border-t px-5 py-3 text-sm text-slate-500">
+              <span>
+                {Math.min((page - 1) * 20 + 1, total)}–{Math.min(page * 20, total)} sur {total}
+              </span>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" disabled={page === 1} onClick={() => setPage((p) => p - 1)}>
+                  Précédent
+                </Button>
+                <Button variant="outline" size="sm" disabled={page * 20 >= total} onClick={() => setPage((p) => p + 1)}>
+                  Suivant
+                </Button>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {selected && (
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <CardTitle className="text-base">{selected.subject}</CardTitle>
+                <CardDescription>
+                  De : <strong>{selected.name}</strong> &lt;{selected.email}&gt; •{' '}
+                  {new Date(selected.createdAt).toLocaleString('fr-FR', { dateStyle: 'full', timeStyle: 'short' })}
+                  {selected.repliedAt && (
+                    <span className="ml-2 text-green-600">✓ Répondu le {new Date(selected.repliedAt).toLocaleDateString('fr-FR')}</span>
+                  )}
+                </CardDescription>
+              </div>
+              <Button variant="ghost" size="sm" className="text-slate-400" onClick={() => setSelected(null)}>
+                Fermer
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="whitespace-pre-wrap rounded-lg bg-slate-50 p-4 text-sm leading-relaxed text-slate-700 dark:bg-slate-800/50 dark:text-slate-300">
+              {selected.message}
+            </div>
+            {selected.replyContent && (
+              <div className="rounded-lg border border-green-200 bg-green-50 p-4 dark:border-green-800 dark:bg-green-950/20">
+                <p className="mb-1 text-xs font-medium text-green-700 dark:text-green-400">Réponse envoyée le {new Date(selected.repliedAt).toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' })} :</p>
+                <p className="whitespace-pre-wrap text-sm text-green-800 dark:text-green-300">{selected.replyContent}</p>
+              </div>
+            )}
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-slate-700">
+                <Reply className="mr-1.5 inline h-4 w-4 text-violet-500" />
+                {selected.replyContent ? 'Envoyer une autre réponse' : 'Répondre à'} <span className="text-violet-600">{selected.email}</span>
+              </p>
+              <Textarea
+                value={replyText}
+                onChange={(e) => setReplyText(e.target.value)}
+                placeholder="Écrivez votre réponse..."
+                className="min-h-[120px] resize-none"
+              />
+              <div className="flex justify-end">
+                <Button
+                  onClick={sendReply}
+                  disabled={isSendingReply || !replyText.trim()}
+                  className="gap-2 bg-violet-600 hover:bg-violet-700"
+                >
+                  {isSendingReply ? <Loader2 className="h-4 w-4 animate-spin" /> : <Reply className="h-4 w-4" />}
+                  Envoyer la réponse
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
+
 // Settings Tab
 function SettingsTab() {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [relayPrinters, setRelayPrinters] = useState<Array<{
+    relaisId: string;
+    commerceName: string;
+    ville: string;
+    operationalStatus: string;
+    printerStatus: 'READY' | 'BROKEN' | 'OUT_OF_PAPER' | 'NOT_EQUIPPED';
+  }>>([]);
   const [settings, setSettings] = useState({
     platformCommission: '10',
     commissionPetit: '100',
@@ -1954,6 +2608,7 @@ function SettingsTab() {
     pricingRatePerKm: '2.5',
     pricingRelayDepartureRate: '0.1',
     pricingRelayArrivalRate: '0.1',
+    pricingRelayPrintFee: '30',
     pricingRoundTo: '10',
   });
 
@@ -1964,11 +2619,16 @@ function SettingsTab() {
   const fetchSettings = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch('/api/settings');
-      const data = await response.json();
-      if (!response.ok) {
+      const [settingsResponse, printersResponse] = await Promise.all([
+        fetch('/api/settings'),
+        fetch('/api/relais/printers'),
+      ]);
+
+      const data = await settingsResponse.json();
+      if (!settingsResponse.ok) {
         throw new Error(data?.error || 'Failed to fetch settings');
       }
+
       setSettings({
         platformCommission: String(data.platformCommission || 10),
         commissionPetit: String(data.commissionPetit || 100),
@@ -1979,8 +2639,14 @@ function SettingsTab() {
         pricingRatePerKm: String(data.pricingRatePerKm || 2.5),
         pricingRelayDepartureRate: String(data.pricingRelayDepartureRate || 0.1),
         pricingRelayArrivalRate: String(data.pricingRelayArrivalRate || 0.1),
+        pricingRelayPrintFee: String(data.pricingRelayPrintFee || 30),
         pricingRoundTo: String(data.pricingRoundTo || 10),
       });
+
+      if (printersResponse.ok) {
+        const printersData = await printersResponse.json();
+        setRelayPrinters(Array.isArray(printersData?.printers) ? printersData.printers : []);
+      }
     } catch (error) {
       console.error('Error fetching settings:', error);
       toast({
@@ -2000,26 +2666,27 @@ function SettingsTab() {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          platformCommission: parseFloat(settings.platformCommission),
-          commissionPetit: parseFloat(settings.commissionPetit),
-          commissionMoyen: parseFloat(settings.commissionMoyen),
-          commissionGros: parseFloat(settings.commissionGros),
-          pricingAdminFee: parseFloat(settings.pricingAdminFee),
-          pricingRatePerKg: parseFloat(settings.pricingRatePerKg),
-          pricingRatePerKm: parseFloat(settings.pricingRatePerKm),
-          pricingRelayDepartureRate: parseFloat(settings.pricingRelayDepartureRate),
-          pricingRelayArrivalRate: parseFloat(settings.pricingRelayArrivalRate),
-          pricingRoundTo: parseFloat(settings.pricingRoundTo),
+          platformCommission: parseLocaleFloat(settings.platformCommission),
+          commissionPetit: parseLocaleFloat(settings.commissionPetit),
+          commissionMoyen: parseLocaleFloat(settings.commissionMoyen),
+          commissionGros: parseLocaleFloat(settings.commissionGros),
+          pricingAdminFee: parseLocaleFloat(settings.pricingAdminFee),
+          pricingRatePerKg: parseLocaleFloat(settings.pricingRatePerKg),
+          pricingRatePerKm: parseLocaleFloat(settings.pricingRatePerKm),
+          pricingRelayDepartureRate: parseLocaleFloat(settings.pricingRelayDepartureRate),
+          pricingRelayArrivalRate: parseLocaleFloat(settings.pricingRelayArrivalRate),
+          pricingRelayPrintFee: parseLocaleFloat(settings.pricingRelayPrintFee),
+          pricingRoundTo: parseLocaleFloat(settings.pricingRoundTo),
         }),
       });
-      
-      if (response.ok) {
-        toast({ title: 'Paramètres sauvegardés', description: 'Les paramètres ont été enregistrés avec succès' });
-      } else {
-        throw new Error('Failed');
+
+      if (!response.ok) {
+        throw new Error('Impossible de sauvegarder les paramètres globaux');
       }
-    } catch {
-      toast({ title: 'Erreur', description: 'Impossible de sauvegarder les paramètres', variant: 'destructive' });
+
+      toast({ title: 'Paramètres sauvegardés', description: 'Paramètres globaux enregistrés avec succès' });
+    } catch (error) {
+      toast({ title: 'Erreur', description: error instanceof Error ? error.message : 'Impossible de sauvegarder les paramètres', variant: 'destructive' });
     } finally {
       setIsSaving(false);
     }
@@ -2078,9 +2745,60 @@ function SettingsTab() {
                     <Label className="text-sm">Commission relais arrivée (taux)</Label>
                     <Input type="number" step="0.01" value={settings.pricingRelayArrivalRate} onChange={(e) => setSettings({ ...settings, pricingRelayArrivalRate: e.target.value })} />
                   </div>
+                  <div className="space-y-2">
+                    <Label className="text-sm">Frais impression au relais (DA)</Label>
+                    <Input type="number" step="1" value={settings.pricingRelayPrintFee} onChange={(e) => setSettings({ ...settings, pricingRelayPrintFee: e.target.value })} />
+                  </div>
                 </div>
                 <p className="text-xs text-slate-500">Exemple: 0.10 = 10%.</p>
               </div>
+
+              <div className="space-y-3">
+                <Label>État des imprimantes relais</Label>
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Relais</TableHead>
+                        <TableHead>Ville</TableHead>
+                        <TableHead>Statut relais</TableHead>
+                        <TableHead>Statut imprimante</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {relayPrinters.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={4} className="text-center text-slate-500">Aucun relais approuvé trouvé</TableCell>
+                        </TableRow>
+                      ) : relayPrinters.map((row) => (
+                        <TableRow key={row.relaisId}>
+                          <TableCell>{row.commerceName}</TableCell>
+                          <TableCell>{row.ville}</TableCell>
+                          <TableCell>{row.operationalStatus}</TableCell>
+                          <TableCell>
+                            <span className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${
+                              row.printerStatus === 'READY'
+                                ? 'bg-emerald-100 text-emerald-700'
+                                : row.printerStatus === 'OUT_OF_PAPER'
+                                  ? 'bg-amber-100 text-amber-700'
+                                  : row.printerStatus === 'BROKEN'
+                                    ? 'bg-red-100 text-red-700'
+                                    : 'bg-slate-100 text-slate-700'
+                            }`}>
+                              {row.printerStatus === 'READY' && 'Prête'}
+                              {row.printerStatus === 'OUT_OF_PAPER' && 'Plus de papier'}
+                              {row.printerStatus === 'BROKEN' && 'En panne'}
+                              {row.printerStatus === 'NOT_EQUIPPED' && 'Non équipée'}
+                            </span>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+                <p className="text-xs text-slate-500">Statuts déclarés par les relais en temps réel. L'admin consulte et audite sans piloter le matériel.</p>
+              </div>
+
               <Button 
                 onClick={handleSave} 
                 className="bg-emerald-600 hover:bg-emerald-700"
@@ -2103,6 +2821,340 @@ function SettingsTab() {
           <Button asChild variant="outline">
             <a href="/api/admin/reset-relais-status" target="_blank">Réinitialiser les statuts relais</a>
           </Button>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ─── Loyalty Tab ─────────────────────────────────────────────────────────────
+function LoyaltyTab() {
+  const { toast } = useToast();
+  const [clients, setClients] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isConfigLoading, setIsConfigLoading] = useState(true);
+  const [isConfigSaving, setIsConfigSaving] = useState(false);
+  const [lastConfigSavedAt, setLastConfigSavedAt] = useState<string | null>(null);
+  const [isCronRunning, setIsCronRunning] = useState(false);
+  const [reEvalIds, setReEvalIds] = useState<Set<string>>(new Set());
+  const [cronResult, setCronResult] = useState<{ processed: number; failed: number; timestamp: string } | null>(null);
+  const [loyaltyConfig, setLoyaltyConfig] = useState({
+    loyaltyImplicitDiscountRate: '0.05',
+    loyaltyImplicitMinParcels: '5',
+    loyaltyImplicitWindowDays: '7',
+    loyaltyImplicitStickyDays: '30',
+  });
+
+  const fetchClients = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const res = await fetch('/api/users?role=CLIENT');
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || 'Erreur chargement');
+      const list = (Array.isArray(data) ? data : []).filter((u: any) => u.role === 'CLIENT');
+      setClients(list);
+    } catch (e) {
+      toast({ title: 'Erreur', description: e instanceof Error ? e.message : 'Impossible de charger', variant: 'destructive' });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [toast]);
+
+  const fetchLoyaltyConfig = useCallback(async () => {
+    setIsConfigLoading(true);
+    try {
+      const res = await fetch('/api/settings');
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || 'Erreur chargement config');
+      setLoyaltyConfig({
+        loyaltyImplicitDiscountRate: String(data.loyaltyImplicitDiscountRate ?? 0.05),
+        loyaltyImplicitMinParcels: String(data.loyaltyImplicitMinParcels ?? 5),
+        loyaltyImplicitWindowDays: String(data.loyaltyImplicitWindowDays ?? 7),
+        loyaltyImplicitStickyDays: String(data.loyaltyImplicitStickyDays ?? 30),
+      });
+    } catch (e) {
+      toast({ title: 'Erreur', description: e instanceof Error ? e.message : 'Impossible de charger la configuration fidélité', variant: 'destructive' });
+    } finally {
+      setIsConfigLoading(false);
+    }
+  }, [toast]);
+
+  useEffect(() => {
+    fetchClients();
+    fetchLoyaltyConfig();
+  }, [fetchClients, fetchLoyaltyConfig]);
+
+  const handleSaveLoyaltyConfig = async () => {
+    setIsConfigSaving(true);
+    try {
+      const payload = {
+        loyaltyImplicitDiscountRate: parseLocaleFloat(loyaltyConfig.loyaltyImplicitDiscountRate),
+        loyaltyImplicitMinParcels: parseLocaleFloat(loyaltyConfig.loyaltyImplicitMinParcels),
+        loyaltyImplicitWindowDays: parseLocaleFloat(loyaltyConfig.loyaltyImplicitWindowDays),
+        loyaltyImplicitStickyDays: parseLocaleFloat(loyaltyConfig.loyaltyImplicitStickyDays),
+      };
+
+      const res = await fetch('/api/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || 'Impossible de sauvegarder la configuration fidélité');
+
+      setLastConfigSavedAt(new Date().toISOString());
+      toast({ title: 'Configuration fidélité sauvegardée', description: 'Les nouvelles règles sont actives immédiatement' });
+      await Promise.all([fetchLoyaltyConfig(), fetchClients()]);
+    } catch (e) {
+      toast({ title: 'Erreur sauvegarde', description: e instanceof Error ? e.message : 'Erreur', variant: 'destructive' });
+    } finally {
+      setIsConfigSaving(false);
+    }
+  };
+
+  const handleReEvalOne = async (clientId: string) => {
+    setReEvalIds(prev => new Set(prev).add(clientId));
+    try {
+      const res = await fetch(`/api/loyalty/status?clientId=${clientId}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || 'Erreur');
+      setClients(prev => prev.map(c =>
+        c.id === clientId
+          ? { ...c, eligibleProImplicit: data.eligible, weeklyValidShipments: data.validParcelsCount, proLastEvaluatedAt: data.windowStart }
+          : c
+      ));
+      toast({ title: data.eligible ? '✓ Client éligible' : '✗ Non éligible', description: `${data.validParcelsCount}/${data.threshold} colis valides sur ${data.windowDays}j` });
+    } catch (e) {
+      toast({ title: 'Erreur réévaluation', description: e instanceof Error ? e.message : 'Erreur', variant: 'destructive' });
+    } finally {
+      setReEvalIds(prev => { const s = new Set(prev); s.delete(clientId); return s; });
+    }
+  };
+
+  const handleCronBatch = async () => {
+    setIsCronRunning(true);
+    setCronResult(null);
+    try {
+      const res = await fetch('/api/loyalty/evaluate/admin-batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ limit: 500 }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || 'Erreur cron');
+      setCronResult({ processed: data.processed, failed: data.failed, timestamp: data.timestamp });
+      toast({ title: `Réévaluation batch terminée`, description: `${data.processed} clients traités, ${data.failed} erreurs` });
+      await fetchClients();
+    } catch (e) {
+      toast({ title: 'Erreur batch', description: e instanceof Error ? e.message : 'Erreur', variant: 'destructive' });
+    } finally {
+      setIsCronRunning(false);
+    }
+  };
+
+  const eligible = clients.filter(c => c.eligibleProImplicit);
+  const notEligible = clients.filter(c => !c.eligibleProImplicit);
+
+  return (
+    <div className="space-y-6">
+      {/* Stats globales */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="rounded-xl border bg-emerald-50 p-4">
+          <p className="text-xs text-emerald-700 font-medium mb-1">Clients éligibles</p>
+          <p className="text-2xl font-black text-emerald-700">{eligible.length}</p>
+        </div>
+        <div className="rounded-xl border bg-slate-50 p-4">
+          <p className="text-xs text-slate-600 font-medium mb-1">Non éligibles</p>
+          <p className="text-2xl font-black text-slate-700">{notEligible.length}</p>
+        </div>
+        <div className="rounded-xl border bg-slate-50 p-4">
+          <p className="text-xs text-slate-600 font-medium mb-1">Total clients</p>
+          <p className="text-2xl font-black text-slate-700">{clients.length}</p>
+        </div>
+        <div className="rounded-xl border bg-amber-50 p-4">
+          <p className="text-xs text-amber-700 font-medium mb-1">Taux fidélité</p>
+          <p className="text-2xl font-black text-amber-700">
+            {clients.length > 0 ? Math.round((eligible.length / clients.length) * 100) : 0}%
+          </p>
+        </div>
+      </div>
+
+      {/* Actions globales */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div>
+              <CardTitle className="flex items-center gap-2"><Award className="h-5 w-5 text-emerald-600" />Fidélité implicite — pilotage admin</CardTitle>
+              <CardDescription>
+                Seuil: {Number(loyaltyConfig.loyaltyImplicitMinParcels) || 5} colis valides (payés/livrés) sur {Number(loyaltyConfig.loyaltyImplicitWindowDays) || 7} jours glissants ·
+                Anti-yoyo {Number(loyaltyConfig.loyaltyImplicitStickyDays) || 30}j ·
+                Remise {Math.round((Number(loyaltyConfig.loyaltyImplicitDiscountRate) || 0.05) * 100)}%
+              </CardDescription>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={fetchClients} disabled={isLoading}>
+                <RefreshCw className={`h-4 w-4 mr-1 ${isLoading ? 'animate-spin' : ''}`} />
+                Actualiser
+              </Button>
+              <Button
+                size="sm"
+                className="bg-emerald-600 hover:bg-emerald-700"
+                onClick={handleCronBatch}
+                disabled={isCronRunning}
+              >
+                {isCronRunning
+                  ? <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                  : <PlayCircle className="h-4 w-4 mr-1" />}
+                Réévaluer tous les clients
+              </Button>
+            </div>
+          </div>
+          {cronResult && (
+            <div className="mt-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm text-emerald-800">
+              Dernier batch: <strong>{cronResult.processed}</strong> clients traités,{' '}
+              <strong>{cronResult.failed}</strong> erreurs —{' '}
+              {new Date(cronResult.timestamp).toLocaleTimeString('fr-FR')}
+            </div>
+          )}
+        </CardHeader>
+        <CardContent>
+          <div className="mb-6 rounded-xl border bg-slate-50 p-4">
+            <div className="flex items-start justify-between gap-3 mb-3 flex-wrap">
+              <div>
+                <p className="text-sm font-semibold text-slate-800">Paramètres fidélité (pilotage sécurisé)</p>
+                <p className="text-xs text-slate-500">Bornes: remise 0-10%, seuil 3-10 colis, fenêtre 7-14 jours, anti-yoyo 7-60 jours</p>
+              </div>
+              <Button size="sm" onClick={handleSaveLoyaltyConfig} disabled={isConfigSaving || isConfigLoading}>
+                {isConfigSaving ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
+                Sauvegarder
+              </Button>
+            </div>
+            {isConfigLoading ? (
+              <div className="flex justify-center py-4"><Loader2 className="h-5 w-5 animate-spin text-emerald-600" /></div>
+            ) : (
+              <div className="space-y-3">
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+                  <span className="font-semibold">Règle active:</span>{' '}
+                  {Number(loyaltyConfig.loyaltyImplicitMinParcels) || 5} colis / {Number(loyaltyConfig.loyaltyImplicitWindowDays) || 7} jours ·
+                  remise {Math.round((Number(loyaltyConfig.loyaltyImplicitDiscountRate) || 0.05) * 100)}% ·
+                  anti-yoyo {Number(loyaltyConfig.loyaltyImplicitStickyDays) || 30} jours
+                  {lastConfigSavedAt ? ` · sauvegardée à ${new Date(lastConfigSavedAt).toLocaleTimeString('fr-FR')}` : ''}
+                </div>
+                <div className="grid gap-3 md:grid-cols-4">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Remise implicite (taux)</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      max="0.1"
+                      value={loyaltyConfig.loyaltyImplicitDiscountRate}
+                      onChange={(e) => setLoyaltyConfig((prev) => ({ ...prev, loyaltyImplicitDiscountRate: e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Seuil colis valides</Label>
+                    <Input
+                      type="number"
+                      step="1"
+                      min="3"
+                      max="10"
+                      value={loyaltyConfig.loyaltyImplicitMinParcels}
+                      onChange={(e) => setLoyaltyConfig((prev) => ({ ...prev, loyaltyImplicitMinParcels: e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Fenêtre glissante (jours)</Label>
+                    <Input
+                      type="number"
+                      step="1"
+                      min="7"
+                      max="14"
+                      value={loyaltyConfig.loyaltyImplicitWindowDays}
+                      onChange={(e) => setLoyaltyConfig((prev) => ({ ...prev, loyaltyImplicitWindowDays: e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Anti-yoyo (jours)</Label>
+                    <Input
+                      type="number"
+                      step="1"
+                      min="7"
+                      max="60"
+                      value={loyaltyConfig.loyaltyImplicitStickyDays}
+                      onChange={(e) => setLoyaltyConfig((prev) => ({ ...prev, loyaltyImplicitStickyDays: e.target.value }))}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {isLoading ? (
+            <div className="flex justify-center py-8"><Loader2 className="h-8 w-8 animate-spin text-emerald-600" /></div>
+          ) : clients.length === 0 ? (
+            <p className="text-center text-slate-500 py-8">Aucun client inscrit</p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Client</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Statut</TableHead>
+                  <TableHead>Colis valides 7j</TableHead>
+                  <TableHead>Éligible depuis</TableHead>
+                  <TableHead>Dernière éval.</TableHead>
+                  <TableHead>Action</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {clients.map(client => (
+                  <TableRow key={client.id}>
+                    <TableCell className="font-medium">{client.name}</TableCell>
+                    <TableCell className="text-slate-500 text-sm">{client.email}</TableCell>
+                    <TableCell>
+                      {client.eligibleProImplicit
+                        ? <Badge className="bg-emerald-600 text-white">✓ Éligible</Badge>
+                        : <Badge className="bg-slate-200 text-slate-600">Non éligible</Badge>
+                      }
+                    </TableCell>
+                    <TableCell>
+                      <span className={`font-bold ${(client.weeklyValidShipments ?? 0) >= (Number(loyaltyConfig.loyaltyImplicitMinParcels) || 5) ? 'text-emerald-700' : 'text-slate-700'}`}>
+                        {client.weeklyValidShipments ?? 0}
+                      </span>
+                      <span className="text-slate-400 text-xs"> / {Number(loyaltyConfig.loyaltyImplicitMinParcels) || 5}</span>
+                    </TableCell>
+                    <TableCell className="text-xs text-slate-500">
+                      {client.eligibleProSince
+                        ? new Date(client.eligibleProSince).toLocaleDateString('fr-FR')
+                        : '—'
+                      }
+                    </TableCell>
+                    <TableCell className="text-xs text-slate-500">
+                      {client.proLastEvaluatedAt
+                        ? new Date(client.proLastEvaluatedAt).toLocaleString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
+                        : 'Jamais'
+                      }
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={reEvalIds.has(client.id)}
+                        onClick={() => handleReEvalOne(client.id)}
+                        title="Réévaluer ce client maintenant"
+                      >
+                        {reEvalIds.has(client.id)
+                          ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          : <RefreshCw className="h-3.5 w-3.5" />
+                        }
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
     </div>

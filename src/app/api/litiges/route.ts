@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
   if (!colis) return NextResponse.json({ error: 'Colis introuvable' }, { status: 404 });
   if (colis.clientId !== payload.id) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
-  const DISPUTABLE_STATUSES = ['PAID', 'DEPOSITED_RELAY', 'RECU_RELAIS', 'EN_TRANSPORT', 'ARRIVE_RELAIS_DESTINATION'];
+  const DISPUTABLE_STATUSES = ['READY_FOR_DEPOSIT', 'PAID', 'DEPOSITED_RELAY', 'RECU_RELAIS', 'EN_TRANSPORT', 'ARRIVE_RELAIS_DESTINATION'];
   if (!DISPUTABLE_STATUSES.includes(colis.status)) {
     return NextResponse.json({ error: 'Ce colis ne peut pas faire l\'objet d\'un litige dans son état actuel' }, { status: 422 });
   }

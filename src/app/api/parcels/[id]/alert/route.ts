@@ -3,9 +3,9 @@ import { requireRole } from "@/lib/rbac";
 import { sendManualAlert, notifyBlockedParcel, detectBlockedParcels } from "@/lib/parcel-alerts";
 
 interface RouteParams {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 }
 
 /**
@@ -20,7 +20,7 @@ interface RouteParams {
  */
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
-    const { id } = params;
+    const { id } = await params;
 
     // Vérifier les droits (ADMIN ou TRANSPORTER/RELAIS can send alerts for their parcels)
     const authResult = await requireRole(request, [

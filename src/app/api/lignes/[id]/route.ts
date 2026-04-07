@@ -63,17 +63,15 @@ export async function PUT(
     const duplicate = await db.ligne.findFirst({
       where: {
         id: { not: id },
-        OR: [
-          { villeDepart: nextDepart, villeArrivee: nextArrivee },
-          { villeDepart: nextArrivee, villeArrivee: nextDepart },
-        ],
+        villeDepart: nextDepart,
+        villeArrivee: nextArrivee,
       },
       select: { id: true },
     });
 
     if (duplicate) {
       return NextResponse.json(
-        { error: 'Une ligne identique existe déjà (même paire de villes)' },
+        { error: 'Une ligne identique existe déjà pour ce sens' },
         { status: 409 }
       );
     }

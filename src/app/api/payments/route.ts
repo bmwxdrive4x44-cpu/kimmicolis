@@ -9,13 +9,15 @@ import {
 } from '@/lib/payment';
 import { requireRole, hasAccess } from '@/lib/rbac';
 import { checkRateLimit, RATE_LIMIT_PRESETS } from '@/lib/ratelimit';
+import { createHostedCheckout, isOnlineMethod, isRealPspConfigured } from '@/lib/psp';
+import { db } from '@/lib/db';
 
 /**
  * GET /api/payments
  * List payments for authenticated user or admin
  */
 export async function GET(request: NextRequest) {
-  const auth = await requireRole(request, ['CLIENT', 'ADMIN']);
+  const auth = await requireRole(request, ['CLIENT', 'ADMIN', 'ENSEIGNE']);
   if (!auth.success) return auth.response;
 
   try {
@@ -85,7 +87,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const auth = await requireRole(request, ['CLIENT']);
+  const auth = await requireRole(request, ['CLIENT', 'ENSEIGNE']);
   if (!auth.success) return auth.response;
 
   try {
@@ -135,7 +137,7 @@ export async function POST(request: NextRequest) {
  * Process or refund a payment
  */
 export async function PUT(request: NextRequest) {
-  const auth = await requireRole(request, ['CLIENT', 'ADMIN']);
+  const auth = await requireRole(request, ['CLIENT', 'ADMIN', 'ENSEIGNE']);
   if (!auth.success) return auth.response;
 
   try {
@@ -167,8 +169,47 @@ export async function PUT(request: NextRequest) {
 
     // Handle actions
     if (action === 'process') {
-      const VALID_METHODS = ['CIB', 'EDAHABIA', 'BARIDI_MOB', 'SIM_STANDARD', 'CASH_RELAY'];
+      const VALID_METHODS = ['CIB', 'EDAHABIA', 'BARIDI_MOB', 'STRIPE_TEST', 'SIM_STANDARD'];
       const paymentMethod = method && VALID_METHODS.includes(method) ? method : undefined;
+
+      if (paymentMethod && isOnlineMethod(paymentMethod)) {
+        if (isRealPspConfigured()) {
+          const hosted = await createHostedCheckout({
+            paymentId: payment.id,
+            amount: payment.amount,
+            currency: payment.currency,
+            method: paymentMethod,
+            clientId: payment.clientId,
+          });
+
+          await db.payment.update({
+            where: { id: payment.id },
+            data: {
+              status: payment.status === 'PENDING' ? 'PROCESSING' : payment.status,
+              method: paymentMethod,
+              errorMessage: hosted.providerSessionId
+                ? `PSP_SESSION:${hosted.providerSessionId}`
+                : payment.errorMessage,
+            },
+          });
+
+          return NextResponse.json({
+            message: 'Redirection vers PSP',
+            redirectUrl: hosted.checkoutUrl,
+            paymentId: payment.id,
+            provider: process.env.PAYMENT_PROVIDER || 'SATIM',
+            mode: 'HOSTED_CHECKOUT',
+          });
+        }
+
+        if (process.env.NODE_ENV === 'production') {
+          return NextResponse.json(
+            { error: 'PSP reel non configure en production (PAYMENT_PROVIDER + variables SATIM_* ou STRIPE_*)' },
+            { status: 500 }
+          );
+        }
+      }
+
       const result = await processPayment(paymentId, 0.95, paymentMethod);
       if (!result.success) {
         return NextResponse.json(

@@ -9,7 +9,7 @@ import { calculateDynamicParcelPricing, estimateSafeDistanceKmByWilayas } from '
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { villeDepart, villeArrivee, weight } = body;
+    const { villeDepart, villeArrivee, weight, labelPrintMode } = body;
 
     if (!villeDepart || !villeArrivee || weight === undefined || weight === null) {
       return NextResponse.json(
@@ -32,6 +32,7 @@ export async function POST(request: NextRequest) {
             'pricingRatePerKm',
             'pricingRelayDepartureRate',
             'pricingRelayArrivalRate',
+            'pricingRelayPrintFee',
             'pricingRoundTo',
           ],
         },
@@ -56,8 +57,17 @@ export async function POST(request: NextRequest) {
       roundTo: getNumber('pricingRoundTo', 10),
     });
 
+    const normalizedLabelPrintMode = String(labelPrintMode || 'HOME').toUpperCase();
+    const relayPrintFee = normalizedLabelPrintMode === 'RELAY'
+      ? getNumber('pricingRelayPrintFee', 30)
+      : 0;
+
     return NextResponse.json({
       ...pricing,
+      labelPrintMode: normalizedLabelPrintMode,
+      relayPrintFee,
+      baseClientPrice: pricing.clientPrice,
+      finalClientPrice: pricing.clientPrice + relayPrintFee,
       estimatedDistanceKm,
     });
   } catch (error) {

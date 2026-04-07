@@ -12,10 +12,8 @@ export async function GET(request: NextRequest) {
 
     const where: Prisma.LigneWhereInput = {};
     if (villeDepart && villeArrivee) {
-      where.OR = [
-        { villeDepart, villeArrivee },
-        { villeDepart: villeArrivee, villeArrivee: villeDepart },
-      ];
+      where.villeDepart = villeDepart;
+      where.villeArrivee = villeArrivee;
     } else if (villeDepart) {
       where.villeDepart = villeDepart;
     } else if (villeArrivee) {
@@ -24,28 +22,11 @@ export async function GET(request: NextRequest) {
 
     const lignes = await db.ligne.findMany({
       where,
-      orderBy: [{ updatedAt: 'desc' }],
-    });
-
-    // Déduplication défensive (paire canonique A↔B), garde la ligne la plus récente.
-    const uniqueByPair = new Map<string, (typeof lignes)[number]>();
-    for (const ligne of lignes) {
-      const [a, b] = [ligne.villeDepart, ligne.villeArrivee].sort();
-      const key = `${a}__${b}`;
-      if (!uniqueByPair.has(key)) {
-        uniqueByPair.set(key, ligne);
-      }
-    }
-
-    const deduped = Array.from(uniqueByPair.values()).sort((x, y) => {
-      if (x.villeDepart === y.villeDepart) {
-        return x.villeArrivee.localeCompare(y.villeArrivee);
-      }
-      return x.villeDepart.localeCompare(y.villeDepart);
+      orderBy: [{ villeDepart: 'asc' }, { villeArrivee: 'asc' }, { updatedAt: 'desc' }],
     });
 
     return NextResponse.json(
-      deduped.map((ligne) => ({
+      lignes.map((ligne) => ({
         ...ligne,
         tarifPoids: ligne.tarifPetit,
         tarifKm: ligne.tarifMoyen,
@@ -91,16 +72,14 @@ export async function POST(request: NextRequest) {
 
     const existing = await db.ligne.findFirst({
       where: {
-        OR: [
-          { villeDepart: depart, villeArrivee: arrivee },
-          { villeDepart: arrivee, villeArrivee: depart },
-        ],
+        villeDepart: depart,
+        villeArrivee: arrivee,
       },
     });
 
     if (existing) {
       return NextResponse.json(
-        { error: 'Cette ligne (ou sa version inverse) existe déjà', existingId: existing.id },
+        { error: 'Cette ligne existe déjà pour ce sens', existingId: existing.id },
         { status: 409 }
       );
     }

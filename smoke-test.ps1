@@ -338,6 +338,19 @@ elseif ($relaisId) {
     Write-Pass "Relais déjà approuvé"
 }
 
+$relaisDepartLookup = Invoke-API -Method GET -Uri "$BaseUrl/api/relais?status=APPROVED&ville=alger"
+$relaisArriveeLookup = Invoke-API -Method GET -Uri "$BaseUrl/api/relais?status=APPROVED&ville=oran"
+
+$relaisDepartId = if (-not (IsError $relaisDepartLookup) -and $relaisDepartLookup.Count -gt 0) { $relaisDepartLookup[0].id } else { $null }
+$relaisArriveeId = if (-not (IsError $relaisArriveeLookup) -and $relaisArriveeLookup.Count -gt 0) { $relaisArriveeLookup[0].id } else { $null }
+
+if ($relaisDepartId -and $relaisArriveeId) {
+    Write-Pass "Relais logistiques trouvés  -  départ=$relaisDepartId / arrivée=$relaisArriveeId"
+}
+else {
+    Write-Fail "Relais logistiques introuvables" "Il faut au moins un relais actif à Alger et un à Oran pour le smoke logistique."
+}
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  PHASE 4  -  CLIENT : CRÉER UN COLIS
@@ -369,8 +382,8 @@ $parcelBody = @{
     recipientLastName  = "Cherif"
     recipientPhone     = "+213555444444"
     withdrawalCode     = $withdrawalCode
-    relaisDepartId     = $relaisId
-    relaisArriveeId    = $relaisId
+    relaisDepartId     = $relaisDepartId
+    relaisArriveeId    = $relaisArriveeId
     villeDepart        = "alger"
     villeArrivee       = "oran"
     format             = "PETIT"
@@ -489,7 +502,7 @@ $scanDepotRes = Invoke-API -Method POST `
     -Uri "$BaseUrl/api/relais/scan-depot" `
     -Body @{
         trackingNumber = $trackingNumber
-        relaisId       = $relaisId
+        relaisId       = $relaisDepartId
         cashAmount     = 1150
     } `
     -Session $relaisSession
@@ -521,7 +534,7 @@ $scanRemiseRes = Invoke-API -Method POST `
     -Uri "$BaseUrl/api/relais/scan-remise-transporteur" `
     -Body @{
         trackingNumber = $trackingNumber
-        relaisId       = $relaisId
+        relaisId       = $relaisDepartId
     } `
     -Session $relaisSession
 
@@ -545,7 +558,7 @@ $scanArriveeRes = Invoke-API -Method POST `
     -Uri "$BaseUrl/api/relais/scan-arrivee" `
     -Body @{
         trackingNumber = $trackingNumber
-        relaisId       = $relaisId
+        relaisId       = $relaisArriveeId
     } `
     -Session $relaisSession
 
@@ -570,7 +583,7 @@ $badLivraisonRes = Invoke-API -Method POST `
     -Uri "$BaseUrl/api/relais/scan-livraison" `
     -Body @{
         trackingNumber     = $trackingNumber
-        relaisId           = $relaisId
+        relaisId           = $relaisArriveeId
         recipientFirstName = "Fatima"
         recipientLastName  = "Cherif"
         recipientPhone     = "+213555444444"
@@ -593,7 +606,7 @@ $goodLivraisonRes = Invoke-API -Method POST `
     -Uri "$BaseUrl/api/relais/scan-livraison" `
     -Body @{
         trackingNumber     = $trackingNumber
-        relaisId           = $relaisId
+        relaisId           = $relaisArriveeId
         recipientFirstName = "Fatima"
         recipientLastName  = "Cherif"
         recipientPhone     = "+213555444444"

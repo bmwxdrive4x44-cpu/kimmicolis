@@ -82,7 +82,7 @@ export async function createPayment(
       return { success: false, error: 'Client mismatch' };
     }
 
-    if (colis.status !== 'CREATED') {
+    if (!['CREATED', 'PENDING_PAYMENT'].includes(colis.status)) {
       return { success: false, error: `Parcel cannot be paid with status ${colis.status}` };
     }
 
@@ -131,6 +131,12 @@ export async function createPayment(
       },
     });
 
+    // Transition colis vers PENDING_PAYMENT (session paiement ouverte)
+    await db.colis.update({
+      where: { id: colisId },
+      data: { status: 'PENDING_PAYMENT', updatedAt: new Date() },
+    });
+
     return {
       success: true,
       payment,
@@ -158,6 +164,11 @@ export async function getPaymentStatus(paymentId: string): Promise<IPayment | nu
     new Date() > payment.expiresAt &&
     (payment.status === 'PENDING' || payment.status === 'PROCESSING')
   ) {
+    // Remettre le colis en CREATED pour que l'enseigne puisse relancer le paiement
+    await db.colis.update({
+      where: { id: payment.colisId },
+      data: { status: 'CREATED', updatedAt: new Date() },
+    }).catch(() => { /* best-effort */ });
     return paymentDb.payment.update({
       where: { id: paymentId },
       data: {
@@ -237,7 +248,7 @@ export async function processPayment(
       await db.colis.update({
         where: { id: payment.colisId },
         data: {
-          status: 'PAID',
+          status: 'READY_FOR_DEPOSIT',
           updatedAt: new Date(),
         },
       });
@@ -261,6 +272,12 @@ export async function processPayment(
       },
     });
 
+    // Remettre le colis en CREATED pour permettre une nouvelle tentative
+    await db.colis.update({
+      where: { id: payment.colisId },
+      data: { status: 'CREATED', updatedAt: new Date() },
+    }).catch(() => { /* best-effort */ });
+
     return {
       success: false,
       payment: failedPayment,
@@ -274,6 +291,11 @@ export async function processPayment(
         errorMessage: error instanceof Error ? error.message : 'Unknown error',
       },
     });
+
+    await db.colis.update({
+      where: { id: payment.colisId },
+      data: { status: 'CREATED', updatedAt: new Date() },
+    }).catch(() => { /* best-effort */ });
 
     return {
       success: false,

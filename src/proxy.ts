@@ -5,7 +5,7 @@ import { routing } from './i18n/routing';
 
 const intlMiddleware = createIntlMiddleware(routing);
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (pathname.startsWith('/api/admin')) {
@@ -54,6 +54,6 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     '/api/admin/:path*',
-    '/((?!_next|_vercel|.*\\..*).*)',
+    '/((?!_next|_vercel|.*\..*).*)',
   ],
 };

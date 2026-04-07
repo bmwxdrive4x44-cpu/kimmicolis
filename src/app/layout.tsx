@@ -1,8 +1,13 @@
-// Root layout - minimal, locale layout handles html/body
+import '@/app/globals.css';
+
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  return children;
+  return (
+    <html suppressHydrationWarning>
+      <body className="min-h-screen bg-background font-sans antialiased">{children}</body>
+    </html>
+  );
 }

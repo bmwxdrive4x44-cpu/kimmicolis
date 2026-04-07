@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { jwtVerify } from 'jose';
 import { getToken } from 'next-auth/jwt';
+import { normalizeRole } from './roles';
 
 const JWT_SECRET = new TextEncoder().encode(process.env.NEXTAUTH_SECRET || 'secret');
 
@@ -42,7 +43,7 @@ export async function verifyJWT(request: NextRequest): Promise<{
       payload: {
         email: String(nextAuthToken.email ?? ''),
         id: String(nextAuthToken.sub ?? nextAuthToken.id ?? ''),
-        role: String(nextAuthToken.role ?? ''),
+        role: normalizeRole(nextAuthToken.role),
         name: String(nextAuthToken.name ?? ''),
       },
     };
@@ -69,7 +70,8 @@ export async function requireRole(
     };
   }
 
-  if (!allowedRoles.includes(payload.role)) {
+  const normalizedAllowedRoles = allowedRoles.map((role) => normalizeRole(role));
+  if (!normalizedAllowedRoles.includes(normalizeRole(payload.role))) {
     return {
       success: false,
       response: NextResponse.json({

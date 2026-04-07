@@ -4,6 +4,7 @@ import { Suspense, useState, useEffect, useMemo } from 'react';
 import { useSession } from 'next-auth/react';
 import { useTranslations, useLocale } from 'next-intl';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { Link } from '@/i18n/routing';
 import { Header } from '@/components/layout/header';
 import { Footer } from '@/components/layout/footer';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -15,11 +16,22 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import {
+  DashboardHero,
+  DashboardMetricCard,
+  DashboardPanel,
+  DashboardShell,
+  DashboardStatsGrid,
+  dashboardTabsListClass,
+  getDashboardTabsTriggerClass,
+} from '@/components/dashboard/dashboard-shell';
 import { WILAYAS, PARCEL_STATUS, generateTrackingNumber, generateQRData } from '@/lib/constants';
+import { parseLocaleFloat } from '@/lib/utils';
 import { calculateDynamicParcelPricing, estimateSafeDistanceKmByWilayas } from '@/lib/pricing';
-import { Package, Plus, History, MapPin, Loader2, CreditCard, Search, Truck, CheckCircle, Clock, QrCode, Printer, User, Pencil, Save, AlertTriangle, XCircle, MessageSquare, Smartphone, Banknote } from 'lucide-react';
+import { Package, Plus, History, MapPin, Loader2, CreditCard, Search, Truck, CheckCircle, Clock, QrCode, Printer, User, Pencil, Save, AlertTriangle, XCircle, MessageSquare, Smartphone, Banknote, Building2, Trash2, CircleHelp } from 'lucide-react';
+import { PRO_DISCOUNT_TIERS, getProBatchDiscountRate, getProBatchDiscountTier } from '@/lib/pricing';
 import { useToast } from '@/hooks/use-toast';
-import Image from 'next/image';
+import { ParcelDeleteButton, ParcelEditDialog } from '@/components/dashboard/parcel-edit-dialog';
 
 const LABEL_STORAGE_KEY = 'swiftcolis.parcel-labels';
 
@@ -29,6 +41,7 @@ function getRoleBasedDashboardPath(role: string, locale: string): string {
     case 'ADMIN': return `/${locale}/dashboard/admin`;
     case 'TRANSPORTER': return `/${locale}/dashboard/transporter`;
     case 'RELAIS': return `/${locale}/dashboard/relais`;
+    case 'ENSEIGNE': return `/${locale}/dashboard/enseigne`;
     case 'CLIENT':
     default: return `/${locale}/dashboard/client`;
   }
@@ -52,7 +65,7 @@ function ClientDashboardContent() {
   const initialTab = useMemo(() => {
     if (searchParams.get('track')) return 'track';
     const tab = searchParams.get('tab');
-    const allowed = ['create', 'track', 'payment', 'history', 'profil', 'litiges'];
+    const allowed = ['create', 'track', 'payment', 'history', 'profil', 'litiges', 'bulk-pro'];
     return allowed.includes(tab || '') ? (tab as string) : 'create';
   }, [searchParams]);
   const initialTracking = useMemo(() => searchParams.get('track') || '', [searchParams]);
@@ -61,6 +74,40 @@ function ClientDashboardContent() {
   const [trackingNumber, setTrackingNumber] = useState(initialTracking);
   const [stats, setStats] = useState({ created: 0, inTransit: 0, delivered: 0, totalSpent: 0 });
   const [cartCount, setCartCount] = useState(0);
+  const [implicitPro, setImplicitPro] = useState({ eligible: false, validParcelsCount: 0, remaining: 5, threshold: 5, windowDays: 90 });
+
+  async function fetchStats() {
+    try {
+      const [parcelsRes, loyaltyRes] = await Promise.all([
+        fetch(`/api/parcels?clientId=${session?.user?.id}`),
+        fetch('/api/loyalty/status'),
+      ]);
+
+      const parcels = await parcelsRes.json();
+      const loyalty = await loyaltyRes.json();
+
+      setCartCount(parcels.filter((p: any) => p.status === 'CREATED').length);
+      
+      setStats({
+        created: parcels.filter((p: any) => ['CREATED', 'PAID', 'PAID_RELAY'].includes(p.status)).length,
+        inTransit: parcels.filter((p: any) => ['DEPOSITED_RELAY', 'RECU_RELAIS', 'EN_TRANSPORT', 'ARRIVE_RELAIS_DESTINATION'].includes(p.status)).length,
+        delivered: parcels.filter((p: any) => p.status === 'LIVRE').length,
+        totalSpent: parcels.reduce((sum: number, p: any) => sum + (p.prixClient || 0), 0),
+      });
+
+      if (loyaltyRes.ok) {
+        setImplicitPro({
+          eligible: Boolean(loyalty.eligible),
+          validParcelsCount: Number(loyalty.validParcelsCount || 0),
+          remaining: Number(loyalty.remaining || 0),
+          threshold: Number(loyalty.threshold || 5),
+          windowDays: Number(loyalty.windowDays || 90),
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching stats:', error);
+    }
+  }
 
   // Debug logging
   useEffect(() => {
@@ -80,15 +127,19 @@ function ClientDashboardContent() {
     const tab = searchParams.get('tab');
     const track = searchParams.get('track') || '';
 
-    if (track) {
-      setTrackingNumber(track);
-      setActiveTab('track');
-      return;
-    }
+    const timeoutRef = setTimeout(() => {
+      if (track) {
+        setTrackingNumber(track);
+        setActiveTab('track');
+        return;
+      }
 
-    if (tab && ['create', 'track', 'payment', 'history', 'profil', 'litiges'].includes(tab)) {
-      setActiveTab(tab);
-    }
+      if (tab && ['create', 'track', 'payment', 'history', 'profil', 'litiges', 'bulk-pro'].includes(tab)) {
+        setActiveTab(tab);
+      }
+    }, 0);
+
+    return () => clearTimeout(timeoutRef);
   }, [searchParams]);
 
   // Redirect if wrong role
@@ -105,34 +156,24 @@ function ClientDashboardContent() {
   }, [status, session, locale]);
 
   useEffect(() => {
-    if (session?.user?.id) {
-      fetchStats();
-    }
+    const timeoutRef = setTimeout(() => {
+      if (session?.user?.id) {
+        void fetchStats();
+      }
+    }, 0);
+
+    return () => clearTimeout(timeoutRef);
   }, [session?.user?.id]);
 
   useEffect(() => {
-    if (activeTab === 'payment' && session?.user?.id) {
-      fetchStats();
-    }
+    const timeoutRef = setTimeout(() => {
+      if (activeTab === 'payment' && session?.user?.id) {
+        void fetchStats();
+      }
+    }, 0);
+
+    return () => clearTimeout(timeoutRef);
   }, [activeTab, session?.user?.id]);
-
-  const fetchStats = async () => {
-    try {
-      const response = await fetch(`/api/parcels?clientId=${session?.user?.id}`);
-      const parcels = await response.json();
-
-      setCartCount(parcels.filter((p: any) => p.status === 'CREATED').length);
-      
-      setStats({
-        created: parcels.filter((p: any) => ['CREATED', 'PAID', 'PAID_RELAY'].includes(p.status)).length,
-        inTransit: parcels.filter((p: any) => ['DEPOSITED_RELAY', 'RECU_RELAIS', 'EN_TRANSPORT', 'ARRIVE_RELAIS_DESTINATION'].includes(p.status)).length,
-        delivered: parcels.filter((p: any) => p.status === 'LIVRE').length,
-        totalSpent: parcels.reduce((sum: number, p: any) => sum + (p.prixClient || 0), 0),
-      });
-    } catch (error) {
-      console.error('Error fetching stats:', error);
-    }
-  };
 
   if (status === 'loading') {
     return (
@@ -163,121 +204,117 @@ function ClientDashboardContent() {
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-900">
       <Header />
-      <main className="flex-1 container px-4 py-8">
-        {/* Welcome Section */}
-        <div className="mb-8">
-          <div className="flex items-center gap-3">
-            <h1 className="text-3xl font-bold text-slate-900 dark:text-white">
-              Mon Espace Client
-            </h1>
-            <Badge variant="outline" className="border-emerald-300 text-emerald-700">
-              Panier: {cartCount}
-            </Badge>
-          </div>
-          <p className="text-slate-600 dark:text-slate-400 mt-1">
-            Bienvenue, {session.user.name}
-          </p>
-        </div>
+      <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8">
+        <DashboardShell tone="client" className="mx-auto max-w-7xl">
+          <DashboardHero
+            tone="client"
+            eyebrow="Expédition personnelle"
+            title="Mon Espace Client"
+            description="Préparez vos colis, suivez les étapes de transit et gardez une vue claire sur vos paiements dans une interface plus éditoriale et plus lisible."
+            meta={
+              <>
+                <Badge variant="outline" className="border-white/70 bg-white/70 text-slate-700">Bienvenue, {session.user.name}</Badge>
+                <Badge variant="outline" className="border-white/70 bg-white/70 text-slate-700">Panier: {cartCount}</Badge>
+                <Link href="/faq">
+                  <Badge variant="outline" className="border-white/70 bg-white/70 text-slate-700 hover:border-sky-200 hover:text-sky-700">
+                    <CircleHelp className="mr-1 h-3.5 w-3.5" />Aide / FAQ
+                  </Badge>
+                </Link>
+                {implicitPro.eligible ? (
+                  <>
+                    <Badge className="bg-violet-600 text-white border-violet-700">Tarif fidele actif</Badge>
+                    <Badge variant="outline" className="border-white/70 bg-white/70 text-slate-700">
+                      Fidelite: {implicitPro.validParcelsCount}/{implicitPro.threshold} colis valides sur {implicitPro.windowDays}j
+                    </Badge>
+                  </>
+                ) : (
+                  <Badge variant="outline" className="border-white/70 bg-white/70 text-slate-700">
+                    Tarif fidele: encore {implicitPro.remaining} colis ({implicitPro.validParcelsCount}/{implicitPro.threshold})
+                  </Badge>
+                )}
+              </>
+            }
+          />
 
-        {/* Stats Cards */}
-        <div className="grid gap-4 md:grid-cols-4 mb-8">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Colis créés</CardTitle>
-              <Package className="h-4 w-4 text-slate-400" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.created}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">En transit</CardTitle>
-              <Truck className="h-4 w-4 text-slate-400" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.inTransit}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Livrés</CardTitle>
-              <CheckCircle className="h-4 w-4 text-slate-400" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.delivered}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total dépensé</CardTitle>
-              <CreditCard className="h-4 w-4 text-slate-400" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.totalSpent} DA</div>
-            </CardContent>
-          </Card>
-        </div>
+          <DashboardStatsGrid>
+            <DashboardMetricCard tone="client" label="Colis créés" value={stats.created} icon={<Package className="h-5 w-5" />} />
+            <DashboardMetricCard tone="client" label="En transit" value={stats.inTransit} icon={<Truck className="h-5 w-5" />} />
+            <DashboardMetricCard tone="client" label="Livrés" value={stats.delivered} icon={<CheckCircle className="h-5 w-5" />} />
+            <DashboardMetricCard tone="client" label="Total dépensé" value={`${stats.totalSpent} DA`} icon={<CreditCard className="h-5 w-5" />} />
+          </DashboardStatsGrid>
 
-        {/* Main Content Tabs */}
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-6 mb-8">
-            <TabsTrigger value="create" className="flex items-center gap-2">
+          <DashboardPanel tone="client">
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
+              <TabsList className={`${dashboardTabsListClass} grid grid-cols-2 ${implicitPro.eligible ? 'lg:grid-cols-7' : 'lg:grid-cols-6'}`}>
+                <TabsTrigger value="create" className={`${getDashboardTabsTriggerClass('client')} flex items-center gap-2`}>
               <Plus className="h-4 w-4" />
               Créer un colis
             </TabsTrigger>
-            <TabsTrigger value="track" className="flex items-center gap-2">
+                <TabsTrigger value="track" className={`${getDashboardTabsTriggerClass('client')} flex items-center gap-2`}>
               <MapPin className="h-4 w-4" />
               Suivi
             </TabsTrigger>
-            <TabsTrigger value="payment" className="flex items-center gap-2">
+                <TabsTrigger value="payment" className={`${getDashboardTabsTriggerClass('client')} flex items-center gap-2`}>
               <CreditCard className="h-4 w-4" />
               Panier ({cartCount})
             </TabsTrigger>
-            <TabsTrigger value="history" className="flex items-center gap-2">
+                <TabsTrigger value="history" className={`${getDashboardTabsTriggerClass('client')} flex items-center gap-2`}>
               <History className="h-4 w-4" />
               Historique
             </TabsTrigger>
-            <TabsTrigger value="profil" className="flex items-center gap-2">
+                <TabsTrigger value="profil" className={`${getDashboardTabsTriggerClass('client')} flex items-center gap-2`}>
               <User className="h-4 w-4" />
               Profil
             </TabsTrigger>
-            <TabsTrigger value="litiges" className="flex items-center gap-2">
+                <TabsTrigger value="litiges" className={`${getDashboardTabsTriggerClass('client')} flex items-center gap-2`}>
               <AlertTriangle className="h-4 w-4" />
               Litiges
             </TabsTrigger>
-          </TabsList>
+                {implicitPro.eligible && (
+                  <TabsTrigger value="bulk-pro" className={`${getDashboardTabsTriggerClass('client')} flex items-center gap-2`}>
+                    <Building2 className="h-4 w-4" />
+                    Expédition fidelite
+                  </TabsTrigger>
+                )}
+              </TabsList>
 
-          <TabsContent value="create">
-            <CreateParcelForm
-              userId={session.user.id}
-              onCreated={fetchStats}
-              onGoToHistory={() => { fetchStats(); setActiveTab('history'); }}
-              onGoToCart={() => { fetchStats(); setActiveTab('payment'); }}
-            />
-          </TabsContent>
+              <TabsContent value="create">
+                <CreateParcelForm
+                  userId={session.user.id}
+                  onCreated={fetchStats}
+                  onGoToHistory={() => { fetchStats(); setActiveTab('history'); }}
+                  onGoToCart={() => { fetchStats(); setActiveTab('payment'); }}
+                />
+              </TabsContent>
 
-          <TabsContent value="track">
-            <TrackingTab initialTracking={trackingNumber} setTrackingNumber={setTrackingNumber} />
-          </TabsContent>
+              <TabsContent value="track">
+                <TrackingTab initialTracking={trackingNumber} setTrackingNumber={setTrackingNumber} />
+              </TabsContent>
 
-          <TabsContent value="payment">
-            <PaymentTab userId={session.user.id} />
-          </TabsContent>
+              <TabsContent value="payment">
+                <PaymentTab userId={session.user.id} />
+              </TabsContent>
 
-          <TabsContent value="history">
-            <ParcelHistory
-              userId={session.user.id}
-              onTrack={(tn: string) => { setTrackingNumber(tn); setActiveTab('track'); }}
-            />
-          </TabsContent>
-          <TabsContent value="profil">
-            <ProfilClientTab userId={session.user.id} />
-          </TabsContent>
-          <TabsContent value="litiges">
-            <LitigesTab userId={session.user.id} />
-          </TabsContent>
-        </Tabs>
+              <TabsContent value="history">
+                <ParcelHistory
+                  userId={session.user.id}
+                  onTrack={(tn: string) => { setTrackingNumber(tn); setActiveTab('track'); }}
+                />
+              </TabsContent>
+              <TabsContent value="profil">
+                <ProfilClientTab userId={session.user.id} />
+              </TabsContent>
+              <TabsContent value="litiges">
+                <LitigesTab userId={session.user.id} />
+              </TabsContent>
+              {implicitPro.eligible && (
+                <TabsContent value="bulk-pro">
+                  <BulkProCreateForm userId={session.user.id} onCreated={fetchStats} />
+                </TabsContent>
+              )}
+            </Tabs>
+          </DashboardPanel>
+        </DashboardShell>
       </main>
       <Footer />
     </div>
@@ -289,12 +326,15 @@ function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart }: { us
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [relais, setRelais] = useState<any[]>([]);
+  const [relayPrinterStatusById, setRelayPrinterStatusById] = useState<Record<string, 'READY' | 'BROKEN' | 'OUT_OF_PAPER' | 'NOT_EQUIPPED'>>({});
+  const [lignesActives, setLignesActives] = useState<any[]>([]);
   const [pricingConfig, setPricingConfig] = useState({
     pricingAdminFee: 50,
     pricingRatePerKg: 120,
     pricingRatePerKm: 2.5,
     pricingRelayDepartureRate: 0.1,
     pricingRelayArrivalRate: 0.1,
+    pricingRelayPrintFee: 30,
     pricingRoundTo: 10,
   });
   const [createdParcel, setCreatedParcel] = useState<any>(null);
@@ -311,6 +351,7 @@ function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart }: { us
     recipientFirstName: '',
     recipientLastName: '',
     recipientPhone: '',
+    labelPrintMode: 'HOME',
   });
   const [calculatedPrice, setCalculatedPrice] = useState<any>(null);
 
@@ -321,13 +362,27 @@ function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart }: { us
 
   useEffect(() => {
     fetchRelais();
+    fetchRelayPrinterStatuses();
     fetchPricingSettings();
+    void fetchLignesActives();
   }, []);
 
   useEffect(() => {
     if (formData.villeDepart && formData.villeArrivee && formData.weight) calculatePrice();
     else setCalculatedPrice(null);
-  }, [formData.villeDepart, formData.villeArrivee, formData.weight, pricingConfig]);
+  }, [formData.villeDepart, formData.villeArrivee, formData.weight, formData.labelPrintMode, pricingConfig]);
+
+  const fetchLignesActives = async () => {
+    try {
+      const res = await fetch('/api/lignes');
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        setLignesActives(data.filter((l: any) => l.isActive !== false));
+      }
+    } catch {
+      // keep empty — toutes les villes restent disponibles si l'API échoue
+    }
+  };
 
   const fetchRelais = async () => {
     try {
@@ -335,6 +390,24 @@ function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart }: { us
       setRelais(await response.json());
     } catch (error) {
       console.error('Error fetching relais:', error);
+    }
+  };
+
+  const fetchRelayPrinterStatuses = async () => {
+    try {
+      const response = await fetch('/api/relais/printers');
+      if (!response.ok) return;
+      const data = await response.json();
+      const rows = Array.isArray(data?.printers) ? data.printers : [];
+      const nextMap = rows.reduce((acc: Record<string, 'READY' | 'BROKEN' | 'OUT_OF_PAPER' | 'NOT_EQUIPPED'>, row: any) => {
+        if (row?.relaisId) {
+          acc[row.relaisId] = row.printerStatus;
+        }
+        return acc;
+      }, {});
+      setRelayPrinterStatusById(nextMap);
+    } catch {
+      // keep empty map as fallback
     }
   };
 
@@ -349,6 +422,7 @@ function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart }: { us
         pricingRatePerKm: Number(data.pricingRatePerKm || 2.5),
         pricingRelayDepartureRate: Number(data.pricingRelayDepartureRate || 0.1),
         pricingRelayArrivalRate: Number(data.pricingRelayArrivalRate || 0.1),
+        pricingRelayPrintFee: Number(data.pricingRelayPrintFee || 30),
         pricingRoundTo: Number(data.pricingRoundTo || 10),
       });
     } catch {
@@ -378,11 +452,17 @@ function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart }: { us
       roundTo: pricingConfig.pricingRoundTo,
     });
 
-    setCalculatedPrice(dynamic);
+    const relayPrintFee = formData.labelPrintMode === 'RELAY' ? pricingConfig.pricingRelayPrintFee : 0;
+
+    setCalculatedPrice({
+      ...dynamic,
+      relayPrintFee,
+      finalClientPrice: dynamic.clientPrice + relayPrintFee,
+    });
   };
 
   const resetForm = () => {
-    setFormData({ villeDepart: '', villeArrivee: '', relaisDepartId: '', relaisArriveeId: '', description: '', weight: '', senderFirstName: '', senderLastName: '', senderPhone: '', recipientFirstName: '', recipientLastName: '', recipientPhone: '' });
+    setFormData({ villeDepart: '', villeArrivee: '', relaisDepartId: '', relaisArriveeId: '', description: '', weight: '', senderFirstName: '', senderLastName: '', senderPhone: '', recipientFirstName: '', recipientLastName: '', recipientPhone: '', labelPrintMode: 'HOME' });
     setCalculatedPrice(null);
     setCreatedParcel(null);
   };
@@ -501,13 +581,39 @@ function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart }: { us
     &#9888;&#65039; À déposer exclusivement au relais indiqué &bull; Règlement en espèces au dépôt &bull; Conserver ce numéro de suivi
   </div>
 </div>
-<script>window.onload = function() { window.print(); }<\/script>
 </body></html>`;
 
     const win = window.open('', '_blank', 'width=900,height=1200');
     if (win) {
       win.document.write(html);
       win.document.close();
+      const waitForImages = async () => {
+        const images = Array.from(win.document.images);
+        await Promise.all(
+          images.map(
+            (img) =>
+              new Promise<void>((resolve) => {
+                if (img.complete) {
+                  resolve();
+                  return;
+                }
+                img.addEventListener('load', () => resolve(), { once: true });
+                img.addEventListener('error', () => resolve(), { once: true });
+              })
+          )
+        );
+      };
+      const triggerPrint = () => {
+        waitForImages().finally(() => {
+          win.focus();
+          win.print();
+        });
+      };
+      if (win.document.readyState === 'complete') {
+        triggerPrint();
+      } else {
+        win.addEventListener('load', triggerPrint, { once: true });
+      }
     }
   };
 
@@ -536,6 +642,7 @@ function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart }: { us
         relaisDepartAddress: departRelay?.address || '',
         relaisArriveeName: arriveeRelay?.commerceName || '',
         relaisArriveeAddress: arriveeRelay?.address || '',
+        labelPrintMode: formData.labelPrintMode,
       };
       localStorage.setItem(LABEL_STORAGE_KEY, JSON.stringify(current));
     } catch (error) {
@@ -560,16 +667,17 @@ function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart }: { us
           villeDepart: formData.villeDepart,
           villeArrivee: formData.villeArrivee,
           description: formData.description,
-          weight: formData.weight ? parseFloat(formData.weight) : null,
+          weight: formData.weight ? parseLocaleFloat(formData.weight) : null,
           senderFirstName: formData.senderFirstName,
           senderLastName: formData.senderLastName,
           senderPhone: formData.senderPhone,
           recipientFirstName: formData.recipientFirstName,
           recipientLastName: formData.recipientLastName,
           recipientPhone: formData.recipientPhone,
-          prixClient: calculatedPrice?.clientPrice || 0,
+          labelPrintMode: formData.labelPrintMode,
+          prixClient: calculatedPrice?.finalClientPrice || 0,
           commissionPlateforme: calculatedPrice?.platformMargin || 0,
-          commissionRelais: calculatedPrice?.relayCommissionTotal || 0,
+          commissionRelais: (calculatedPrice?.relayCommissionTotal || 0) + (calculatedPrice?.relayPrintFee || 0),
           netTransporteur: calculatedPrice?.transportCost || 0,
           qrCode: qrData,
           status: 'CREATED',
@@ -591,14 +699,67 @@ function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart }: { us
     }
   };
 
-  const relaisDepart = relais.filter(r => r.ville === formData.villeDepart);
-  const relaisArrivee = relais.filter(r => r.ville === formData.villeArrivee);
+  const activeRelayCityIds = useMemo(() => {
+    return Array.from(
+      new Set(
+        relais
+          .filter((relay: any) => relay.status === 'APPROVED' && relay.operationalStatus === 'ACTIF')
+          .map((relay: any) => relay.ville)
+      )
+    );
+  }, [relais]);
+
+  // Villes de départ disponibles = villes avec relais actifs et présentes dans une ligne active
+  const departWilayas = useMemo(() => {
+    if (activeRelayCityIds.length === 0) return [];
+    if (lignesActives.length === 0) {
+      return WILAYAS.filter((w) => activeRelayCityIds.includes(w.id));
+    }
+    const ids = new Set<string>();
+    lignesActives.forEach(l => { ids.add(l.villeDepart); ids.add(l.villeArrivee); });
+    return WILAYAS.filter(w => ids.has(w.id) && activeRelayCityIds.includes(w.id));
+  }, [activeRelayCityIds, lignesActives]);
+
+  // Villes d'arrivée disponibles = villes reliées à la ville de départ choisie et ayant des relais actifs
+  const arriveeWilayas = useMemo(() => {
+    if (!formData.villeDepart) return [];
+    if (activeRelayCityIds.length === 0) return [];
+    if (lignesActives.length === 0) {
+      return WILAYAS.filter(w => w.id !== formData.villeDepart && activeRelayCityIds.includes(w.id));
+    }
+    const ids = new Set<string>();
+    lignesActives.forEach(l => {
+      if (l.villeDepart === formData.villeDepart) ids.add(l.villeArrivee);
+      if (l.villeArrivee === formData.villeDepart) ids.add(l.villeDepart);
+    });
+    return WILAYAS.filter(w => ids.has(w.id) && activeRelayCityIds.includes(w.id));
+  }, [activeRelayCityIds, lignesActives, formData.villeDepart]);
+
+  const isRelayPrintMode = formData.labelPrintMode === 'RELAY';
+  const relaisDepart = relais.filter((r: any) => {
+    if (r.ville !== formData.villeDepart) return false;
+    if (!isRelayPrintMode) return true;
+    return relayPrinterStatusById[r.id] === 'READY';
+  });
+  const relaisArrivee = relais.filter((r: any) => r.ville === formData.villeArrivee);
   const selectedRelayDepart = relais.find((r: any) => r.id === formData.relaisDepartId);
   const selectedRelayArrivee = relais.find((r: any) => r.id === formData.relaisArriveeId);
   const estimatedDistanceKm =
     formData.villeDepart && formData.villeArrivee
       ? estimateSafeDistanceKmByWilayas(formData.villeDepart, formData.villeArrivee)
       : null;
+
+  useEffect(() => {
+    if (!isRelayPrintMode || !formData.relaisDepartId) return;
+    if (relayPrinterStatusById[formData.relaisDepartId] === 'READY') return;
+
+    setFormData((prev) => ({ ...prev, relaisDepartId: '' }));
+    toast({
+      title: 'Relais de départ indisponible pour impression',
+      description: 'Veuillez choisir un relais de départ avec imprimante disponible.',
+      variant: 'destructive',
+    });
+  }, [isRelayPrintMode, formData.relaisDepartId, relayPrinterStatusById, toast]);
 
   // — Success card after creation
   if (createdParcel) {
@@ -611,6 +772,9 @@ function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart }: { us
             </div>
             <h2 className="text-2xl font-bold mb-1">Colis créé !</h2>
             <p className="text-slate-500 text-sm">Déposez le colis au relais et réglez en espèces.</p>
+            {createdParcel.labelPrintMode === 'RELAY' && (
+              <p className="text-xs text-blue-600 mt-2">Impression demandée au relais: des frais supplémentaires ont été ajoutés.</p>
+            )}
           </div>
 
           {/* Numéro de suivi */}
@@ -633,7 +797,7 @@ function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart }: { us
             <div className="flex flex-col items-center mb-4">
               <p className="text-xs text-slate-500 mb-2">QR Code à présenter au relais</p>
               <div className="p-3 bg-white border rounded-lg shadow-sm">
-                <Image src={createdParcel.qrCodeImage} alt="QR Code colis" width={150} height={150} />
+                <img src={createdParcel.qrCodeImage} alt="QR Code colis" width={150} height={150} className="block" />
               </div>
             </div>
           )}
@@ -644,13 +808,19 @@ function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart }: { us
             <p className="text-amber-700 dark:text-amber-400">{relais.find(r => r.id === formData.relaisDepartId)?.commerceName}</p>
           </div>
 
-          <Button
-            className="w-full bg-blue-600 hover:bg-blue-700 mb-3"
-            onClick={printParcelLabel}
-          >
-            <Printer className="h-4 w-4 mr-2" />
-            Imprimer l'étiquette à coller sur le colis
-          </Button>
+          {createdParcel.labelPrintMode === 'HOME' ? (
+            <Button
+              className="w-full bg-blue-600 hover:bg-blue-700 mb-3"
+              onClick={printParcelLabel}
+            >
+              <Printer className="h-4 w-4 mr-2" />
+              Imprimer l'étiquette à coller sur le colis
+            </Button>
+          ) : (
+            <div className="mb-3 rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-700">
+              Étiquette à imprimer au relais de dépôt.
+            </div>
+          )}
 
           <div className="flex flex-col sm:flex-row gap-3">
             <Button variant="outline" className="flex-1" onClick={resetForm}>
@@ -674,6 +844,11 @@ function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart }: { us
       <CardHeader className="pb-4 text-center">
         <CardTitle className="text-2xl">Créer un nouveau colis</CardTitle>
         <CardDescription className="mx-auto max-w-2xl">Un formulaire plus simple, centré sur l'essentiel.</CardDescription>
+        <div className="pt-2">
+          <Link href="/faq" className="inline-flex items-center gap-2 text-sm font-medium text-sky-700 hover:text-sky-800">
+            <CircleHelp className="h-4 w-4" />Besoin d'aide ? Voir la FAQ
+          </Link>
+        </div>
       </CardHeader>
       <CardContent className="space-y-6 px-4 sm:px-6">
         {/* Barre de progression */}
@@ -704,19 +879,34 @@ function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart }: { us
             <div className="grid gap-3 md:grid-cols-2">
               <div className="space-y-2">
                 <Label className="text-sm">Départ</Label>
-                <Select value={formData.villeDepart} onValueChange={(v) => setFormData({ ...formData, villeDepart: v, relaisDepartId: '' })}>
+                <Select
+                  value={formData.villeDepart}
+                  onValueChange={(v) => setFormData({ ...formData, villeDepart: v, villeArrivee: '', relaisDepartId: '', relaisArriveeId: '' })}
+                >
                   <SelectTrigger className="h-10"><SelectValue placeholder="Sélectionner" /></SelectTrigger>
                   <SelectContent>
-                    {WILAYAS.map(w => <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>)}
+                    {departWilayas.length === 0 ? (
+                      <div className="px-3 py-4 text-center text-sm text-slate-400">Aucune ligne configurée</div>
+                    ) : (
+                      departWilayas.map(w => <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>)
+                    )}
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
                 <Label className="text-sm">Arrivée</Label>
-                <Select value={formData.villeArrivee} onValueChange={(v) => setFormData({ ...formData, villeArrivee: v, relaisArriveeId: '' })}>
-                  <SelectTrigger className="h-10"><SelectValue placeholder="Sélectionner" /></SelectTrigger>
+                <Select
+                  value={formData.villeArrivee}
+                  onValueChange={(v) => setFormData({ ...formData, villeArrivee: v, relaisArriveeId: '' })}
+                  disabled={!formData.villeDepart}
+                >
+                  <SelectTrigger className="h-10"><SelectValue placeholder={formData.villeDepart ? 'Sélectionner' : 'Choisir le départ d\'abord'} /></SelectTrigger>
                   <SelectContent>
-                    {WILAYAS.map(w => <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>)}
+                    {arriveeWilayas.length === 0 ? (
+                      <div className="px-3 py-4 text-center text-sm text-slate-400">Aucune ligne depuis cette ville</div>
+                    ) : (
+                      arriveeWilayas.map(w => <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>)
+                    )}
                   </SelectContent>
                 </Select>
               </div>
@@ -751,7 +941,13 @@ function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart }: { us
                   <p className="text-xs text-slate-600 dark:text-slate-400">
                     Dépôt obligatoire dans ce relais uniquement (aucun dépôt possible dans un autre relais, même ville).
                   </p>
-                  {relaisDepart.length === 0 && <p className="text-sm text-orange-500">Aucun relais disponible dans cette ville</p>}
+                  {relaisDepart.length === 0 && (
+                    <p className="text-sm text-orange-500">
+                      {isRelayPrintMode
+                        ? 'Aucun relais avec imprimante disponible dans cette ville'
+                        : 'Aucun relais disponible dans cette ville'}
+                    </p>
+                  )}
                 </div>
                 <div className="min-w-0 space-y-2">
                   <Label className="text-sm">Relais arrivée</Label>
@@ -791,7 +987,7 @@ function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart }: { us
                 {calculatedPrice && (
                   <div className="rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
                     <p className="text-xs uppercase tracking-wide text-emerald-700">Montant estimé</p>
-                    <p className="text-2xl font-bold">{calculatedPrice.clientPrice} DA</p>
+                    <p className="text-2xl font-bold">{calculatedPrice.finalClientPrice} DA</p>
                   </div>
                 )}
               </div>
@@ -803,6 +999,28 @@ function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart }: { us
               <div className="space-y-2">
                 <Label className="text-sm">Description</Label>
                 <Input className="h-10" value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} placeholder="Contenu du colis (optionnel)" />
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-sm">Option d'impression de l'étiquette</Label>
+                <Select
+                  value={formData.labelPrintMode}
+                  onValueChange={(v) => setFormData({ ...formData, labelPrintMode: v })}
+                >
+                  <SelectTrigger className="h-10"><SelectValue placeholder="Choisir une option" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="HOME">Imprimer chez moi (sans frais)</SelectItem>
+                    <SelectItem value="RELAY">Imprimer au relais (+{pricingConfig.pricingRelayPrintFee} DA)</SelectItem>
+                  </SelectContent>
+                </Select>
+                {isRelayPrintMode && (
+                  <p className="text-xs text-slate-500">
+                    Seuls les relais de départ avec imprimante disponible sont proposés.
+                  </p>
+                )}
+                <p className="text-xs text-slate-400">
+                  Pas d'imprimante ? <Link href="/faq" className="text-emerald-600 underline hover:text-emerald-700">Le relais peut imprimer à votre place → FAQ</Link>
+                </p>
               </div>
 
               <div className="rounded-xl bg-slate-50 p-4">
@@ -847,8 +1065,11 @@ function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart }: { us
                   <div>
                     <h4 className="font-semibold">Montant à payer</h4>
                     <p className="text-xs text-slate-500">Le montant final sera confirmé au dépôt du colis.</p>
+                    {calculatedPrice.relayPrintFee > 0 && (
+                      <p className="text-xs text-blue-600">Frais impression relais: +{calculatedPrice.relayPrintFee} DA</p>
+                    )}
                   </div>
-                  <p className="text-2xl font-bold text-emerald-600">{calculatedPrice.clientPrice} DA</p>
+                  <p className="text-2xl font-bold text-emerald-600">{calculatedPrice.finalClientPrice} DA</p>
                 </div>
               </CardContent>
             </Card>
@@ -938,7 +1159,54 @@ function TrackingTab({ initialTracking, setTrackingNumber }: { initialTracking: 
   }, [initialTracking]);
 
   const statusOrder = ['CREATED', 'PAID_RELAY', 'DEPOSITED_RELAY', 'RECU_RELAIS', 'EN_TRANSPORT', 'ARRIVE_RELAIS_DESTINATION', 'LIVRE'];
-  const currentStatusIndex = result ? statusOrder.indexOf(result.status) : -1;
+  const statusRank = useMemo(
+    () => Object.fromEntries(statusOrder.map((status, index) => [status, index])) as Record<string, number>,
+    []
+  );
+
+  const effectiveStatus = useMemo(() => {
+    if (!result) return null;
+    const historyStatuses = Array.isArray(result.trackingHistory)
+      ? result.trackingHistory.map((h: any) => h?.status).filter(Boolean)
+      : [];
+    const candidates = [result.status, ...historyStatuses].filter(Boolean) as string[];
+    if (candidates.length === 0) return result.status;
+
+    let best = result.status as string;
+    let bestRank = statusRank[best] ?? -1;
+
+    for (const candidate of candidates) {
+      const rank = statusRank[candidate] ?? -1;
+      if (rank > bestRank) {
+        best = candidate;
+        bestRank = rank;
+      }
+    }
+    return best;
+  }, [result, statusRank]);
+
+  const currentStatusIndex = effectiveStatus ? statusOrder.indexOf(effectiveStatus) : -1;
+
+  const milestoneSteps = [
+    { id: 'CREATED', label: 'Cree' },
+    { id: 'DEPOSITED_RELAY', label: 'Depose relais' },
+    { id: 'EN_TRANSPORT', label: 'En route' },
+    { id: 'ARRIVE_RELAIS_DESTINATION', label: 'Arrive relais' },
+    { id: 'LIVRE', label: 'Livre' },
+  ] as const;
+
+  const currentMilestoneIndex = milestoneSteps.reduce((best, step, index) => {
+    const stepRank = statusRank[step.id] ?? -1;
+    return currentStatusIndex >= stepRank ? index : best;
+  }, 0);
+
+  const stageLabel = currentStatusIndex >= statusOrder.indexOf('ARRIVE_RELAIS_DESTINATION')
+    ? 'Arrivé au relais'
+    : currentStatusIndex >= statusOrder.indexOf('EN_TRANSPORT')
+      ? 'En transport'
+      : 'Créé';
+
+  const currentStatusLabel = PARCEL_STATUS.find((s) => s.id === effectiveStatus)?.label || effectiveStatus;
 
   return (
     <Card>
@@ -964,6 +1232,9 @@ function TrackingTab({ initialTracking, setTrackingNumber }: { initialTracking: 
           <div className="text-center py-8 text-slate-500">
             <Package className="h-12 w-12 mx-auto mb-3 opacity-30" />
             <p>Aucun colis trouvé pour ce numéro de suivi.</p>
+            <p className="text-xs mt-2">
+              Numéro perdu ou inconnu ? <Link href="/faq" className="text-emerald-600 underline hover:text-emerald-700">Consulter la FAQ</Link>
+            </p>
           </div>
         )}
 
@@ -976,8 +1247,8 @@ function TrackingTab({ initialTracking, setTrackingNumber }: { initialTracking: 
                   <p className="text-xs text-slate-500 uppercase tracking-wide mb-0.5">Numéro de suivi</p>
                   <p className="font-mono font-bold text-xl">{result.trackingNumber}</p>
                 </div>
-                <Badge className={`${PARCEL_STATUS.find(s => s.id === result.status)?.color} text-white shrink-0`}>
-                  {PARCEL_STATUS.find(s => s.id === result.status)?.label}
+                <Badge className={`${PARCEL_STATUS.find(s => s.id === effectiveStatus)?.color || 'bg-slate-600'} text-white shrink-0`}>
+                  {currentStatusLabel}
                 </Badge>
               </div>
 
@@ -990,7 +1261,13 @@ function TrackingTab({ initialTracking, setTrackingNumber }: { initialTracking: 
                     <p className="text-xs text-slate-400">{result.relaisDepart.commerceName}</p>
                   )}
                 </div>
-                <Truck className="h-5 w-5 text-emerald-500 shrink-0" />
+                {currentStatusIndex >= statusOrder.indexOf('ARRIVE_RELAIS_DESTINATION') ? (
+                  <CheckCircle className="h-5 w-5 text-emerald-500 shrink-0" />
+                ) : currentStatusIndex >= statusOrder.indexOf('EN_TRANSPORT') ? (
+                  <Truck className="h-5 w-5 text-emerald-500 shrink-0" />
+                ) : (
+                  <Truck className="h-5 w-5 text-slate-400 shrink-0" />
+                )}
                 <div className="flex-1 text-right">
                   <p className="text-xs text-slate-500">Arrivée</p>
                   <p className="font-semibold text-sm">{WILAYAS.find(w => w.id === result.villeArrivee)?.name || result.villeArrivee}</p>
@@ -1000,21 +1277,33 @@ function TrackingTab({ initialTracking, setTrackingNumber }: { initialTracking: 
                 </div>
               </div>
 
-              {/* Barre de progression statut */}
-              <div className="flex items-center gap-1">
-                {statusOrder.map((s, i) => (
-                  <div
-                    key={s}
-                    className={`flex-1 h-1.5 rounded-full transition-all ${
-                      i <= currentStatusIndex ? 'bg-emerald-500' : 'bg-slate-200 dark:bg-slate-700'
-                    }`}
-                  />
-                ))}
+              {/* Timeline à jalons nommés */}
+              <div className="mt-2 grid grid-cols-5 items-start gap-2">
+                {milestoneSteps.map((step, index) => {
+                  const done = index <= currentMilestoneIndex;
+                  const active = index === currentMilestoneIndex;
+                  return (
+                    <div key={step.id} className="flex flex-col items-center text-center">
+                      <div className="w-full flex items-center">
+                        <span className={`h-0.5 flex-1 ${index === 0 ? 'opacity-0' : done ? 'bg-emerald-500' : 'bg-slate-200 dark:bg-slate-700'}`} />
+                        <span
+                          className={`h-3.5 w-3.5 rounded-full border-2 ${
+                            done
+                              ? 'bg-emerald-500 border-emerald-500'
+                              : 'bg-white border-slate-300 dark:bg-slate-800 dark:border-slate-600'
+                          } ${active ? 'ring-2 ring-emerald-200' : ''}`}
+                        />
+                        <span className={`h-0.5 flex-1 ${index === milestoneSteps.length - 1 ? 'opacity-0' : index < currentMilestoneIndex ? 'bg-emerald-500' : 'bg-slate-200 dark:bg-slate-700'}`} />
+                      </div>
+                      <span className={`mt-2 text-[11px] ${active ? 'font-semibold text-emerald-700' : 'text-slate-400'}`}>
+                        {step.label}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
-              <div className="flex justify-between text-xs text-slate-400 mt-1">
-                <span>Créé</span>
-                <span>{PARCEL_STATUS.find(s => s.id === result.status)?.label}</span>
-                <span>Livré</span>
+              <div className="mt-2 text-center text-xs text-slate-500">
+                Etape actuelle: <span className="font-semibold text-slate-700">{stageLabel}</span>
               </div>
             </div>
 
@@ -1045,7 +1334,7 @@ function TrackingTab({ initialTracking, setTrackingNumber }: { initialTracking: 
               <div className="flex flex-col items-center">
                 <p className="text-xs text-slate-500 mb-2">QR Code</p>
                 <div className="p-3 bg-white border rounded-lg shadow-sm">
-                  <Image src={result.qrCodeImage} alt="QR Code" width={120} height={120} />
+                  <img src={result.qrCodeImage} alt="QR Code" width={120} height={120} className="block" />
                 </div>
               </div>
             )}
@@ -1102,6 +1391,20 @@ function PaymentTab({ userId }: { userId: string }) {
         <CardDescription>Payez en ligne (CIB, Edahabia, Baridi Mob) ou en espèces au relais de départ</CardDescription>
       </CardHeader>
       <CardContent>
+        <div className="mb-6 rounded-2xl border border-sky-100 bg-sky-50 p-4">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-sm font-semibold text-sky-900">FAQ paiement rapide</p>
+              <div className="mt-2 space-y-2 text-sm text-sky-800">
+                <p><span className="font-medium">Quand je paie ?</span> Après création du colis, depuis le panier ou au relais de départ selon le mode choisi.</p>
+                <p><span className="font-medium">Puis-je payer au relais ?</span> Oui, le panier conserve les colis créés en attente de règlement au relais de dépôt.</p>
+              </div>
+            </div>
+            <Link href="/faq" className="shrink-0 text-sm font-medium text-sky-700 hover:text-sky-900">
+              Voir la FAQ
+            </Link>
+          </div>
+        </div>
         {isLoading ? (
           <div className="flex justify-center py-8">
             <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
@@ -1113,6 +1416,9 @@ function PaymentTab({ userId }: { userId: string }) {
             <Button variant="outline" onClick={() => push(`/${locale}/dashboard/client?tab=create`)}>
               Créer un nouveau colis
             </Button>
+            <p className="text-xs text-slate-400 mt-3">
+              Comment ça marche ? <Link href="/faq" className="text-emerald-600 underline hover:text-emerald-700">Voir la FAQ</Link>
+            </p>
           </div>
         ) : (
           <div className="space-y-4">
@@ -1185,6 +1491,8 @@ function PaymentTab({ userId }: { userId: string }) {
                       <Button variant="outline" onClick={() => push(`/${locale}/dashboard/client?tab=track&track=${parcel.trackingNumber}`)}>
                         <Banknote className="h-4 w-4 mr-1" />Voir (espèces)
                       </Button>
+                      <ParcelEditDialog parcel={parcel} buttonLabel="Modifier" onSaved={fetchData} />
+                      <ParcelDeleteButton parcel={parcel} onSaved={fetchData} />
                     </div>
                   </CardContent>
                 </Card>
@@ -1346,13 +1654,39 @@ function ParcelHistory({ userId, onTrack }: { userId: string; onTrack: (tn: stri
     &#9888;&#65039; À déposer exclusivement au relais indiqué &bull; Règlement en espèces au dépôt &bull; Conserver ce numéro de suivi
   </div>
 </div>
-<script>window.onload = function() { window.print(); }<\/script>
 </body></html>`;
 
       const win = window.open('', '_blank', 'width=900,height=1200');
       if (win) {
         win.document.write(html);
         win.document.close();
+        const waitForImages = async () => {
+          const images = Array.from(win.document.images);
+          await Promise.all(
+            images.map(
+              (img) =>
+                new Promise<void>((resolve) => {
+                  if (img.complete) {
+                    resolve();
+                    return;
+                  }
+                  img.addEventListener('load', () => resolve(), { once: true });
+                  img.addEventListener('error', () => resolve(), { once: true });
+                })
+            )
+          );
+        };
+        const triggerPrint = () => {
+          waitForImages().finally(() => {
+            win.focus();
+            win.print();
+          });
+        };
+        if (win.document.readyState === 'complete') {
+          triggerPrint();
+        } else {
+          win.addEventListener('load', triggerPrint, { once: true });
+        }
       }
     } catch (error) {
       console.error('Error generating label from history:', error);
@@ -1386,6 +1720,11 @@ function ParcelHistory({ userId, onTrack }: { userId: string; onTrack: (tn: stri
           <div className="text-center py-8 text-slate-500">
             <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
             <p>{colis.length === 0 ? 'Aucun colis pour le moment' : 'Aucun colis pour ce filtre'}</p>
+            {colis.length === 0 && (
+              <p className="text-xs mt-2">
+                <Link href="/faq" className="text-emerald-600 underline hover:text-emerald-700">Comment créer mon premier colis ? → FAQ</Link>
+              </p>
+            )}
           </div>
         ) : (
           <Table>
@@ -1420,6 +1759,8 @@ function ParcelHistory({ userId, onTrack }: { userId: string; onTrack: (tn: stri
                       <Button size="sm" variant="outline" onClick={() => onTrack(c.trackingNumber)}>
                         <MapPin className="h-3 w-3 mr-1" />Suivre
                       </Button>
+                      <ParcelEditDialog parcel={c} buttonLabel="Modifier" onSaved={fetchColis} />
+                      <ParcelDeleteButton parcel={c} onSaved={fetchColis} />
                       <Button size="sm" variant="outline" onClick={() => printStoredOrLiveLabel(c)}>
                         <Printer className="h-3 w-3 mr-1" />Étiquette
                       </Button>
@@ -1794,6 +2135,335 @@ function LitigesTab({ userId }: { userId: string }) {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// BulkProCreateForm — Expedition fidelite (eligibilite implicite)
+// ─────────────────────────────────────────────────────────────────────────────
+interface BulkRow {
+  id: string;
+  weight: string;
+  description: string;
+  senderFirstName: string;
+  senderLastName: string;
+  senderPhone: string;
+  recipientFirstName: string;
+  recipientLastName: string;
+  recipientPhone: string;
+}
+
+function newRow(): BulkRow {
+  return {
+    id: Math.random().toString(36).slice(2),
+    weight: '',
+    description: '',
+    senderFirstName: '',
+    senderLastName: '',
+    senderPhone: '',
+    recipientFirstName: '',
+    recipientLastName: '',
+    recipientPhone: '',
+  };
+}
+
+function BulkProCreateForm({ userId, onCreated }: { userId: string; onCreated: () => void }) {
+  const { toast } = useToast();
+  const [relais, setRelais] = useState<any[]>([]);
+  const [lignesActives, setLignesActives] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [results, setResults] = useState<any[] | null>(null);
+  const [shared, setShared] = useState({
+    villeDepart: '',
+    villeArrivee: '',
+    relaisDepartId: '',
+    relaisArriveeId: '',
+  });
+  const [rows, setRows] = useState<BulkRow[]>([newRow()]);
+
+  useEffect(() => {
+    fetch('/api/relais?status=APPROVED').then(r => r.json()).then(setRelais).catch(() => {});
+    fetch('/api/lignes').then(r => r.json()).then(d => { if (Array.isArray(d)) setLignesActives(d.filter((l: any) => l.isActive !== false)); }).catch(() => {});
+  }, []);
+
+  const activeRelayCityIds = useMemo(() => relais.filter((r: any) => r.status === 'APPROVED' && r.operationalStatus === 'ACTIF').map((r: any) => r.ville), [relais]);
+
+  const availableDepartVilles = useMemo(() => {
+    if (activeRelayCityIds.length === 0) return [];
+    if (lignesActives.length === 0) return WILAYAS.filter(w => activeRelayCityIds.includes(w.id));
+    const ids = new Set(lignesActives.flatMap((l: any) => [l.villeDepart, ...(l.villesEtapes || []), l.villeArrivee]));
+    return WILAYAS.filter(w => ids.has(w.id) && activeRelayCityIds.includes(w.id));
+  }, [activeRelayCityIds, lignesActives]);
+
+  const availableArriveeVilles = useMemo(() => {
+    if (activeRelayCityIds.length === 0) return [];
+    if (lignesActives.length === 0) return WILAYAS.filter(w => w.id !== shared.villeDepart && activeRelayCityIds.includes(w.id));
+    const ids = new Set(lignesActives.flatMap((l: any) => [l.villeDepart, ...(l.villesEtapes || []), l.villeArrivee]));
+    return WILAYAS.filter(w => w.id !== shared.villeDepart && ids.has(w.id) && activeRelayCityIds.includes(w.id));
+  }, [activeRelayCityIds, lignesActives, shared.villeDepart]);
+
+  const relaisDepart = useMemo(() => relais.filter((r: any) => r.status === 'APPROVED' && r.operationalStatus === 'ACTIF' && r.ville === shared.villeDepart), [relais, shared.villeDepart]);
+  const relaisArrivee = useMemo(() => relais.filter((r: any) => r.status === 'APPROVED' && r.operationalStatus === 'ACTIF' && r.ville === shared.villeArrivee), [relais, shared.villeArrivee]);
+
+  const count = rows.length;
+  const discountRate = getProBatchDiscountRate(count);
+  const activeTier = getProBatchDiscountTier(count);
+
+  const updateRow = (id: string, field: keyof BulkRow, value: string) => {
+    setRows(prev => prev.map(r => r.id === id ? { ...r, [field]: value } : r));
+  };
+
+  const addRow = () => {
+    if (rows.length < 50) setRows(prev => [...prev, newRow()]);
+  };
+
+  const removeRow = (id: string) => {
+    if (rows.length > 1) setRows(prev => prev.filter(r => r.id !== id));
+  };
+
+  const handleSubmit = async () => {
+    if (!shared.villeDepart || !shared.villeArrivee || !shared.relaisDepartId || !shared.relaisArriveeId) {
+      toast({ title: 'Champs manquants', description: 'Remplissez les informations communes (ville + relais)', variant: 'destructive' });
+      return;
+    }
+    const incomplete = rows.find(r => !r.weight || !r.senderFirstName || !r.senderLastName || !r.senderPhone || !r.recipientFirstName || !r.recipientLastName || !r.recipientPhone);
+    if (incomplete) {
+      toast({ title: 'Colis incomplet', description: 'Tous les champs expéditeur/destinataire sont requis', variant: 'destructive' });
+      return;
+    }
+    setIsLoading(true);
+    try {
+      const res = await fetch('/api/parcels/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          clientId: userId,
+          ...shared,
+          parcels: rows.map(r => ({
+            weight: parseFloat(r.weight),
+            description: r.description || 'Colis',
+            senderFirstName: r.senderFirstName,
+            senderLastName: r.senderLastName,
+            senderPhone: r.senderPhone,
+            recipientFirstName: r.recipientFirstName,
+            recipientLastName: r.recipientLastName,
+            recipientPhone: r.recipientPhone,
+          })),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Erreur inconnue');
+      setResults(data.parcels);
+      onCreated();
+      toast({ title: `${data.count} colis créés`, description: data.discountPercent > 0 ? `Remise fidelite appliquee : -${data.discountPercent}%` : undefined });
+    } catch (err: any) {
+      toast({ title: 'Erreur', description: err.message, variant: 'destructive' });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handlePrintAll = (parcels: any[]) => {
+    const labelsHtml = parcels.map(p => `
+      <div style="page-break-after:always;padding:24px;font-family:sans-serif;border:2px solid #222;width:400px;margin:auto">
+        <h2 style="text-align:center;font-size:18px;margin-bottom:8px">SwiftColis — Étiquette</h2>
+        <p><strong>N° suivi :</strong> ${p.trackingNumber}</p>
+        <p><strong>De :</strong> ${p.villeDepart}</p>
+        <p><strong>À :</strong> ${p.villeArrivee}</p>
+        <p><strong>Poids :</strong> ${p.poids ?? p.weight} kg</p>
+        <p><strong>Prix :</strong> ${p.prixClient ?? p.clientPrice} DA</p>
+        <p><strong>Description :</strong> ${p.description}</p>
+      </div>
+    `).join('');
+    const win = window.open('', '_blank');
+    if (!win) { toast({ title: 'Fenêtre bloquée', description: 'Autorisez les popups pour imprimer', variant: 'destructive' }); return; }
+    win.document.write(`<html><head><title>Etiquettes fidelite</title><style>body{margin:0}</style></head><body>${labelsHtml}</body></html>`);
+    win.document.close();
+    const waitForImages = async () => {
+      const images = Array.from(win.document.images);
+      await Promise.all(
+        images.map(
+          (img) =>
+            new Promise<void>((resolve) => {
+              if (img.complete) {
+                resolve();
+                return;
+              }
+              img.addEventListener('load', () => resolve(), { once: true });
+              img.addEventListener('error', () => resolve(), { once: true });
+            })
+        )
+      );
+    };
+    const triggerPrint = () => {
+      waitForImages().finally(() => {
+        win.focus();
+        win.print();
+      });
+    };
+    if (win.document.readyState === 'complete') {
+      triggerPrint();
+    } else {
+      win.addEventListener('load', triggerPrint, { once: true });
+    }
+  };
+
+  if (results) {
+    return (
+      <div className="space-y-4 p-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-semibold text-slate-800">{results.length} colis créés avec succès</h3>
+          <div className="flex gap-2">
+            <Button onClick={() => handlePrintAll(results)} variant="outline" size="sm">
+              <Printer className="h-4 w-4 mr-2" />
+              Imprimer toutes les étiquettes
+            </Button>
+            <Button onClick={() => { setResults(null); setRows([newRow()]); setShared({ villeDepart: '', villeArrivee: '', relaisDepartId: '', relaisArriveeId: '' }); }} size="sm">
+              Nouvelle expédition
+            </Button>
+          </div>
+        </div>
+        <div className="overflow-x-auto rounded-lg border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>N° suivi</TableHead>
+                <TableHead>Expéditeur</TableHead>
+                <TableHead>Destinataire</TableHead>
+                <TableHead>Poids</TableHead>
+                <TableHead>Prix</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {results.map((p: any) => (
+                <TableRow key={p.id}>
+                  <TableCell className="font-mono text-xs">{p.trackingNumber}</TableCell>
+                  <TableCell>{p.senderFirstName} {p.senderLastName}</TableCell>
+                  <TableCell>{p.recipientFirstName} {p.recipientLastName}</TableCell>
+                  <TableCell>{p.poids ?? p.weight} kg</TableCell>
+                  <TableCell className="font-semibold">{p.prixClient ?? p.clientPrice} DA</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6 p-4">
+      {/* Discount preview */}
+      <div className="rounded-lg bg-violet-50 border border-violet-200 p-4">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <Building2 className="h-5 w-5 text-violet-600" />
+            <span className="font-semibold text-violet-800">Tarifs degressifs fidelite</span>
+          </div>
+          <span className="text-sm font-medium text-violet-700">{count} colis — {discountRate > 0 ? `-${Math.round(discountRate * 100)}%` : 'Pas de remise'}</span>
+        </div>
+        <div className="flex gap-2 flex-wrap">
+          {PRO_DISCOUNT_TIERS.map(tier => (
+            <span key={tier.minCount} className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ${activeTier?.minCount === tier.minCount ? 'bg-violet-600 text-white' : 'bg-white text-slate-600 border'}`}>
+              {tier.label}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {/* Shared fields */}
+      <div className="bg-white rounded-lg border p-4">
+        <h4 className="font-medium text-slate-700 mb-4">Informations communes</h4>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label>Ville de départ</Label>
+            <Select value={shared.villeDepart} onValueChange={v => setShared(s => ({ ...s, villeDepart: v, relaisDepartId: '' }))}>
+              <SelectTrigger><SelectValue placeholder="Sélectionner" /></SelectTrigger>
+              <SelectContent>{availableDepartVilles.map(w => <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>)}</SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>Relais de dépôt</Label>
+            <Select value={shared.relaisDepartId} onValueChange={v => setShared(s => ({ ...s, relaisDepartId: v }))} disabled={!shared.villeDepart}>
+              <SelectTrigger><SelectValue placeholder="Sélectionner" /></SelectTrigger>
+              <SelectContent>{relaisDepart.map((r: any) => <SelectItem key={r.id} value={r.id}>{r.commerceName}</SelectItem>)}</SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>Ville d'arrivée</Label>
+            <Select value={shared.villeArrivee} onValueChange={v => setShared(s => ({ ...s, villeArrivee: v, relaisArriveeId: '' }))}>
+              <SelectTrigger><SelectValue placeholder="Sélectionner" /></SelectTrigger>
+              <SelectContent>{availableArriveeVilles.map(w => <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>)}</SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>Relais de livraison</Label>
+            <Select value={shared.relaisArriveeId} onValueChange={v => setShared(s => ({ ...s, relaisArriveeId: v }))} disabled={!shared.villeArrivee}>
+              <SelectTrigger><SelectValue placeholder="Sélectionner" /></SelectTrigger>
+              <SelectContent>{relaisArrivee.map((r: any) => <SelectItem key={r.id} value={r.id}>{r.commerceName}</SelectItem>)}</SelectContent>
+            </Select>
+          </div>
+        </div>
+      </div>
+
+      {/* Rows */}
+      <div className="bg-white rounded-lg border overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3 bg-slate-50 border-b">
+          <span className="font-medium text-slate-700">Colis ({count}/50)</span>
+          <Button size="sm" variant="outline" onClick={addRow} disabled={rows.length >= 50}>
+            <Plus className="h-4 w-4 mr-1" />Ajouter un colis
+          </Button>
+        </div>
+        <div className="divide-y">
+          {rows.map((row, idx) => (
+            <div key={row.id} className="p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-slate-600">Colis #{idx + 1}</span>
+                {rows.length > 1 && (
+                  <button onClick={() => removeRow(row.id)} className="text-slate-400 hover:text-red-500 transition-colors">
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Poids (kg)</Label>
+                  <Input type="number" min="0.1" step="0.1" value={row.weight} onChange={e => updateRow(row.id, 'weight', e.target.value)} placeholder="0.5" className="h-9" />
+                </div>
+                <div className="space-y-1 col-span-1 sm:col-span-3">
+                  <Label className="text-xs">Description</Label>
+                  <Input value={row.description} onChange={e => updateRow(row.id, 'description', e.target.value)} placeholder="Contenu du colis" className="h-9" />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-2 bg-slate-50 rounded p-3">
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Expéditeur</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Input value={row.senderLastName} onChange={e => updateRow(row.id, 'senderLastName', e.target.value)} placeholder="Nom" className="h-8 text-xs" />
+                    <Input value={row.senderFirstName} onChange={e => updateRow(row.id, 'senderFirstName', e.target.value)} placeholder="Prénom" className="h-8 text-xs" />
+                  </div>
+                  <Input value={row.senderPhone} onChange={e => updateRow(row.id, 'senderPhone', e.target.value)} placeholder="Téléphone" className="h-8 text-xs" />
+                </div>
+                <div className="space-y-2 bg-slate-50 rounded p-3">
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Destinataire</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Input value={row.recipientLastName} onChange={e => updateRow(row.id, 'recipientLastName', e.target.value)} placeholder="Nom" className="h-8 text-xs" />
+                    <Input value={row.recipientFirstName} onChange={e => updateRow(row.id, 'recipientFirstName', e.target.value)} placeholder="Prénom" className="h-8 text-xs" />
+                  </div>
+                  <Input value={row.recipientPhone} onChange={e => updateRow(row.id, 'recipientPhone', e.target.value)} placeholder="Téléphone" className="h-8 text-xs" />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex justify-end">
+        <Button onClick={handleSubmit} disabled={isLoading} className="bg-violet-600 hover:bg-violet-700 text-white min-w-40">
+          {isLoading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Création...</> : <><Building2 className="h-4 w-4 mr-2" />Créer {count} colis</>}
+        </Button>
+      </div>
     </div>
   );
 }

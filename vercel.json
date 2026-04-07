@@ -5,6 +5,18 @@
     {
       "path": "/api/matching/auto-assign/cron",
       "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/cron/auto-assign?schedule=DAILY_8AM",
+      "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/cron/auto-assign?schedule=DAILY_6PM",
+      "schedule": "0 17 * * *"
+    },
+    {
+      "path": "/api/cron/auto-assign?schedule=WEEKLY",
+      "schedule": "0 7 * * 1"
     }
   ]
 }

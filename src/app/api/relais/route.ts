@@ -4,6 +4,29 @@ import { requireRole } from '@/lib/rbac';
 import { isAlgerianCommerceRegisterNumber, normalizeCommerceRegisterNumber } from '@/lib/validators';
 import { checkRateLimit, RATE_LIMIT_PRESETS } from '@/lib/ratelimit';
 
+function pickPrimaryRelais<T extends { status?: string | null; operationalStatus?: string | null; updatedAt?: Date | string | null; createdAt?: Date | string | null }>(
+  relais: T[]
+): T | null {
+  if (!Array.isArray(relais) || relais.length === 0) return null;
+
+  const score = (item: T) => {
+    const statusScore = item.status === 'APPROVED' ? 3 : item.status === 'PENDING' ? 2 : 1;
+    const operationalScore = item.operationalStatus === 'ACTIF' ? 1 : 0;
+    const updated = item.updatedAt ? new Date(item.updatedAt).getTime() : 0;
+    const created = item.createdAt ? new Date(item.createdAt).getTime() : 0;
+    return { statusScore, operationalScore, updated, created };
+  };
+
+  return [...relais].sort((a, b) => {
+    const sa = score(a);
+    const sb = score(b);
+    if (sb.statusScore !== sa.statusScore) return sb.statusScore - sa.statusScore;
+    if (sb.operationalScore !== sa.operationalScore) return sb.operationalScore - sa.operationalScore;
+    if (sb.updated !== sa.updated) return sb.updated - sa.updated;
+    return sb.created - sa.created;
+  })[0];
+}
+
 // GET all relais or filter by userId
 export async function GET(request: NextRequest) {
   try {
@@ -15,7 +38,7 @@ export async function GET(request: NextRequest) {
     const isPublicApprovedLookup = status === 'APPROVED' && !userId;
 
     if (isPublicApprovedLookup) {
-      const where: Record<string, unknown> = { status: 'APPROVED' };
+      const where: Record<string, unknown> = { status: 'APPROVED', operationalStatus: 'ACTIF' };
       if (ville) where.ville = ville;
 
       const relais = await db.relais.findMany({
@@ -33,6 +56,7 @@ export async function GET(request: NextRequest) {
           commissionMoyen: true,
           commissionGros: true,
           status: true,
+          operationalStatus: true,
         },
         orderBy: { createdAt: 'desc' },
       });
@@ -63,6 +87,13 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: 'desc' },
     });
 
+    if ((userId || auth.payload.role === 'RELAIS') && relais.length > 1) {
+      const primaryRelais = pickPrimaryRelais(relais);
+      if (primaryRelais) {
+        return NextResponse.json([primaryRelais]);
+      }
+    }
+
     return NextResponse.json(relais);
   } catch (error) {
     console.error('Error fetching relais:', error);
@@ -89,18 +120,58 @@ export async function POST(request: NextRequest) {
     const rcNumber = normalizeCommerceRegisterNumber(String(commerceRegisterNumber || ''));
 
     if (!userId || !commerceName || !address || !ville || !rcNumber) {
-      return NextResponse.json({ error: 'Missing required fields (numéro RC obligatoire)' }, { status: 400 });
+      return NextResponse.json({
+        error: 'Missing required fields (numéro RC obligatoire)',
+        code: 'MISSING_REQUIRED_FIELDS',
+        fields: ['userId', 'commerceName', 'address', 'ville', 'commerceRegisterNumber'],
+      }, { status: 400 });
     }
 
     if (!isAlgerianCommerceRegisterNumber(rcNumber)) {
       return NextResponse.json({
         error: 'Invalid commerce register number format',
+        code: 'INVALID_COMMERCE_REGISTER_NUMBER',
+        field: 'commerceRegisterNumber',
         details: 'Format RC algérien invalide (ex: RC-16/1234567B21)',
       }, { status: 400 });
     }
 
     if (auth.payload.role === 'RELAIS' && userId !== auth.payload.id) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    // Prevent duplicate relay applications across different accounts using the same RC/SIRET.
+    const existingRelaisWithSameRc = await db.relais.findFirst({
+      where: {
+        userId: { not: userId },
+        user: {
+          siret: rcNumber,
+        },
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            name: true,
+          },
+        },
+      },
+      orderBy: { updatedAt: 'desc' },
+    });
+
+    if (existingRelaisWithSameRc) {
+      return NextResponse.json(
+        {
+          error: 'Un dossier relais existe déjà avec ce numéro RC/SIRET',
+          code: 'DUPLICATE_RELAIS_RC',
+          details: {
+            existingRelaisId: existingRelaisWithSameRc.id,
+            existingStatus: existingRelaisWithSameRc.status,
+          },
+        },
+        { status: 409 }
+      );
     }
 
     const existingRelais = await db.relais.findUnique({
@@ -122,7 +193,8 @@ export async function POST(request: NextRequest) {
           latitude: latitude ?? null,
           longitude: longitude ?? null,
           photos: photos ? JSON.stringify(photos) : null,
-          status: 'PENDING',
+          // Keep approved dossiers approved; only non-approved dossiers go back to review.
+          status: existingRelais.status === 'APPROVED' ? 'APPROVED' : 'PENDING',
         },
       });
 

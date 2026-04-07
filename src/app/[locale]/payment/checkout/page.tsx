@@ -1,22 +1,18 @@
 'use client';
 
-'use client';
-
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { useLocale } from 'next-intl';
 import { useEffect, useState, Suspense } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import {
-  Banknote, CreditCard, ArrowLeft, Loader2, CheckCircle, XCircle,
+  CreditCard, ArrowLeft, Loader2, CheckCircle, XCircle,
   Smartphone, AlertCircle, Lock, ShieldCheck
 } from 'lucide-react';
 
-type PaymentMethod = 'CIB' | 'EDAHABIA' | 'BARIDI_MOB' | 'CASH_RELAY';
+type PaymentMethod = 'CIB' | 'EDAHABIA' | 'BARIDI_MOB' | 'STRIPE_TEST';
 type CheckoutStep = 'method' | 'form' | 'processing' | 'success' | 'failure';
 
 interface PaymentData {
@@ -29,15 +25,6 @@ interface PaymentData {
   expiresAt: string;
   transactionRef?: string | null;
   colis?: { trackingNumber: string; villeDepart: string; villeArrivee: string; weight?: number | null };
-}
-
-function formatCardNumber(value: string): string {
-  return value.replace(/\s/g, '').replace(/(.{4})/g, '$1 ').trim().slice(0, 19);
-}
-function formatExpiry(value: string): string {
-  const v = value.replace(/\D/g, '').slice(0, 4);
-  if (v.length >= 3) return `${v.slice(0, 2)}/${v.slice(2)}`;
-  return v;
 }
 
 function MethodCard({ method, title, subtitle, icon, onClick }: {
@@ -66,18 +53,56 @@ function CheckoutContent() {
   const { data: session, status: authStatus } = useSession();
   const searchParams = useSearchParams();
   const paymentId = searchParams.get('paymentId');
+  const userRole = (session?.user as { role?: string } | undefined)?.role;
+
+  const getPaymentTabUrl = () => {
+    if (userRole === 'ENSEIGNE') return `/${locale}/dashboard/enseigne?tab=payments`;
+    return `/${locale}/dashboard/client?tab=payment`;
+  };
+
+  const getHistoryTabUrl = () => {
+    if (userRole === 'ENSEIGNE') return `/${locale}/dashboard/enseigne?tab=tracking`;
+    return `/${locale}/dashboard/client?tab=history`;
+  };
 
   const [payment, setPayment] = useState<PaymentData | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [step, setStep] = useState<CheckoutStep>('method');
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethod | null>(null);
-  const [cardForm, setCardForm] = useState({ cardNumber: '', expiry: '', cvv: '', cardHolder: '' });
-  const [baridiForm, setBaridiForm] = useState({ phone: '', otp: '' });
-  const [otpSent, setOtpSent] = useState(false);
-  const [sendingOtp, setSendingOtp] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [txRef, setTxRef] = useState<string | null>(null);
+  const [queueRemaining, setQueueRemaining] = useState(0);
+  const [queueReturnUrl, setQueueReturnUrl] = useState<string | null>(null);
+
+  const waitForBackendConfirmation = async (id: string, maxAttempts = 12) => {
+    for (let i = 0; i < maxAttempts; i++) {
+      const res = await fetch(`/api/payments?paymentId=${id}`, { cache: 'no-store' });
+      if (!res.ok) {
+        throw new Error('Impossible de vérifier le statut paiement');
+      }
+
+      const data = await res.json();
+      setPayment(data);
+
+      if (data.status === 'COMPLETED') {
+        setTxRef(data.transactionRef || null);
+        setStep('success');
+        return;
+      }
+
+      if (data.status === 'FAILED') {
+        setErrorMsg(data.errorMessage || 'Paiement refusé par le fournisseur.');
+        setStep('failure');
+        return;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+
+    setErrorMsg('Paiement en cours de confirmation côté serveur. Veuillez réessayer dans quelques secondes.');
+    setStep('failure');
+  };
 
   useEffect(() => {
     if (authStatus === 'unauthenticated') router.push(`/${locale}/auth/login`);
@@ -86,6 +111,20 @@ function CheckoutContent() {
   useEffect(() => {
     if (authStatus !== 'authenticated') return;
     if (!paymentId) { setIsLoading(false); return; }
+
+    // Lire la queue enseigne depuis sessionStorage
+    try {
+      const raw = sessionStorage.getItem('swiftcolis_payment_queue');
+      if (raw) {
+        const queue: { ids: string[]; returnUrl: string } = JSON.parse(raw);
+        // Retirer le paymentId courant de la queue
+        const remaining = queue.ids.filter((id) => id !== paymentId);
+        setQueueRemaining(remaining.length);
+        setQueueReturnUrl(queue.returnUrl);
+        sessionStorage.setItem('swiftcolis_payment_queue', JSON.stringify({ ids: remaining, returnUrl: queue.returnUrl }));
+      }
+    } catch { /* sessionStorage indisponible */ }
+
     (async () => {
       try {
         const res = await fetch(`/api/payments?paymentId=${paymentId}`);
@@ -100,35 +139,13 @@ function CheckoutContent() {
 
   const handleMethodSelect = (method: PaymentMethod) => {
     setSelectedMethod(method);
-    setStep(method === 'CASH_RELAY' ? 'success' : 'form');
-  };
-
-  const validateCardForm = () => {
-    if (cardForm.cardNumber.replace(/\s/g, '').length < 16) { setErrorMsg('Numéro de carte invalide (16 chiffres)'); return false; }
-    if (!/^\d{2}\/\d{2}$/.test(cardForm.expiry)) { setErrorMsg("Date d'expiration invalide (MM/AA)"); return false; }
-    if (cardForm.cvv.length < 3) { setErrorMsg('CVV invalide'); return false; }
-    if (!cardForm.cardHolder.trim()) { setErrorMsg('Nom du porteur requis'); return false; }
-    return true;
-  };
-
-  const handleSendOtp = async () => {
-    if (!/^(05|06|07)\d{8}$/.test(baridiForm.phone.replace(/\s/g, ''))) {
-      setErrorMsg('Numéro algérien invalide (ex: 0612345678)'); return;
-    }
-    setSendingOtp(true);
-    await new Promise(r => setTimeout(r, 1500));
-    setOtpSent(true); setSendingOtp(false); setErrorMsg(null);
+    setStep('form');
   };
 
   const handlePay = async () => {
     if (!payment || !selectedMethod) return;
     setErrorMsg(null);
-    if (selectedMethod === 'BARIDI_MOB') {
-      if (!otpSent) { setErrorMsg('Veuillez d\'abord recevoir votre code OTP'); return; }
-      if (baridiForm.otp.length < 4) { setErrorMsg('Code OTP invalide'); return; }
-    } else {
-      if (!validateCardForm()) return;
-    }
+
     setStep('processing');
     try {
       const res = await fetch('/api/payments', {
@@ -137,9 +154,25 @@ function CheckoutContent() {
         body: JSON.stringify({ paymentId: payment.id, action: 'process', method: selectedMethod }),
       });
       const data = await res.json();
-      if (!res.ok || !data.payment) { setErrorMsg(data.error || 'Paiement refusé. Veuillez réessayer.'); setStep('failure'); return; }
-      setTxRef(data.payment.transactionRef || null);
-      setStep('success');
+
+      if (!res.ok) {
+        setErrorMsg(data.error || 'Paiement refusé. Veuillez réessayer.');
+        setStep('failure');
+        return;
+      }
+
+      if (data.redirectUrl) {
+        window.location.assign(data.redirectUrl);
+        return;
+      }
+
+      if (data.payment?.id) {
+        await waitForBackendConfirmation(data.payment.id);
+        return;
+      }
+
+      setErrorMsg('Réponse PSP invalide.');
+      setStep('failure');
     } catch { setErrorMsg('Erreur de connexion. Veuillez réessayer.'); setStep('failure'); }
   };
 
@@ -154,7 +187,7 @@ function CheckoutContent() {
           <XCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
           <h2 className="text-xl font-semibold mb-2">Paiement introuvable</h2>
           <p className="text-slate-600 mb-6">{loadError}</p>
-          <Button onClick={() => router.push(`/${locale}/dashboard/client?tab=payment`)}>Retour</Button>
+          <Button onClick={() => router.push(getPaymentTabUrl())}>Retour</Button>
         </CardContent></Card>
       </div>
     );
@@ -166,7 +199,7 @@ function CheckoutContent() {
 
         {step !== 'processing' && step !== 'success' && (
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="sm" onClick={() => step === 'form' ? setStep('method') : router.push(`/${locale}/dashboard/client?tab=payment`)}>
+            <Button variant="ghost" size="sm" onClick={() => step === 'form' ? setStep('method') : router.push(getPaymentTabUrl())}>
               <ArrowLeft className="h-4 w-4 mr-1" />Retour
             </Button>
             <span className="text-sm text-slate-500 flex items-center gap-1"><Lock className="h-3 w-3" /> Paiement sécurisé</span>
@@ -200,7 +233,7 @@ function CheckoutContent() {
               <MethodCard method="CIB" title="Carte CIB" subtitle="Visa / Mastercard algérienne (SATIM)" icon={<CreditCard className="h-6 w-6 text-blue-600" />} onClick={() => handleMethodSelect('CIB')} />
               <MethodCard method="EDAHABIA" title="Carte Edahabia" subtitle="Carte Algérie Poste (CCP)" icon={<CreditCard className="h-6 w-6 text-yellow-600" />} onClick={() => handleMethodSelect('EDAHABIA')} />
               <MethodCard method="BARIDI_MOB" title="Baridi Mob" subtitle="Paiement mobile Algérie Poste" icon={<Smartphone className="h-6 w-6 text-green-600" />} onClick={() => handleMethodSelect('BARIDI_MOB')} />
-              <MethodCard method="CASH_RELAY" title="Espèces au relais" subtitle="Payer en cash lors du dépôt du colis" icon={<Banknote className="h-6 w-6 text-slate-600" />} onClick={() => handleMethodSelect('CASH_RELAY')} />
+              <MethodCard method="STRIPE_TEST" title="Stripe (mode test)" subtitle="Cartes de test Stripe" icon={<CreditCard className="h-6 w-6 text-purple-600" />} onClick={() => handleMethodSelect('STRIPE_TEST')} />
             </CardContent>
           </Card>
         )}
@@ -212,6 +245,7 @@ function CheckoutContent() {
                 {selectedMethod === 'CIB' && 'Payer avec Carte CIB'}
                 {selectedMethod === 'EDAHABIA' && 'Payer avec Carte Edahabia'}
                 {selectedMethod === 'BARIDI_MOB' && 'Payer avec Baridi Mob'}
+                {selectedMethod === 'STRIPE_TEST' && 'Payer avec Stripe (test)'}
               </CardTitle>
               <CardDescription className="flex items-center gap-1 text-xs">
                 <ShieldCheck className="h-3 w-3 text-green-600" />
@@ -225,78 +259,16 @@ function CheckoutContent() {
                 </div>
               )}
 
-              {(selectedMethod === 'CIB' || selectedMethod === 'EDAHABIA') && (
-                <>
-                  {selectedMethod === 'CIB' && (
-                    <div className="flex gap-2 flex-wrap mb-2">
-                      {['BNA', 'CPA', 'BEA', 'BADR', 'BDL', 'CNEP', 'BNP PARIBAS EL DJAZAÏR'].map(b => (
-                        <Badge key={b} variant="outline" className="text-xs">{b}</Badge>
-                      ))}
-                    </div>
-                  )}
-                  <div>
-                    <Label htmlFor="cardHolder">Nom sur la carte</Label>
-                    <Input id="cardHolder" placeholder="AHMED BENALI" value={cardForm.cardHolder}
-                      onChange={e => setCardForm(f => ({ ...f, cardHolder: e.target.value.toUpperCase() }))}
-                      className="mt-1 font-mono" autoComplete="cc-name" />
-                  </div>
-                  <div>
-                    <Label htmlFor="cardNumber">Numéro de carte</Label>
-                    <Input id="cardNumber" placeholder="1234 5678 9012 3456" value={cardForm.cardNumber}
-                      onChange={e => setCardForm(f => ({ ...f, cardNumber: formatCardNumber(e.target.value) }))}
-                      className="mt-1 font-mono tracking-widest" maxLength={19} autoComplete="cc-number" />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="expiry">Expiration</Label>
-                      <Input id="expiry" placeholder="MM/AA" value={cardForm.expiry}
-                        onChange={e => setCardForm(f => ({ ...f, expiry: formatExpiry(e.target.value) }))}
-                        className="mt-1 font-mono" maxLength={5} autoComplete="cc-exp" />
-                    </div>
-                    <div>
-                      <Label htmlFor="cvv">CVV</Label>
-                      <Input id="cvv" placeholder="123" type="password" value={cardForm.cvv}
-                        onChange={e => setCardForm(f => ({ ...f, cvv: e.target.value.replace(/\D/g, '').slice(0, 3) }))}
-                        className="mt-1 font-mono" maxLength={3} autoComplete="cc-csc" />
-                    </div>
-                  </div>
-                </>
-              )}
-
-              {selectedMethod === 'BARIDI_MOB' && (
-                <>
-                  <div>
-                    <Label htmlFor="baridiPhone">Numéro de téléphone</Label>
-                    <div className="flex gap-2 mt-1">
-                      <Input id="baridiPhone" placeholder="0612345678" value={baridiForm.phone}
-                        onChange={e => setBaridiForm(f => ({ ...f, phone: e.target.value.replace(/\D/g, '') }))}
-                        className="font-mono" maxLength={10} disabled={otpSent} />
-                      <Button variant="outline" onClick={handleSendOtp} disabled={otpSent || sendingOtp} className="shrink-0">
-                        {sendingOtp ? <Loader2 className="h-4 w-4 animate-spin" /> : otpSent ? '✓ Envoyé' : 'Envoyer OTP'}
-                      </Button>
-                    </div>
-                  </div>
-                  {otpSent && (
-                    <div>
-                      <Label htmlFor="otp">Code OTP (reçu par SMS)</Label>
-                      <Input id="otp" placeholder="123456" value={baridiForm.otp}
-                        onChange={e => setBaridiForm(f => ({ ...f, otp: e.target.value.replace(/\D/g, '').slice(0, 6) }))}
-                        className="mt-1 font-mono tracking-widest text-center text-xl" maxLength={6} />
-                    </div>
-                  )}
-                  {errorMsg && !otpSent && (
-                    <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-                      <AlertCircle className="h-4 w-4" />{errorMsg}
-                    </div>
-                  )}
-                </>
-              )}
+              <div className="rounded-lg border border-slate-200 bg-slate-50 dark:bg-slate-900 p-4 text-sm text-slate-700 dark:text-slate-300">
+                Vous allez etre redirige vers la page securisee du PSP pour finaliser le paiement.
+                Le statut de votre colis sera mis a jour apres confirmation du webhook.
+              </div>
 
               <Button onClick={handlePay} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white" size="lg">
-                <Lock className="h-4 w-4 mr-2" />Payer {payment?.amount.toFixed(2)} DA
+                <Lock className="h-4 w-4 mr-2" />Continuer vers PSP ({payment?.amount.toFixed(2)} DA)
               </Button>
               <p className="text-xs text-center text-slate-500">
-                Paiement sécurisé via {selectedMethod === 'BARIDI_MOB' ? 'Baridi (Algérie Poste)' : 'réseau SATIM'}.
+                Paiement sécurisé via {selectedMethod === 'BARIDI_MOB' ? 'Baridi (Algérie Poste)' : selectedMethod === 'STRIPE_TEST' ? 'Stripe test' : 'réseau SATIM'}.
               </p>
             </CardContent>
           </Card>
@@ -306,33 +278,67 @@ function CheckoutContent() {
           <Card><CardContent className="pt-12 pb-12 text-center">
             <Loader2 className="h-16 w-16 animate-spin text-emerald-600 mx-auto mb-6" />
             <h2 className="text-xl font-semibold mb-2">Traitement en cours…</h2>
-            <p className="text-slate-500 text-sm">Ne fermez pas cette fenêtre.</p>
+            <p className="text-slate-500 text-sm">Attente de confirmation du backend via webhook officiel. Ne fermez pas cette fenêtre.</p>
           </CardContent></Card>
         )}
 
         {step === 'success' && (
           <Card><CardContent className="pt-10 pb-10 text-center">
             <CheckCircle className="h-16 w-16 text-emerald-600 mx-auto mb-4" />
-            {selectedMethod === 'CASH_RELAY' ? (
-              <>
-                <h2 className="text-xl font-bold text-emerald-700 mb-2">Paiement au relais sélectionné</h2>
-                <p className="text-slate-600 mb-4">
-                  Rendez-vous au point relais de départ avec votre colis.
-                  Payez <strong>{payment?.amount.toFixed(2)} DA</strong> en espèces.
-                  Le paiement sera enregistré automatiquement lors du dépôt du colis.
-                </p>
-              </>
+            <h2 className="text-xl font-bold text-emerald-700 mb-2">Paiement confirmé par le backend</h2>
+            <p className="text-slate-600 mb-2">Votre paiement de <strong>{payment?.amount.toFixed(2)} DA</strong> est validé après confirmation serveur.</p>
+            {txRef && <p className="text-xs text-slate-500 font-mono bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded mb-4 inline-block">Réf: {txRef}</p>}
+            {queueRemaining > 0 ? (
+              <p className="text-sm text-amber-700 font-medium mb-4">
+                {queueRemaining} colis restant{queueRemaining > 1 ? 's' : ''} à payer dans ce lot.
+              </p>
             ) : (
-              <>
-                <h2 className="text-xl font-bold text-emerald-700 mb-2">Paiement confirmé !</h2>
-                <p className="text-slate-600 mb-2">Votre paiement de <strong>{payment?.amount.toFixed(2)} DA</strong> a été accepté.</p>
-                {txRef && <p className="text-xs text-slate-500 font-mono bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded mb-4 inline-block">Réf: {txRef}</p>}
-                <p className="text-sm text-slate-500 mb-4">Votre colis sera pris en charge dès son dépôt au relais de départ.</p>
-              </>
+              <p className="text-sm text-slate-500 mb-4">Votre colis passe au prochain état opérationnel côté serveur.</p>
             )}
-            <Button onClick={() => router.push(`/${locale}/dashboard/client?tab=history`)} className="bg-emerald-600 hover:bg-emerald-700 text-white">
-              Voir mes colis
-            </Button>
+            {queueRemaining > 0 ? (() => {
+              // Lire le prochain paymentId depuis sessionStorage
+              try {
+                const raw = sessionStorage.getItem('swiftcolis_payment_queue');
+                if (raw) {
+                  const queue: { ids: string[]; returnUrl: string } = JSON.parse(raw);
+                  if (queue.ids.length > 0) {
+                    return (
+                      <div className="flex flex-col gap-2 items-center">
+                        <Button
+                          onClick={() => router.push(`/${locale}/payment/checkout?paymentId=${queue.ids[0]}`)}
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                        >
+                          Payer le colis suivant ({queueRemaining} restant{queueRemaining > 1 ? 's' : ''})
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => { sessionStorage.removeItem('swiftcolis_payment_queue'); router.push(queue.returnUrl); }}
+                        >
+                          Terminer et revenir au tableau de bord
+                        </Button>
+                      </div>
+                    );
+                  }
+                }
+              } catch { /* ignore */ }
+              return null;
+            })() : (
+              <Button
+                onClick={() => {
+                  const returnUrl = queueReturnUrl;
+                  if (returnUrl) {
+                    sessionStorage.removeItem('swiftcolis_payment_queue');
+                    router.push(returnUrl);
+                  } else {
+                    router.push(getHistoryTabUrl());
+                  }
+                }}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white"
+              >
+                Voir mes colis
+              </Button>
+            )}
           </CardContent></Card>
         )}
 
@@ -343,7 +349,7 @@ function CheckoutContent() {
             <p className="text-slate-600 mb-6">{errorMsg || "Votre paiement n'a pas pu être traité."}</p>
             <div className="flex gap-3 justify-center">
               <Button variant="outline" onClick={() => { setStep('method'); setErrorMsg(null); }}>Réessayer</Button>
-              <Button variant="ghost" onClick={() => router.push(`/${locale}/dashboard/client?tab=payment`)}>Annuler</Button>
+              <Button variant="ghost" onClick={() => router.push(getPaymentTabUrl())}>Annuler</Button>
             </div>
           </CardContent></Card>
         )}

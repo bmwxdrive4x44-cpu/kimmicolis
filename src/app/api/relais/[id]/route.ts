@@ -129,6 +129,15 @@ export async function PUT(
     if (longitude !== undefined) data.longitude = longitude;
     if (photos !== undefined) data.photos = photos;
 
+    // If admin changes approval status, keep all records of the same user aligned.
+    // This protects against legacy duplicate rows that might exist in some environments.
+    if (isAdmin && status !== undefined) {
+      await db.relais.updateMany({
+        where: { userId: existingRelais.userId },
+        data: { status },
+      });
+    }
+
     const relais = await db.relais.update({
       where: { id },
       data,
@@ -155,13 +164,62 @@ export async function DELETE(
 
     const { id } = await params;
     
+    const relais = await db.relais.findUnique({
+      where: { id },
+      select: { 
+        id: true,
+        commerceName: true,
+        parcelsDepart: { select: { id: true } },
+        parcelsArrivee: { select: { id: true } },
+      },
+    });
+
+    if (!relais) {
+      return NextResponse.json({ error: 'Relais not found' }, { status: 404 });
+    }
+
+    // Check if relay has associated parcels
+    const associatedParcels = relais.parcelsDepart.length + relais.parcelsArrivee.length;
+    if (associatedParcels > 0) {
+      return NextResponse.json({ 
+        error: `Cannot delete relay with associated parcels`,
+        code: 'RELAIS_HAS_PARCELS',
+        details: `${relais.commerceName} has ${associatedParcels} parcels. Delete or reassign parcels first.`
+      }, { status: 409 });
+    }
+
+    // Delete cash transactions and pickups
+    await db.relaisCash.deleteMany({
+      where: { relaisId: id },
+    });
+
+    await db.cashPickup.deleteMany({
+      where: { relaisId: id },
+    });
+
+    // Delete related records
+    await db.relaisSanction.deleteMany({
+      where: { relaisId: id },
+    });
+
+    await db.relaisAudit.deleteMany({
+      where: { relaisId: id },
+    });
+
+    // Finally delete the relais
     await db.relais.delete({
       where: { id },
     });
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ 
+      success: true, 
+      message: 'Relais deleted successfully'
+    });
   } catch (error) {
     console.error('Error deleting relais:', error);
-    return NextResponse.json({ error: 'Failed to delete relais' }, { status: 500 });
+    return NextResponse.json({ 
+      error: 'Failed to delete relais',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 });
   }
 }

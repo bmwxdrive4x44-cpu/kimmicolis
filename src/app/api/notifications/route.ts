@@ -26,7 +26,7 @@ function dedupeNotifications(notifications: any[]) {
 
 // GET notifications for user
 export async function GET(request: NextRequest) {
-  const auth = await requireRole(request, ['ADMIN', 'CLIENT', 'RELAIS', 'TRANSPORTER']);
+  const auth = await requireRole(request, ['ADMIN', 'CLIENT', 'RELAIS', 'TRANSPORTER', 'ENSEIGNE']);
   if (!auth.success) return auth.response;
 
   try {
@@ -88,7 +88,7 @@ export async function POST(request: NextRequest) {
 
 // PUT mark as read
 export async function PUT(request: NextRequest) {
-  const auth = await requireRole(request, ['ADMIN', 'CLIENT', 'RELAIS', 'TRANSPORTER']);
+  const auth = await requireRole(request, ['ADMIN', 'CLIENT', 'RELAIS', 'TRANSPORTER', 'ENSEIGNE']);
   if (!auth.success) return auth.response;
 
   try {

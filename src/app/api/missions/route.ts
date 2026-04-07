@@ -3,6 +3,40 @@ import { db } from '@/lib/db';
 import { requireRole } from '@/lib/rbac';
 import { createNotificationDedup } from '@/lib/notifications';
 
+function parseVillesEtapes(value: unknown): string[] {
+  if (!value) return [];
+  if (Array.isArray(value)) return value.map((item) => String(item).trim()).filter(Boolean);
+  if (typeof value !== 'string') return [];
+
+  const raw = value.trim();
+  if (!raw) return [];
+
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      return parsed.map((item) => String(item).trim()).filter(Boolean);
+    }
+  } catch {
+    // fallback CSV
+  }
+
+  return raw.split(',').map((item) => item.trim()).filter(Boolean);
+}
+
+function trajetSupportsParcel(trajet: {
+  villeDepart: string;
+  villeArrivee: string;
+  villesEtapes?: unknown;
+}, parcel: {
+  villeDepart: string;
+  villeArrivee: string;
+}) {
+  const itinerary = [trajet.villeDepart, ...parseVillesEtapes(trajet.villesEtapes), trajet.villeArrivee];
+  const depIndex = itinerary.indexOf(parcel.villeDepart);
+  const arrIndex = itinerary.indexOf(parcel.villeArrivee);
+  return depIndex >= 0 && arrIndex > depIndex;
+}
+
 // GET missions
 export async function GET(request: NextRequest) {
   const auth = await requireRole(request, ['TRANSPORTER', 'RELAIS', 'ADMIN']);
@@ -59,12 +93,67 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Parcel not found' }, { status: 404 });
     }
     // Accept both new and legacy statuses for backward compatibility
-    const acceptableStatuses = ['DEPOSITED_RELAY', 'RECU_RELAIS', 'PAID_RELAY', 'PAID'];
+    const acceptableStatuses = ['DEPOSITED_RELAY', 'WAITING_PICKUP', 'READY_FOR_DEPOSIT', 'RECU_RELAIS', 'PAID_RELAY', 'PAID'];
     if (!acceptableStatuses.includes(parcel.status)) {
       return NextResponse.json(
         { error: `Impossible d'assigner un transporteur à un colis avec le statut: ${parcel.status}` },
         { status: 400 }
       );
+    }
+
+    let trajet: {
+      id: string;
+      transporteurId: string;
+      lineId: string | null;
+      villeDepart: string;
+      villeArrivee: string;
+      villesEtapes: string | null;
+      status: string;
+      placesColis: number;
+      placesUtilisees: number;
+      dateDepart: Date;
+    } | null = null;
+
+    if (trajetId) {
+      trajet = await db.trajet.findUnique({
+        where: { id: trajetId },
+        select: {
+          id: true,
+          transporteurId: true,
+          lineId: true,
+          villeDepart: true,
+          villeArrivee: true,
+          villesEtapes: true,
+          status: true,
+          placesColis: true,
+          placesUtilisees: true,
+          dateDepart: true,
+        },
+      });
+
+      if (!trajet) {
+        return NextResponse.json({ error: 'Trajet introuvable' }, { status: 404 });
+      }
+
+      if (trajet.transporteurId !== transporteurId) {
+        return NextResponse.json({ error: 'Le trajet sélectionné n’appartient pas à ce transporteur' }, { status: 400 });
+      }
+
+      if (trajet.status !== 'PROGRAMME' || trajet.dateDepart < new Date()) {
+        return NextResponse.json({ error: 'Le trajet sélectionné n’est plus disponible' }, { status: 400 });
+      }
+
+      if (trajet.placesUtilisees >= trajet.placesColis) {
+        return NextResponse.json({ error: 'Le trajet sélectionné est complet' }, { status: 400 });
+      }
+
+      if (parcel.lineId && trajet.lineId && parcel.lineId !== trajet.lineId) {
+        return NextResponse.json({ error: 'Le trajet sélectionné ne correspond pas à la ligne du colis' }, { status: 400 });
+      }
+
+      if (!trajetSupportsParcel(trajet, parcel)) {
+        return NextResponse.json({ error: 'Le trajet sélectionné ne couvre pas l’itinéraire du colis' }, { status: 400 });
+      }
     }
 
     // Create mission
@@ -77,18 +166,18 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Update parcel status to ASSIGNED
+    // Update parcel status to WAITING_PICKUP (assigned to transporter but not yet collected)
     await db.colis.update({
       where: { id: colisId },
-      data: { status: 'ASSIGNED' },
+      data: { status: 'WAITING_PICKUP' },
     });
 
     // Add tracking history
     await db.trackingHistory.create({
       data: {
         colisId,
-        status: 'ASSIGNED',
-        notes: 'Transporteur assigné au colis',
+        status: 'WAITING_PICKUP',
+        notes: 'Transporteur assigné au colis — en attente de collecte au relais',
       },
     });
 

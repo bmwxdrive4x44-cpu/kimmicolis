@@ -24,6 +24,8 @@ export default async function DashboardIndex({
       redirect(`/${locale}/dashboard/transporter`);
     case 'RELAIS':
       redirect(`/${locale}/dashboard/relais`);
+    case 'ENSEIGNE':
+      redirect(`/${locale}/dashboard/enseigne`);
     case 'CLIENT':
     default:
       redirect(`/${locale}/dashboard/client`);

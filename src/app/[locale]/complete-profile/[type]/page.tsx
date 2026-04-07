@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { FormFieldError, FormGlobalError } from '@/components/ui/form-error';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -34,12 +35,24 @@ export default function CompleteProfilePage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isChecking, setIsChecking] = useState(true);
   const [hasProfile, setHasProfile] = useState(false);
+  const [existingTransporterId, setExistingTransporterId] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<{
+    commerceRegisterNumber?: string;
+    commerceName?: string;
+    address?: string;
+    ville?: string;
+    phone?: string;
+    vehicle?: string;
+    license?: string;
+  }>({});
 
   const [formData, setFormData] = useState<{
     commerceName?: string;
     address?: string;
     ville?: string;
     commerceRegisterNumber?: string;
+    phone?: string;
     vehicle?: string;
     license?: string;
     experience?: string;
@@ -48,7 +61,7 @@ export default function CompleteProfilePage() {
   }>(
     isRelais
       ? { commerceName: '', address: '', ville: '', commerceRegisterNumber: '' }
-      : { vehicle: '', license: '', experience: '', regions: [], description: '', commerceRegisterNumber: '' }
+      : { phone: '', vehicle: '', license: '', experience: '', regions: [], description: '', commerceRegisterNumber: '' }
   );
 
   // Check if user already has a profile of this type
@@ -87,9 +100,34 @@ export default function CompleteProfilePage() {
           } else {
             setFormData((prev) => ({
               ...prev,
+              phone: userData?.phone || '',
+              vehicle: existingProfile?.vehicle || '',
+              license: existingProfile?.license || '',
+              experience: existingProfile?.experience !== undefined ? String(existingProfile.experience) : '',
+              regions: existingProfile?.regions
+                ? Array.isArray(existingProfile.regions)
+                  ? existingProfile.regions
+                  : (() => {
+                      try {
+                        return JSON.parse(existingProfile.regions);
+                      } catch {
+                        return [];
+                      }
+                    })()
+                : [],
+              description: existingProfile?.description || '',
               commerceRegisterNumber: userData?.siret || '',
             }));
+            setExistingTransporterId(existingProfile?.id || null);
           }
+        } else if (isTransporter) {
+          const userRes = await fetch(`/api/users/${session.user.id}`);
+          const userData = userRes.ok ? await userRes.json() : null;
+          setFormData((prev) => ({
+            ...prev,
+            phone: userData?.phone || '',
+            commerceRegisterNumber: userData?.siret || '',
+          }));
         }
       } catch (error) {
         console.error('Error checking profile:', error);
@@ -106,6 +144,8 @@ export default function CompleteProfilePage() {
   }, [status, session, router, locale, isRelais]);
 
   const handleRegionChange = (region: string, checked: boolean) => {
+    setSubmitError(null);
+    setFieldErrors((prev) => ({ ...prev }));
     if (isTransporter) {
       setFormData((prev) => ({
         ...prev,
@@ -117,49 +157,75 @@ export default function CompleteProfilePage() {
   };
 
   const validateForm = () => {
+    const phoneRegex = /^\+?[0-9]{8,15}$/;
+    const errors: {
+      commerceRegisterNumber?: string;
+      commerceName?: string;
+      address?: string;
+      ville?: string;
+      phone?: string;
+      vehicle?: string;
+      license?: string;
+    } = {};
+
     if (isRelais) {
       const data = formData as any;
-      if (!data.commerceName || !data.address || !data.ville || !data.commerceRegisterNumber?.trim()) {
-        toast({
-          title: 'Erreur',
-          description: 'Veuillez remplir tous les champs obligatoires, y compris le numéro du registre du commerce',
-          variant: 'destructive',
-        });
-        return false;
-      }
-      if (!isAlgerianCommerceRegisterNumber(data.commerceRegisterNumber)) {
-        toast({
-          title: 'Erreur',
-          description: 'Format RC invalide (ex: RC-16/1234567B21)',
-          variant: 'destructive',
-        });
-        return false;
+      const rcNumber = normalizeCommerceRegisterNumber(String(data.commerceRegisterNumber || ''));
+      const commerceName = String(data.commerceName || '').trim();
+      const address = String(data.address || '').trim();
+      const ville = String(data.ville || '').trim();
+
+      if (!commerceName) errors.commerceName = 'Le nom du commerce est obligatoire.';
+      if (!address) errors.address = 'L\'adresse complète est obligatoire.';
+      if (!ville) errors.ville = 'La ville est obligatoire.';
+      if (!rcNumber) {
+        errors.commerceRegisterNumber = 'Le numéro du registre du commerce est obligatoire.';
+      } else if (!isAlgerianCommerceRegisterNumber(rcNumber)) {
+        errors.commerceRegisterNumber = 'Format RC invalide (ex: RC-16/1234567B21).';
       }
     } else if (isTransporter) {
       const data = formData as any;
-      if (!data.vehicle || !data.license || !data.commerceRegisterNumber?.trim()) {
-        toast({
-          title: 'Erreur',
-          description: 'Veuillez remplir le type de véhicule, le numéro de permis et le numéro du registre du commerce',
-          variant: 'destructive',
-        });
-        return false;
+      const phone = String(data.phone || '').trim();
+      const vehicle = String(data.vehicle || '').trim();
+      const license = String(data.license || '').trim();
+      const rcNumber = normalizeCommerceRegisterNumber(String(data.commerceRegisterNumber || ''));
+
+      if (!phone) {
+        errors.phone = 'Le téléphone est obligatoire.';
+      } else if (!phoneRegex.test(phone)) {
+        errors.phone = 'Format de téléphone invalide (8 à 15 chiffres, + autorisé).';
       }
-      if (!isAlgerianCommerceRegisterNumber(data.commerceRegisterNumber)) {
-        toast({
-          title: 'Erreur',
-          description: 'Format RC invalide (ex: RC-16/1234567B21)',
-          variant: 'destructive',
-        });
-        return false;
+      if (!vehicle) errors.vehicle = 'Le type de véhicule est obligatoire.';
+      if (!license) errors.license = 'Le numéro de permis est obligatoire.';
+      if (!rcNumber) {
+        errors.commerceRegisterNumber = 'Le numéro du registre du commerce est obligatoire.';
+      } else if (!isAlgerianCommerceRegisterNumber(rcNumber)) {
+        errors.commerceRegisterNumber = 'Format RC invalide (ex: RC-16/1234567B21).';
       }
     }
+
+    setFieldErrors(errors);
+    if (Object.keys(errors).length > 0) {
+      setSubmitError('Veuillez corriger les champs en rouge.');
+      toast({ title: 'Erreur', description: 'Veuillez corriger les champs en rouge.', variant: 'destructive' });
+      return false;
+    }
+
+    setSubmitError(null);
     return true;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!validateForm() || !session?.user?.id) return;
+    setSubmitError(null);
+    setFieldErrors({});
+    if (!validateForm()) return;
+
+    if (!session?.user?.id) {
+      setSubmitError('Session expirée. Veuillez vous reconnecter.');
+      toast({ title: 'Erreur', description: 'Session expirée. Veuillez vous reconnecter.', variant: 'destructive' });
+      return;
+    }
 
     setIsLoading(true);
 
@@ -174,6 +240,10 @@ export default function CompleteProfilePage() {
 
         if (!updateUserResponse.ok) {
           const error = await updateUserResponse.json().catch(() => null);
+          const msg = error?.details || error?.error || 'Erreur lors de l\'enregistrement du numéro RC';
+          if (String(msg).toLowerCase().includes('commerce register') || String(msg).toLowerCase().includes('registre')) {
+            setFieldErrors((prev) => ({ ...prev, commerceRegisterNumber: 'Numéro RC invalide côté serveur.' }));
+          }
           throw new Error(error?.error || 'Erreur lors de l\'enregistrement du numéro RC');
         }
 
@@ -192,7 +262,17 @@ export default function CompleteProfilePage() {
 
         if (!response.ok) {
           const error = await response.json();
-          throw new Error(error.error || 'Erreur lors de la création du point relais');
+          const msg = error?.details || error?.error || 'Erreur lors de la création du point relais';
+          if (error?.code === 'MISSING_REQUIRED_FIELDS') {
+            setSubmitError('Des champs obligatoires sont manquants.');
+          }
+          if (error?.code === 'INVALID_COMMERCE_REGISTER_NUMBER' || error?.field === 'commerceRegisterNumber') {
+            setFieldErrors((prev) => ({ ...prev, commerceRegisterNumber: 'Numéro RC invalide côté serveur.' }));
+          }
+          if (String(msg).toLowerCase().includes('commerce register') || String(msg).toLowerCase().includes('registre')) {
+            setFieldErrors((prev) => ({ ...prev, commerceRegisterNumber: 'Numéro RC invalide côté serveur.' }));
+          }
+          throw new Error(msg);
         }
 
         toast({ title: 'Succès', description: 'Point relais créé avec succès!' });
@@ -202,21 +282,28 @@ export default function CompleteProfilePage() {
         const updateUserResponse = await fetch(`/api/users/${session.user.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ siret: normalizeCommerceRegisterNumber(data.commerceRegisterNumber) }),
+          body: JSON.stringify({
+            siret: normalizeCommerceRegisterNumber(data.commerceRegisterNumber),
+            phone: data.phone?.trim(),
+          }),
         });
 
         if (!updateUserResponse.ok) {
           const error = await updateUserResponse.json().catch(() => null);
-          throw new Error(error?.error || 'Erreur lors de l\'enregistrement du numéro RC');
+          const msg = error?.details || error?.error || 'Erreur lors de l\'enregistrement du numéro RC';
+          if (String(msg).toLowerCase().includes('commerce register') || String(msg).toLowerCase().includes('registre')) {
+            setFieldErrors((prev) => ({ ...prev, commerceRegisterNumber: 'Numéro RC invalide côté serveur.' }));
+          }
+          throw new Error(msg);
         }
 
-        const response = await fetch('/api/transporters', {
-          method: 'POST',
+        const response = await fetch(existingTransporterId ? `/api/transporters/${existingTransporterId}` : '/api/transporters', {
+          method: existingTransporterId ? 'PUT' : 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             userId: session.user.id,
             fullName: session.user.name,
-            phone: session.user.phone || '',
+            phone: data.phone?.trim(),
             vehicle: data.vehicle,
             license: data.license,
             commerceRegisterNumber: normalizeCommerceRegisterNumber(data.commerceRegisterNumber),
@@ -228,16 +315,35 @@ export default function CompleteProfilePage() {
 
         if (!response.ok) {
           const error = await response.json();
-          throw new Error(error.error || 'Erreur lors de la création du profil transporteur');
+          const msg = error?.details || error?.error || 'Erreur lors de la création du profil transporteur';
+          if (error?.code === 'APPLICATION_ALREADY_SUBMITTED') {
+            throw new Error('Votre dossier transporteur existe déjà. Modifiez-le depuis cette page ou contactez le support.');
+          }
+          if (error?.code === 'MISSING_REQUIRED_FIELDS') {
+            setSubmitError('Des champs obligatoires sont manquants.');
+          }
+          if (error?.code === 'INVALID_COMMERCE_REGISTER_NUMBER' || error?.field === 'commerceRegisterNumber') {
+            setFieldErrors((prev) => ({ ...prev, commerceRegisterNumber: 'Numéro RC invalide côté serveur.' }));
+          }
+          const lower = String(msg).toLowerCase();
+          if (lower.includes('phone') || lower.includes('téléphone')) {
+            setFieldErrors((prev) => ({ ...prev, phone: 'Téléphone invalide côté serveur.' }));
+          }
+          if (lower.includes('commerce register') || lower.includes('registre')) {
+            setFieldErrors((prev) => ({ ...prev, commerceRegisterNumber: 'Numéro RC invalide côté serveur.' }));
+          }
+          throw new Error(msg);
         }
 
         toast({ title: 'Succès', description: 'Profil transporteur créé avec succès!' });
         router.push(`/${locale}/dashboard/transporter`);
       }
     } catch (error) {
+      const message = error instanceof Error ? error.message : 'Une erreur est survenue';
+      setSubmitError(message);
       toast({
         title: 'Erreur',
-        description: error instanceof Error ? error.message : 'Une erreur est survenue',
+        description: message,
         variant: 'destructive',
       });
     } finally {
@@ -295,6 +401,8 @@ export default function CompleteProfilePage() {
                 </p>
               </div>
 
+              <FormGlobalError message={submitError} />
+
               {isRelais ? (
                 <>
                   <div className="space-y-2">
@@ -305,10 +413,15 @@ export default function CompleteProfilePage() {
                       id="commerceRegisterNumberRelais"
                       placeholder="Ex: 16/0012345B22"
                       value={(formData as any).commerceRegisterNumber}
-                      onChange={(e) => setFormData({ ...formData, commerceRegisterNumber: e.target.value })}
+                      onChange={(e) => {
+                        setSubmitError(null);
+                        setFieldErrors((prev) => ({ ...prev, commerceRegisterNumber: undefined }));
+                        setFormData({ ...formData, commerceRegisterNumber: e.target.value });
+                      }}
                       required
                       className="h-11"
                     />
+                    <FormFieldError message={fieldErrors.commerceRegisterNumber} />
                     <p className="text-xs text-muted-foreground">Format CNRC : WW/NNNNNNNLAA — ex : <code>16/0012345B22</code> ou <code>RC-16/0012345B22</code> (WW = wilaya, L = type B/C/H/R, AA = année)</p>
                   </div>
 
@@ -320,10 +433,15 @@ export default function CompleteProfilePage() {
                       id="commerceName"
                       placeholder="Ex: Épicerie du Centre, Pharmacie Laval..."
                       value={(formData as any).commerceName}
-                      onChange={(e) => setFormData({ ...formData, commerceName: e.target.value })}
+                      onChange={(e) => {
+                        setSubmitError(null);
+                        setFieldErrors((prev) => ({ ...prev, commerceName: undefined }));
+                        setFormData({ ...formData, commerceName: e.target.value });
+                      }}
                       required
                       className="h-11"
                     />
+                    <FormFieldError message={fieldErrors.commerceName} />
                   </div>
 
                   <div className="space-y-2">
@@ -334,10 +452,15 @@ export default function CompleteProfilePage() {
                       id="address"
                       placeholder="Ex: 123 Rue Didouche Mourad, Alger Centre"
                       value={(formData as any).address}
-                      onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                      onChange={(e) => {
+                        setSubmitError(null);
+                        setFieldErrors((prev) => ({ ...prev, address: undefined }));
+                        setFormData({ ...formData, address: e.target.value });
+                      }}
                       required
                       rows={3}
                     />
+                    <FormFieldError message={fieldErrors.address} />
                   </div>
 
                   <div className="space-y-2">
@@ -346,7 +469,11 @@ export default function CompleteProfilePage() {
                     </Label>
                     <Select
                       value={(formData as any).ville}
-                      onValueChange={(value) => setFormData({ ...formData, ville: value })}
+                      onValueChange={(value) => {
+                        setSubmitError(null);
+                        setFieldErrors((prev) => ({ ...prev, ville: undefined }));
+                        setFormData({ ...formData, ville: value });
+                      }}
                     >
                       <SelectTrigger className="h-11">
                         <SelectValue placeholder="Sélectionnez votre ville" />
@@ -359,11 +486,30 @@ export default function CompleteProfilePage() {
                         ))}
                       </SelectContent>
                     </Select>
+                    <FormFieldError message={fieldErrors.ville} />
                   </div>
                 </>
               ) : (
                 <>
                   <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2 md:col-span-2">
+                      <Label htmlFor="phone" className="text-base font-semibold">
+                        Téléphone <span className="text-red-500">*</span>
+                      </Label>
+                      <Input
+                        id="phone"
+                        placeholder="Ex: 0550123456"
+                        value={(formData as any).phone || ''}
+                        onChange={(e) => {
+                          setSubmitError(null);
+                          setFieldErrors((prev) => ({ ...prev, phone: undefined }));
+                          setFormData({ ...formData, phone: e.target.value });
+                        }}
+                        required
+                        className="h-11"
+                      />
+                      <FormFieldError message={fieldErrors.phone} />
+                    </div>
                     <div className="space-y-2 md:col-span-2">
                       <Label htmlFor="commerceRegisterNumberTransporter" className="text-base font-semibold">
                         Numéro du registre du commerce <span className="text-red-500">*</span>
@@ -372,10 +518,15 @@ export default function CompleteProfilePage() {
                         id="commerceRegisterNumberTransporter"
                         placeholder="Ex: 16/0012345B22"
                         value={(formData as any).commerceRegisterNumber}
-                        onChange={(e) => setFormData({ ...formData, commerceRegisterNumber: e.target.value })}
+                        onChange={(e) => {
+                          setSubmitError(null);
+                          setFieldErrors((prev) => ({ ...prev, commerceRegisterNumber: undefined }));
+                          setFormData({ ...formData, commerceRegisterNumber: e.target.value });
+                        }}
                         required
                         className="h-11"
                       />
+                      <FormFieldError message={fieldErrors.commerceRegisterNumber} />
                       <p className="text-xs text-muted-foreground">Format CNRC : WW/NNNNNNNLAA — ex : <code>16/0012345B22</code> ou <code>RC-16/0012345B22</code> (WW = wilaya, L = type B/C/H/R, AA = année)</p>
                     </div>
                     <div className="space-y-2">
@@ -386,10 +537,15 @@ export default function CompleteProfilePage() {
                         id="vehicle"
                         placeholder="Ex: Utilitaire 3.5T, Van, Moto..."
                         value={(formData as any).vehicle}
-                        onChange={(e) => setFormData({ ...formData, vehicle: e.target.value })}
+                        onChange={(e) => {
+                          setSubmitError(null);
+                          setFieldErrors((prev) => ({ ...prev, vehicle: undefined }));
+                          setFormData({ ...formData, vehicle: e.target.value });
+                        }}
                         required
                         className="h-11"
                       />
+                      <FormFieldError message={fieldErrors.vehicle} />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="license" className="text-base font-semibold">
@@ -399,10 +555,15 @@ export default function CompleteProfilePage() {
                         id="license"
                         placeholder="Ex: AB123456"
                         value={(formData as any).license}
-                        onChange={(e) => setFormData({ ...formData, license: e.target.value })}
+                        onChange={(e) => {
+                          setSubmitError(null);
+                          setFieldErrors((prev) => ({ ...prev, license: undefined }));
+                          setFormData({ ...formData, license: e.target.value });
+                        }}
                         required
                         className="h-11"
                       />
+                      <FormFieldError message={fieldErrors.license} />
                     </div>
                   </div>
 
@@ -415,7 +576,10 @@ export default function CompleteProfilePage() {
                       type="number"
                       placeholder="0"
                       value={(formData as any).experience}
-                      onChange={(e) => setFormData({ ...formData, experience: e.target.value })}
+                      onChange={(e) => {
+                        setSubmitError(null);
+                        setFormData({ ...formData, experience: e.target.value });
+                      }}
                       min="0"
                       className="h-11"
                     />
@@ -449,7 +613,10 @@ export default function CompleteProfilePage() {
                       id="description"
                       placeholder="Parlez-nous un peu de vous et de votre expérience..."
                       value={(formData as any).description}
-                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                      onChange={(e) => {
+                        setSubmitError(null);
+                        setFormData({ ...formData, description: e.target.value });
+                      }}
                       rows={3}
                     />
                   </div>

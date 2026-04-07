@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { createNotificationDedup } from '@/lib/notifications';
 import { requireRole } from '@/lib/rbac';
+import { applyTransition, canTransition } from '@/lib/parcelStateMachine';
 
 /**
  * POST /api/delivery/confirm
@@ -22,7 +23,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { trackingNumber, qrData, missionId, action, location, photoUrl } = body;
+    const { trackingNumber, qrData, missionId, action, location, photoUrl, eventId: bodyEventId } = body;
 
     // Parse tracking from QR data if not directly provided
     let tracking = trackingNumber;
@@ -91,6 +92,28 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    const effectiveEventId =
+      (typeof bodyEventId === 'string' && bodyEventId.trim().length > 0 ? bodyEventId.trim() : null) ||
+      request.headers.get('x-event-id') ||
+      `${effectiveAction || 'unknown'}:${parcel.id}:${mission?.id || 'no-mission'}`;
+
+    const existingEvent = await db.actionLog.findFirst({
+      where: {
+        entityType: 'COLIS',
+        entityId: parcel.id,
+        action: `DELIVERY_EVENT:${effectiveEventId}`,
+      },
+      select: { id: true },
+    });
+
+    if (existingEvent) {
+      return NextResponse.json({
+        success: true,
+        idempotent: true,
+        message: 'Événement déjà traité',
+      });
+    }
+
     let newParcelStatus: string;
     let newMissionStatus: string;
     let notes: string;
@@ -110,7 +133,7 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         );
       }
-      newParcelStatus = 'PICKED_UP';
+      newParcelStatus = applyTransition(parcel.status === 'ASSIGNED' || parcel.status === 'RECU_RELAIS' ? 'DEPOSITED_RELAY' : parcel.status, 'PICKED_UP');
       newMissionStatus = 'PICKED_UP';
       notes = 'Colis pris en charge par le transporteur';
     }
@@ -120,13 +143,21 @@ export async function POST(request: NextRequest) {
     // Transporter delivers parcel to destination relay
     // ──────────────────────────────────────────────
     else if (effectiveAction === 'arrive_relay') {
-      if (!['PICKED_UP', 'EN_TRANSPORT'].includes(parcel.status)) {
+      if (!['PICKED_UP', 'IN_TRANSIT', 'EN_TRANSPORT'].includes(parcel.status)) {
         return NextResponse.json(
           { error: `Impossible de livrer au relais un colis avec le statut: ${parcel.status}` },
           { status: 400 }
         );
       }
-      newParcelStatus = 'ARRIVED_RELAY';
+
+      if (canTransition(parcel.status, 'ARRIVED_RELAY')) {
+        newParcelStatus = applyTransition(parcel.status, 'ARRIVED_RELAY');
+      } else {
+        // Support one-scan arrival by traversing PICKED_UP -> IN_TRANSIT -> ARRIVED_RELAY via state machine.
+        const inTransit = applyTransition(parcel.status, 'IN_TRANSIT');
+        newParcelStatus = applyTransition(inTransit, 'ARRIVED_RELAY');
+      }
+
       newMissionStatus = 'COMPLETED';
       notes = 'Colis livré au relais de destination par le transporteur';
       missionUpdateData.completedAt = new Date();
@@ -164,6 +195,23 @@ export async function POST(request: NextRequest) {
       title: 'Mise à jour de votre colis',
       message: `${notes} — Colis: ${parcel.trackingNumber}`,
       type: 'IN_APP',
+    });
+
+    await db.actionLog.create({
+      data: {
+        userId: auth.payload.id,
+        entityType: 'COLIS',
+        entityId: parcel.id,
+        action: `DELIVERY_EVENT:${effectiveEventId}`,
+        details: JSON.stringify({
+          missionId: mission?.id || null,
+          action: effectiveAction,
+          fromStatus: parcel.status,
+          toStatus: newParcelStatus,
+          location: location || null,
+          photoUrl: photoUrl || null,
+        }),
+      },
     });
 
     return NextResponse.json({

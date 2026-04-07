@@ -2,40 +2,40 @@
 
 import { useState, Suspense } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { signIn } from 'next-auth/react';
 import { Link } from '@/i18n/routing';
+import { BrandLogo } from '@/components/brand-logo';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Separator } from '@/components/ui/separator';
-import { Package, Loader2, Mail, Lock, User, Phone, Store, MapPin, Truck, AlertCircle, Eye, EyeOff, CheckCircle2 } from 'lucide-react';
+import { FormFieldError, FormGlobalError } from '@/components/ui/form-error';
+import { Loader2, Mail, Lock, User, Phone, Eye, EyeOff } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { WILAYAS } from '@/lib/constants';
-import { isAlgerianCommerceRegisterNumber, normalizeCommerceRegisterNumber } from '@/lib/validators';
 
 function RegisterForm() {
   const t = useTranslations('auth.register');
   const locale = useLocale();
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
-    const [showPassword, setShowPassword] = useState(false);
-    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<{
+    firstName?: string;
+    lastName?: string;
+    phone?: string;
     email?: string;
     password?: string;
     confirmPassword?: string;
+    commerceRegisterNumber?: string;
+    vehicle?: string;
+    license?: string;
+    commerceName?: string;
     address?: string;
     ville?: string;
   }>({});
-
-  const roleFromUrl = searchParams.get('role') || 'CLIENT';
 
   const [formData, setFormData] = useState({
     // Common fields
@@ -46,37 +46,19 @@ function RegisterForm() {
     personalAddress: '',
     password: '',
     confirmPassword: '',
-    role: roleFromUrl,
-
-    // Transporter fields
-    vehicle: '',
-    license: '',
-    experience: '',
-    regions: [] as string[],
-    description: '',
-    commerceRegisterNumber: '',
-
-    // Relais fields
-    commerceName: '',
-    address: '',
-    ville: '',
+    role: 'CLIENT',
   });
-
-  const handleRegionChange = (region: string, checked: boolean) => {
-    setFormData(prev => ({
-      ...prev,
-      regions: checked
-        ? [...prev.regions, region]
-        : prev.regions.filter(r => r !== region)
-    }));
-  };
 
   const validateForm = () => {
     const errors: typeof fieldErrors = {};
+    const phoneRegex = /^\+?[0-9]{8,15}$/;
 
-    if (!formData.firstName || !formData.lastName || !formData.phone) {
-      toast({ title: 'Erreur', description: 'Veuillez remplir tous les champs requis', variant: 'destructive' });
-      return false;
+    if (!formData.firstName.trim()) errors.firstName = 'Le prénom est obligatoire.';
+    if (!formData.lastName.trim()) errors.lastName = 'Le nom est obligatoire.';
+    if (!formData.phone.trim()) {
+      errors.phone = 'Le téléphone est obligatoire.';
+    } else if (!phoneRegex.test(formData.phone.trim())) {
+      errors.phone = 'Format de téléphone invalide (8 à 15 chiffres, + autorisé).';
     }
 
     if (!formData.email) {
@@ -95,36 +77,21 @@ function RegisterForm() {
       errors.confirmPassword = 'Les mots de passe ne correspondent pas.';
     }
 
-    if ((formData.role === 'TRANSPORTER' || formData.role === 'RELAIS') && !formData.commerceRegisterNumber.trim()) {
-      toast({ title: 'Erreur', description: 'Le numéro du registre du commerce est obligatoire', variant: 'destructive' });
-      return false;
-    }
-
-    if ((formData.role === 'TRANSPORTER' || formData.role === 'RELAIS') && !isAlgerianCommerceRegisterNumber(formData.commerceRegisterNumber)) {
-      toast({ title: 'Erreur', description: 'Format RC invalide (ex: RC-16/1234567B21)', variant: 'destructive' });
-      return false;
-    }
-
-    if (formData.role === 'RELAIS') {
-      if (!formData.address.trim()) {
-        errors.address = 'L\'adresse du point relais est obligatoire.';
-      }
-      if (!formData.ville) {
-        errors.ville = 'La ville est obligatoire.';
-      }
-    }
-
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
+      setSubmitError('Veuillez corriger les champs en rouge.');
+      toast({ title: 'Erreur', description: 'Veuillez corriger les champs en rouge.', variant: 'destructive' });
       return false;
     }
 
+    setSubmitError(null);
     setFieldErrors({});
     return true;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmitError(null);
     if (!validateForm()) return;
 
     setIsLoading(true);
@@ -144,18 +111,20 @@ function RegisterForm() {
           email: formData.email,
           phone: formData.phone,
           password: formData.password,
-          role: formData.role,
-          siret: (formData.role === 'TRANSPORTER' || formData.role === 'RELAIS') ? normalizeCommerceRegisterNumber(formData.commerceRegisterNumber) : undefined,
+          role: 'CLIENT',
         }),
       });
 
       const data = await response.json();
       if (!response.ok) {
         const rawError = `${data?.error || ''} ${data?.details || ''}`.toLowerCase();
+        const isExistingEmail = response.status === 409
+          || data?.code === 'EMAIL_ALREADY_EXISTS'
+          || rawError.includes('email already exists');
 
-        if (rawError.includes('email already exists')) {
+        if (isExistingEmail) {
           setFieldErrors(prev => ({ ...prev, email: 'Cet email est déjà utilisé. Connectez-vous ou utilisez une autre adresse.' }));
-          throw new Error('Cet email est déjà utilisé.');
+          throw new Error('Un compte existe déjà avec cet email. Connectez-vous pour continuer.');
         } else if (rawError.includes('invalid email format')) {
           setFieldErrors(prev => ({ ...prev, email: 'Le format de l\'email est invalide.' }));
           throw new Error('Email invalide.');
@@ -182,69 +151,15 @@ function RegisterForm() {
         return;
       }
 
-      // 3. Create role-specific application (only if details provided)
-      if (formData.role === 'TRANSPORTER' && formData.vehicle && formData.license && formData.commerceRegisterNumber.trim()) {
-        const transporterResponse = await fetch('/api/transporters', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            userId,
-            fullName,
-            phone: formData.phone,
-            vehicle: formData.vehicle,
-            license: formData.license,
-            commerceRegisterNumber: normalizeCommerceRegisterNumber(formData.commerceRegisterNumber),
-            experience: parseInt(formData.experience) || 0,
-            regions: formData.regions,
-            description: formData.description,
-          }),
-        });
-
-        if (!transporterResponse.ok) {
-          const transporterError = await transporterResponse.json().catch(() => null);
-          throw new Error(transporterError?.error || 'Erreur lors de la création du profil transporteur');
-        }
-
-        toast({ title: 'Profil transporteur créé', description: 'Votre demande a été enregistrée avec succès.' });
-      }
-
-      if (formData.role === 'RELAIS' && formData.commerceRegisterNumber.trim()) {
-        const relaisResponse = await fetch('/api/relais', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            userId,
-            commerceName: formData.commerceName,
-            address: formData.address,
-            ville: formData.ville,
-            phone: formData.phone,
-            commerceRegisterNumber: normalizeCommerceRegisterNumber(formData.commerceRegisterNumber),
-          }),
-        });
-
-        if (!relaisResponse.ok) {
-          const relaisError = await relaisResponse.json().catch(() => null);
-          throw new Error(relaisError?.error || 'Erreur lors de la création du point relais');
-        }
-
-        toast({ title: 'Profil relais créé', description: 'Votre point relais a été enregistré avec succès.' });
-      }
-
       toast({ title: 'Compte créé', description: 'Bienvenue sur SwiftColis!' });
-
-      // If TRANSPORTER without vehicle details, redirect to completion page
-      if (formData.role === 'TRANSPORTER' && !formData.vehicle) {
-        window.location.href = `/${locale}/complete-profile/transporter`;
-      } else {
-        const dashboardPath = `/${locale}/dashboard/${
-          formData.role === 'TRANSPORTER' ? 'transporter' : formData.role === 'RELAIS' ? 'relais' : 'client'
-        }`;
-        window.location.href = dashboardPath;
-      }
+      const dashboardPath = `/${locale}/dashboard/client`;
+      window.location.href = dashboardPath;
     } catch (error) {
+      const message = error instanceof Error ? error.message : 'Impossible de creer le compte';
+      setSubmitError(message);
       toast({
         title: 'Erreur',
-        description: error instanceof Error ? error.message : 'Impossible de créer le compte',
+        description: message,
         variant: 'destructive',
       });
     } finally {
@@ -256,55 +171,17 @@ function RegisterForm() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-slate-50 to-emerald-50 dark:from-slate-900 dark:to-slate-800 p-4 py-8">
       <div className="text-center mb-8">
-        <Link href="/" className="inline-flex items-center gap-2.5 mb-6">
-          <div className="p-2 bg-emerald-600 rounded-xl">
-            <Package className="h-6 w-6 text-white" />
-          </div>
-          <span className="text-2xl font-bold bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">
-            SwiftColis
-          </span>
-        </Link>
+        <BrandLogo className="mb-6" />
         <h1 className="text-3xl font-bold text-slate-900 dark:text-white">{t('title')}</h1>
         <p className="mt-2 text-slate-500 dark:text-slate-400">{t('subtitle')}</p>
+        <div className="mt-4 inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 dark:border-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300">
+          Inscription client
+        </div>
       </div>
 
       <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden">
         <form onSubmit={handleSubmit}>
-          {/* Role Selection */}
-          <div className="p-6 border-b border-slate-100 dark:border-slate-800">
-            <Label className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-3 block">
-              {t('role.label')}
-            </Label>
-            <div className="grid grid-cols-3 gap-3">
-              {[
-                { value: 'CLIENT', emoji: '📦', label: t('role.client'), desc: 'Envoyer des colis' },
-                { value: 'TRANSPORTER', emoji: '🚚', label: t('role.transporter'), desc: 'Transporter et livrer' },
-                { value: 'RELAIS', emoji: '🏪', label: t('role.relais'), desc: 'Point de dépôt' },
-              ].map(({ value, emoji, label, desc }) => (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => setFormData({ ...formData, role: value })}
-                  className={`relative flex flex-col items-center gap-2 p-4 rounded-xl border-2 text-center transition-all ${
-                    formData.role === value
-                      ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/30 shadow-sm'
-                      : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 bg-white dark:bg-slate-800/50'
-                  }`}
-                >
-                  {formData.role === value && (
-                    <CheckCircle2 className="absolute top-2 right-2 h-4 w-4 text-emerald-500" />
-                  )}
-                  <span className="text-2xl">{emoji}</span>
-                  <div>
-                    <div className={`text-sm font-semibold ${
-                      formData.role === value ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-700 dark:text-slate-300'
-                    }`}>{label}</div>
-                    <div className="text-xs text-slate-400 mt-0.5 hidden sm:block">{desc}</div>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
+          <FormGlobalError message={submitError} className="mx-6 mt-6" />
 
           {/* Common Fields */}
           <div className="p-6 space-y-5">
@@ -317,18 +194,20 @@ function RegisterForm() {
                 <div className="relative">
                   <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                   <Input id="firstName" placeholder="Votre prénom" value={formData.firstName}
-                    onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+                    onChange={(e) => { setFormData({ ...formData, firstName: e.target.value }); setFieldErrors(p => ({ ...p, firstName: undefined })); setSubmitError(null); }}
                     className="pl-10 h-11 bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700" required />
                 </div>
+                <FormFieldError message={fieldErrors.firstName} />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="lastName" className="text-sm font-medium text-slate-700 dark:text-slate-300">Nom</Label>
                 <div className="relative">
                   <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                   <Input id="lastName" placeholder="Votre nom" value={formData.lastName}
-                    onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                    onChange={(e) => { setFormData({ ...formData, lastName: e.target.value }); setFieldErrors(p => ({ ...p, lastName: undefined })); setSubmitError(null); }}
                     className="pl-10 h-11 bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700" required />
                 </div>
+                <FormFieldError message={fieldErrors.lastName} />
               </div>
             </div>
 
@@ -342,20 +221,17 @@ function RegisterForm() {
                     className={`pl-10 h-11 bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 ${fieldErrors.email ? 'border-red-400' : ''}`}
                     required />
                 </div>
-                {fieldErrors.email && (
-                  <div className="flex items-center gap-1 text-xs text-red-600 dark:text-red-400">
-                    <AlertCircle className="h-3.5 w-3.5 shrink-0" /><span>{fieldErrors.email}</span>
-                  </div>
-                )}
+                <FormFieldError message={fieldErrors.email} />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="phone" className="text-sm font-medium text-slate-700 dark:text-slate-300">{t('phone')}</Label>
                 <div className="relative">
                   <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                   <Input id="phone" type="tel" placeholder="+213 XX XX XX XX" value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    className="pl-10 h-11 bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700" required />
+                    onChange={(e) => { setFormData({ ...formData, phone: e.target.value }); setFieldErrors(p => ({ ...p, phone: undefined })); setSubmitError(null); }}
+                    className={`pl-10 h-11 bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 ${fieldErrors.phone ? 'border-red-400' : ''}`} required />
                 </div>
+                <FormFieldError message={fieldErrors.phone} />
               </div>
             </div>
 
@@ -383,11 +259,7 @@ function RegisterForm() {
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
-                {fieldErrors.password && (
-                  <div className="flex items-center gap-1 text-xs text-red-600 dark:text-red-400">
-                    <AlertCircle className="h-3.5 w-3.5 shrink-0" /><span>{fieldErrors.password}</span>
-                  </div>
-                )}
+                <FormFieldError message={fieldErrors.password} />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="confirmPassword" className="text-sm font-medium text-slate-700 dark:text-slate-300">{t('confirmPassword')}</Label>
@@ -403,146 +275,10 @@ function RegisterForm() {
                     {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
-                {fieldErrors.confirmPassword && (
-                  <div className="flex items-center gap-1 text-xs text-red-600 dark:text-red-400">
-                    <AlertCircle className="h-3.5 w-3.5 shrink-0" /><span>{fieldErrors.confirmPassword}</span>
-                  </div>
-                )}
+                <FormFieldError message={fieldErrors.confirmPassword} />
               </div>
             </div>
           </div>
-
-            {/* Transporter Fields */}
-            {formData.role === 'TRANSPORTER' && (
-              <div className="p-6 space-y-5 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/20">
-                <h3 className="text-xs font-semibold uppercase tracking-widest text-slate-400 flex items-center gap-2">
-                  <Truck className="h-4 w-4" /> Informations du transporteur
-                </h3>
-                <div className="space-y-1.5">
-                  <Label htmlFor="commerceRegisterNumberTransporter" className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                    Numéro du registre du commerce <span className="text-red-500">*</span>
-                  </Label>
-                  <Input id="commerceRegisterNumberTransporter" placeholder="Ex: 16/0012345B22"
-                    value={formData.commerceRegisterNumber}
-                    onChange={(e) => setFormData({ ...formData, commerceRegisterNumber: e.target.value })}
-                    className="h-11 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700"
-                    required={formData.role === 'TRANSPORTER'} />
-                  <p className="text-xs text-slate-400">Format CNRC : WW/NNNNNNNLAA — ex : <code className="font-mono">16/0012345B22</code></p>
-                </div>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="vehicle" className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                      Véhicule <span className="text-slate-400 font-normal">(optionnel)</span>
-                    </Label>
-                    <Input id="vehicle" placeholder="Ex: Utilitaire 3.5T" value={formData.vehicle}
-                      onChange={(e) => setFormData({ ...formData, vehicle: e.target.value })}
-                      className="h-11 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="license" className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                      N° de permis <span className="text-slate-400 font-normal">(optionnel)</span>
-                    </Label>
-                    <Input id="license" placeholder="Ex: AB123456" value={formData.license}
-                      onChange={(e) => setFormData({ ...formData, license: e.target.value })}
-                      className="h-11 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700" />
-                  </div>
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="experience" className="text-sm font-medium text-slate-700 dark:text-slate-300">Années d'expérience</Label>
-                  <Input id="experience" type="number" placeholder="0" value={formData.experience}
-                    onChange={(e) => setFormData({ ...formData, experience: e.target.value })} min="0"
-                    className="h-11 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700" />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-sm font-medium text-slate-700 dark:text-slate-300">Régions desservies</Label>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 max-h-48 overflow-y-auto p-3 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800">
-                    {WILAYAS.map((wilaya) => (
-                      <div key={wilaya.id} className="flex items-center space-x-2">
-                        <Checkbox id={wilaya.id} checked={formData.regions.includes(wilaya.id)}
-                          onCheckedChange={(checked) => handleRegionChange(wilaya.id, checked as boolean)} />
-                        <label htmlFor={wilaya.id} className="text-sm cursor-pointer text-slate-600 dark:text-slate-400">{wilaya.name}</label>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="description" className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                    Description <span className="text-slate-400 font-normal">(optionnel)</span>
-                  </Label>
-                  <Textarea id="description" placeholder="Parlez-nous un peu de vous et de votre expérience…"
-                    value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    rows={3} className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 resize-none" />
-                </div>
-              </div>
-            )}
-
-            {/* Relais Fields */}
-            {formData.role === 'RELAIS' && (
-              <div className="p-6 space-y-5 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/20">
-                <h3 className="text-xs font-semibold uppercase tracking-widest text-slate-400 flex items-center gap-2">
-                  <Store className="h-4 w-4" /> Informations du point relais
-                </h3>
-                <div className="space-y-1.5">
-                  <Label htmlFor="commerceRegisterNumberRelais" className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                    Numéro du registre du commerce <span className="text-red-500">*</span>
-                  </Label>
-                  <Input id="commerceRegisterNumberRelais" placeholder="Ex: 16/0012345B22"
-                    value={formData.commerceRegisterNumber}
-                    onChange={(e) => setFormData({ ...formData, commerceRegisterNumber: e.target.value })}
-                    className="h-11 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700"
-                    required={formData.role === 'RELAIS'} />
-                  <p className="text-xs text-slate-400">Format CNRC : WW/NNNNNNNLAA — ex : <code className="font-mono">16/0012345B22</code></p>
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="commerceName" className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                    Nom du commerce <span className="text-slate-400 font-normal">(optionnel)</span>
-                  </Label>
-                  <div className="relative">
-                    <Store className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                    <Input id="commerceName" placeholder="Ex: Épicerie du Centre" value={formData.commerceName}
-                      onChange={(e) => setFormData({ ...formData, commerceName: e.target.value })}
-                      className="pl-10 h-11 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700" />
-                  </div>
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="address" className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                    Adresse du point relais <span className="text-red-500">*</span>
-                  </Label>
-                  <Textarea id="address" placeholder="Ex: 123 Rue Didouche Mourad, Alger Centre"
-                    value={formData.address}
-                    onChange={(e) => { setFormData({ ...formData, address: e.target.value }); setFieldErrors(p => ({ ...p, address: undefined })); }}
-                    rows={2} className={`resize-none bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 ${fieldErrors.address ? 'border-red-400' : ''}`} />
-                  {fieldErrors.address && (
-                    <div className="flex items-center gap-1 text-xs text-red-600 dark:text-red-400">
-                      <AlertCircle className="h-3.5 w-3.5 shrink-0" /><span>{fieldErrors.address}</span>
-                    </div>
-                  )}
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="ville" className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                    Ville <span className="text-red-500">*</span>
-                  </Label>
-                  <div className="relative">
-                    <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 z-10" />
-                    <Select value={formData.ville} onValueChange={(value) => { setFormData({ ...formData, ville: value }); setFieldErrors(p => ({ ...p, ville: undefined })); }}>
-                      <SelectTrigger className={`pl-10 h-11 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 ${fieldErrors.ville ? 'border-red-400' : ''}`}>
-                        <SelectValue placeholder="Sélectionnez votre ville" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {WILAYAS.map((w) => (
-                          <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  {fieldErrors.ville && (
-                    <div className="flex items-center gap-1 text-xs text-red-600 dark:text-red-400">
-                      <AlertCircle className="h-3.5 w-3.5 shrink-0" /><span>{fieldErrors.ville}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
 
           <div className="p-6 border-t border-slate-100 dark:border-slate-800 space-y-4">
             <Button type="submit" className="w-full h-12 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl shadow-sm transition-all" disabled={isLoading}>
@@ -556,6 +292,19 @@ function RegisterForm() {
                 Connectez-vous
               </Link>
             </p>
+
+            <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 p-4 space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 text-center">Je suis professionnel</p>
+              <p className="text-center text-xs text-slate-500 dark:text-slate-400">
+                Vous pourrez activer un profil pro plus tard.
+              </p>
+              <Link
+                href={`/${locale}/pro`}
+                className="flex items-center justify-center rounded-lg border border-slate-300 bg-white dark:bg-slate-800 px-3 py-2.5 text-center text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+              >
+                Acceder a l'espace professionnel
+              </Link>
+            </div>
           </div>
         </form>
       </div>

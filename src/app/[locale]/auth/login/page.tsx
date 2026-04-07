@@ -1,3 +1,4 @@
+
 'use client';
 
 import { Suspense, useState } from 'react';
@@ -5,11 +6,14 @@ import { useTranslations, useLocale } from 'next-intl';
 import { signIn } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Link } from '@/i18n/routing';
+import { BrandLogo } from '@/components/brand-logo';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Package, Loader2, Mail, Lock, AlertCircle, Eye, EyeOff, ArrowRight, Truck, Store } from 'lucide-react';
+import { FormFieldError, FormGlobalError } from '@/components/ui/form-error';
+import { Package, Loader2, Mail, Lock, AlertCircle, Eye, EyeOff, ArrowRight, Truck, Store, Building2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { normalizeRole } from '@/lib/roles';
 
 function LoginForm() {
   const t = useTranslations('auth.login');
@@ -22,6 +26,7 @@ function LoginForm() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loginError, setLoginError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({});
 
   const getDashboardPath = (role: string) => {
     switch (role) {
@@ -31,6 +36,8 @@ function LoginForm() {
         return `/${locale}/dashboard/transporter`;
       case 'RELAIS':
         return `/${locale}/dashboard/relais`;
+      case 'ENSEIGNE':
+        return `/${locale}/dashboard/enseigne`;
       case 'CLIENT':
       default:
         return `/${locale}/dashboard/client`;
@@ -41,12 +48,25 @@ function LoginForm() {
     e.preventDefault();
 
     const normalizedEmail = email.trim().toLowerCase();
+    const nextErrors: { email?: string; password?: string } = {};
 
-    if (!normalizedEmail || !password) {
-      setLoginError('Veuillez saisir votre email et votre mot de passe');
+    if (!normalizedEmail) {
+      nextErrors.email = 'L\'email est obligatoire.';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      nextErrors.email = 'Le format de l\'email est invalide.';
+    }
+
+    if (!password) {
+      nextErrors.password = 'Le mot de passe est obligatoire.';
+    }
+
+    if (Object.keys(nextErrors).length > 0) {
+      setFieldErrors(nextErrors);
+      setLoginError('Veuillez corriger les champs en rouge.');
       return;
     }
 
+    setFieldErrors({});
     setLoginError('');
     setIsLoading(true);
 
@@ -58,11 +78,19 @@ function LoginForm() {
       });
 
       if (result?.error || !result?.ok) {
+        const errorMessage = result?.error || 'Connexion impossible pour le moment. Réessayez.';
+        if (result?.error === 'CredentialsSignin') {
+          setFieldErrors({
+            email: 'Vérifiez votre email.',
+            password: 'Mot de passe incorrect.',
+          });
+        }
         setLoginError(
           result?.error === 'CredentialsSignin'
             ? 'Email ou mot de passe incorrect. Vérifiez vos identifiants.'
-            : 'Connexion impossible pour le moment. Réessayez.'
+            : `Connexion impossible pour le moment. (${errorMessage})`
         );
+        console.error('signIn error', result);
       } else {
         // Fetch session to get user role
         const sessionRes = await fetch('/api/auth/session');
@@ -76,7 +104,7 @@ function LoginForm() {
         }
 
         const sessionData = await sessionRes.json();
-        const userRole = sessionData?.user?.role || 'CLIENT';
+        const userRole = normalizeRole(sessionData?.user?.role);
 
         toast({
           title: 'Connexion réussie',
@@ -94,13 +122,6 @@ function LoginForm() {
     }
   };
 
-  const handleForgotPassword = () => {
-    toast({
-      title: 'Mot de passe oublié',
-      description: 'La récupération de mot de passe sera disponible très bientôt.',
-    });
-  };
-
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
       {/* Email */}
@@ -115,13 +136,18 @@ function LoginForm() {
             type="email"
             placeholder="email@exemple.com"
             value={email}
-            onChange={(e) => { setEmail(e.target.value); setLoginError(''); }}
+            onChange={(e) => {
+              setEmail(e.target.value);
+              setLoginError('');
+              setFieldErrors((prev) => ({ ...prev, email: undefined }));
+            }}
             className={`pl-10 h-11 bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 focus:border-emerald-500 focus-visible:ring-emerald-500/20 ${
-              loginError ? 'border-red-400 focus-visible:ring-red-400/20' : ''
+              fieldErrors.email ? 'border-red-400 focus-visible:ring-red-400/20' : ''
             }`}
             required
           />
         </div>
+        <FormFieldError message={fieldErrors.email} />
       </div>
 
       {/* Password */}
@@ -130,13 +156,12 @@ function LoginForm() {
           <Label htmlFor="password" className="text-sm font-medium text-slate-700 dark:text-slate-300">
             {t('password')}
           </Label>
-          <button
-            type="button"
-            onClick={handleForgotPassword}
+          <Link
+            href="/auth/forgot-password"
             className="text-xs text-emerald-600 hover:text-emerald-700 hover:underline transition-colors"
           >
             {t('forgotPassword')}
-          </button>
+          </Link>
         </div>
         <div className="relative">
           <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
@@ -145,9 +170,13 @@ function LoginForm() {
             type={showPassword ? 'text' : 'password'}
             placeholder="••••••••"
             value={password}
-            onChange={(e) => { setPassword(e.target.value); setLoginError(''); }}
+            onChange={(e) => {
+              setPassword(e.target.value);
+              setLoginError('');
+              setFieldErrors((prev) => ({ ...prev, password: undefined }));
+            }}
             className={`pl-10 pr-10 h-11 bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 focus:border-emerald-500 focus-visible:ring-emerald-500/20 ${
-              loginError ? 'border-red-400 focus-visible:ring-red-400/20' : ''
+              fieldErrors.password ? 'border-red-400 focus-visible:ring-red-400/20' : ''
             }`}
             required
           />
@@ -160,15 +189,11 @@ function LoginForm() {
             {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
           </button>
         </div>
+        <FormFieldError message={fieldErrors.password} />
       </div>
 
       {/* Inline error */}
-      {loginError && (
-        <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-700 dark:border-red-800 dark:bg-red-950/40 dark:text-red-400">
-          <AlertCircle className="h-4 w-4 shrink-0" />
-          <span>{loginError}</span>
-        </div>
-      )}
+      <FormGlobalError message={loginError} />
 
       {/* Submit */}
       <Button
@@ -190,6 +215,17 @@ function LoginForm() {
           {t('registerLink')}
         </Link>
       </p>
+
+      <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
+        <p className="text-xs text-center text-slate-400 mb-2">Je suis professionnel</p>
+        <Link
+          href="/pro"
+          className="flex items-center justify-center gap-1.5 rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+        >
+          <Building2 className="h-3.5 w-3.5" />
+          Acceder a l'espace professionnel
+        </Link>
+      </div>
     </form>
   );
 }
@@ -207,12 +243,7 @@ export default function LoginPage() {
           <div className="absolute bottom-20 right-10 w-96 h-96 rounded-full bg-white blur-3xl" />
         </div>
 
-        <Link href="/" className="relative flex items-center gap-3">
-          <div className="p-2 bg-white/20 rounded-xl backdrop-blur-sm">
-            <Package className="h-7 w-7 text-white" />
-          </div>
-          <span className="text-2xl font-bold tracking-tight">SwiftColis</span>
-        </Link>
+        <BrandLogo variant="branded" />
 
         <div className="relative space-y-8">
           <div>
@@ -247,14 +278,7 @@ export default function LoginPage() {
       {/* Right panel — form */}
       <div className="flex flex-col items-center justify-center p-6 bg-white dark:bg-slate-950">
         {/* Mobile logo */}
-        <Link href="/" className="flex items-center gap-2 mb-10 lg:hidden">
-          <div className="p-2 bg-emerald-600 rounded-xl">
-            <Package className="h-6 w-6 text-white" />
-          </div>
-          <span className="text-2xl font-bold bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">
-            SwiftColis
-          </span>
-        </Link>
+        <BrandLogo className="mb-10 lg:hidden" />
 
         <div className="w-full max-w-sm">
           <div className="mb-8">

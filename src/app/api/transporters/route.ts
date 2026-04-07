@@ -59,12 +59,18 @@ export async function POST(request: NextRequest) {
     const rcNumber = normalizeCommerceRegisterNumber(String(commerceRegisterNumber || ''));
 
     if (!userId || !fullName || !phone || !vehicle || !license || !rcNumber) {
-      return NextResponse.json({ error: 'Missing required fields (numéro RC obligatoire)' }, { status: 400 });
+      return NextResponse.json({
+        error: 'Missing required fields (numéro RC obligatoire)',
+        code: 'MISSING_REQUIRED_FIELDS',
+        fields: ['userId', 'fullName', 'phone', 'vehicle', 'license', 'commerceRegisterNumber'],
+      }, { status: 400 });
     }
 
     if (!isAlgerianCommerceRegisterNumber(rcNumber)) {
       return NextResponse.json({
         error: 'Invalid commerce register number format',
+        code: 'INVALID_COMMERCE_REGISTER_NUMBER',
+        field: 'commerceRegisterNumber',
         details: 'Format RC algérien invalide (ex: RC-16/1234567B21)',
       }, { status: 400 });
     }
@@ -76,7 +82,10 @@ export async function POST(request: NextRequest) {
     // Check if already applied
     const existing = await db.transporterApplication.findUnique({ where: { userId } });
     if (existing) {
-      return NextResponse.json({ error: 'Application already submitted' }, { status: 400 });
+      return NextResponse.json({
+        error: 'Application already submitted',
+        code: 'APPLICATION_ALREADY_SUBMITTED',
+      }, { status: 409 });
     }
 
     const application = await db.transporterApplication.create({

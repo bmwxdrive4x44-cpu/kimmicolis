@@ -4,8 +4,9 @@ import { useSession } from 'next-auth/react';
 import { useLocale } from 'next-intl';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
+import { normalizeRole } from '@/lib/roles';
 
-export type UserRole = 'ADMIN' | 'TRANSPORTER' | 'RELAIS' | 'CLIENT';
+export type UserRole = 'ADMIN' | 'TRANSPORTER' | 'RELAIS' | 'ENSEIGNE' | 'CLIENT';
 
 export function useAuthRedirect(requiredRole: UserRole) {
   const { data: session, status, update } = useSession();
@@ -24,9 +25,10 @@ export function useAuthRedirect(requiredRole: UserRole) {
     }
 
     if (status === 'authenticated' && session?.user?.role) {
-      const userRole = session.user.role as UserRole;
+      const userRole = normalizeRole(session.user.role) as UserRole;
+      const expectedRole = normalizeRole(requiredRole) as UserRole;
       
-      if (userRole !== requiredRole) {
+      if (userRole !== expectedRole) {
         // Redirect to correct dashboard
         const correctPath = getDashboardPath(userRole, locale);
         window.location.href = correctPath;
@@ -45,6 +47,8 @@ export function getDashboardPath(role: UserRole, locale: string): string {
       return `/${locale}/dashboard/transporter`;
     case 'RELAIS':
       return `/${locale}/dashboard/relais`;
+    case 'ENSEIGNE':
+      return `/${locale}/dashboard/enseigne`;
     case 'CLIENT':
     default:
       return `/${locale}/dashboard/client`;

@@ -2,6 +2,7 @@ import type { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import bcrypt from 'bcryptjs';
 import { db } from './db';
+import { normalizeRole } from './roles';
 
 const BCRYPT_ROUNDS = 12;
 
@@ -9,7 +10,7 @@ type DemoAccountConfig = {
   email: string;
   password: string;
   name: string;
-  role: 'ADMIN' | 'CLIENT' | 'TRANSPORTER' | 'RELAIS';
+  role: 'ADMIN' | 'CLIENT' | 'TRANSPORTER' | 'RELAIS' | 'ENSEIGNE';
   phone: string;
   siret?: string;
   relais?: {
@@ -56,16 +57,78 @@ const DEMO_ACCOUNTS: DemoAccountConfig[] = [
       commerceName: 'Epicerie du Centre',
       address: '123 Rue Didouche Mourad',
       ville: 'alger',
-      status: 'PENDING',
+      status: 'APPROVED',
       commissionPetit: 100,
       commissionMoyen: 200,
       commissionGros: 300,
     },
   },
+  {
+    email: 'enseigne@demo.dz',
+    password: 'enseigne123',
+    name: 'Boutique Atlas',
+    role: 'ENSEIGNE',
+    phone: '+213555444444',
+    siret: 'RC-16/1234567B21',
+  },
 ];
 
 function isBcryptHash(hashedPassword: string): boolean {
   return hashedPassword.startsWith('$2a$') || hashedPassword.startsWith('$2b$') || hashedPassword.startsWith('$2y$');
+}
+
+function isUnknownClientTypeFieldError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error || '');
+  return message.includes('Unknown field `clientType`') && message.includes('model `User`');
+}
+
+async function findUserForAuth(email: string) {
+  const normalizedEmail = email.toLowerCase();
+
+  try {
+    return await db.user.findUnique({
+      where: { email: normalizedEmail },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        phone: true,
+        password: true,
+        clientType: true,
+        relais: {
+          select: {
+            id: true,
+            status: true,
+          },
+        },
+      },
+    });
+  } catch (error) {
+    if (!isUnknownClientTypeFieldError(error)) {
+      throw error;
+    }
+
+    const user = await db.user.findUnique({
+      where: { email: normalizedEmail },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        phone: true,
+        password: true,
+        relais: {
+          select: {
+            id: true,
+            status: true,
+          },
+        },
+      },
+    });
+
+    return user ? { ...user, clientType: 'STANDARD' } : null;
+  }
 }
 
 async function hashLegacyPassword(password: string): Promise<string> {
@@ -76,15 +139,11 @@ async function hashLegacyPassword(password: string): Promise<string> {
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-async function hashPassword(password: string): Promise<string> {
+export async function hashPassword(password: string): Promise<string> {
   return bcrypt.hash(password, BCRYPT_ROUNDS);
 }
 
 async function ensureDevelopmentDemoUser(email: string, password: string) {
-  if (process.env.NODE_ENV === 'production') {
-    return null;
-  }
-
   const demoAccount = DEMO_ACCOUNTS.find(
     (account) => account.email === email.toLowerCase() && account.password === password
   );
@@ -119,6 +178,8 @@ async function ensureDevelopmentDemoUser(email: string, password: string) {
       name: true,
       role: true,
       phone: true,
+      password: true,
+      clientType: true,
       relais: {
         select: {
           id: true,
@@ -183,35 +244,41 @@ export const authOptions: NextAuthOptions = {
           return null;
         }
 
-        let user = await db.user.findUnique({
-          where: { email: credentials.email.toLowerCase() },
-          select: {
-            id: true,
-            email: true,
-            name: true,
-            role: true,
-            phone: true,
-            password: true,
-            relais: {
-              select: {
-                id: true,
-                status: true,
-              },
-            },
-          },
-        });
+        // Ensure demo users are created / updated in dev for every login attempt.
+        if (process.env.NODE_ENV !== 'production') {
+          await ensureDevelopmentDemoUser(credentials.email, credentials.password);
+        }
+
+        let user = await findUserForAuth(credentials.email);
 
         if (!user) {
+          console.warn('[auth] user not found, force demo user creation', credentials.email);
           user = await ensureDevelopmentDemoUser(credentials.email, credentials.password);
         }
 
         if (!user || !user.password) {
+          console.warn('[auth] user is missing or has no password', credentials.email, user);
           return null;
         }
 
-        const isValid = await verifyPassword(credentials.password, user.password);
+        let isValid = await verifyPassword(credentials.password, user.password);
+        console.log('[auth] verifyPassword', credentials.email, isValid);
+
+        if (!isValid && process.env.NODE_ENV !== 'production') {
+          // Re-hash / upsert possible stale demo user password and retry.
+          console.log('[auth] retry demo user sync for', credentials.email);
+          await ensureDevelopmentDemoUser(credentials.email, credentials.password);
+          const reloaded = await db.user.findUnique({
+            where: { email: credentials.email.toLowerCase() },
+          });
+          if (reloaded?.password) {
+            isValid = await verifyPassword(credentials.password, reloaded.password);
+            console.log('[auth] verifyPassword retry', credentials.email, isValid);
+          }
+        }
 
         if (!isValid) {
+          console.warn('[auth] invalid credentials', credentials.email);
           return null;
         }
 
@@ -227,10 +294,11 @@ export const authOptions: NextAuthOptions = {
           id: user.id,
           email: user.email,
           name: user.name,
-          role: user.role,
+          role: normalizeRole(user.role),
           phone: user.phone ?? undefined,
           relaisId: user.relais?.id ?? null,
           relaisStatus: user.relais?.status ?? undefined,
+          clientType: (user as any).clientType ?? 'STANDARD',
         };
       },
     }),
@@ -243,20 +311,24 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
-        token.role = user.role;
+        token.role = normalizeRole(user.role);
         token.phone = user.phone;
         token.relaisId = user.relaisId;
         token.relaisStatus = user.relaisStatus;
+        token.clientType = (user as any).clientType ?? 'STANDARD';
+      } else if (token.role) {
+        token.role = normalizeRole(token.role);
       }
       return token;
     },
     async session({ session, token }) {
       if (token && session.user) {
         session.user.id = token.sub!;
-        session.user.role = token.role as string;
+        session.user.role = normalizeRole(token.role);
         session.user.phone = token.phone as string;
         session.user.relaisId = token.relaisId as string;
         session.user.relaisStatus = token.relaisStatus as string;
+        session.user.clientType = (token.clientType as string) ?? 'STANDARD';
       }
       return session;
     },
@@ -305,4 +377,3 @@ declare module 'next-auth/jwt' {
   }
 }
 
-export { hashPassword };

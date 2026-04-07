@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
       ? Math.max(1, Math.min(requestedHours, 24 * 30))
       : 24;
 
-    const eligibleStatuses = ['CREATED', 'PAID_RELAY', 'DEPOSITED_RELAY', 'RECU_RELAIS'];
+    const eligibleStatuses: string[] = ['CREATED', 'PAID_RELAY', 'DEPOSITED_RELAY', 'RECU_RELAIS'];
     const now = new Date();
     const sincePeriod = new Date(now.getTime() - periodHours * 60 * 60 * 1000);
 
@@ -62,8 +62,9 @@ export async function GET(request: NextRequest) {
       ...(villeArrivee ? { villeArrivee } : {}),
     };
 
+    const activeMissionStatuses: string[] = ['ASSIGNE', 'EN_COURS'];
     const activeMissionWhere = {
-      status: { in: ['ASSIGNE', 'EN_COURS'] as const },
+      status: { in: activeMissionStatuses },
       ...(villeDepart || villeArrivee
         ? {
             colis: {
@@ -153,7 +154,7 @@ export async function GET(request: NextRequest) {
       db.mission.groupBy({
         by: ['transporteurId'],
         where: activeMissionWhere,
-        _count: { _all: true },
+        _count: { transporteurId: true },
       }),
     ]);
 
@@ -176,7 +177,7 @@ export async function GET(request: NextRequest) {
     const transporterLoad = activeLoads
       .map((l) => ({
         transporteurId: l.transporteurId,
-        activeMissions: l._count._all,
+        activeMissions: l._count.transporteurId,
         name: userMap.get(l.transporteurId)?.name ?? 'Transporteur',
         email: userMap.get(l.transporteurId)?.email ?? '',
       }))

@@ -6,16 +6,28 @@ import { useLocale } from 'next-intl';
 import { useRouter } from 'next/navigation';
 import { Header } from '@/components/layout/header';
 import { Footer } from '@/components/layout/footer';
+import {
+  DashboardHero,
+  DashboardMetricCard,
+  DashboardPanel,
+  DashboardShell,
+  DashboardStatsGrid,
+  dashboardTabsListClass,
+  getDashboardTabsTriggerClass,
+} from '@/components/dashboard/dashboard-shell';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
+import { FormFieldError, FormGlobalError } from '@/components/ui/form-error';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { WILAYAS, PARCEL_STATUS, TRAJET_STATUS } from '@/lib/constants';
-import { Truck, Plus, Package, MapPin, DollarSign, Loader2, CheckCircle, Clock, Route, QrCode, Navigation, Scan, Wallet, ArrowUpFromLine, TrendingUp, History, Save, Pencil, User } from 'lucide-react';
+import { parseLocaleFloat } from '@/lib/utils';
+import { Truck, Plus, Package, MapPin, DollarSign, Loader2, CheckCircle, Clock, Route, QrCode, Navigation, Scan, Wallet, ArrowUpFromLine, TrendingUp, History, Save, Pencil, User, Zap, Settings, BarChart2, AlertCircle, RefreshCw, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 function getRoleBasedDashboardPath(role: string, locale: string): string {
@@ -23,6 +35,7 @@ function getRoleBasedDashboardPath(role: string, locale: string): string {
     case 'ADMIN': return `/${locale}/dashboard/admin`;
     case 'TRANSPORTER': return `/${locale}/dashboard/transporter`;
     case 'RELAIS': return `/${locale}/dashboard/relais`;
+    case 'ENSEIGNE': return `/${locale}/dashboard/enseigne`;
     default: return `/${locale}/dashboard/client`;
   }
 }
@@ -73,6 +86,24 @@ export default function TransporterDashboard() {
     }
   }, [session?.user?.id, hasProfile]);
 
+  useEffect(() => {
+    if (!session?.user?.id || !hasProfile) return;
+
+    const intervalId = window.setInterval(() => {
+      fetchStats();
+    }, 15000);
+
+    const handleFocus = () => {
+      fetchStats();
+    };
+
+    window.addEventListener('focus', handleFocus);
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [session?.user?.id, hasProfile]);
+
   const fetchStats = async () => {
     setIsLoading(true);
     try {
@@ -111,81 +142,64 @@ export default function TransporterDashboard() {
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-900">
       <Header />
-      <main className="flex-1 container px-4 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold">Espace Transporteur</h1>
-          <p className="text-slate-600 dark:text-slate-400 mt-1">Bienvenue, {session.user.name}</p>
-        </div>
+      <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8">
+        <DashboardShell tone="transporteur" className="mx-auto max-w-7xl">
+          <DashboardHero
+            tone="transporteur"
+            eyebrow="Mobilité terrain"
+            title="Espace Transporteur"
+            description="Pilotez vos trajets, missions, scans et revenus depuis une vue plus fluide, pensée pour une lecture rapide entre deux départs."
+            meta={
+              <>
+                <Badge variant="outline" className="border-white/70 bg-white/70 text-slate-700">Bienvenue, {session.user.name}</Badge>
+                <Badge variant="outline" className="border-white/70 bg-white/70 text-slate-700">Profil actif</Badge>
+              </>
+            }
+          />
 
-        {/* Stats Cards */}
-        <div className="grid gap-4 md:grid-cols-4 mb-8">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Mes trajets</CardTitle>
-              <Route className="h-4 w-4 text-slate-400" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.trajets}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Missions actives</CardTitle>
-              <Truck className="h-4 w-4 text-slate-400" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.missions}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Livrés</CardTitle>
-              <CheckCircle className="h-4 w-4 text-slate-400" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.completed}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Gains</CardTitle>
-              <DollarSign className="h-4 w-4 text-slate-400" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-emerald-600">{stats.earnings} DA</div>
-            </CardContent>
-          </Card>
-        </div>
+          <DashboardStatsGrid>
+            <DashboardMetricCard tone="transporteur" label="Mes trajets" value={stats.trajets} icon={<Route className="h-5 w-5" />} />
+            <DashboardMetricCard tone="transporteur" label="Missions actives" value={stats.missions} icon={<Truck className="h-5 w-5" />} />
+            <DashboardMetricCard tone="transporteur" label="Livrés" value={stats.completed} icon={<CheckCircle className="h-5 w-5" />} />
+            <DashboardMetricCard tone="transporteur" label="Gains" value={`${stats.earnings} DA`} icon={<DollarSign className="h-5 w-5" />} />
+          </DashboardStatsGrid>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-6 mb-8">
-            <TabsTrigger value="overview"><MapPin className="h-4 w-4 mr-1 hidden sm:inline" />Vue d'ensemble</TabsTrigger>
-            <TabsTrigger value="trajets"><Route className="h-4 w-4 mr-1 hidden sm:inline" />Trajets</TabsTrigger>
-            <TabsTrigger value="missions"><Package className="h-4 w-4 mr-1 hidden sm:inline" />Missions</TabsTrigger>
-            <TabsTrigger value="scan"><QrCode className="h-4 w-4 mr-1 hidden sm:inline" />Scanner</TabsTrigger>
-            <TabsTrigger value="wallet"><Wallet className="h-4 w-4 mr-1 hidden sm:inline" />Portefeuille</TabsTrigger>
-            <TabsTrigger value="profil"><Truck className="h-4 w-4 mr-1 hidden sm:inline" />Mon profil</TabsTrigger>
-          </TabsList>
+          <DashboardPanel tone="transporteur">
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
+              <TabsList className={`${dashboardTabsListClass} grid grid-cols-2 lg:grid-cols-7`}>
+                <TabsTrigger value="overview" className={getDashboardTabsTriggerClass('transporteur')}><MapPin className="h-4 w-4 mr-1 hidden sm:inline" />Vue d'ensemble</TabsTrigger>
+                <TabsTrigger value="trajets" className={getDashboardTabsTriggerClass('transporteur')}><Route className="h-4 w-4 mr-1 hidden sm:inline" />Trajets</TabsTrigger>
+                <TabsTrigger value="missions" className={getDashboardTabsTriggerClass('transporteur')}><Package className="h-4 w-4 mr-1 hidden sm:inline" />Missions</TabsTrigger>
+                <TabsTrigger value="scan" className={getDashboardTabsTriggerClass('transporteur')}><QrCode className="h-4 w-4 mr-1 hidden sm:inline" />Scanner</TabsTrigger>
+                <TabsTrigger value="wallet" className={getDashboardTabsTriggerClass('transporteur')}><Wallet className="h-4 w-4 mr-1 hidden sm:inline" />Portefeuille</TabsTrigger>
+                <TabsTrigger value="auto-assign" className={getDashboardTabsTriggerClass('transporteur')}><Zap className="h-4 w-4 mr-1 hidden sm:inline" />Auto-assign</TabsTrigger>
+                <TabsTrigger value="profil" className={getDashboardTabsTriggerClass('transporteur')}><Truck className="h-4 w-4 mr-1 hidden sm:inline" />Mon profil</TabsTrigger>
+              </TabsList>
 
-          <TabsContent value="overview">
-            <OverviewTab userId={session.user.id} setActiveTab={setActiveTab} />
-          </TabsContent>
-          <TabsContent value="trajets">
-            <TrajetsTab userId={session.user.id} />
-          </TabsContent>
-          <TabsContent value="missions">
-            <MissionsTab userId={session.user.id} onRefreshStats={fetchStats} />
-          </TabsContent>
-          <TabsContent value="scan">
-            <ScanTab onRefreshStats={fetchStats} />
-          </TabsContent>
-          <TabsContent value="wallet">
-            <WalletTab userId={session.user.id} />
-          </TabsContent>
-          <TabsContent value="profil">
-            <ProfilTab userId={session.user.id} userName={session.user.name || ''} />
-          </TabsContent>
-        </Tabs>
+              <TabsContent value="overview">
+                <OverviewTab userId={session.user.id} setActiveTab={setActiveTab} />
+              </TabsContent>
+              <TabsContent value="trajets">
+                <TrajetsTab userId={session.user.id} />
+              </TabsContent>
+              <TabsContent value="missions">
+                <MissionsTab userId={session.user.id} onRefreshStats={fetchStats} />
+              </TabsContent>
+              <TabsContent value="scan">
+                <ScanTab onRefreshStats={fetchStats} />
+              </TabsContent>
+              <TabsContent value="wallet">
+                <WalletTab userId={session.user.id} />
+              </TabsContent>
+              <TabsContent value="auto-assign">
+                <AutoAssignTab userId={session.user.id} />
+              </TabsContent>
+              <TabsContent value="profil">
+                <ProfilTab userId={session.user.id} userName={session.user.name || ''} />
+              </TabsContent>
+            </Tabs>
+          </DashboardPanel>
+        </DashboardShell>
       </main>
       <Footer />
     </div>
@@ -323,10 +337,31 @@ function OverviewTab({ userId, setActiveTab }: { userId: string; setActiveTab: (
 // Trajets Tab
 function TrajetsTab({ userId }: { userId: string }) {
   const { toast } = useToast();
+  const WEEKDAY_OPTIONS = [
+    { id: 6, label: 'Samedi' },
+    { id: 0, label: 'Dimanche' },
+    { id: 1, label: 'Lundi' },
+    { id: 2, label: 'Mardi' },
+    { id: 3, label: 'Mercredi' },
+    { id: 4, label: 'Jeudi' },
+    { id: 5, label: 'Vendredi' },
+  ];
   const [trajets, setTrajets] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<{
+    villeDepart?: string;
+    villeArrivee?: string;
+    dateDepart?: string;
+    placesColis?: string;
+    villesEtapes?: string;
+    capacitePoidsKg?: string;
+    capaciteSurfaceM2?: string;
+    recurrenceDays?: string;
+    recurrenceWeekdays?: string;
+  }>({});
   const formatVillesEtapes = (value: unknown): string[] => {
     if (!value) return [];
     if (Array.isArray(value)) {
@@ -353,7 +388,140 @@ function TrajetsTab({ userId }: { userId: string }) {
     dateDepart: '',
     placesColis: '10',
     villesEtapes: '',
+    capacitePoidsKg: '',
+    capaciteSurfaceM2: '',
+    recurrenceMode: 'SINGLE',
+    recurrenceDays: '7',
+    recurrenceWeekdays: ['6', '0', '1', '2', '3'],
   });
+
+  const setFormField = (key: keyof typeof formData, value: any) => {
+    setSubmitError(null);
+    setFieldErrors((prev) => ({ ...prev, [key]: undefined }));
+    setFormData((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const toggleWeekday = (weekday: string, checked: boolean) => {
+    const current = new Set(formData.recurrenceWeekdays);
+    if (checked) current.add(weekday);
+    else current.delete(weekday);
+    setFormField('recurrenceWeekdays', Array.from(current));
+  };
+
+  const getRecurrenceLabel = (mode?: string) => {
+    if (mode === 'DAILY') return 'Quotidien';
+    if (mode === 'WORKDAYS_DZ') return 'Ouvrés DZ';
+    if (mode === 'CUSTOM_DAYS') return 'Jours personnalisés';
+    return 'Unique';
+  };
+
+  const getWeekdayShortLabel = (day: number) => {
+    const map: Record<number, string> = {
+      0: 'Dim',
+      1: 'Lun',
+      2: 'Mar',
+      3: 'Mer',
+      4: 'Jeu',
+      5: 'Ven',
+      6: 'Sam',
+    };
+    return map[day] || String(day);
+  };
+
+  const getRecurrenceDetails = (trajet: any) => {
+    if (trajet?.recurrenceMode === 'WORKDAYS_DZ') {
+      return 'Sam, Dim, Lun, Mar, Mer';
+    }
+    if (trajet?.recurrenceMode === 'CUSTOM_DAYS') {
+      const days = Array.isArray(trajet?.recurrenceWeekdays)
+        ? trajet.recurrenceWeekdays
+            .map((d: unknown) => Number.parseInt(String(d), 10))
+            .filter((d: number) => Number.isInteger(d) && d >= 0 && d <= 6)
+        : [];
+      if (days.length === 0) return null;
+      return days.sort((a: number, b: number) => (a === 6 ? -1 : a) - (b === 6 ? -1 : b)).map(getWeekdayShortLabel).join(', ');
+    }
+    return null;
+  };
+
+  const validateCreateForm = () => {
+    const errors: {
+      villeDepart?: string;
+      villeArrivee?: string;
+      dateDepart?: string;
+      placesColis?: string;
+      villesEtapes?: string;
+      capacitePoidsKg?: string;
+      capaciteSurfaceM2?: string;
+      recurrenceDays?: string;
+      recurrenceWeekdays?: string;
+    } = {};
+
+    const villeDepart = formData.villeDepart.trim();
+    const villeArrivee = formData.villeArrivee.trim();
+    const dateDepart = formData.dateDepart.trim();
+    const placesColis = parseInt(formData.placesColis, 10);
+    const capacitePoidsKg = formData.capacitePoidsKg ? Number.parseFloat(formData.capacitePoidsKg) : null;
+    const capaciteSurfaceM2 = formData.capaciteSurfaceM2 ? Number.parseFloat(formData.capaciteSurfaceM2) : null;
+    const recurrenceDays = Number.parseInt(formData.recurrenceDays, 10);
+    const selectedWeekdays = formData.recurrenceWeekdays.map((d) => Number.parseInt(d, 10)).filter((d) => Number.isInteger(d) && d >= 0 && d <= 6);
+    const now = Date.now();
+    const dateMs = Date.parse(dateDepart);
+    const etapes = formatVillesEtapes(formData.villesEtapes);
+
+    if (!villeDepart) errors.villeDepart = 'La ville de départ est obligatoire.';
+    if (!villeArrivee) errors.villeArrivee = 'La ville d\'arrivée est obligatoire.';
+    if (villeDepart && villeArrivee && villeDepart === villeArrivee) {
+      errors.villeArrivee = 'La ville d\'arrivée doit être différente de la ville de départ.';
+    }
+
+    if (!dateDepart) {
+      errors.dateDepart = 'La date de départ est obligatoire.';
+    } else if (Number.isNaN(dateMs)) {
+      errors.dateDepart = 'La date de départ est invalide.';
+    } else if (dateMs < now) {
+      errors.dateDepart = 'La date de départ doit être dans le futur.';
+    }
+
+    if (!Number.isInteger(placesColis) || placesColis < 1 || placesColis > 200) {
+      errors.placesColis = 'La capacité doit être un entier entre 1 et 200.';
+    }
+
+    if (capacitePoidsKg !== null && (!Number.isFinite(capacitePoidsKg) || capacitePoidsKg < 20 || capacitePoidsKg > 20000)) {
+      errors.capacitePoidsKg = 'Le poids max doit être entre 20 et 20000 kg.';
+    }
+
+    if (capaciteSurfaceM2 !== null && (!Number.isFinite(capaciteSurfaceM2) || capaciteSurfaceM2 < 0.5 || capaciteSurfaceM2 > 100)) {
+      errors.capaciteSurfaceM2 = 'La surface utile doit être entre 0.5 et 100 m2.';
+    }
+
+    if (capacitePoidsKg === null && capaciteSurfaceM2 === null) {
+      errors.capacitePoidsKg = 'Renseignez au moins le poids max ou la surface utile.';
+      errors.capaciteSurfaceM2 = 'Renseignez au moins le poids max ou la surface utile.';
+    }
+
+    if (formData.recurrenceMode !== 'SINGLE' && (!Number.isInteger(recurrenceDays) || recurrenceDays < 2 || recurrenceDays > 30)) {
+      errors.recurrenceDays = 'La récurrence doit être entre 2 et 30 jours.';
+    }
+
+    if (formData.recurrenceMode === 'CUSTOM_DAYS' && selectedWeekdays.length === 0) {
+      errors.recurrenceWeekdays = 'Sélectionnez au moins un jour.';
+    }
+
+    if (etapes.some((e) => e === villeDepart || e === villeArrivee)) {
+      errors.villesEtapes = 'Les villes étapes ne doivent pas répéter la ville de départ ou d\'arrivée.';
+    }
+
+    setFieldErrors(errors);
+    if (Object.keys(errors).length > 0) {
+      setSubmitError('Veuillez corriger les champs en rouge.');
+      toast({ title: 'Erreur', description: 'Veuillez corriger les champs en rouge.', variant: 'destructive' });
+      return false;
+    }
+
+    setSubmitError(null);
+    return true;
+  };
 
   useEffect(() => { fetchTrajets(); }, [userId]);
 
@@ -392,6 +560,10 @@ function TrajetsTab({ userId }: { userId: string }) {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmitError(null);
+    setFieldErrors({});
+    if (!validateCreateForm()) return;
+
     setIsCreating(true);
     try {
       const response = await fetch('/api/trajets', {
@@ -401,21 +573,59 @@ function TrajetsTab({ userId }: { userId: string }) {
           ...formData,
           transporteurId: userId,
           placesColis: parseInt(formData.placesColis),
+          recurrenceDays: parseInt(formData.recurrenceDays, 10),
+          recurrenceWeekdays: formData.recurrenceWeekdays.map((d) => Number.parseInt(d, 10)),
+          capacitePoidsKg: formData.capacitePoidsKg ? Number.parseFloat(formData.capacitePoidsKg) : null,
+          capaciteSurfaceM2: formData.capaciteSurfaceM2 ? Number.parseFloat(formData.capaciteSurfaceM2) : null,
         }),
       });
 
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        throw new Error(data?.error || 'Impossible d\'enregistrer le trajet');
+        if (data?.field) {
+          setFieldErrors((prev) => ({ ...prev, [data.field]: data?.details || data?.error || 'Valeur invalide' }));
+        }
+        if (Array.isArray(data?.fields)) {
+          const next: typeof fieldErrors = {};
+          if (data.fields.includes('villeDepart')) next.villeDepart = 'La ville de départ est obligatoire.';
+          if (data.fields.includes('villeArrivee')) next.villeArrivee = 'La ville d\'arrivée est obligatoire.';
+          if (data.fields.includes('dateDepart')) next.dateDepart = 'La date de départ est obligatoire.';
+          if (data.fields.includes('placesColis')) next.placesColis = 'La capacité colis est obligatoire.';
+          if (data.fields.includes('capacitePoidsKg')) next.capacitePoidsKg = 'Le poids max est invalide.';
+          if (data.fields.includes('capaciteSurfaceM2')) next.capaciteSurfaceM2 = 'La surface utile est invalide.';
+          if (data.fields.includes('recurrenceDays')) next.recurrenceDays = 'Le nombre de jours est invalide.';
+          if (data.fields.includes('recurrenceWeekdays')) next.recurrenceWeekdays = 'Sélectionnez au moins un jour.';
+          setFieldErrors((prev) => ({ ...prev, ...next }));
+        }
+        throw new Error(data?.details || data?.error || 'Impossible d\'enregistrer le trajet');
       }
 
-      toast({ title: 'Trajet enregistré', description: 'Le trajet a bien été publié.' });
+      const createdCount = Number(data?.createdCount || 1);
+      toast({
+        title: createdCount > 1 ? 'Trajets enregistrés' : 'Trajet enregistré',
+        description: createdCount > 1
+          ? `${createdCount} trajets ont été publiés automatiquement.`
+          : 'Le trajet a bien été publié.',
+      });
       fetchTrajets();
-      setFormData({ villeDepart: '', villeArrivee: '', dateDepart: '', placesColis: '10', villesEtapes: '' });
+      setFormData({
+        villeDepart: '',
+        villeArrivee: '',
+        dateDepart: '',
+        placesColis: '10',
+        villesEtapes: '',
+        capacitePoidsKg: '',
+        capaciteSurfaceM2: '',
+        recurrenceMode: 'SINGLE',
+        recurrenceDays: '7',
+        recurrenceWeekdays: ['6', '0', '1', '2', '3'],
+      });
     } catch (error) {
+      const message = error instanceof Error ? error.message : 'Impossible d\'enregistrer le trajet';
+      setSubmitError(message);
       toast({
         title: 'Erreur',
-        description: error instanceof Error ? error.message : 'Impossible d\'enregistrer le trajet',
+        description: message,
         variant: 'destructive',
       });
     } finally {
@@ -431,40 +641,132 @@ function TrajetsTab({ userId }: { userId: string }) {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleCreate} className="space-y-4">
+            <FormGlobalError message={submitError} />
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <Label>Ville de départ</Label>
-                <Select value={formData.villeDepart} onValueChange={(v) => setFormData({ ...formData, villeDepart: v })}>
-                  <SelectTrigger><SelectValue placeholder="Sélectionner" /></SelectTrigger>
+                <Label>Ville de départ <span className="text-red-500">*</span></Label>
+                <Select value={formData.villeDepart} onValueChange={(v) => setFormField('villeDepart', v)}>
+                  <SelectTrigger className={fieldErrors.villeDepart ? 'border-red-400' : ''}><SelectValue placeholder="Sélectionner" /></SelectTrigger>
                   <SelectContent>
                     {WILAYAS.map(w => <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
+                <FormFieldError message={fieldErrors.villeDepart} />
               </div>
               <div className="space-y-2">
-                <Label>Ville d'arrivée</Label>
-                <Select value={formData.villeArrivee} onValueChange={(v) => setFormData({ ...formData, villeArrivee: v })}>
-                  <SelectTrigger><SelectValue placeholder="Sélectionner" /></SelectTrigger>
+                <Label>Ville d'arrivée <span className="text-red-500">*</span></Label>
+                <Select value={formData.villeArrivee} onValueChange={(v) => setFormField('villeArrivee', v)}>
+                  <SelectTrigger className={fieldErrors.villeArrivee ? 'border-red-400' : ''}><SelectValue placeholder="Sélectionner" /></SelectTrigger>
                   <SelectContent>
                     {WILAYAS.map(w => <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
+                <FormFieldError message={fieldErrors.villeArrivee} />
               </div>
             </div>
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <Label>Date de départ</Label>
-                <Input type="datetime-local" value={formData.dateDepart} onChange={(e) => setFormData({ ...formData, dateDepart: e.target.value })} />
+                <Label>Date de départ <span className="text-red-500">*</span></Label>
+                <Input type="datetime-local" value={formData.dateDepart} onChange={(e) => setFormField('dateDepart', e.target.value)} className={fieldErrors.dateDepart ? 'border-red-400' : ''} />
+                <FormFieldError message={fieldErrors.dateDepart} />
               </div>
               <div className="space-y-2">
-                <Label>Capacité colis (max)</Label>
-                <Input type="number" min={1} step={1} value={formData.placesColis} onChange={(e) => setFormData({ ...formData, placesColis: e.target.value })} placeholder="Ex: 10" />
-                <p className="text-xs text-slate-500">Nombre maximum de colis que vous pouvez transporter sur ce trajet.</p>
+                <Label>Capacité équivalente (petits colis) <span className="text-red-500">*</span></Label>
+                <Input type="number" min={1} step={1} value={formData.placesColis} onChange={(e) => setFormField('placesColis', e.target.value)} placeholder="Ex: 10" className={fieldErrors.placesColis ? 'border-red-400' : ''} />
+                <p className="text-xs text-slate-500">Indication de volume en équivalent petits colis. Pour les colis volumineux, renseignez aussi la surface/poids ci-dessous.</p>
+                <FormFieldError message={fieldErrors.placesColis} />
               </div>
             </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Poids max utile (kg)</Label>
+                <Input
+                  type="number"
+                  min={20}
+                  max={20000}
+                  step={10}
+                  value={formData.capacitePoidsKg}
+                  onChange={(e) => setFormField('capacitePoidsKg', e.target.value)}
+                  placeholder="Ex: 600"
+                  className={fieldErrors.capacitePoidsKg ? 'border-red-400' : ''}
+                />
+                <FormFieldError message={fieldErrors.capacitePoidsKg} />
+              </div>
+              <div className="space-y-2">
+                <Label>Surface utile estimée (m2)</Label>
+                <Input
+                  type="number"
+                  min={0.5}
+                  max={100}
+                  step={0.1}
+                  value={formData.capaciteSurfaceM2}
+                  onChange={(e) => setFormField('capaciteSurfaceM2', e.target.value)}
+                  placeholder="Ex: 2.4"
+                  className={fieldErrors.capaciteSurfaceM2 ? 'border-red-400' : ''}
+                />
+                <p className="text-xs text-slate-500">Exemple utilitaire léger: 2.0 a 3.5 m2 utiles.</p>
+                <FormFieldError message={fieldErrors.capaciteSurfaceM2} />
+              </div>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Publication</Label>
+                <Select value={formData.recurrenceMode} onValueChange={(v) => setFormField('recurrenceMode', v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="SINGLE">Publication unique</SelectItem>
+                    <SelectItem value="DAILY">Navette quotidienne (auto)</SelectItem>
+                    <SelectItem value="WORKDAYS_DZ">Jours ouvrés DZ (sam-mer, hors jeu/ven)</SelectItem>
+                    <SelectItem value="CUSTOM_DAYS">Jours personnalisés</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {formData.recurrenceMode !== 'SINGLE' && (
+                <div className="space-y-2">
+                  <Label>Nombre de jours à générer</Label>
+                  <Input
+                    type="number"
+                    min={2}
+                    max={30}
+                    step={1}
+                    value={formData.recurrenceDays}
+                    onChange={(e) => setFormField('recurrenceDays', e.target.value)}
+                    className={fieldErrors.recurrenceDays ? 'border-red-400' : ''}
+                  />
+                  <p className="text-xs text-slate-500">
+                    {formData.recurrenceMode === 'WORKDAYS_DZ'
+                      ? 'Exemple: 7 pour générer 7 départs en jours ouvrés algériens (jeudi/vendredi exclus).'
+                      : 'Exemple: 7 pour publier automatiquement la navette des 7 prochains jours.'}
+                  </p>
+                  <FormFieldError message={fieldErrors.recurrenceDays} />
+                </div>
+              )}
+            </div>
+            {formData.recurrenceMode === 'CUSTOM_DAYS' && (
+              <div className="space-y-2">
+                <Label>Jours de départ</Label>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 md:grid-cols-7">
+                  {WEEKDAY_OPTIONS.map((day) => {
+                    const checked = formData.recurrenceWeekdays.includes(String(day.id));
+                    return (
+                      <label key={day.id} className="flex items-center gap-2 rounded border px-2 py-1 text-sm">
+                        <Checkbox
+                          checked={checked}
+                          onCheckedChange={(v) => toggleWeekday(String(day.id), Boolean(v))}
+                        />
+                        <span>{day.label}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+                <p className="text-xs text-slate-500">Tip: pour l'Algérie, évitez jeudi/vendredi si vous voulez uniquement les jours ouvrés.</p>
+                <FormFieldError message={fieldErrors.recurrenceWeekdays} />
+              </div>
+            )}
             <div className="space-y-2">
               <Label>Villes étapes (optionnel, séparées par des virgules)</Label>
-              <Input value={formData.villesEtapes} onChange={(e) => setFormData({ ...formData, villesEtapes: e.target.value })} placeholder="Ex: blida, medea" />
+              <Input value={formData.villesEtapes} onChange={(e) => setFormField('villesEtapes', e.target.value)} placeholder="Ex: blida, medea" className={fieldErrors.villesEtapes ? 'border-red-400' : ''} />
+              <FormFieldError message={fieldErrors.villesEtapes} />
             </div>
             <Button type="submit" disabled={isCreating} className="bg-emerald-600 hover:bg-emerald-700">
               {isCreating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
@@ -500,6 +802,16 @@ function TrajetsTab({ userId }: { userId: string }) {
                       {formatVillesEtapes(t.villesEtapes).length > 0 && (
                         <p className="text-xs text-slate-400">via {formatVillesEtapes(t.villesEtapes).join(', ')}</p>
                       )}
+                      <div className="mt-1">
+                        <Badge variant="outline" className="text-xs">
+                          Récurrence: {getRecurrenceLabel(t.recurrenceMode)}
+                        </Badge>
+                        {getRecurrenceDetails(t) && (
+                          <p className="mt-1 text-xs text-slate-500">
+                            Jours: {getRecurrenceDetails(t)}
+                          </p>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell className="text-sm">
                       {new Date(t.dateDepart).toLocaleString('fr-FR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'})}
@@ -507,6 +819,13 @@ function TrajetsTab({ userId }: { userId: string }) {
                     <TableCell>
                       <p className="font-medium">{Math.max((t.placesColis || 0) - (t.placesUtilisees || 0), 0)} dispo</p>
                       <p className="text-xs text-slate-500">Chargé {t.placesUtilisees}/{t.placesColis}</p>
+                      {(t.capacitePoidsKg || t.capaciteSurfaceM2) && (
+                        <p className="text-xs text-slate-500">
+                          {t.capacitePoidsKg ? `${t.capacitePoidsKg} kg` : ''}
+                          {t.capacitePoidsKg && t.capaciteSurfaceM2 ? ' · ' : ''}
+                          {t.capaciteSurfaceM2 ? `${t.capaciteSurfaceM2} m2` : ''}
+                        </p>
+                      )}
                     </TableCell>
                     <TableCell>
                       <Badge className={`${TRAJET_STATUS.find(s => s.id === t.status)?.color} text-white`}>
@@ -560,6 +879,26 @@ function MissionsTab({ userId, onRefreshStats }: { userId: string; onRefreshStat
   const [processingId, setProcessingId] = useState<string | null>(null);
 
   useEffect(() => { fetchMissions(); }, [userId]);
+
+  useEffect(() => {
+    if (!userId) return;
+
+    const intervalId = window.setInterval(() => {
+      fetchMissions();
+      onRefreshStats?.();
+    }, 15000);
+
+    const handleFocus = () => {
+      fetchMissions();
+      onRefreshStats?.();
+    };
+
+    window.addEventListener('focus', handleFocus);
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [userId, onRefreshStats]);
 
   const fetchMissions = async () => {
     try {
@@ -912,7 +1251,7 @@ function WalletTab({ userId }: { userId: string }) {
   useEffect(() => { fetchWallet(); }, [userId]);
 
   const handleWithdraw = async () => {
-    const amount = parseFloat(withdrawAmount);
+    const amount = parseLocaleFloat(withdrawAmount);
     if (!amount || amount <= 0) { toast({ title: 'Montant invalide', variant: 'destructive' }); return; }
     const available = wallet?.availableEarnings ?? 0;
     if (amount > available) {
@@ -1084,6 +1423,452 @@ function WalletTab({ userId }: { userId: string }) {
           )}
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+// Auto-assign Tab — Préférences & automation
+function AutoAssignTab({ userId }: { userId: string }) {
+  const { toast } = useToast();
+  const [prefs, setPrefs] = useState<any>(null);
+  const [status, setStatus] = useState<any>(null);
+  const [analytics, setAnalytics] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isTriggering, setIsTriggering] = useState(false);
+  const [cityInput, setCityInput] = useState('');
+  const [excludeInput, setExcludeInput] = useState('');
+  const [form, setForm] = useState({
+    autoAssignEnabled: false,
+    autoAssignSchedule: 'DAILY_8AM',
+    maxDailyMissions: 10,
+    maxActiveParallel: 5,
+    maxWeightKg: '',
+    acceptsCOD: true,
+    acceptsPriority: true,
+    acceptsBulk: false,
+    preferredCities: [] as string[],
+    excludedCities: [] as string[],
+    scoreWeightDistance: 30,
+    scoreWeightCapacity: 25,
+    scoreWeightTiming: 20,
+    scoreWeightEarnings: 25,
+  });
+
+  const fetchAll = async () => {
+    setIsLoading(true);
+    try {
+      const [prefsRes, statusRes, analyticsRes] = await Promise.all([
+        fetch('/api/transporters/preferences'),
+        fetch('/api/transporters/auto-assign'),
+        fetch(`/api/transporters/analytics?transporteurId=${userId}`),
+      ]);
+      const prefsData = await prefsRes.json();
+      const statusData = statusRes.ok ? await statusRes.json() : null;
+      const analyticsData = analyticsRes.ok ? await analyticsRes.json() : null;
+
+      if (prefsData && !prefsData.error) {
+        setPrefs(prefsData);
+        setForm({
+          autoAssignEnabled: prefsData.autoAssignEnabled ?? false,
+          autoAssignSchedule: prefsData.autoAssignSchedule || 'DAILY_8AM',
+          maxDailyMissions: prefsData.maxDailyMissions ?? 10,
+          maxActiveParallel: prefsData.maxActiveParallel ?? 5,
+          maxWeightKg: prefsData.maxWeightKg ? String(prefsData.maxWeightKg) : '',
+          acceptsCOD: prefsData.acceptsCOD ?? true,
+          acceptsPriority: prefsData.acceptsPriority ?? true,
+          acceptsBulk: prefsData.acceptsBulk ?? false,
+          preferredCities: prefsData.preferredCities ? JSON.parse(prefsData.preferredCities) : [],
+          excludedCities: prefsData.excludedCities ? JSON.parse(prefsData.excludedCities) : [],
+          scoreWeightDistance: prefsData.scoreWeightDistance ?? 30,
+          scoreWeightCapacity: prefsData.scoreWeightCapacity ?? 25,
+          scoreWeightTiming: prefsData.scoreWeightTiming ?? 20,
+          scoreWeightEarnings: prefsData.scoreWeightEarnings ?? 25,
+        });
+      }
+      setStatus(statusData);
+      setAnalytics(analyticsData);
+    } catch (err) {
+      console.error('Error fetching auto-assign data:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchAll(); }, [userId]);
+
+  const handleSave = async () => {
+    const totalWeight =
+      form.scoreWeightDistance + form.scoreWeightCapacity +
+      form.scoreWeightTiming + form.scoreWeightEarnings;
+    if (totalWeight <= 0) {
+      toast({ title: 'Erreur', description: 'La somme des poids de scoring doit être > 0', variant: 'destructive' });
+      return;
+    }
+    setIsSaving(true);
+    try {
+      const res = await fetch('/api/transporters/preferences', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...form,
+          maxWeightKg: form.maxWeightKg ? parseFloat(form.maxWeightKg) : null,
+        }),
+      });
+      if (res.ok) {
+        toast({ title: 'Préférences sauvegardées', description: form.autoAssignEnabled ? 'Auto-assign activé ✓' : 'Auto-assign désactivé' });
+        await fetchAll();
+      } else {
+        const data = await res.json();
+        toast({ title: 'Erreur', description: data.error || 'Impossible de sauvegarder', variant: 'destructive' });
+      }
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleTriggerNow = async () => {
+    setIsTriggering(true);
+    try {
+      const res = await fetch('/api/transporters/auto-assign', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ limit: form.maxDailyMissions }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast({
+          title: `${data.summary?.success ?? 0} colis assignés`,
+          description: `${data.summary?.failed ?? 0} échec(s) · ${data.summary?.activeMissions ?? 0} missions actives`,
+        });
+        await fetchAll();
+      } else {
+        toast({ title: 'Impossible de déclencher', description: data.error, variant: 'destructive' });
+      }
+    } finally {
+      setIsTriggering(false);
+    }
+  };
+
+  const addCity = (list: 'preferredCities' | 'excludedCities', value: string) => {
+    const city = value.trim();
+    if (!city) return;
+    if (form[list].includes(city)) return;
+    setForm(f => ({ ...f, [list]: [...f[list], city] }));
+    if (list === 'preferredCities') setCityInput('');
+    else setExcludeInput('');
+  };
+
+  const removeCity = (list: 'preferredCities' | 'excludedCities', city: string) => {
+    setForm(f => ({ ...f, [list]: f[list].filter(c => c !== city) }));
+  };
+
+  const scheduleLabel = (s: string) => {
+    if (s === 'DAILY_8AM') return 'Tous les jours à 8h';
+    if (s === 'DAILY_6PM') return 'Tous les jours à 18h';
+    if (s === 'WEEKLY') return 'Une fois par semaine (lundi)';
+    return 'Manuel uniquement';
+  };
+
+  if (isLoading) return <div className="flex justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-emerald-600" /></div>;
+
+  const totalScoreWeight = form.scoreWeightDistance + form.scoreWeightCapacity + form.scoreWeightTiming + form.scoreWeightEarnings;
+
+  return (
+    <div className="max-w-4xl mx-auto space-y-6">
+
+      {/* Statut en temps réel */}
+      <div className="grid gap-4 md:grid-cols-4">
+        <Card className={`border-2 ${form.autoAssignEnabled ? 'border-emerald-400 bg-emerald-50 dark:bg-emerald-900/20' : 'border-slate-200'}`}>
+          <CardContent className="pt-4 pb-4 text-center">
+            <Zap className={`h-6 w-6 mx-auto mb-1 ${form.autoAssignEnabled ? 'text-emerald-600' : 'text-slate-400'}`} />
+            <p className="text-xs font-medium">{form.autoAssignEnabled ? 'Auto-assign actif' : 'Auto-assign inactif'}</p>
+            <p className="text-xs text-slate-500 mt-0.5">{scheduleLabel(form.autoAssignSchedule)}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4 pb-4 text-center">
+            <Package className="h-6 w-6 mx-auto mb-1 text-blue-500" />
+            <p className="text-2xl font-bold text-blue-600">{status?.activeCount ?? '—'}</p>
+            <p className="text-xs text-slate-500">Missions actives</p>
+            <p className="text-xs text-slate-400">max {form.maxActiveParallel}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4 pb-4 text-center">
+            <Clock className="h-6 w-6 mx-auto mb-1 text-orange-500" />
+            <p className="text-2xl font-bold text-orange-600">{status?.todayCount ?? '—'}</p>
+            <p className="text-xs text-slate-500">Assignées aujourd'hui</p>
+            <p className="text-xs text-slate-400">max {form.maxDailyMissions}/jour</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4 pb-4 text-center">
+            <BarChart2 className="h-6 w-6 mx-auto mb-1 text-purple-500" />
+            <p className="text-2xl font-bold text-purple-600">{prefs?.successRate?.toFixed(0) ?? '100'}%</p>
+            <p className="text-xs text-slate-500">Taux de succès</p>
+            <p className="text-xs text-slate-400">{analytics?.totalCompleted ?? 0} livrées</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Activation */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><Zap className="h-5 w-5 text-emerald-600" />Activation & Programme</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between p-4 border-2 rounded-lg border-dashed">
+            <div>
+              <p className="font-semibold">Auto-assign activé</p>
+              <p className="text-sm text-slate-500">Reçoit automatiquement des colis selon vos préférences</p>
+            </div>
+            <button
+              onClick={() => setForm(f => ({ ...f, autoAssignEnabled: !f.autoAssignEnabled }))}
+              className={`relative w-12 h-6 rounded-full transition-colors ${form.autoAssignEnabled ? 'bg-emerald-500' : 'bg-slate-300'}`}
+            >
+              <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${form.autoAssignEnabled ? 'translate-x-6' : 'translate-x-0.5'}`} />
+            </button>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label>Fréquence d'attribution automatique</Label>
+              <Select value={form.autoAssignSchedule} onValueChange={(v) => setForm(f => ({ ...f, autoAssignSchedule: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="DAILY_8AM">Tous les jours à 8h du matin</SelectItem>
+                  <SelectItem value="DAILY_6PM">Tous les jours à 18h</SelectItem>
+                  <SelectItem value="WEEKLY">Une fois par semaine (lundi 8h)</SelectItem>
+                  <SelectItem value="MANUAL">Manuel uniquement</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Poids max accepté (kg, optionnel)</Label>
+              <Input
+                type="number"
+                min={1}
+                max={10000}
+                value={form.maxWeightKg}
+                onChange={(e) => setForm(f => ({ ...f, maxWeightKg: e.target.value }))}
+                placeholder="Ex: 80 (laisser vide = illimité)"
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label>Maximum de missions par jour</Label>
+              <Input
+                type="number" min={1} max={100}
+                value={form.maxDailyMissions}
+                onChange={(e) => setForm(f => ({ ...f, maxDailyMissions: parseInt(e.target.value) || 10 }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Maximum de missions en parallèle</Label>
+              <Input
+                type="number" min={1} max={50}
+                value={form.maxActiveParallel}
+                onChange={(e) => setForm(f => ({ ...f, maxActiveParallel: parseInt(e.target.value) || 5 }))}
+              />
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-4">
+            {[
+              { key: 'acceptsCOD', label: 'Accepter paiement à la livraison (COD)' },
+              { key: 'acceptsPriority', label: 'Accepter colis prioritaires (clients Pro)' },
+              { key: 'acceptsBulk', label: 'Accepter expéditions groupées (bulk)' },
+            ].map(({ key, label }) => (
+              <label key={key} className="flex items-center gap-2 text-sm cursor-pointer select-none">
+                <Checkbox
+                  checked={(form as any)[key]}
+                  onCheckedChange={(v) => setForm(f => ({ ...f, [key]: Boolean(v) }))}
+                />
+                {label}
+              </label>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Géographie */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><MapPin className="h-5 w-5 text-blue-600" />Zones préférées</CardTitle>
+          <CardDescription>Optimisez votre attribution en définissant vos zones</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label>Villes préférées</Label>
+            <div className="flex gap-2">
+              <Input
+                value={cityInput}
+                onChange={(e) => setCityInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addCity('preferredCities', cityInput))}
+                placeholder="Ex: Alger, Oran, Blida…"
+              />
+              <Button variant="outline" onClick={() => addCity('preferredCities', cityInput)}>Ajouter</Button>
+            </div>
+            <div className="flex flex-wrap gap-2 mt-2">
+              {form.preferredCities.map(city => (
+                <Badge key={city} className="bg-emerald-100 text-emerald-700 gap-1 pr-1">
+                  {city}
+                  <button onClick={() => removeCity('preferredCities', city)} className="ml-1 hover:text-red-600"><X className="h-3 w-3" /></button>
+                </Badge>
+              ))}
+              {form.preferredCities.length === 0 && <p className="text-sm text-slate-400">Aucune ville préférée (toutes les villes acceptées)</p>}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Villes exclues</Label>
+            <div className="flex gap-2">
+              <Input
+                value={excludeInput}
+                onChange={(e) => setExcludeInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addCity('excludedCities', excludeInput))}
+                placeholder="Villes à éviter absolument…"
+              />
+              <Button variant="outline" onClick={() => addCity('excludedCities', excludeInput)}>Exclure</Button>
+            </div>
+            <div className="flex flex-wrap gap-2 mt-2">
+              {form.excludedCities.map(city => (
+                <Badge key={city} className="bg-red-100 text-red-700 gap-1 pr-1">
+                  {city}
+                  <button onClick={() => removeCity('excludedCities', city)} className="ml-1 hover:text-red-800"><X className="h-3 w-3" /></button>
+                </Badge>
+              ))}
+              {form.excludedCities.length === 0 && <p className="text-sm text-slate-400">Aucune ville exclue</p>}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Scoring weights */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><Settings className="h-5 w-5 text-slate-600" />Critères de priorité</CardTitle>
+          <CardDescription>
+            Définissez ce qui compte le plus dans l'attribution (total : <span className={totalScoreWeight === 0 ? 'text-red-500 font-bold' : 'font-bold'}>{totalScoreWeight}</span>)
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {totalScoreWeight === 0 && (
+            <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              La somme des critères doit être supérieure à 0
+            </div>
+          )}
+          {[
+            { key: 'scoreWeightDistance', label: 'Distance route', desc: 'Préférer les routes directes' },
+            { key: 'scoreWeightCapacity', label: 'Capacité disponible', desc: 'Préférer les trajets avec place' },
+            { key: 'scoreWeightTiming', label: 'Timing départ', desc: 'Préférer les départs proches' },
+            { key: 'scoreWeightEarnings', label: 'Potentiel de gains', desc: 'Préférer les colis mieux rémunérés' },
+          ].map(({ key, label, desc }) => (
+            <div key={key} className="space-y-1">
+              <div className="flex justify-between">
+                <div>
+                  <Label className="text-sm">{label}</Label>
+                  <p className="text-xs text-slate-400">{desc}</p>
+                </div>
+                <span className="font-mono font-bold text-sm w-8 text-right">{(form as any)[key]}</span>
+              </div>
+              <input
+                type="range" min={0} max={100} step={5}
+                value={(form as any)[key]}
+                onChange={(e) => setForm(f => ({ ...f, [key]: parseInt(e.target.value) }))}
+                className="w-full accent-emerald-600"
+              />
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+
+      {/* Analytics */}
+      {analytics && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2"><BarChart2 className="h-5 w-5 text-purple-600" />Analytics auto-assign</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4 md:grid-cols-3">
+              <div className="text-center p-4 bg-slate-50 dark:bg-slate-800 rounded-lg">
+                <p className="text-3xl font-bold text-emerald-600">{analytics.totalAssigned ?? 0}</p>
+                <p className="text-sm text-slate-500 mt-1">Colis assignés (total)</p>
+              </div>
+              <div className="text-center p-4 bg-slate-50 dark:bg-slate-800 rounded-lg">
+                <p className="text-3xl font-bold text-blue-600">{analytics.totalCompleted ?? 0}</p>
+                <p className="text-sm text-slate-500 mt-1">Livrés avec succès</p>
+              </div>
+              <div className="text-center p-4 bg-slate-50 dark:bg-slate-800 rounded-lg">
+                <p className="text-3xl font-bold text-purple-600">{analytics.avgEarningsPerMission?.toFixed(0) ?? 0} DA</p>
+                <p className="text-sm text-slate-500 mt-1">Gain moyen/mission</p>
+              </div>
+            </div>
+
+            {analytics.topRoutes && analytics.topRoutes.length > 0 && (
+              <div className="mt-4">
+                <p className="text-sm font-semibold text-slate-600 mb-2">Routes les plus fréquentes</p>
+                <div className="space-y-2">
+                  {analytics.topRoutes.slice(0, 5).map((r: any, i: number) => (
+                    <div key={i} className="flex items-center justify-between text-sm">
+                      <span>{r.villeDepart} → {r.villeArrivee}</span>
+                      <Badge variant="outline">{r.count} missions</Badge>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {analytics.monthlyStats && analytics.monthlyStats.length > 0 && (
+              <div className="mt-4">
+                <p className="text-sm font-semibold text-slate-600 mb-2">Missions par mois</p>
+                <div className="space-y-1">
+                  {analytics.monthlyStats.map((m: any) => {
+                    const max = Math.max(...analytics.monthlyStats.map((x: any) => x.count), 1);
+                    return (
+                      <div key={m.month} className="flex items-center gap-3">
+                        <span className="text-xs text-slate-500 w-16 shrink-0">{m.month}</span>
+                        <div className="flex-1 bg-slate-100 dark:bg-slate-700 rounded-full h-2.5">
+                          <div className="bg-emerald-500 h-2.5 rounded-full" style={{ width: `${(m.count / max) * 100}%` }} />
+                        </div>
+                        <span className="text-xs font-semibold w-8 text-right">{m.count}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {status?.lastCheck && (
+              <p className="text-xs text-slate-400 mt-4">
+                Dernière vérification : {new Date(status.lastCheck).toLocaleString('fr-FR')}
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Actions */}
+      <div className="flex flex-wrap gap-3">
+        <Button onClick={handleSave} disabled={isSaving || totalScoreWeight === 0} className="bg-emerald-600 hover:bg-emerald-700">
+          {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+          Enregistrer les préférences
+        </Button>
+        {form.autoAssignEnabled && (
+          <Button variant="outline" onClick={handleTriggerNow} disabled={isTriggering || !status?.canAssignMore}>
+            {isTriggering ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Zap className="h-4 w-4 mr-2" />}
+            Déclencher maintenant
+          </Button>
+        )}
+        <Button variant="ghost" onClick={fetchAll} disabled={isLoading}>
+          <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+          Actualiser
+        </Button>
+      </div>
     </div>
   );
 }

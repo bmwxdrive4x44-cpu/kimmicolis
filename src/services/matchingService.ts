@@ -7,6 +7,7 @@
  */
 
 import { db } from '@/lib/db';
+import { createNotificationDedup } from '@/lib/notifications';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -15,6 +16,7 @@ import { db } from '@/lib/db';
 export interface TrajetWithCapacity {
   id: string;
   transporteurId: string;
+  lineId?: string | null;
   villeDepart: string;
   villeArrivee: string;
   villesEtapes: string[]; // Toujours un tableau (normalisé depuis JSON)
@@ -62,6 +64,7 @@ export interface AutoAssignResult {
 
 type AutoAssignableColis = {
   id: string;
+  lineId?: string | null;
   villeDepart: string;
   villeArrivee: string;
   clientId: string;
@@ -236,15 +239,17 @@ async function getActiveMissionCountMap(transporteurIds: string[]): Promise<Map<
 }
 
 export async function getRankedTrajetsForRoute(params: {
+  lineId?: string | null;
   villeDepart: string;
   villeArrivee: string;
 }): Promise<RankedTrajet[]> {
-  const { villeDepart, villeArrivee } = params;
+  const { lineId, villeDepart, villeArrivee } = params;
 
   const rawTrajets = await db.trajet.findMany({
     where: {
       status: 'PROGRAMME',
       dateDepart: { gte: new Date() },
+      ...(lineId ? { lineId } : {}),
     },
     include: {
       transporteur: { select: { id: true, name: true, phone: true, email: true } },
@@ -307,16 +312,17 @@ export async function getRankedTrajetsForRoute(params: {
  */
 export async function matchColisToTrajets(colis: {
   id: string;
+  lineId?: string | null;
   villeDepart: string;
   villeArrivee: string;
   clientId: string;
   status: string;
 }): Promise<MatchColisResult> {
-  const eligibleStatuses = ['CREATED', 'PAID', 'PAID_RELAY', 'DEPOSITED_RELAY', 'RECU_RELAIS'];
+  const eligibleStatuses = ['PAID', 'PAID_RELAY', 'DEPOSITED_RELAY', 'RECU_RELAIS'];
   if (!eligibleStatuses.includes(colis.status)) {
     return {
       success: false,
-      error: `Le colis est dans un statut non éligible au matching: ${colis.status}`,
+      error: `Paiement requis avant matching (statut actuel: ${colis.status})`,
     };
   }
 
@@ -335,6 +341,7 @@ export async function matchColisToTrajets(colis: {
   }
 
   const rankedTrajets = await getRankedTrajetsForRoute({
+    lineId: colis.lineId,
     villeDepart: colis.villeDepart,
     villeArrivee: colis.villeArrivee,
   });
@@ -406,16 +413,26 @@ export async function matchColisToTrajets(colis: {
 
   // Notifier le client
   try {
-    await db.notification.create({
-      data: {
-        userId: colis.clientId,
-        title: 'Votre colis a été assigné',
-        message: `Un transporteur a été trouvé pour votre colis ${colis.villeDepart} → ${colis.villeArrivee}.`,
-        type: 'IN_APP',
-      },
+    await createNotificationDedup({
+      userId: colis.clientId,
+      title: 'Votre colis a été assigné',
+      message: `Un transporteur a été trouvé pour votre colis ${colis.villeDepart} → ${colis.villeArrivee}.`,
+      type: 'IN_APP',
     });
   } catch (error) {
     console.error('Notification matching non envoyée:', error);
+  }
+
+  // Notifier le transporteur
+  try {
+    await createNotificationDedup({
+      userId: trajet.transporteurId,
+      title: 'Nouvelle mission assignée',
+      message: `Nouveau colis à prendre en charge: ${colis.villeDepart} → ${colis.villeArrivee}. La mission est disponible dans votre dashboard transporteur.`,
+      type: 'IN_APP',
+    });
+  } catch (error) {
+    console.error('Notification transporteur non envoyee:', error);
   }
 
   return {
@@ -431,7 +448,7 @@ export async function matchColisToTrajets(colis: {
 export async function autoAssignUnmatchedColis(limit = 50): Promise<AutoAssignResult> {
   const safeLimit = Number.isFinite(limit) ? Math.max(1, Math.min(limit, 200)) : 50;
 
-  const eligibleStatuses = ['CREATED', 'PAID', 'PAID_RELAY', 'DEPOSITED_RELAY', 'RECU_RELAIS'];
+  const eligibleStatuses = ['PAID', 'PAID_RELAY', 'DEPOSITED_RELAY', 'RECU_RELAIS'];
 
   const baseColisWhere = {
     status: { in: eligibleStatuses },
@@ -470,7 +487,6 @@ export async function autoAssignUnmatchedColis(limit = 50): Promise<AutoAssignRe
       case 'PAID_RELAY':
       case 'PAID':
         return 2;
-      case 'CREATED':
       default:
         return 1;
     }
@@ -492,6 +508,7 @@ export async function autoAssignUnmatchedColis(limit = 50): Promise<AutoAssignRe
     where: baseColisWhere,
     select: {
       id: true,
+      lineId: true,
       villeDepart: true,
       villeArrivee: true,
       clientId: true,

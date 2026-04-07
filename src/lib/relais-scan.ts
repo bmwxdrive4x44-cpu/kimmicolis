@@ -1,5 +1,6 @@
 import { db } from '@/lib/db';
 import { RELAY_BLOCK_THRESHOLD_DA } from '@/lib/constants';
+import { extractTrackingFromQrPayload } from '@/lib/qr-payload';
 
 export type RelayScanError = {
   error: string;
@@ -17,24 +18,12 @@ export function resolveTrackingNumber(
   trackingNumber: unknown,
   qrData: unknown
 ): string | undefined {
-  if (typeof trackingNumber === 'string' && trackingNumber.trim()) {
-    return trackingNumber.trim();
+  const directTracking = extractTrackingFromQrPayload(trackingNumber);
+  if (directTracking) {
+    return directTracking;
   }
 
-  if (typeof qrData !== 'string' || !qrData.trim()) {
-    return undefined;
-  }
-
-  try {
-    const parsed = JSON.parse(qrData);
-    if (typeof parsed?.tracking === 'string' && parsed.tracking.trim()) {
-      return parsed.tracking.trim();
-    }
-  } catch {
-    // Fallback: qrData can be plain tracking text
-  }
-
-  return qrData.trim();
+  return extractTrackingFromQrPayload(qrData);
 }
 
 /**

@@ -5,7 +5,10 @@ import { checkRateLimit, RATE_LIMIT_PRESETS } from '@/lib/ratelimit';
 import { requireRole, verifyJWT } from '@/lib/rbac';
 import { generateQRCodeImage, buildQRCodePayload } from '@/lib/qrcode';
 import { calculateDynamicParcelPricing, estimateSafeDistanceKmByWilayas } from '@/lib/pricing';
+import { evaluateImplicitProEligibility } from '@/lib/pro-eligibility';
+import { getImplicitLoyaltyConfig } from '@/lib/loyalty-config';
 import { createHash } from 'crypto';
+import { findActiveLineByCities } from '@/lib/logistics';
 
 function normalizePhone(value: string): string {
   return value.replace(/\s+/g, '').replace(/[^+\d]/g, '');
@@ -21,6 +24,36 @@ function generateWithdrawalCode(length: 4 | 6 = 6): string {
   return String(Math.floor(Math.random() * (max - min + 1)) + min);
 }
 
+function parseVillesEtapes(value: unknown): string[] {
+  if (!value) return [];
+  if (Array.isArray(value)) return value.map((item) => String(item).trim()).filter(Boolean);
+  if (typeof value !== 'string') return [];
+
+  const raw = value.trim();
+  if (!raw) return [];
+
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      return parsed.map((item) => String(item).trim()).filter(Boolean);
+    }
+  } catch {
+    // fallback CSV
+  }
+
+  return raw.split(',').map((item) => item.trim()).filter(Boolean);
+}
+
+function trajetSupportsParcel(
+  trajet: { villeDepart: string; villeArrivee: string; villesEtapes?: unknown },
+  parcel: { villeDepart: string; villeArrivee: string }
+) {
+  const itinerary = [trajet.villeDepart, ...parseVillesEtapes(trajet.villesEtapes), trajet.villeArrivee];
+  const depIndex = itinerary.indexOf(parcel.villeDepart);
+  const arrIndex = itinerary.indexOf(parcel.villeArrivee);
+  return depIndex >= 0 && arrIndex > depIndex;
+}
+
 async function getPricingConfig() {
   const keys = [
     'pricingAdminFee',
@@ -28,6 +61,7 @@ async function getPricingConfig() {
     'pricingRatePerKm',
     'pricingRelayDepartureRate',
     'pricingRelayArrivalRate',
+    'pricingRelayPrintFee',
     'pricingRoundTo',
   ];
 
@@ -45,6 +79,7 @@ async function getPricingConfig() {
     ratePerKm: getNumber('pricingRatePerKm', 2.5),
     relayDepartureRate: getNumber('pricingRelayDepartureRate', 0.1),
     relayArrivalRate: getNumber('pricingRelayArrivalRate', 0.1),
+    relayPrintFee: getNumber('pricingRelayPrintFee', 30),
     roundTo: getNumber('pricingRoundTo', 10),
   };
 }
@@ -105,9 +140,10 @@ export async function GET(request: NextRequest) {
       where.status = status;
     } else if (available === 'true') {
       // Show parcels available for transport: deposited at relay (new + legacy statuses)
-      where.status = { in: ['DEPOSITED_RELAY', 'RECU_RELAIS', 'PAID_RELAY'] };
+      where.status = { in: ['DEPOSITED_RELAY', 'WAITING_PICKUP', 'READY_FOR_DEPOSIT', 'RECU_RELAIS', 'PAID_RELAY'] };
       // Only parcels without an active mission
       where.missions = { none: { status: { in: ['ASSIGNE', 'PICKED_UP'] } } };
+      where.lineId = { not: null };
     }
     if (tracking) {
       where.trackingNumber = tracking;
@@ -116,6 +152,7 @@ export async function GET(request: NextRequest) {
     const parcels = await db.colis.findMany({
       where,
       include: {
+        line: true,
         client: {
           select: { id: true, name: true, email: true, phone: true },
         },
@@ -134,6 +171,29 @@ export async function GET(request: NextRequest) {
       },
       orderBy: { createdAt: 'desc' },
     });
+
+    if (available === 'true' && payload.role === 'TRANSPORTER') {
+      const futureTrajets = await db.trajet.findMany({
+        where: {
+          transporteurId: payload.id,
+          status: 'PROGRAMME',
+          dateDepart: { gte: new Date() },
+        },
+        select: { lineId: true, villeDepart: true, villeArrivee: true, villesEtapes: true },
+      });
+
+      return NextResponse.json(
+        parcels.filter((parcel) =>
+          futureTrajets.some((trajet) => {
+            if (parcel.lineId && trajet.lineId && parcel.lineId !== trajet.lineId) {
+              return false;
+            }
+
+            return trajetSupportsParcel(trajet, parcel);
+          })
+        )
+      );
+    }
 
     return NextResponse.json(parcels);
   } catch (error) {
@@ -181,6 +241,7 @@ export async function POST(request: NextRequest) {
       recipientFirstName,
       recipientLastName,
       recipientPhone,
+      labelPrintMode,
       withdrawalCode,
       relaisDepartId,
       relaisArriveeId,
@@ -227,11 +288,11 @@ export async function POST(request: NextRequest) {
 
     // Check if relais are operational
     const [relaisDepart, relaisArrivee] = await Promise.all([
-      db.relais.findUnique({ where: { id: relaisDepartId }, select: { operationalStatus: true, suspensionReason: true } }),
-      db.relais.findUnique({ where: { id: relaisArriveeId }, select: { operationalStatus: true, suspensionReason: true } }),
+      db.relais.findUnique({ where: { id: relaisDepartId }, select: { ville: true, status: true, operationalStatus: true, suspensionReason: true } }),
+      db.relais.findUnique({ where: { id: relaisArriveeId }, select: { ville: true, status: true, operationalStatus: true, suspensionReason: true } }),
     ]);
 
-    if (!relaisDepart || relaisDepart.operationalStatus === 'SUSPENDU') {
+    if (!relaisDepart || relaisDepart.status !== 'APPROVED' || relaisDepart.operationalStatus === 'SUSPENDU') {
       return NextResponse.json(
         { 
           error: 'Relais de départ suspendu', 
@@ -241,7 +302,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!relaisArrivee || relaisArrivee.operationalStatus === 'SUSPENDU') {
+    if (!relaisArrivee || relaisArrivee.status !== 'APPROVED' || relaisArrivee.operationalStatus === 'SUSPENDU') {
       return NextResponse.json(
         { 
           error: 'Relais d\'arrivée suspendu', 
@@ -251,10 +312,33 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (relaisDepart.ville !== villeDepart || relaisArrivee.ville !== villeArrivee) {
+      return NextResponse.json(
+        { error: 'Les relais sélectionnés ne correspondent pas aux villes choisies' },
+        { status: 400 }
+      );
+    }
+
+    const activeLine = await findActiveLineByCities(villeDepart, villeArrivee);
+    if (!activeLine) {
+      return NextResponse.json(
+        { error: 'Aucune ligne active n\'est disponible pour cet itinéraire' },
+        { status: 400 }
+      );
+    }
+
     const effectiveWithdrawalCode = String(withdrawalCode ?? generateWithdrawalCode(6));
     if (!/^\d{4}$|^\d{6}$/.test(effectiveWithdrawalCode)) {
       return NextResponse.json(
         { error: 'Le code de retrait doit contenir 4 ou 6 chiffres' },
+        { status: 400 }
+      );
+    }
+
+    const normalizedLabelPrintMode = String(labelPrintMode || 'HOME').toUpperCase();
+    if (!['HOME', 'RELAY'].includes(normalizedLabelPrintMode)) {
+      return NextResponse.json(
+        { error: 'Mode impression invalide (HOME ou RELAY)' },
         { status: 400 }
       );
     }
@@ -275,20 +359,35 @@ export async function POST(request: NextRequest) {
       roundTo: pricingConfig.roundTo,
     });
 
-    const prixClient = dynamic.clientPrice;
+    const relayPrintFee = normalizedLabelPrintMode === 'RELAY' ? pricingConfig.relayPrintFee : 0;
+  const baseClientPriceWithPrint = dynamic.clientPrice + relayPrintFee;
+  const eligibility = await evaluateImplicitProEligibility(clientId);
+  const loyaltyConfig = await getImplicitLoyaltyConfig();
+  const implicitDiscountRate = eligibility.eligible ? loyaltyConfig.discountRate : 0;
+  const implicitDiscountAmount = Math.round(baseClientPriceWithPrint * implicitDiscountRate);
+  const prixClient = baseClientPriceWithPrint - implicitDiscountAmount;
     const netTransporteur = dynamic.netTransporteur;
-    const relayFee = dynamic.relayCommissionTotal;
+    const relayFee = dynamic.relayCommissionTotal + relayPrintFee;
     const platformFee = dynamic.platformMargin;
     const pricingBreakdown: Record<string, unknown> = {
       model: 'dynamic',
       ...dynamic,
       estimatedDistanceKm,
+      labelPrintMode: normalizedLabelPrintMode,
+      relayPrintFee,
+      baseClientPrice: dynamic.clientPrice,
+      baseClientPriceWithPrint,
+      implicitProEligible: eligibility.eligible,
+      implicitProDiscountRate: implicitDiscountRate,
+      implicitProDiscountAmount: implicitDiscountAmount,
+      finalClientPrice: prixClient,
     };
 
     // Generate tracking number and QR code
     const trackingNumber = generateTrackingNumber();
-    const qrCode = generateQRData(trackingNumber);
-    const qrPayload = buildQRCodePayload(trackingNumber);
+    const requestOrigin = new URL(request.url).origin;
+    const qrCode = generateQRData(trackingNumber, requestOrigin);
+    const qrPayload = buildQRCodePayload(trackingNumber, requestOrigin);
     const qrCodeImage = await generateQRCodeImage(qrPayload);
 
     // Create parcel
@@ -296,6 +395,7 @@ export async function POST(request: NextRequest) {
       data: {
         trackingNumber,
         clientId,
+        lineId: activeLine.id,
         senderFirstName: senderFirstName.trim(),
         senderLastName: senderLastName.trim(),
         senderPhone: normalizedSenderPhone,
@@ -326,13 +426,21 @@ export async function POST(request: NextRequest) {
         colisId: colis.id,
         status: 'CREATED',
         location: villeDepart,
-        notes: 'Colis créé',
+        notes: `Colis créé (impression ${normalizedLabelPrintMode === 'RELAY' ? 'au relais' : 'à domicile'}) et placé dans la file d'attente de la ligne ${activeLine.villeDepart} → ${activeLine.villeArrivee}`,
       },
     });
+
+    try {
+      await evaluateImplicitProEligibility(clientId);
+    } catch (eligibilityError) {
+      console.error('[implicit-pro] post-create evaluation failed:', eligibilityError);
+    }
 
     return NextResponse.json({
       ...colis,
       withdrawalCode: effectiveWithdrawalCode,
+      labelPrintMode: normalizedLabelPrintMode,
+      relayPrintFee,
       pricingBreakdown,
     });
   } catch (error) {

@@ -1,8 +1,9 @@
-const { PrismaClient } = require('@prisma/client');
-
-const db = new PrismaClient();
+let db;
 
 (async () => {
+  const { PrismaClient } = await import('@prisma/client');
+  db = new PrismaClient();
+
   const total = await db.ligne.count();
   const rows = await db.ligne.findMany({
     select: { villeDepart: true, villeArrivee: true },

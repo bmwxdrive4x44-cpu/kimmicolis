@@ -118,7 +118,9 @@
   }
   body {
     @apply bg-background text-foreground;
-    background-image: url('/images/hero-delivery.png');
+    background-image:
+      linear-gradient(to bottom, oklch(1 0 0 / 0.82), oklch(1 0 0 / 0.9)),
+      url('/images/hero-algeria-relay.svg');
     background-size: cover;
     background-position: center;
     background-attachment: fixed;

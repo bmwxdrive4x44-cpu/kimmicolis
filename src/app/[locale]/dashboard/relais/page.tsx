@@ -4,9 +4,19 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useSession } from 'next-auth/react';
 import { useLocale } from 'next-intl';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Link } from '@/i18n/routing';
 import { Header } from '@/components/layout/header';
 import { Footer } from '@/components/layout/footer';
+import {
+  DashboardHero,
+  DashboardMetricCard,
+  DashboardPanel,
+  DashboardShell,
+  DashboardStatsGrid,
+  dashboardTabsListClass,
+  getDashboardTabsTriggerClass,
+} from '@/components/dashboard/dashboard-shell';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
@@ -15,8 +25,11 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { WILAYAS, PARCEL_STATUS, RELAIS_STATUS, DEFAULT_RELAY_COMMISSION, RELAY_CASH_ALERT_THRESHOLD } from '@/lib/constants';
-import { Store, Package, QrCode, DollarSign, Loader2, CheckCircle, Clock, Scan, ArrowDownToLine, ArrowUpFromLine, Settings, BarChart3, AlertCircle, Save, AlertTriangle, CreditCard, History, BanknoteIcon, User, Pencil, TrendingUp } from 'lucide-react';
+import { parseLocaleFloat } from '@/lib/utils';
+import { extractTrackingFromQrPayload } from '@/lib/qr-payload';
+import { Store, Package, QrCode, DollarSign, Loader2, CheckCircle, Clock, Scan, ArrowDownToLine, ArrowUpFromLine, Settings, BarChart3, AlertCircle, Save, AlertTriangle, CreditCard, History, BanknoteIcon, User, Pencil, TrendingUp, Printer, CircleHelp } from 'lucide-react';
 import { isAlgerianCommerceRegisterNumber } from '@/lib/validators';
+import { QrCameraScanner } from '@/components/ui/qr-camera-scanner';
 import { useToast } from '@/hooks/use-toast';
 
 function getRoleBasedDashboardPath(role: string, locale: string): string {
@@ -24,6 +37,7 @@ function getRoleBasedDashboardPath(role: string, locale: string): string {
     case 'ADMIN': return `/${locale}/dashboard/admin`;
     case 'TRANSPORTER': return `/${locale}/dashboard/transporter`;
     case 'RELAIS': return `/${locale}/dashboard/relais`;
+    case 'ENSEIGNE': return `/${locale}/dashboard/enseigne`;
     default: return `/${locale}/dashboard/client`;
   }
 }
@@ -48,6 +62,17 @@ export default function RelaisDashboard() {
   const [cashInfo, setCashInfo] = useState({ cashCollected: 0, cashReversed: 0, balance: 0, totalCommissions: 0 });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [printerStatus, setPrinterStatus] = useState<'READY' | 'BROKEN' | 'OUT_OF_PAPER' | 'NOT_EQUIPPED'>('READY');
+
+  const printerStatusMeta = useMemo(() => {
+    const map = {
+      READY: { label: 'Imprimante: prête', className: 'bg-emerald-600 text-white' },
+      OUT_OF_PAPER: { label: 'Imprimante: plus de papier', className: 'bg-amber-500 text-white' },
+      BROKEN: { label: 'Imprimante: en panne', className: 'bg-red-600 text-white' },
+      NOT_EQUIPPED: { label: 'Imprimante: non équipée', className: 'bg-slate-500 text-white' },
+    } as const;
+    return map[printerStatus] || map.READY;
+  }, [printerStatus]);
 
   // Simple redirect if not authenticated
   useEffect(() => {
@@ -82,6 +107,15 @@ export default function RelaisDashboard() {
         ]);
         if (statsRes?.ok) setStats(await statsRes.json());
         if (cashRes?.ok) setCashInfo(await cashRes.json());
+
+        const printerRes = await fetch('/api/relais/printers').catch(() => null);
+        if (printerRes?.ok) {
+          const printerData = await printerRes.json();
+          const current = Array.isArray(printerData?.printers) ? printerData.printers[0] : null;
+          if (current?.printerStatus) {
+            setPrinterStatus(current.printerStatus);
+          }
+        }
       } else {
         console.warn('[Relais Dashboard] Aucun relais trouvé pour cet utilisateur');
         router.push(`/${locale}/complete-profile/relais`);
@@ -101,6 +135,7 @@ export default function RelaisDashboard() {
         const paths: Record<string, string> = {
           'ADMIN': `/${locale}/dashboard/admin`,
           'TRANSPORTER': `/${locale}/dashboard/transporter`,
+          'ENSEIGNE': `/${locale}/dashboard/enseigne`,
           'CLIENT': `/${locale}/dashboard/client`,
         };
         window.location.href = paths[session.user.role] || `/${locale}/dashboard/client`;
@@ -149,33 +184,38 @@ export default function RelaisDashboard() {
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-900">
       <Header />
-      <main className="flex-1 container px-4 py-8">
-        <div className="mb-6 flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Espace Point Relais</h1>
-            <p className="text-slate-600 dark:text-slate-400 mt-1 flex items-center gap-2">
-              <Store className="h-4 w-4" />
-              {relaisInfo?.commerceName || session.user.name}
-              {relaisInfo && (
-                <Badge className={`${RELAIS_STATUS.find(s => s.id === relaisInfo.status)?.color} text-white ml-2`}>
-                  {RELAIS_STATUS.find(s => s.id === relaisInfo.status)?.label}
-                </Badge>
-              )}
-            </p>
-          </div>
-        </div>
+      <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8">
+        <DashboardShell tone="relais" className="mx-auto max-w-7xl">
+          <DashboardHero
+            tone="relais"
+            eyebrow="Point relais"
+            title="Espace Point Relais"
+            description="Centralisez les scans, la caisse et le suivi opérationnel dans une interface plus structurée, plus lumineuse et plus lisible au quotidien."
+            meta={
+              <>
+                <Badge variant="outline" className="border-white/70 bg-white/70 text-slate-700 flex items-center gap-2"><Store className="h-3.5 w-3.5" />{relaisInfo?.commerceName || session.user.name}</Badge>
+                {relaisInfo ? (
+                  <Badge className={`${RELAIS_STATUS.find(s => s.id === relaisInfo.status)?.color} text-white`}>
+                    {RELAIS_STATUS.find(s => s.id === relaisInfo.status)?.label}
+                  </Badge>
+                ) : null}
+                <Badge className={printerStatusMeta.className}>{printerStatusMeta.label}</Badge>
+                <Link href="/faq" className="inline-flex items-center gap-1 text-xs text-white/80 hover:text-white underline underline-offset-2"><CircleHelp className="h-3.5 w-3.5" />Aide / FAQ</Link>
+              </>
+            }
+          />
 
-        {/* Error Banner */}
-        {error && (
-          <Card className="mb-6 border-red-200 bg-red-50 dark:bg-red-900/20">
-            <CardContent className="py-4">
-              <div className="flex items-center gap-3">
-                <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0" />
-                <p className="text-red-700 dark:text-red-400">{error}</p>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+          {/* Error Banner */}
+          {error && (
+            <Card className="border-red-200 bg-red-50/90 dark:bg-red-900/20">
+              <CardContent className="py-4">
+                <div className="flex items-center gap-3">
+                  <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0" />
+                  <p className="text-red-700 dark:text-red-400">{error}</p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
         {relaisInfo?.status === 'PENDING' && (
           <Card className="mb-6 border-orange-200 bg-orange-50 dark:bg-orange-900/20">
@@ -198,7 +238,7 @@ export default function RelaisDashboard() {
                 <AlertCircle className="h-6 w-6 text-red-600" />
                 <div>
                   <p className="font-semibold text-red-700">Inscription refusée</p>
-                  <p className="text-sm text-red-600">Veuillez contacter le support pour plus d'informations</p>
+                  <p className="text-sm text-red-600">Veuillez contacter le support pour plus d'informations. <Link href="/faq" className="underline font-medium">Consulter la FAQ</Link></p>
                 </div>
               </div>
             </CardContent>
@@ -219,53 +259,14 @@ export default function RelaisDashboard() {
           </Card>
         )}
 
-        {/* Stats Cards */}
-        <div className="grid gap-4 md:grid-cols-4 mb-8">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">En attente</CardTitle>
-              <Clock className="h-4 w-4 text-orange-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.pending}</div>
-              <p className="text-xs text-slate-500">colis à traiter</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Reçus / Déposés</CardTitle>
-              <ArrowDownToLine className="h-4 w-4 text-blue-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.received}</div>
-              <p className="text-xs text-slate-500">total reçus</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Cash en main</CardTitle>
-              <BanknoteIcon className="h-4 w-4 text-emerald-500" />
-            </CardHeader>
-            <CardContent>
-              <div className={`text-2xl font-bold ${cashInfo.balance >= RELAY_CASH_ALERT_THRESHOLD ? 'text-red-600' : 'text-emerald-600'}`}>
-                {cashInfo.balance.toFixed(0)} DA
-              </div>
-              <p className="text-xs text-slate-500">à reverser</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Commissions</CardTitle>
-              <DollarSign className="h-4 w-4 text-emerald-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-emerald-600">{cashInfo.totalCommissions.toFixed(0)} DA</div>
-              <p className="text-xs text-slate-500">total gagné</p>
-            </CardContent>
-          </Card>
-        </div>
+          <DashboardStatsGrid>
+            <DashboardMetricCard tone="relais" label="En attente" value={stats.pending} icon={<Clock className="h-5 w-5" />} detail="colis à traiter" />
+            <DashboardMetricCard tone="relais" label="Reçus / Déposés" value={stats.received} icon={<ArrowDownToLine className="h-5 w-5" />} detail="total reçus" />
+            <DashboardMetricCard tone="relais" label="Cash en main" value={`${cashInfo.balance.toFixed(0)} DA`} icon={<BanknoteIcon className="h-5 w-5" />} detail="à reverser" className={cashInfo.balance >= RELAY_CASH_ALERT_THRESHOLD ? 'ring-1 ring-red-300' : ''} />
+            <DashboardMetricCard tone="relais" label="Commissions" value={`${cashInfo.totalCommissions.toFixed(0)} DA`} icon={<DollarSign className="h-5 w-5" />} detail="total gagné" />
+          </DashboardStatsGrid>
 
-        <Card className="mb-8">
+          <Card>
           <CardHeader>
             <CardTitle>Synthèse colis</CardTitle>
             <CardDescription>Vue agrégée cohérente avec les autres dashboards</CardDescription>
@@ -295,41 +296,44 @@ export default function RelaisDashboard() {
               </div>
             </div>
           </CardContent>
-        </Card>
+          </Card>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-4 lg:grid-cols-7 mb-8">
-            <TabsTrigger value="overview"><BarChart3 className="h-4 w-4 mr-1 hidden sm:inline" />Vue d'ensemble</TabsTrigger>
-            <TabsTrigger value="scan"><QrCode className="h-4 w-4 mr-1 hidden sm:inline" />Scanner QR</TabsTrigger>
-            <TabsTrigger value="cash"><CreditCard className="h-4 w-4 mr-1 hidden sm:inline" />Caisse</TabsTrigger>
-            <TabsTrigger value="gains"><TrendingUp className="h-4 w-4 mr-1 hidden sm:inline" />Gains</TabsTrigger>
-            <TabsTrigger value="suivi" className="hidden lg:inline-flex"><BarChart3 className="h-4 w-4 mr-1" />Suivi</TabsTrigger>
-            <TabsTrigger value="settings"><Settings className="h-4 w-4 mr-1 hidden sm:inline" />Paramètres</TabsTrigger>
-            <TabsTrigger value="profil"><User className="h-4 w-4 mr-1 hidden sm:inline" />Profil</TabsTrigger>
-          </TabsList>
+          <DashboardPanel tone="relais">
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
+              <TabsList className={`${dashboardTabsListClass} grid grid-cols-2 lg:grid-cols-7`}>
+                <TabsTrigger value="overview" className={getDashboardTabsTriggerClass('relais')}><BarChart3 className="h-4 w-4 mr-1 hidden sm:inline" />Vue d'ensemble</TabsTrigger>
+                <TabsTrigger value="scan" className={getDashboardTabsTriggerClass('relais')}><QrCode className="h-4 w-4 mr-1 hidden sm:inline" />Scanner QR</TabsTrigger>
+                <TabsTrigger value="cash" className={getDashboardTabsTriggerClass('relais')}><CreditCard className="h-4 w-4 mr-1 hidden sm:inline" />Caisse</TabsTrigger>
+                <TabsTrigger value="gains" className={getDashboardTabsTriggerClass('relais')}><TrendingUp className="h-4 w-4 mr-1 hidden sm:inline" />Gains</TabsTrigger>
+                <TabsTrigger value="suivi" className={`${getDashboardTabsTriggerClass('relais')} hidden lg:inline-flex`}><BarChart3 className="h-4 w-4 mr-1" />Suivi</TabsTrigger>
+                <TabsTrigger value="settings" className={getDashboardTabsTriggerClass('relais')}><Settings className="h-4 w-4 mr-1 hidden sm:inline" />Paramètres</TabsTrigger>
+                <TabsTrigger value="profil" className={getDashboardTabsTriggerClass('relais')}><User className="h-4 w-4 mr-1 hidden sm:inline" />Profil</TabsTrigger>
+              </TabsList>
 
-          <TabsContent value="overview">
-            <OverviewTab relaisInfo={relaisInfo} setActiveTab={setActiveTab} cashInfo={cashInfo} />
-          </TabsContent>
-          <TabsContent value="scan">
-            <ScanTab relaisId={relaisInfo?.id} userId={session.user.id} onRefresh={fetchRelaisInfo} />
-          </TabsContent>
-          <TabsContent value="cash">
-            <CashTab relaisId={relaisInfo?.id} cashInfo={cashInfo} userId={session.user.id} onRefresh={fetchRelaisInfo} />
-          </TabsContent>
-          <TabsContent value="gains">
-            <GainsTab relaisId={relaisInfo?.id} />
-          </TabsContent>
-          <TabsContent value="suivi">
-            <SuiviTab relaisId={relaisInfo?.id} />
-          </TabsContent>
-          <TabsContent value="settings">
-            <SettingsTab relaisInfo={relaisInfo} onUpdate={fetchRelaisInfo} />
-          </TabsContent>
-          <TabsContent value="profil">
-            <ProfilRelaisTab userId={session.user.id} relaisInfo={relaisInfo} />
-          </TabsContent>
-        </Tabs>
+              <TabsContent value="overview">
+                <OverviewTab relaisInfo={relaisInfo} setActiveTab={setActiveTab} cashInfo={cashInfo} />
+              </TabsContent>
+              <TabsContent value="scan">
+                <ScanTab relaisId={relaisInfo?.id} userId={session.user.id} onRefresh={fetchRelaisInfo} />
+              </TabsContent>
+              <TabsContent value="cash">
+                <CashTab relaisId={relaisInfo?.id} cashInfo={cashInfo} userId={session.user.id} onRefresh={fetchRelaisInfo} />
+              </TabsContent>
+              <TabsContent value="gains">
+                <GainsTab relaisId={relaisInfo?.id} />
+              </TabsContent>
+              <TabsContent value="suivi">
+                <SuiviTab relaisId={relaisInfo?.id} />
+              </TabsContent>
+              <TabsContent value="settings">
+                <SettingsTab relaisInfo={relaisInfo} onUpdate={fetchRelaisInfo} />
+              </TabsContent>
+              <TabsContent value="profil">
+                <ProfilRelaisTab userId={session.user.id} relaisInfo={relaisInfo} />
+              </TabsContent>
+            </Tabs>
+          </DashboardPanel>
+        </DashboardShell>
       </main>
       <Footer />
     </div>
@@ -695,37 +699,64 @@ function OverviewTab({ relaisInfo, setActiveTab, cashInfo }: { relaisInfo: any; 
 // Scan Tab — MVP workflow
 function ScanTab({ relaisId, userId, onRefresh }: { relaisId: string | undefined; userId: string; onRefresh: () => void }) {
   const { toast } = useToast();
-  const [tracking, setTracking] = useState('');
+  const searchParams = useSearchParams();
+  const [tracking, setTracking] = useState(() => searchParams.get('scan') ?? '');
   const [parcel, setParcel] = useState<any>(null);
+  const [paymentReceipt, setPaymentReceipt] = useState<{ amount: number; collectedAtIso: string; trackingNumber: string } | null>(null);
+  const [matchingFeedback, setMatchingFeedback] = useState<{ matched: boolean; error: string | null } | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isPrinting, setIsPrinting] = useState(false);
   const [deliveryCheck, setDeliveryCheck] = useState({
     recipientFirstName: '',
     recipientLastName: '',
     recipientPhone: '',
     withdrawalCode: '',
+    recipientIdentityNumber: '',
   });
 
-  const handleSearch = async () => {
-    if (!tracking.trim()) return;
+  // Auto-trigger search if ?scan= param is present on mount
+  useEffect(() => {
+    const scanParam = searchParams.get('scan');
+    if (scanParam && !parcel) {
+      handleSearch();
+    }
+  }, []);
+
+  const handleSearch = async (rawInput?: string) => {
+    const resolvedTracking = extractTrackingFromQrPayload(rawInput ?? tracking);
+    if (!resolvedTracking) {
+      toast({ title: 'QR invalide', description: 'Le QR scanné ne contient pas de numéro de suivi exploitable', variant: 'destructive' });
+      return;
+    }
+
     setIsSearching(true);
     setParcel(null);
+    setPaymentReceipt(null);
+    setMatchingFeedback(null);
     try {
-      const res = await fetch(`/api/qr/${tracking.trim().toUpperCase()}`);
+      const res = await fetch(`/api/qr/${resolvedTracking}`);
       const data = await res.json();
       if (!res.ok) {
-        toast({ title: 'Introuvable', description: data.error || 'Colis non trouvé', variant: 'destructive' });
+        toast({ title: 'Erreur scan', description: 'Impossible de récupérer les informations du colis', variant: 'destructive' });
       } else {
+        if (!data?.trackingNumber || !data?.relaisDepart || !data?.relaisArrivee) {
+          toast({ title: 'Erreur scan', description: 'Impossible de récupérer les informations du colis', variant: 'destructive' });
+          setParcel(null);
+          return;
+        }
         setParcel(data);
+        setTracking(resolvedTracking);
         setDeliveryCheck({
           recipientFirstName: '',
           recipientLastName: '',
           recipientPhone: '',
           withdrawalCode: '',
+          recipientIdentityNumber: '',
         });
       }
     } catch {
-      toast({ title: 'Erreur réseau', variant: 'destructive' });
+      toast({ title: 'Erreur scan', description: 'Impossible de récupérer les informations du colis', variant: 'destructive' });
     } finally {
       setIsSearching(false);
     }
@@ -734,16 +765,22 @@ function ScanTab({ relaisId, userId, onRefresh }: { relaisId: string | undefined
   const handleAction = async (action: string) => {
     if (!parcel || !relaisId) return;
 
+    if (action === 'receive_at_departure') {
+      await handleDepartureReception();
+      return;
+    }
+
     if (action === 'deliver') {
       if (
         !deliveryCheck.recipientFirstName.trim() ||
         !deliveryCheck.recipientLastName.trim() ||
         !deliveryCheck.recipientPhone.trim() ||
-        !deliveryCheck.withdrawalCode.trim()
+        !deliveryCheck.withdrawalCode.trim() ||
+        !deliveryCheck.recipientIdentityNumber.trim()
       ) {
         toast({
           title: 'Vérification requise',
-          description: 'Nom, prénom, téléphone et code de retrait sont obligatoires',
+          description: 'Nom, prénom, téléphone, code de retrait et numéro de pièce d\'identité sont obligatoires',
           variant: 'destructive',
         });
         return;
@@ -777,25 +814,143 @@ function ScanTab({ relaisId, userId, onRefresh }: { relaisId: string | undefined
     }
   };
 
+  const handlePrintLabel = async () => {
+    if (!parcel || !relaisId) return;
+
+    setIsPrinting(true);
+
+    try {
+      const authRes = await fetch(`/api/qr/${parcel.trackingNumber}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'print_label',
+          relaisId,
+          userId,
+        }),
+      });
+
+      const authData = await authRes.json().catch(() => ({}));
+      if (!authRes.ok) {
+        const details = authData?.details ? ` ${authData.details}` : '';
+        toast({
+          title: 'Impression impossible',
+          description: `${authData?.error || 'Impossible de récupérer les informations du colis'}${details}`,
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      const departName = WILAYAS.find((w) => w.id === parcel.villeDepart)?.name || parcel.villeDepart;
+      const arriveeName = WILAYAS.find((w) => w.id === parcel.villeArrivee)?.name || parcel.villeArrivee;
+      const html = `<!DOCTYPE html>
+<html><head>
+  <meta charset="UTF-8" />
+  <title>Étiquette relais - ${parcel.trackingNumber}</title>
+  <style>
+    body { font-family: Arial, sans-serif; color: #111; margin: 18px; }
+    .label { border: 2px solid #111; padding: 14px; }
+    .h { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+    .brand { font-size: 22px; font-weight: 800; color: #059669; }
+    .tracking { font-family: 'Courier New', monospace; font-size: 24px; font-weight: 800; }
+    .route { background: #059669; color: white; text-align: center; padding: 8px; font-weight: 700; margin-bottom: 12px; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+    .box { border: 1px solid #ddd; padding: 10px; border-radius: 6px; }
+    .muted { color: #666; font-size: 12px; text-transform: uppercase; letter-spacing: .6px; }
+    .v { font-size: 15px; font-weight: 600; }
+    .desc { border: 1px dashed #bbb; padding: 8px; border-radius: 6px; margin-bottom: 10px; }
+    .qr { text-align: center; margin-top: 10px; }
+    .qr img { width: 120px; height: 120px; }
+  </style>
+</head>
+<body>
+  <div class="label">
+    <div class="h">
+      <div class="brand">SwiftColis</div>
+      <div class="tracking">${parcel.trackingNumber}</div>
+    </div>
+    <div class="route">${departName} → ${arriveeName}</div>
+    <div class="grid">
+      <div class="box">
+        <div class="muted">Expéditeur</div>
+        <div class="v">${parcel.senderLastName || ''} ${parcel.senderFirstName || ''}</div>
+        <div>${parcel.senderPhone || ''}</div>
+      </div>
+      <div class="box">
+        <div class="muted">Destinataire</div>
+        <div class="v">${parcel.recipientLastName || ''} ${parcel.recipientFirstName || ''}</div>
+        <div>${parcel.recipientPhone || ''}</div>
+      </div>
+    </div>
+    <div class="grid">
+      <div class="box"><div class="muted">Relais départ</div><div>${parcel.relaisDepart?.commerceName || ''}</div><div>${parcel.relaisDepart?.address || ''}</div></div>
+      <div class="box"><div class="muted">Relais arrivée</div><div>${parcel.relaisArrivee?.commerceName || ''}</div><div>${parcel.relaisArrivee?.address || ''}</div></div>
+    </div>
+    ${parcel.description ? `<div class="desc"><strong>Description:</strong> ${parcel.description}</div>` : ''}
+    ${parcel.qrCodeImage ? `<div class="qr"><img src="${parcel.qrCodeImage}" alt="QR" /><div>Scanner au relais</div></div>` : ''}
+  </div>
+</body></html>`;
+
+      const win = window.open('', '_blank', 'width=900,height=1200');
+      if (win) {
+        win.document.write(html);
+        win.document.close();
+        const waitForImages = async () => {
+          const images = Array.from(win.document.images);
+          await Promise.all(
+            images.map(
+              (img) =>
+                new Promise<void>((resolve) => {
+                  if (img.complete) {
+                    resolve();
+                    return;
+                  }
+                  img.addEventListener('load', () => resolve(), { once: true });
+                  img.addEventListener('error', () => resolve(), { once: true });
+                })
+            )
+          );
+        };
+        const triggerPrint = () => {
+          waitForImages().finally(() => {
+            win.focus();
+            win.print();
+          });
+        };
+        if (win.document.readyState === 'complete') {
+          triggerPrint();
+        } else {
+          win.addEventListener('load', triggerPrint, { once: true });
+        }
+      }
+
+      toast({ title: 'Impression autorisée', description: 'Étiquette générée après vérification paiement et anti-double-scan.' });
+    } catch {
+      toast({ title: 'Impression impossible', description: 'Impossible de récupérer les informations du colis', variant: 'destructive' });
+    } finally {
+      setIsPrinting(false);
+    }
+  };
+
   const currentStatus = parcel?.status;
   const isDepRelay = parcel?.relaisDepart?.id === relaisId;
   const isArrRelay = parcel?.relaisArrivee?.id === relaisId;
+  const amountToPayAtRelay = Number(parcel?.amountToPayAtRelay ?? (parcel?.status === 'CREATED' ? parcel?.prixClient : 0) ?? 0);
   const statusInfo = PARCEL_STATUS.find(s => s.id === currentStatus);
 
   type ActionDef = { action: string; label: string; description: string; color: string; icon: React.ComponentType<{ className?: string }> };
   const availableActions: ActionDef[] = [];
 
   if (parcel) {
-    if (currentStatus === 'CREATED' && isDepRelay) {
+    if (['CREATED', 'READY_FOR_DEPOSIT'].includes(String(currentStatus)) && isDepRelay) {
       availableActions.push({
-        action: 'validate_payment',
-        label: 'Valider le paiement cash',
-        description: `Encaisser ${parcel.prixClient ?? '—'} DA du client`,
-        color: 'bg-blue-600 hover:bg-blue-700',
-        icon: BanknoteIcon,
+        action: 'receive_at_departure',
+        label: currentStatus === 'CREATED' ? 'Valider réception + paiement' : 'Valider réception + dépôt',
+        description: currentStatus === 'CREATED' ? `Encaisser ${parcel.prixClient ?? '—'} DA puis confirmer le dépôt` : 'Confirmer le dépôt du colis au relais de départ',
+        color: 'bg-emerald-600 hover:bg-emerald-700',
+        icon: ArrowDownToLine,
       });
-    }
-    if (currentStatus === 'PAID_RELAY' && isDepRelay) {
+    } else if (currentStatus === 'PAID_RELAY' && isDepRelay) {
       availableActions.push({
         action: 'deposit',
         label: 'Confirmer le dépôt du colis',
@@ -815,86 +970,67 @@ function ScanTab({ relaisId, userId, onRefresh }: { relaisId: string | undefined
     }
   }
 
-  const STATUS_FLOW = ['CREATED', 'PAID_RELAY', 'DEPOSITED_RELAY', 'EN_TRANSPORT', 'ARRIVE_RELAIS_DESTINATION', 'LIVRE'];
+  const STATUS_FLOW = ['CREATED', 'READY_FOR_DEPOSIT', 'PAID_RELAY', 'DEPOSITED_RELAY', 'EN_TRANSPORT', 'ARRIVE_RELAIS_DESTINATION', 'LIVRE'];
   const STATUS_LABELS: Record<string, string> = {
-    CREATED: 'Créé', PAID_RELAY: 'Payé', DEPOSITED_RELAY: 'Déposé',
+    CREATED: 'Créé', READY_FOR_DEPOSIT: 'À déposer', PAID_RELAY: 'Payé', DEPOSITED_RELAY: 'Déposé',
     EN_TRANSPORT: 'Transport', ARRIVE_RELAIS_DESTINATION: 'Arrivé', LIVRE: 'Livré',
   };
 
-  const [receptionTracking, setReceptionTracking] = useState('');
-  const [receptionParcel, setReceptionParcel] = useState<any>(null);
-  const [isReceptionSearching, setIsReceptionSearching] = useState(false);
-  const [isReceptionProcessing, setIsReceptionProcessing] = useState(false);
-
-  const handleReceptionSearch = async () => {
-    if (!receptionTracking.trim()) return;
-    setIsReceptionSearching(true);
-    setReceptionParcel(null);
-    try {
-      const res = await fetch(`/api/qr/${receptionTracking.trim().toUpperCase()}`);
-      const data = await res.json();
-      if (!res.ok) {
-        toast({ title: 'Introuvable', description: data.error || 'Colis non trouvé', variant: 'destructive' });
-      } else {
-        setReceptionParcel(data);
-        toast({ title: 'Colis trouvé', description: `Suivi: ${data.trackingNumber}` });
-      }
-    } catch {
-      toast({ title: 'Erreur réseau', variant: 'destructive' });
-    } finally {
-      setIsReceptionSearching(false);
-    }
-  };
-
-  const handleValidateReceptionPayment = async () => {
-    if (!receptionParcel) return;
-    if (!relaisId) {
-      toast({ title: 'Erreur', description: 'ID relais non trouvé. Rechargez la page.', variant: 'destructive' });
-      return;
-    }
-    if (receptionParcel.relaisDepart?.id !== relaisId) {
+  const handleDepartureReception = async () => {
+    if (!parcel || !relaisId) return;
+    if (parcel.relaisDepart?.id !== relaisId) {
       toast({
         title: 'Relais incorrect',
-        description: `Ce colis doit être traité au relais de départ: ${receptionParcel.relaisDepart?.commerceName ?? 'inconnu'}`,
+        description: `Ce colis doit être traité au relais de départ: ${parcel.relaisDepart?.commerceName ?? 'inconnu'}`,
         variant: 'destructive',
       });
       return;
     }
-    
-    // Step 1: Validate payment
-    setIsReceptionProcessing(true);
-    try {
-      console.log('[Reception] Étape 1: Validation paiement cash', {
-        tracking: receptionParcel.trackingNumber,
-        prixClient: receptionParcel.prixClient,
-        relaisId,
-        parcelRelaisDeparId: receptionParcel.relaisDepart?.id,
-        parcelRelaisDeparName: receptionParcel.relaisDepart?.commerceName,
-      });
 
-      const res1 = await fetch(`/api/qr/${receptionParcel.trackingNumber}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'validate_payment',
-          relaisId,
-          userId,
-        }),
-      });
-      
-      const data1 = await res1.json();
-      console.log('[Reception] Réponse étape 1:', { status: res1.status, data: data1 });
-      
-      if (!res1.ok) {
-        toast({ title: 'Erreur paiement', description: data1.error || 'Impossibilité de valider le paiement', variant: 'destructive' });
-        setIsReceptionProcessing(false);
-        return;
+    const requiresCashPayment = parcel.status === 'CREATED';
+    const expectedAmount = Number(parcel?.amountToPayAtRelay ?? parcel?.prixClient ?? 0);
+
+    if (requiresCashPayment && expectedAmount > 0) {
+      const confirmed = window.confirm(`Montant à encaisser au relais: ${expectedAmount.toFixed(0)} DA. Confirmer l'encaissement ?`);
+      if (!confirmed) return;
+    }
+
+    setIsUpdating(true);
+    try {
+      if (requiresCashPayment) {
+        const paymentRes = await fetch(`/api/qr/${parcel.trackingNumber}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'validate_payment',
+            relaisId,
+            userId,
+          }),
+        });
+
+        const paymentData = await paymentRes.json();
+        if (!paymentRes.ok) {
+          toast({
+            title: 'Erreur paiement',
+            description: paymentData.error || 'Impossibilité de valider le paiement',
+            variant: 'destructive',
+          });
+          return;
+        }
+
+        const collected = Number(paymentData?.amountCollected ?? expectedAmount ?? 0);
+        setPaymentReceipt({
+          amount: collected,
+          collectedAtIso: new Date().toISOString(),
+          trackingNumber: parcel.trackingNumber,
+        });
+        toast({
+          title: 'Paiement encaissé',
+          description: `${collected.toFixed(0)} DA enregistrés en caisse relais`,
+        });
       }
 
-      // Step 2: Deposit — only if payment validation succeeded
-      console.log('[Reception] Étape 2: Dépôt du colis');
-      
-      const res2 = await fetch(`/api/qr/${receptionParcel.trackingNumber}`, {
+      const depositRes = await fetch(`/api/qr/${parcel.trackingNumber}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -903,140 +1039,56 @@ function ScanTab({ relaisId, userId, onRefresh }: { relaisId: string | undefined
           userId,
         }),
       });
-      
-      const data2 = await res2.json();
-      console.log('[Reception] Réponse étape 2:', { status: res2.status, data: data2 });
-      
-      if (!res2.ok) {
-        toast({ 
-          title: 'Avertissement', 
-          description: `Paiement validé mais dépôt échoué: ${data2.error}. Relais peut réessayer le dépôt.`,
-          variant: 'destructive'
+
+      const depositData = await depositRes.json();
+      if (!depositRes.ok) {
+        toast({
+          title: 'Avertissement',
+          description: `${requiresCashPayment ? 'Paiement validé mais ' : ''}dépôt échoué: ${depositData.error}. Relais peut réessayer le dépôt.`,
+          variant: 'destructive',
         });
-        // Still refresh since payment was recorded
-        setReceptionTracking('');
-        setReceptionParcel(null);
         onRefresh();
-      } else {
-        toast({ 
-          title: 'Succès', 
-          description: `✓ Paiement encaissé + Dépôt enregistré (${receptionParcel.trackingNumber})`,
-        });
-        setReceptionTracking('');
-        setReceptionParcel(null);
-        onRefresh();
+        return;
       }
+
+      if (depositData?.matching?.attempted) {
+        setMatchingFeedback({
+          matched: Boolean(depositData.matching.matched),
+          error: depositData.matching.error || null,
+        });
+      } else {
+        setMatchingFeedback(null);
+      }
+
+      toast({
+        title: 'Succès',
+        description: `✓ ${requiresCashPayment ? `Paiement encaissé (${expectedAmount.toFixed(0)} DA) + ` : ''}Dépôt enregistré (${parcel.trackingNumber})`,
+      });
+
+      if (depositData?.matching?.attempted && !depositData.matching.matched) {
+        toast({
+          title: 'Matching transporteur non trouvé',
+          description: depositData.matching.error || 'Aucun trajet compatible trouvé pour ce colis.',
+          variant: 'destructive',
+        });
+      }
+
+      setParcel((prev: any) => ({ ...prev, status: depositData.parcel?.status ?? 'DEPOSITED_RELAY' }));
+      onRefresh();
     } catch (err) {
-      console.error('[Reception] Erreur:', err);
+      console.error('[ScanTab] Réception départ erreur:', err);
       toast({ title: 'Erreur réseau', description: String(err), variant: 'destructive' });
     } finally {
-      setIsReceptionProcessing(false);
+      setIsUpdating(false);
     }
   };
 
   return (
     <div className="space-y-6">
-      {/* Reception & Payment Section */}
-      <Card className="border-2 border-emerald-200 dark:border-emerald-700">
-        <CardHeader className="bg-emerald-50 dark:bg-emerald-950">
-          <CardTitle className="flex items-center gap-2 text-emerald-900 dark:text-emerald-100">
-            <BanknoteIcon className="h-5 w-5" />
-            Réception du Colis + Paiement Espèces
-          </CardTitle>
-          <CardDescription className="text-emerald-700 dark:text-emerald-300">
-            Validez la réception et le paiement en espèces du client
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4 pt-6">
-          <div className="flex gap-2">
-            <Input
-              placeholder="Numéro de suivi du client (ex: SCXXXXXXXXX)"
-              value={receptionTracking}
-              onChange={(e) => setReceptionTracking(e.target.value.toUpperCase())}
-              onKeyDown={(e) => e.key === 'Enter' && handleReceptionSearch()}
-              className="font-mono"
-            />
-            <Button 
-              onClick={handleReceptionSearch} 
-              disabled={isReceptionSearching || !receptionTracking.trim()}
-              className="bg-emerald-600 hover:bg-emerald-700"
-            >
-              {isReceptionSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Scan className="h-4 w-4 mr-2" />}
-              Chercher
-            </Button>
-          </div>
-
-          {receptionParcel && (
-            <div className="border rounded-lg p-4 bg-slate-50 dark:bg-slate-800 space-y-3">
-              <div className="grid gap-3">
-                <div className="flex justify-between">
-                  <span className="text-slate-600 dark:text-slate-400">Numéro de suivi:</span>
-                  <span className="font-mono font-bold">{receptionParcel.trackingNumber}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-600 dark:text-slate-400">Client:</span>
-                  <span className="font-semibold">{receptionParcel.client?.name}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-600 dark:text-slate-400">Poids:</span>
-                  <Badge variant="outline">{receptionParcel.weight ? `${receptionParcel.weight} kg` : 'Non renseigné'}</Badge>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-600 dark:text-slate-400">De / Pour:</span>
-                  <span className="text-sm">{receptionParcel.villeDepart} → {receptionParcel.villeArrivee}</span>
-                </div>
-                <div className="border-t pt-3 flex justify-between">
-                  <span className="font-semibold">Montant à encaisser:</span>
-                  <span className="text-2xl font-bold text-emerald-600">{receptionParcel.prixClient?.toFixed(0) ?? '—'} DA</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-600 dark:text-slate-400">Statut:</span>
-                  <Badge className={`${PARCEL_STATUS.find(s => s.id === receptionParcel.status)?.color} text-white`}>
-                    {PARCEL_STATUS.find(s => s.id === receptionParcel.status)?.label}
-                  </Badge>
-                </div>
-              </div>
-
-              {receptionParcel.status === 'CREATED' && receptionParcel.relaisDepart?.id === relaisId && (
-                <Button 
-                  onClick={handleValidateReceptionPayment} 
-                  disabled={isReceptionProcessing}
-                  className="w-full bg-emerald-600 hover:bg-emerald-700 h-12 text-base"
-                >
-                  {isReceptionProcessing ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                      Traitement en cours...
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle className="h-5 w-5 mr-2" />
-                      Valider Réception + Paiement
-                    </>
-                  )}
-                </Button>
-              )}
-              {receptionParcel.status === 'CREATED' && receptionParcel.relaisDepart?.id !== relaisId && (
-                <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 rounded text-sm text-amber-700 dark:text-amber-300">
-                  Ce colis ne peut pas être encaissé dans ce point relais. Relais de départ attendu :
-                  {' '}
-                  <strong>{receptionParcel.relaisDepart?.commerceName ?? 'inconnu'}</strong>.
-                </div>
-              )}
-              {receptionParcel.status !== 'CREATED' && (
-                <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 rounded text-sm text-blue-700 dark:text-blue-300">
-                  Ce colis ne peut pas être validé à cette étape (Statut: {PARCEL_STATUS.find(s => s.id === receptionParcel.status)?.label})
-                </div>
-              )}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2"><Scan className="h-5 w-5" />Scanner / Rechercher un colis</CardTitle>
-          <CardDescription>Entrez le numéro de suivi ou scannez le QR code</CardDescription>
+          <CardTitle className="flex items-center gap-2"><Scan className="h-5 w-5" />Scanner / Rechercher / Réceptionner un colis</CardTitle>
+          <CardDescription>Entrez le numéro de suivi ou scannez le QR code pour encaisser, déposer ou remettre un colis</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex gap-2">
@@ -1047,11 +1099,25 @@ function ScanTab({ relaisId, userId, onRefresh }: { relaisId: string | undefined
               onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
               className="font-mono"
             />
-            <Button onClick={handleSearch} disabled={isSearching || !tracking.trim()}>
+            <Button onClick={() => handleSearch()} disabled={isSearching || !tracking.trim()}>
               {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <QrCode className="h-4 w-4 mr-2" />}
               Rechercher
             </Button>
           </div>
+          <QrCameraScanner
+            disabled={isSearching || isUpdating}
+            onScan={(raw) => {
+              setTracking(raw);
+              handleSearch(raw);
+            }}
+            onError={(message) => {
+              toast({
+                title: 'Scanner caméra indisponible',
+                description: message,
+                variant: 'destructive',
+              });
+            }}
+          />
 
           {parcel && (
             <Card className="bg-slate-50 dark:bg-slate-800 border-2">
@@ -1076,6 +1142,47 @@ function ScanTab({ relaisId, userId, onRefresh }: { relaisId: string | undefined
                   </div>
                 </div>
 
+                {isDepRelay && currentStatus === 'CREATED' && amountToPayAtRelay > 0 && (
+                  <div className="mb-6 rounded-lg border border-emerald-200 bg-emerald-50 p-4">
+                    <p className="text-xs uppercase tracking-wide text-emerald-700">Montant à payer au relais</p>
+                    <p className="mt-1 text-2xl font-extrabold text-emerald-700">{amountToPayAtRelay.toFixed(0)} DA</p>
+                    <p className="text-xs text-emerald-700/80 mt-1">Ce montant sera enregistré automatiquement dans la caisse du relais après validation.</p>
+                  </div>
+                )}
+
+                {paymentReceipt && paymentReceipt.trackingNumber === parcel.trackingNumber && (
+                  <div className="mb-6 rounded-lg border border-blue-200 bg-blue-50 p-4">
+                    <p className="text-xs uppercase tracking-wide text-blue-700">Preuve d'encaissement</p>
+                    <p className="mt-1 text-lg font-bold text-blue-800">{paymentReceipt.amount.toFixed(0)} DA encaissés</p>
+                    <p className="text-xs text-blue-700/80 mt-1">
+                      Enregistré le {new Date(paymentReceipt.collectedAtIso).toLocaleString('fr-FR')}
+                    </p>
+                  </div>
+                )}
+
+                {matchingFeedback && (
+                  <div className={`mb-6 rounded-lg border p-4 ${matchingFeedback.matched ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50'}`}>
+                    <p className={`text-xs uppercase tracking-wide ${matchingFeedback.matched ? 'text-emerald-700' : 'text-amber-700'}`}>
+                      Mission transporteur
+                    </p>
+                    <p className={`mt-1 text-sm font-semibold ${matchingFeedback.matched ? 'text-emerald-800' : 'text-amber-800'}`}>
+                      {matchingFeedback.matched
+                        ? 'Une mission transporteur a été créée automatiquement.'
+                        : 'Aucune mission transporteur n’a été créée automatiquement.'}
+                    </p>
+                    {!matchingFeedback.matched && matchingFeedback.error && (
+                      <p className="text-xs text-amber-800/80 mt-1">{matchingFeedback.error}</p>
+                    )}
+                  </div>
+                )}
+
+                <div className="mb-6">
+                  <Button type="button" variant="outline" onClick={handlePrintLabel} className="w-full sm:w-auto" disabled={isPrinting || isUpdating}>
+                    {isPrinting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Printer className="h-4 w-4 mr-2" />}
+                    Imprimer l'étiquette au relais
+                  </Button>
+                </div>
+
                 {(parcel.recipientFirstName || parcel.recipientLastName || parcel.recipientPhone) && (
                   <div className="mb-6 rounded-lg border bg-white dark:bg-slate-900 p-4">
                     <p className="text-xs uppercase tracking-wide text-slate-500 mb-2">Destinataire attendu</p>
@@ -1084,7 +1191,6 @@ function ScanTab({ relaisId, userId, onRefresh }: { relaisId: string | undefined
                   </div>
                 )}
 
-                {/* Barre de progression statuts */}
                 <div className="flex items-center gap-1 overflow-x-auto pb-2 mb-6">
                   {STATUS_FLOW.map((s, idx) => {
                     const cIdx = STATUS_FLOW.indexOf(currentStatus);
@@ -1105,41 +1211,50 @@ function ScanTab({ relaisId, userId, onRefresh }: { relaisId: string | undefined
                 {availableActions.length > 0 ? (
                   <div className="space-y-3">
                     {currentStatus === 'ARRIVE_RELAIS_DESTINATION' && isArrRelay && (
-                      <div className="rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800 p-4 space-y-3">
-                        <p className="font-semibold text-amber-900 dark:text-amber-100">Double sécurité obligatoire avant remise</p>
+                      <div className="rounded-lg border border-red-200 bg-red-50 dark:bg-red-950/30 dark:border-red-800 p-4 space-y-4">
+                        <div className="flex items-start gap-3">
+                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-red-600 text-white mt-0.5">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 11c0-1.104.896-2 2-2s2 .896 2 2-.896 2-2 2-2-.896-2-2zm0 0V7m0 4v4m-6 4h12a2 2 0 002-2V5a2 2 0 00-2-2H6a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+                          </div>
+                          <div>
+                            <p className="font-bold text-red-900 dark:text-red-100">Vérification d'identité obligatoire</p>
+                            <p className="text-sm text-red-700 dark:text-red-300 mt-0.5">Demandez au destinataire de présenter une pièce d'identité officielle (CIN, passeport, permis de conduire) avant toute remise.</p>
+                          </div>
+                        </div>
+
+                        <ol className="space-y-1.5 text-sm">
+                          <li className="flex items-center gap-2 text-red-800 dark:text-red-200"><span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-red-600 text-[11px] font-bold text-white">1</span>Vérifiez que la photo sur la pièce d'identité correspond au porteur</li>
+                          <li className="flex items-center gap-2 text-red-800 dark:text-red-200"><span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-red-600 text-[11px] font-bold text-white">2</span>Saisissez le nom, prénom et téléphone tels qu'indiqués sur la pièce</li>
+                          <li className="flex items-center gap-2 text-red-800 dark:text-red-200"><span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-red-600 text-[11px] font-bold text-white">3</span>Entrez le numéro de la pièce d'identité pour la traçabilité</li>
+                          <li className="flex items-center gap-2 text-red-800 dark:text-red-200"><span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-red-600 text-[11px] font-bold text-white">4</span>Demandez le code de retrait reçu par le destinataire</li>
+                        </ol>
+
                         <div className="grid gap-3 md:grid-cols-2">
                           <div className="space-y-1">
-                            <Label>Nom destinataire</Label>
-                            <Input
-                              value={deliveryCheck.recipientLastName}
-                              onChange={(e) => setDeliveryCheck(prev => ({ ...prev, recipientLastName: e.target.value }))}
-                            />
+                            <Label>Nom destinataire <span className="text-red-600">*</span></Label>
+                            <Input placeholder="Tel qu'indiqué sur la pièce d'identité" value={deliveryCheck.recipientLastName} onChange={(e) => setDeliveryCheck(prev => ({ ...prev, recipientLastName: e.target.value }))} />
                           </div>
                           <div className="space-y-1">
-                            <Label>Prénom destinataire</Label>
-                            <Input
-                              value={deliveryCheck.recipientFirstName}
-                              onChange={(e) => setDeliveryCheck(prev => ({ ...prev, recipientFirstName: e.target.value }))}
-                            />
+                            <Label>Prénom destinataire <span className="text-red-600">*</span></Label>
+                            <Input placeholder="Tel qu'indiqué sur la pièce d'identité" value={deliveryCheck.recipientFirstName} onChange={(e) => setDeliveryCheck(prev => ({ ...prev, recipientFirstName: e.target.value }))} />
                           </div>
                           <div className="space-y-1">
-                            <Label>Téléphone destinataire</Label>
-                            <Input
-                              value={deliveryCheck.recipientPhone}
-                              onChange={(e) => setDeliveryCheck(prev => ({ ...prev, recipientPhone: e.target.value }))}
-                            />
+                            <Label>Téléphone destinataire <span className="text-red-600">*</span></Label>
+                            <Input placeholder="0555 123 456" value={deliveryCheck.recipientPhone} onChange={(e) => setDeliveryCheck(prev => ({ ...prev, recipientPhone: e.target.value }))} />
                           </div>
                           <div className="space-y-1">
-                            <Label>Code de retrait (4 ou 6 chiffres)</Label>
-                            <Input
-                              value={deliveryCheck.withdrawalCode}
-                              onChange={(e) => setDeliveryCheck(prev => ({ ...prev, withdrawalCode: e.target.value.replace(/\D/g, '') }))}
-                              maxLength={6}
-                            />
+                            <Label>Code de retrait <span className="text-red-600">*</span></Label>
+                            <Input placeholder="4 ou 6 chiffres reçus par le destinataire" value={deliveryCheck.withdrawalCode} onChange={(e) => setDeliveryCheck(prev => ({ ...prev, withdrawalCode: e.target.value.replace(/\D/g, '') }))} maxLength={6} />
+                          </div>
+                          <div className="space-y-1 md:col-span-2">
+                            <Label>N° pièce d'identité (CIN / Passeport / Permis) <span className="text-red-600">*</span></Label>
+                            <Input placeholder="Ex: 123456789 — à relever depuis la pièce présentée" value={deliveryCheck.recipientIdentityNumber} onChange={(e) => setDeliveryCheck(prev => ({ ...prev, recipientIdentityNumber: e.target.value.trim().toUpperCase() }))} className="font-mono uppercase" />
+                            <p className="text-xs text-red-600">Ce numéro est enregistré dans le journal de traçabilité de la livraison.</p>
                           </div>
                         </div>
                       </div>
                     )}
+
                     {availableActions.map((a) => {
                       const Icon = a.icon;
                       return (
@@ -1214,7 +1329,7 @@ function CashTab({ relaisId, cashInfo: initialCashInfo, userId, onRefresh }: { r
   useEffect(() => { fetchTransactions(); }, [fetchTransactions]);
 
   const handleReverse = async () => {
-    const amount = parseFloat(reverseAmount);
+    const amount = parseLocaleFloat(reverseAmount);
     if (!relaisId || !amount || amount <= 0) {
       toast({ title: 'Montant invalide', variant: 'destructive' });
       return;
@@ -1245,7 +1360,7 @@ function CashTab({ relaisId, cashInfo: initialCashInfo, userId, onRefresh }: { r
   };
 
   const handleRequestPickup = async () => {
-    const expectedAmount = parseFloat(pickupAmount);
+    const expectedAmount = parseLocaleFloat(pickupAmount);
     if (!relaisId || !expectedAmount || expectedAmount <= 0) {
       toast({ title: 'Montant invalide', description: 'Le montant attendu est requis', variant: 'destructive' });
       return;
@@ -1334,7 +1449,7 @@ function CashTab({ relaisId, cashInfo: initialCashInfo, userId, onRefresh }: { r
                 <Input placeholder="Ex : Versement du 23/03" value={reverseNotes} onChange={(e) => setReverseNotes(e.target.value)} />
               </div>
             </div>
-            <Button onClick={handleReverse} disabled={isReversing || !reverseAmount || parseFloat(reverseAmount) <= 0} className="bg-blue-600 hover:bg-blue-700">
+            <Button onClick={handleReverse} disabled={isReversing || !reverseAmount || parseLocaleFloat(reverseAmount) <= 0} className="bg-blue-600 hover:bg-blue-700">
               {isReversing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle className="h-4 w-4 mr-2" />}
               Confirmer le versement
             </Button>
@@ -1363,7 +1478,7 @@ function CashTab({ relaisId, cashInfo: initialCashInfo, userId, onRefresh }: { r
                 <Input placeholder="Ex : disponible après 14h" value={pickupNotes} onChange={(e) => setPickupNotes(e.target.value)} />
               </div>
             </div>
-            <Button onClick={handleRequestPickup} disabled={isRequestingPickup || !pickupAmount || parseFloat(pickupAmount) <= 0} className="bg-emerald-600 hover:bg-emerald-700">
+            <Button onClick={handleRequestPickup} disabled={isRequestingPickup || !pickupAmount || parseLocaleFloat(pickupAmount) <= 0} className="bg-emerald-600 hover:bg-emerald-700">
               {isRequestingPickup ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <BanknoteIcon className="h-4 w-4 mr-2" />}
               Demander une collecte
             </Button>
@@ -1450,6 +1565,8 @@ function CashTab({ relaisId, cashInfo: initialCashInfo, userId, onRefresh }: { r
 function SettingsTab({ relaisInfo, onUpdate }: { relaisInfo: any; onUpdate: () => void }) {
   const { toast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
+  const [isSavingPrinter, setIsSavingPrinter] = useState(false);
+  const [printerStatus, setPrinterStatus] = useState<'READY' | 'BROKEN' | 'OUT_OF_PAPER' | 'NOT_EQUIPPED'>('READY');
   const [formData, setFormData] = useState({
     commerceName: '',
     address: '',
@@ -1474,6 +1591,25 @@ function SettingsTab({ relaisInfo, onUpdate }: { relaisInfo: any; onUpdate: () =
       if (relaisInfo.closeTime) setHours(h => ({ ...h, close: relaisInfo.closeTime }));
     }
   }, [relaisInfo]);
+
+  useEffect(() => {
+    const fetchPrinterStatus = async () => {
+      if (!relaisInfo?.id) return;
+      try {
+        const res = await fetch('/api/relais/printers');
+        if (!res.ok) return;
+        const data = await res.json();
+        const current = Array.isArray(data?.printers) ? data.printers[0] : null;
+        if (current?.printerStatus) {
+          setPrinterStatus(current.printerStatus);
+        }
+      } catch {
+        // no-op: keep current printer status in UI
+      }
+    };
+
+    void fetchPrinterStatus();
+  }, [relaisInfo?.id]);
 
   const handleSave = async () => {
     if (!relaisInfo?.id) {
@@ -1569,6 +1705,38 @@ function SettingsTab({ relaisInfo, onUpdate }: { relaisInfo: any; onUpdate: () =
       });
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleUpdatePrinterStatus = async () => {
+    if (!relaisInfo?.id) {
+      toast({ title: 'Erreur', description: 'Relais non trouvé', variant: 'destructive' });
+      return;
+    }
+
+    setIsSavingPrinter(true);
+    try {
+      const response = await fetch('/api/relais/printers', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ printerStatus }),
+      });
+
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data?.error || 'Impossible de mettre à jour le statut imprimante');
+      }
+
+      toast({ title: 'Statut imprimante mis à jour', description: 'Votre statut est immédiatement pris en compte pour le scan et l\'impression.' });
+      onUpdate();
+    } catch (err) {
+      toast({
+        title: 'Erreur',
+        description: err instanceof Error ? err.message : 'Impossible de mettre à jour le statut imprimante',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSavingPrinter(false);
     }
   };
 
@@ -1674,6 +1842,34 @@ function SettingsTab({ relaisInfo, onUpdate }: { relaisInfo: any; onUpdate: () =
           </div>
           <Button variant="outline" className="mt-4" disabled={!relaisInfo || isSaving} onClick={handleUpdateHours}>
             {isSaving ? 'Mise à jour...' : 'Mettre à jour les horaires'}
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>État de l'imprimante</CardTitle>
+          <CardDescription>Déclarez votre disponibilité matérielle en temps réel (papier, panne, indisponible).</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="space-y-2">
+            <Label>Statut imprimante</Label>
+            <Select value={printerStatus} onValueChange={(value) => setPrinterStatus(value as 'READY' | 'BROKEN' | 'OUT_OF_PAPER' | 'NOT_EQUIPPED')}>
+              <SelectTrigger className="max-w-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="READY">Prête</SelectItem>
+                <SelectItem value="OUT_OF_PAPER">Plus de papier</SelectItem>
+                <SelectItem value="BROKEN">En panne</SelectItem>
+                <SelectItem value="NOT_EQUIPPED">Non équipée</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <p className="text-xs text-slate-500">Le scan/impression n'est autorisé que si le relais est opérationnel et l'imprimante disponible.</p>
+          <Button variant="outline" onClick={handleUpdatePrinterStatus} disabled={!relaisInfo || isSavingPrinter}>
+            {isSavingPrinter ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Printer className="h-4 w-4 mr-2" />}
+            Mettre à jour le statut imprimante
           </Button>
         </CardContent>
       </Card>

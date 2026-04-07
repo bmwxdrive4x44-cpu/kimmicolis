@@ -58,9 +58,12 @@ export const PARCEL_FORMATS = [
 ];
 
 export const PARCEL_STATUS = [
-  { id: 'CREATED',                    label: 'Créé',                    labelEn: 'Created',               labelAr: 'تم الإنشاء',            color: 'bg-gray-500',    step: 1 },
+  { id: 'CREATED',                    label: 'Créé',                     labelEn: 'Created',               labelAr: 'تم الإنشاء',            color: 'bg-gray-500',    step: 1 },
+  { id: 'PENDING_PAYMENT',            label: 'Paiement en attente',      labelEn: 'Pending payment',       labelAr: 'في انتظار الدفع',       color: 'bg-amber-500',   step: 2 },
+  { id: 'READY_FOR_DEPOSIT',          label: 'À déposer au relais',      labelEn: 'Ready for deposit',     labelAr: 'جاهز للإيداع',          color: 'bg-violet-500',  step: 2 },
   { id: 'PAID_RELAY',                 label: 'Paiement validé (relais)', labelEn: 'Payment validated',     labelAr: 'تم التحقق من الدفع',    color: 'bg-blue-500',    step: 2 },
   { id: 'DEPOSITED_RELAY',            label: 'Déposé au relais',         labelEn: 'Deposited at relay',    labelAr: 'تم الإيداع في النقطة',  color: 'bg-yellow-500',  step: 3 },
+  { id: 'WAITING_PICKUP',             label: 'En attente de collecte',   labelEn: 'Waiting pickup',        labelAr: 'في انتظار الاستلام',    color: 'bg-sky-500',     step: 3 },
   { id: 'EN_TRANSPORT',               label: 'En transport',             labelEn: 'In Transit',            labelAr: 'قيد النقل',             color: 'bg-orange-500',  step: 4 },
   { id: 'ARRIVE_RELAIS_DESTINATION',  label: 'Arrivé au relais',         labelEn: 'Arrived at Relay',      labelAr: 'وصل لنقطة التوصيل',     color: 'bg-teal-500',    step: 5 },
   { id: 'LIVRE',                      label: 'Livré',                    labelEn: 'Delivered',             labelAr: 'تم التوصيل',            color: 'bg-emerald-600', step: 6 },
@@ -82,6 +85,7 @@ export const TRAJET_STATUS = [
 
 export const USER_ROLES = [
   { id: 'CLIENT', label: 'Client', labelEn: 'Client', labelAr: 'عميل' },
+  { id: 'ENSEIGNE', label: 'Enseigne', labelEn: 'Merchant', labelAr: 'تاجر' },
   { id: 'TRANSPORTER', label: 'Transporteur', labelEn: 'Transporter', labelAr: 'ناقل' },
   { id: 'RELAIS', label: 'Point relais', labelEn: 'Relay Point', labelAr: 'نقطة توصيل' },
   { id: 'ADMIN', label: 'Administrateur', labelEn: 'Administrator', labelAr: 'مدير' },
@@ -123,6 +127,8 @@ export function getTariff(villeDepart: string, villeArrivee: string, format: str
   return tariffs[format as keyof typeof tariffs] || tariffs.PETIT;
 }
 
+import { buildParcelQrPayload } from '@/lib/qr-payload';
+
 export function generateTrackingNumber(): string {
   const prefix = 'SC';
   const timestamp = Date.now().toString(36).toUpperCase();
@@ -130,12 +136,8 @@ export function generateTrackingNumber(): string {
   return `${prefix}${timestamp}${random}`;
 }
 
-export function generateQRData(trackingNumber: string): string {
-  return JSON.stringify({
-    tracking: trackingNumber,
-    platform: 'SwiftColis',
-    generated: new Date().toISOString(),
-  });
+export function generateQRData(trackingNumber: string, baseUrl?: string): string {
+  return buildParcelQrPayload(trackingNumber, baseUrl);
 }
 
 // ─── MVP Workflow helpers ──────────────────────────────────────────────────────

@@ -1,0 +1,50 @@
+﻿<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000">
+  <defs>
+    <linearGradient id="mainBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#f0fdf4"/>
+    </linearGradient>
+    <linearGradient id="mapGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#22c55e" stop-opacity="0.1"/>
+      <stop offset="100%" stop-color="#15803d" stop-opacity="0.05"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Fond clair et frais -->
+  <rect width="1600" height="1000" fill="url(#mainBg)"/>
+  
+  <!-- Motif de points légers pour le côté "Tech" -->
+  <pattern id="lightGrid" width="40" height="40" patternUnits="userSpaceOnUse">
+    <circle cx="2" cy="2" r="1" fill="#22c55e" opacity="0.1"/>
+  </pattern>
+  <rect width="1600" height="1000" fill="url(#lightGrid)"/>
+
+  <!-- Carte de l'Algérie stylisée et claire -->
+  <path d="M450 250 L1150 250 L1050 750 L550 800 Z" fill="url(#mapGrad)" stroke="#22c55e" stroke-width="1" stroke-opacity="0.2"/>
+
+  <!-- Réseau logistique coloré -->
+  <g>
+    <!-- Alger Hub -->
+    <circle cx="800" cy="300" r="12" fill="#22c55e" />
+    <circle cx="800" cy="300" r="20" fill="none" stroke="#22c55e" stroke-width="1" stroke-opacity="0.3">
+      <animate attributeName="r" from="12" to="35" dur="3s" repeatCount="indefinite" />
+      <animate attributeName="opacity" from="0.5" to="0" dur="3s" repeatCount="indefinite" />
+    </circle>
+
+    <!-- Connexions luminescentes -->
+    <g stroke="#22c55e" stroke-width="2" stroke-opacity="0.3" stroke-dasharray="8,4">
+      <path d="M800 300 L550 400" />
+      <path d="M800 300 L1050 400" />
+      <path d="M800 300 L800 650" />
+    </g>
+
+    <circle cx="550" cy="400" r="6" fill="#16a34a" />
+    <circle cx="1050" cy="400" r="6" fill="#16a34a" />
+    <circle cx="800" cy="650" r="6" fill="#16a34a" />
+  </g>
+
+  <!-- Éléments de décoration aériens -->
+  <path d="M200 100 Q 400 50 600 150 T 1000 50" fill="none" stroke="#22c55e" stroke-width="1" stroke-opacity="0.1" />
+  <path d="M1200 800 Q 1400 850 1500 700" fill="none" stroke="#22c55e" stroke-width="1" stroke-opacity="0.1" />
+
+</svg>

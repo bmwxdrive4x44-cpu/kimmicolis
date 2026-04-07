@@ -6,6 +6,12 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { isAlgerianCommerceRegisterNumber, normalizeCommerceRegisterNumber } from '@/lib/validators';
 import { checkRateLimit, RATE_LIMIT_PRESETS } from '@/lib/ratelimit';
+import { normalizeRole } from '@/lib/roles';
+
+function isMissingClientTypeColumnError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error || '');
+  return message.toLowerCase().includes('clienttype');
+}
 
 // GET all users (ADMIN ONLY)
 export async function GET(request: NextRequest) {
@@ -18,29 +24,132 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const users = await db.user.findMany({
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        firstName: true,
-        lastName: true,
-        address: true,
-        role: true,
-        phone: true,
-        isActive: true,
-        createdAt: true,
-        relais: {
-          select: {
-            id: true,
-            commerceName: true,
-            status: true,
+    try {
+      const users = await db.user.findMany({
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          firstName: true,
+          lastName: true,
+          address: true,
+          role: true,
+          phone: true,
+          siret: true,
+          isActive: true,
+          clientType: true,
+          createdAt: true,
+          relais: {
+            select: {
+              id: true,
+              commerceName: true,
+              status: true,
+              operationalStatus: true,
+              address: true,
+              ville: true,
+            },
+          },
+          enseigne: {
+            select: {
+              id: true,
+              businessName: true,
+              operationalCity: true,
+              billingEmail: true,
+            },
+          },
+          transporterApplication: {
+            select: {
+              id: true,
+              vehicle: true,
+              regions: true,
+              status: true,
+            },
           },
         },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
-    return NextResponse.json(users);
+        orderBy: { createdAt: 'desc' },
+      });
+      return NextResponse.json(users);
+    } catch (error) {
+      // If clientType doesn't exist, retry without it
+      if (isMissingClientTypeColumnError(error)) {
+        try {
+          const users = await db.user.findMany({
+            select: {
+              id: true,
+              email: true,
+              name: true,
+              firstName: true,
+              lastName: true,
+              address: true,
+              role: true,
+              phone: true,
+              siret: true,
+              isActive: true,
+              createdAt: true,
+              relais: {
+                select: {
+                  id: true,
+                  commerceName: true,
+                  status: true,
+                  operationalStatus: true,
+                  address: true,
+                  ville: true,
+                },
+              },
+              enseigne: {
+                select: {
+                  id: true,
+                  businessName: true,
+                  operationalCity: true,
+                  billingEmail: true,
+                },
+              },
+              transporterApplication: {
+                select: {
+                  id: true,
+                  vehicle: true,
+                  regions: true,
+                  status: true,
+                },
+              },
+            },
+            orderBy: { createdAt: 'desc' },
+          });
+
+          return NextResponse.json(users.map((user) => ({ ...user, clientType: 'STANDARD' })));
+        } catch (fallbackError) {
+          console.error('Fallback query failed:', fallbackError);
+          // Last resort: query without relais
+          const users = await db.user.findMany({
+            orderBy: { createdAt: 'desc' },
+          });
+          return NextResponse.json(
+            users.map((user) => ({
+              ...user,
+              clientType: 'STANDARD',
+              relais: null,
+              enseigne: null,
+              transporterApplication: null,
+            }))
+          );
+        }
+      } else {
+        // For any other error, try simple query without relations
+        console.warn('Query with relais failed, retrying without relations:', error);
+        const users = await db.user.findMany({
+          orderBy: { createdAt: 'desc' },
+        });
+        return NextResponse.json(
+          users.map((user) => ({
+            ...user,
+            clientType: 'STANDARD',
+            relais: null,
+            enseigne: null,
+            transporterApplication: null,
+          }))
+        );
+      }
+    }
   } catch (error) {
     console.error('Error fetching users:', error);
     return NextResponse.json({ error: 'Failed to fetch users' }, { status: 500 });
@@ -60,6 +169,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { name, firstName, lastName, address, email, password, phone, role, siret } = body;
+    const normalizedRole = normalizeRole(role);
 
     const normalizedFirstName = String(firstName || '').trim();
     const normalizedLastName = String(lastName || '').trim();
@@ -92,14 +202,14 @@ export async function POST(request: NextRequest) {
 
     const normalizedSiret = normalizeCommerceRegisterNumber(String(siret || ''));
 
-    if ((role === 'TRANSPORTER' || role === 'RELAIS') && !normalizedSiret) {
+    if ((normalizedRole === 'TRANSPORTER' || normalizedRole === 'RELAIS') && !normalizedSiret) {
       return NextResponse.json({
         error: 'Missing required fields',
         details: 'Le numéro du registre du commerce est obligatoire pour les transporteurs et les points relais',
       }, { status: 400 });
     }
 
-    if ((role === 'TRANSPORTER' || role === 'RELAIS') && !isAlgerianCommerceRegisterNumber(normalizedSiret)) {
+    if ((normalizedRole === 'TRANSPORTER' || normalizedRole === 'RELAIS') && !isAlgerianCommerceRegisterNumber(normalizedSiret)) {
       return NextResponse.json({
         error: 'Invalid commerce register number format',
         details: 'Format RC algérien invalide (ex: RC-16/1234567B21)',
@@ -114,8 +224,9 @@ export async function POST(request: NextRequest) {
     if (existingUser) {
       return NextResponse.json({ 
         error: 'Email already exists',
+        code: 'EMAIL_ALREADY_EXISTS',
         details: 'An account with this email already exists' 
-      }, { status: 400 });
+      }, { status: 409 });
     }
 
     // Hash password
@@ -131,8 +242,8 @@ export async function POST(request: NextRequest) {
         email: email.toLowerCase(),
         password: hashedPassword,
         phone: phone || null,
-        role: role || 'CLIENT',
-        siret: (role === 'TRANSPORTER' || role === 'RELAIS') ? normalizedSiret : null,
+        role: normalizedRole,
+        siret: (normalizedRole === 'TRANSPORTER' || normalizedRole === 'RELAIS') ? normalizedSiret : null,
       },
     });
 

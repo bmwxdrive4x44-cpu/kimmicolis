@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { RELAY_BLOCK_THRESHOLD_DA } from '@/lib/constants';
 import { createHash } from 'crypto';
 import { createNotificationDedup } from '@/lib/notifications';
+import { extractTrackingFromQrPayload } from '@/lib/qr-payload';
 
 function normalizeName(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, ' ');
@@ -82,15 +83,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Parse tracking number from QR data if not directly provided
-    let tracking = trackingNumber;
-    if (!tracking && qrData) {
-      try {
-        const parsed = JSON.parse(qrData);
-        tracking = parsed.tracking;
-      } catch {
-        tracking = qrData;
-      }
-    }
+    let tracking = extractTrackingFromQrPayload(trackingNumber) || extractTrackingFromQrPayload(qrData);
 
     if (!tracking) {
       return NextResponse.json({ error: 'trackingNumber ou qrData est requis' }, { status: 400 });

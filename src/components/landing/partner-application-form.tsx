@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { FormFieldError, FormGlobalError } from '@/components/ui/form-error';
 import { useToast } from '@/hooks/use-toast';
 import { WILAYAS } from '@/lib/constants';
 import { isAlgerianCommerceRegisterNumber, normalizeCommerceRegisterNumber } from '@/lib/validators';
@@ -86,6 +87,8 @@ export function PartnerApplicationForm({ role }: PartnerApplicationFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [existingRecordId, setExistingRecordId] = useState<string | null>(null);
   const [existingStatus, setExistingStatus] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof FormState, string>>>({});
 
   const wrongRole = Boolean(session?.user?.role && status === 'authenticated' && session.user.role !== role);
 
@@ -95,6 +98,8 @@ export function PartnerApplicationForm({ role }: PartnerApplicationFormProps) {
   );
 
   const setField = <K extends keyof FormState>(key: K, value: FormState[K]) => {
+    setSubmitError(null);
+    setFieldErrors((prev) => ({ ...prev, [key]: undefined }));
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
@@ -168,46 +173,58 @@ export function PartnerApplicationForm({ role }: PartnerApplicationFormProps) {
   }, [fetchExistingApplication, status]);
 
   const validateForm = () => {
+    const errors: Partial<Record<keyof FormState, string>> = {};
     const rcNumber = normalizeCommerceRegisterNumber(form.commerceRegisterNumber);
+    const phoneRegex = /^\+?[0-9]{8,15}$/;
 
     if (!rcNumber) {
-      toast({ title: 'Erreur', description: 'Le numéro du registre du commerce est obligatoire.', variant: 'destructive' });
-      return false;
-    }
-
-    if (!isAlgerianCommerceRegisterNumber(rcNumber)) {
-      toast({ title: 'Erreur', description: 'Format RC invalide. Exemple : 16/0012345B22', variant: 'destructive' });
-      return false;
+      errors.commerceRegisterNumber = 'Le numéro du registre du commerce est obligatoire.';
+    } else if (!isAlgerianCommerceRegisterNumber(rcNumber)) {
+      errors.commerceRegisterNumber = 'Format RC invalide. Exemple : 16/0012345B22';
     }
 
     if (status !== 'authenticated') {
-      if (!form.firstName || !form.lastName || !form.email || !form.phone || !form.password || !form.confirmPassword) {
-        toast({ title: 'Erreur', description: 'Veuillez remplir les informations de compte.', variant: 'destructive' });
-        return false;
+      if (!form.firstName.trim()) errors.firstName = 'Le prénom est obligatoire.';
+      if (!form.lastName.trim()) errors.lastName = 'Le nom est obligatoire.';
+      if (!form.email.trim()) {
+        errors.email = 'L\'email est obligatoire.';
+      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
+        errors.email = 'Le format de l\'email est invalide.';
       }
-      if (form.password.length < 6) {
-        toast({ title: 'Erreur', description: 'Le mot de passe doit contenir au moins 6 caractères.', variant: 'destructive' });
-        return false;
+      if (!form.phone.trim()) {
+        errors.phone = 'Le téléphone est obligatoire.';
+      } else if (!phoneRegex.test(form.phone.trim())) {
+        errors.phone = 'Format de téléphone invalide (8 à 15 chiffres, + autorisé).';
       }
-      if (form.password !== form.confirmPassword) {
-        toast({ title: 'Erreur', description: 'Les mots de passe ne correspondent pas.', variant: 'destructive' });
-        return false;
+      if (!form.password) {
+        errors.password = 'Le mot de passe est obligatoire.';
+      } else if (form.password.length < 6) {
+        errors.password = 'Le mot de passe doit contenir au moins 6 caractères.';
+      }
+      if (!form.confirmPassword) {
+        errors.confirmPassword = 'La confirmation du mot de passe est obligatoire.';
+      } else if (form.password !== form.confirmPassword) {
+        errors.confirmPassword = 'Les mots de passe ne correspondent pas.';
       }
     }
 
     if (isRelais) {
-      if (!form.commerceName || !form.address || !form.ville) {
-        toast({ title: 'Erreur', description: 'Veuillez renseigner le commerce, l\'adresse et la ville.', variant: 'destructive' });
-        return false;
-      }
-      return true;
+      if (!form.commerceName.trim()) errors.commerceName = 'Le nom du commerce est obligatoire.';
+      if (!form.address.trim()) errors.address = 'L\'adresse complète est obligatoire.';
+      if (!form.ville.trim()) errors.ville = 'La ville est obligatoire.';
+    } else {
+      if (!form.vehicle.trim()) errors.vehicle = 'Le type de véhicule est obligatoire.';
+      if (!form.license.trim()) errors.license = 'Le numéro de permis est obligatoire.';
     }
 
-    if (!form.vehicle || !form.license) {
-      toast({ title: 'Erreur', description: 'Veuillez renseigner le véhicule et le permis.', variant: 'destructive' });
+    setFieldErrors(errors);
+    if (Object.keys(errors).length > 0) {
+      setSubmitError('Veuillez corriger les champs en rouge.');
+      toast({ title: 'Erreur', description: 'Veuillez corriger les champs en rouge.', variant: 'destructive' });
       return false;
     }
 
+    setSubmitError(null);
     return true;
   };
 
@@ -235,7 +252,20 @@ export function PartnerApplicationForm({ role }: PartnerApplicationFormProps) {
 
     const createUserData = await createUserRes.json().catch(() => null);
     if (!createUserRes.ok) {
-      throw new Error(createUserData?.error || 'Impossible de créer le compte.');
+      const isExistingAccount = createUserRes.status === 409
+        || createUserData?.code === 'EMAIL_ALREADY_EXISTS'
+        || String(createUserData?.error || '').toLowerCase().includes('email already exists');
+
+      if (isExistingAccount) {
+        setFieldErrors((prev) => ({ ...prev, email: 'Cet email est déjà utilisé.' }));
+        throw new Error('Un compte existe déjà avec cet email. Connectez-vous puis complétez votre dossier.');
+      }
+
+      if (createUserData?.code === 'INVALID_COMMERCE_REGISTER_NUMBER') {
+        setFieldErrors((prev) => ({ ...prev, commerceRegisterNumber: 'Numéro RC invalide.' }));
+      }
+
+      throw new Error(createUserData?.details || createUserData?.error || 'Impossible de créer le compte.');
     }
 
     const signInResult = await signIn('credentials', {
@@ -293,6 +323,12 @@ export function PartnerApplicationForm({ role }: PartnerApplicationFormProps) {
 
     if (!response.ok) {
       const data = await response.json().catch(() => null);
+      if (data?.field === 'commerceRegisterNumber' || data?.code === 'INVALID_COMMERCE_REGISTER_NUMBER') {
+        setFieldErrors((prev) => ({ ...prev, commerceRegisterNumber: 'Numéro RC invalide côté serveur.' }));
+      }
+      if (response.status === 409 && data?.code === 'DUPLICATE_RELAIS_RC') {
+        throw new Error('Ce numéro de Registre du Commerce est déjà utilisé par un autre point relais.');
+      }
       throw new Error(data?.error || 'Impossible d\'enregistrer la demande relais.');
     }
   };
@@ -324,12 +360,23 @@ export function PartnerApplicationForm({ role }: PartnerApplicationFormProps) {
 
     if (!response.ok) {
       const data = await response.json().catch(() => null);
+      if (data?.field === 'commerceRegisterNumber' || data?.code === 'INVALID_COMMERCE_REGISTER_NUMBER') {
+        setFieldErrors((prev) => ({ ...prev, commerceRegisterNumber: 'Numéro RC invalide côté serveur.' }));
+      }
+      if (data?.code === 'MISSING_REQUIRED_FIELDS') {
+        setSubmitError('Des champs obligatoires sont manquants.');
+      }
+      if (response.status === 409 && data?.code === 'DUPLICATE_TRANSPORTER_RC') {
+        throw new Error('Ce numéro de Registre du Commerce est déjà utilisé par un autre transporteur.');
+      }
       throw new Error(data?.error || 'Impossible d\'enregistrer la demande transporteur.');
     }
   };
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
+    setSubmitError(null);
+    setFieldErrors({});
 
     if (wrongRole) {
       toast({ title: 'Compte incompatible', description: 'Connectez-vous avec un compte du bon type pour compléter ce dossier.', variant: 'destructive' });
@@ -359,9 +406,11 @@ export function PartnerApplicationForm({ role }: PartnerApplicationFormProps) {
       router.push(theme.dashboardPath);
       router.refresh();
     } catch (error) {
+      const message = error instanceof Error ? error.message : 'Une erreur est survenue.';
+      setSubmitError(message);
       toast({
         title: 'Erreur',
-        description: error instanceof Error ? error.message : 'Une erreur est survenue.',
+        description: message,
         variant: 'destructive',
       });
     } finally {
@@ -401,6 +450,8 @@ export function PartnerApplicationForm({ role }: PartnerApplicationFormProps) {
           </div>
         )}
 
+        <FormGlobalError message={submitError} className="mb-6" />
+
         <form className="space-y-6" onSubmit={handleSubmit}>
           {status !== 'authenticated' && (
             <div className="space-y-4 rounded-xl border bg-slate-50 p-5">
@@ -412,26 +463,32 @@ export function PartnerApplicationForm({ role }: PartnerApplicationFormProps) {
                 <div className="space-y-2">
                   <Label>Prénom</Label>
                   <Input value={form.firstName} onChange={(e) => setField('firstName', e.target.value)} />
+                  <FormFieldError message={fieldErrors.firstName} />
                 </div>
                 <div className="space-y-2">
                   <Label>Nom</Label>
                   <Input value={form.lastName} onChange={(e) => setField('lastName', e.target.value)} />
+                  <FormFieldError message={fieldErrors.lastName} />
                 </div>
                 <div className="space-y-2 md:col-span-2">
                   <Label>Email</Label>
                   <Input type="email" value={form.email} onChange={(e) => setField('email', e.target.value)} />
+                  <FormFieldError message={fieldErrors.email} />
                 </div>
                 <div className="space-y-2">
                   <Label>Téléphone</Label>
                   <Input value={form.phone} onChange={(e) => setField('phone', e.target.value)} />
+                  <FormFieldError message={fieldErrors.phone} />
                 </div>
                 <div className="space-y-2">
                   <Label>Mot de passe</Label>
                   <Input type="password" value={form.password} onChange={(e) => setField('password', e.target.value)} />
+                  <FormFieldError message={fieldErrors.password} />
                 </div>
                 <div className="space-y-2 md:col-span-2">
                   <Label>Confirmer le mot de passe</Label>
                   <Input type="password" value={form.confirmPassword} onChange={(e) => setField('confirmPassword', e.target.value)} />
+                  <FormFieldError message={fieldErrors.confirmPassword} />
                 </div>
               </div>
             </div>
@@ -454,6 +511,7 @@ export function PartnerApplicationForm({ role }: PartnerApplicationFormProps) {
               <div className="space-y-2">
                 <Label>Téléphone</Label>
                 <Input value={form.phone} onChange={(e) => setField('phone', e.target.value)} />
+                <FormFieldError message={fieldErrors.phone} />
               </div>
             </div>
           )}
@@ -465,6 +523,7 @@ export function PartnerApplicationForm({ role }: PartnerApplicationFormProps) {
               value={form.commerceRegisterNumber}
               onChange={(e) => setField('commerceRegisterNumber', e.target.value)}
             />
+            <FormFieldError message={fieldErrors.commerceRegisterNumber} />
             <p className="text-xs text-slate-500">Format CNRC : WW/NNNNNNNLAA. Exemple : 16/0012345B22</p>
           </div>
 
@@ -473,10 +532,12 @@ export function PartnerApplicationForm({ role }: PartnerApplicationFormProps) {
               <div className="space-y-2 md:col-span-2">
                 <Label>Nom du commerce</Label>
                 <Input value={form.commerceName} onChange={(e) => setField('commerceName', e.target.value)} />
+                <FormFieldError message={fieldErrors.commerceName} />
               </div>
               <div className="space-y-2 md:col-span-2">
                 <Label>Adresse complète</Label>
                 <Textarea rows={3} value={form.address} onChange={(e) => setField('address', e.target.value)} />
+                <FormFieldError message={fieldErrors.address} />
               </div>
               <div className="space-y-2 md:col-span-2">
                 <Label>Ville</Label>
@@ -492,18 +553,21 @@ export function PartnerApplicationForm({ role }: PartnerApplicationFormProps) {
                     ))}
                   </SelectContent>
                 </Select>
+                <FormFieldError message={fieldErrors.ville} />
               </div>
             </div>
           ) : (
             <div className="space-y-4">
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label>Type de véhicule</Label>
+                  <Label>Type de véhicule <span className="text-red-500">*</span></Label>
                   <Input value={form.vehicle} onChange={(e) => setField('vehicle', e.target.value)} />
+                  <FormFieldError message={fieldErrors.vehicle} />
                 </div>
                 <div className="space-y-2">
-                  <Label>Numéro de permis</Label>
+                  <Label>Numéro de permis <span className="text-red-500">*</span></Label>
                   <Input value={form.license} onChange={(e) => setField('license', e.target.value)} />
+                  <FormFieldError message={fieldErrors.license} />
                 </div>
                 <div className="space-y-2 md:col-span-2">
                   <Label>Années d'expérience</Label>

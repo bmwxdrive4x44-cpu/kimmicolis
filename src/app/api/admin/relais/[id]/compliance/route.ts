@@ -8,14 +8,14 @@ import { db } from '@/lib/db';
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   // Vérification auth ADMIN
   const auth = await requireRole(request, ['ADMIN']);
   if (!auth.success) return auth.response;
 
   try {
-    const { id: relaisId } = params;
+    const { id: relaisId } = await params;
 
     // Récupérer le relais avec ses relations
     const relais = await db.relais.findUnique({
@@ -245,14 +245,14 @@ export async function GET(
  */
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   // Vérification auth ADMIN
   const auth = await requireRole(request, ['ADMIN']);
   if (!auth.success) return auth.response;
 
   try {
-    const { id: relaisId } = params;
+    const { id: relaisId } = await params;
     const body = await request.json();
 
     const { score, notes } = body;
