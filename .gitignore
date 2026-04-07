@@ -54,7 +54,5 @@ dev.db-wal
 prisma/dev.db
 prisma/dev.db-shm
 prisma/dev.db-wal
-# Lock files
-package-lock.json
 # Skills directory
 /skills/
