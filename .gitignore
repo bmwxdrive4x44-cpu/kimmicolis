@@ -47,6 +47,7 @@ test
 prompt
 
 server.log
+smoke-test-report.json
 # SQLite local database files
 dev.db
 dev.db-shm
