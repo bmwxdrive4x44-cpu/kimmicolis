@@ -14,10 +14,24 @@ jobs:
   smoke-test:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: swiftcolis
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d swiftcolis"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
     env:
-      DATABASE_URL: ${{ fromJSON(toJSON(secrets)).DATABASE_URL }}
-      NEXTAUTH_SECRET: ${{ fromJSON(toJSON(secrets)).NEXTAUTH_SECRET }}
-      SLACK_WEBHOOK_URL: ${{ fromJSON(toJSON(secrets)).SLACK_WEBHOOK_URL }}
+      DATABASE_URL: ${{ secrets.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/swiftcolis?schema=public' }}
+      NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET || 'ci-nextauth-secret-not-for-prod' }}
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL || '' }}
 
     steps:
       - name: Checkout code
@@ -36,6 +50,9 @@ jobs:
             echo "npm ci failed, fallback to npm install"
             npm install --no-audit --no-fund
           }
+
+      - name: Prepare database schema
+        run: npx prisma migrate deploy || npx prisma db push
 
       - name: Build application
         run: npm run build
