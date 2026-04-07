@@ -1,8 +1,22 @@
 import { Resend } from 'resend';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-
 const FROM = process.env.RESEND_FROM ?? 'SwiftColis <onboarding@resend.dev>';
+
+let resendClient: Resend | null = null;
+
+function getResendClient(): Resend {
+  if (resendClient) {
+    return resendClient;
+  }
+
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    throw new Error('RESEND_API_KEY is not configured');
+  }
+
+  resendClient = new Resend(apiKey);
+  return resendClient;
+}
 
 export async function sendEmail({
   to,
@@ -13,6 +27,8 @@ export async function sendEmail({
   subject: string;
   html: string;
 }) {
+  const resend = getResendClient();
+
   const { data, error } = await resend.emails.send({
     from: FROM,
     to,
