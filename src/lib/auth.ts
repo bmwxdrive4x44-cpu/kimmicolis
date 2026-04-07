@@ -82,6 +82,20 @@ function isUnknownClientTypeFieldError(error: unknown): boolean {
   return message.includes('Unknown field `clientType`') && message.includes('model `User`');
 }
 
+function isMissingClientTypeColumnError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error || '');
+  const maybeCode = (error as { code?: string } | null)?.code;
+
+  if (maybeCode === 'P2022' && message.toLowerCase().includes('clienttype')) {
+    return true;
+  }
+
+  return (
+    message.includes('User.clientType') &&
+    (message.includes('does not exist') || message.includes('n\'existe pas'))
+  );
+}
+
 async function findUserForAuth(email: string) {
   const normalizedEmail = email.toLowerCase();
 
@@ -105,7 +119,7 @@ async function findUserForAuth(email: string) {
       },
     });
   } catch (error) {
-    if (!isUnknownClientTypeFieldError(error)) {
+    if (!isUnknownClientTypeFieldError(error) && !isMissingClientTypeColumnError(error)) {
       throw error;
     }
 
