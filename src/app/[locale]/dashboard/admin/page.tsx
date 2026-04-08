@@ -152,7 +152,7 @@ export default function AdminDashboard() {
 
           <DashboardPanel tone="admin">
             <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className={`${dashboardTabsListClass} grid grid-cols-2 lg:grid-cols-9`}>
+              <TabsList className={`${dashboardTabsListClass} grid grid-cols-2 lg:grid-cols-10`}>
                 <TabsTrigger value="overview" className={getDashboardTabsTriggerClass('admin')}><BarChart3 className="h-4 w-4 mr-2" />Vue d'ensemble</TabsTrigger>
                 <TabsTrigger value="users" className={getDashboardTabsTriggerClass('admin')}><Users className="h-4 w-4 mr-2" />Utilisateurs</TabsTrigger>
                 <TabsTrigger value="parcels" className={getDashboardTabsTriggerClass('admin')}><Package className="h-4 w-4 mr-2" />Colis</TabsTrigger>
@@ -160,6 +160,7 @@ export default function AdminDashboard() {
                 <TabsTrigger value="lines" className={getDashboardTabsTriggerClass('admin')}><MapPin className="h-4 w-4 mr-2" />Lignes</TabsTrigger>
                 <TabsTrigger value="loyalty" className={getDashboardTabsTriggerClass('admin')}><Award className="h-4 w-4 mr-2" />Fidélité</TabsTrigger>
                 <TabsTrigger value="audit" className={getDashboardTabsTriggerClass('admin')}><ScrollText className="h-4 w-4 mr-2" />Audit</TabsTrigger>
+                <TabsTrigger value="disputes" className={getDashboardTabsTriggerClass('admin')}><AlertCircle className="h-4 w-4 mr-2" />Litiges</TabsTrigger>
                 <TabsTrigger value="messages" className={getDashboardTabsTriggerClass('admin')}>
                   <Inbox className="h-4 w-4 mr-2" />
                   Messages
@@ -190,6 +191,9 @@ export default function AdminDashboard() {
               </TabsContent>
               <TabsContent value="audit">
                 <AuditTab />
+              </TabsContent>
+              <TabsContent value="disputes">
+                <DisputesTab />
               </TabsContent>
               <TabsContent value="messages">
                 <MessagesTab onUnreadCountChange={setUnreadMessagesCount} />
@@ -2288,6 +2292,247 @@ function AuditTab() {
           )}
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+// ─── Litiges Tab ─────────────────────────────────────────────────────────────
+function DisputesTab() {
+  const { toast } = useToast();
+  const [disputes, setDisputes] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'OPEN' | 'UNDER_REVIEW' | 'RESOLVED' | 'CLOSED'>('ALL');
+  const [selectedDispute, setSelectedDispute] = useState<any | null>(null);
+  const [newStatus, setNewStatus] = useState<'OPEN' | 'UNDER_REVIEW' | 'RESOLVED' | 'CLOSED'>('UNDER_REVIEW');
+  const [resolution, setResolution] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+
+  const fetchDisputes = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (statusFilter !== 'ALL') {
+        params.set('status', statusFilter);
+      }
+      const query = params.toString();
+      const res = await fetch(`/api/disputes${query ? `?${query}` : ''}`);
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data?.error || 'Impossible de charger les litiges');
+      }
+      setDisputes(Array.isArray(data) ? data : []);
+    } catch (error) {
+      toast({
+        title: 'Erreur',
+        description: error instanceof Error ? error.message : 'Impossible de charger les litiges',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [statusFilter, toast]);
+
+  useEffect(() => {
+    fetchDisputes();
+  }, [fetchDisputes]);
+
+  const openUpdateDialog = (dispute: any) => {
+    setSelectedDispute(dispute);
+    setNewStatus(dispute.status || 'UNDER_REVIEW');
+    setResolution(dispute.resolution || '');
+  };
+
+  const handleUpdateDispute = async () => {
+    if (!selectedDispute) return;
+
+    setIsSaving(true);
+    try {
+      const res = await fetch('/api/disputes', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          disputeId: selectedDispute.id,
+          status: newStatus,
+          resolution: resolution.trim() || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data?.error || 'Mise à jour impossible');
+      }
+
+      toast({ title: 'Litige mis à jour', description: `Nouveau statut: ${newStatus}` });
+      setSelectedDispute(null);
+      setResolution('');
+      await fetchDisputes();
+    } catch (error) {
+      toast({
+        title: 'Erreur',
+        description: error instanceof Error ? error.message : 'Mise à jour impossible',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const statusBadge = (status: string) => {
+    switch (status) {
+      case 'OPEN':
+        return 'bg-red-100 text-red-700';
+      case 'UNDER_REVIEW':
+        return 'bg-orange-100 text-orange-700';
+      case 'RESOLVED':
+        return 'bg-emerald-100 text-emerald-700';
+      case 'CLOSED':
+        return 'bg-slate-200 text-slate-700';
+      default:
+        return 'bg-slate-100 text-slate-600';
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <AlertCircle className="h-5 w-5 text-red-600" />
+                Litiges clients
+              </CardTitle>
+              <CardDescription>Traitement des litiges, arbitrage et clôture</CardDescription>
+            </div>
+            <div className="flex items-center gap-2">
+              <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as any)}>
+                <SelectTrigger className="w-44">
+                  <SelectValue placeholder="Filtrer par statut" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">Tous les statuts</SelectItem>
+                  <SelectItem value="OPEN">OPEN</SelectItem>
+                  <SelectItem value="UNDER_REVIEW">UNDER_REVIEW</SelectItem>
+                  <SelectItem value="RESOLVED">RESOLVED</SelectItem>
+                  <SelectItem value="CLOSED">CLOSED</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button variant="outline" onClick={fetchDisputes} disabled={isLoading}>
+                <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+                Actualiser
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-emerald-600" /></div>
+          ) : disputes.length === 0 ? (
+            <p className="text-center text-slate-500 py-8">Aucun litige trouvé</p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Colis</TableHead>
+                  <TableHead>Motif</TableHead>
+                  <TableHead>Client</TableHead>
+                  <TableHead>Statut</TableHead>
+                  <TableHead>Créé le</TableHead>
+                  <TableHead>Action</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {disputes.map((dispute) => (
+                  <TableRow key={dispute.id}>
+                    <TableCell>
+                      <div className="space-y-0.5">
+                        <p className="font-mono text-sm">{dispute.colis?.trackingNumber || dispute.colisId}</p>
+                        <p className="text-xs text-slate-500">{dispute.colis?.villeDepart || '—'} → {dispute.colis?.villeArrivee || '—'}</p>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="space-y-1">
+                        <p className="text-xs font-semibold text-slate-700">{dispute.reason}</p>
+                        <p className="text-xs text-slate-500 max-w-[280px] truncate" title={dispute.description}>{dispute.description}</p>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="space-y-0.5">
+                        <p className="text-sm">{dispute.openedBy?.name || 'N/A'}</p>
+                        <p className="text-xs text-slate-500">{dispute.openedBy?.email || '—'}</p>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge className={statusBadge(dispute.status)}>{dispute.status}</Badge>
+                    </TableCell>
+                    <TableCell className="text-xs text-slate-500">
+                      {new Date(dispute.createdAt).toLocaleDateString('fr-FR', {
+                        day: '2-digit',
+                        month: 'short',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </TableCell>
+                    <TableCell>
+                      <Button size="sm" variant="outline" onClick={() => openUpdateDialog(dispute)}>
+                        Gérer
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      <Dialog open={Boolean(selectedDispute)} onOpenChange={(open) => { if (!open) setSelectedDispute(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Mettre à jour le litige</DialogTitle>
+            <DialogDescription>
+              {selectedDispute?.colis?.trackingNumber
+                ? `Colis ${selectedDispute.colis.trackingNumber}`
+                : selectedDispute?.colisId || ''}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Nouveau statut</Label>
+              <Select value={newStatus} onValueChange={(value) => setNewStatus(value as any)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="OPEN">OPEN</SelectItem>
+                  <SelectItem value="UNDER_REVIEW">UNDER_REVIEW</SelectItem>
+                  <SelectItem value="RESOLVED">RESOLVED</SelectItem>
+                  <SelectItem value="CLOSED">CLOSED</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Résolution (optionnelle)</Label>
+              <Textarea
+                placeholder="Notes de résolution / décision d'arbitrage"
+                value={resolution}
+                onChange={(e) => setResolution(e.target.value)}
+                rows={4}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSelectedDispute(null)} disabled={isSaving}>Annuler</Button>
+            <Button onClick={handleUpdateDispute} disabled={isSaving}>
+              {isSaving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+              Enregistrer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

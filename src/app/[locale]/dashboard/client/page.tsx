@@ -2014,7 +2014,7 @@ function LitigesTab({ userId }: { userId: string }) {
     if (!selectedColisId || !description.trim()) return;
     setIsSubmitting(true);
     try {
-      const res = await fetch('/api/litiges', {
+      const res = await fetch('/api/disputes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ colisId: selectedColisId, reason, description }),
@@ -2026,7 +2026,8 @@ function LitigesTab({ userId }: { userId: string }) {
         setSelectedColisId('');
         // Refresh parcels
         const updated = await fetch(`/api/parcels?clientId=${userId}`);
-        setParcels(Array.isArray(await updated.json()) ? await updated.clone().json() : []);
+        const updatedData = await updated.json();
+        setParcels(Array.isArray(updatedData) ? updatedData : []);
       } else {
         toast({ title: 'Erreur', description: 'Impossible d\'ouvrir le litige.', variant: 'destructive' });
       }
