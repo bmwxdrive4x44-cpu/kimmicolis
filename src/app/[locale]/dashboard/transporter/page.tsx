@@ -901,7 +901,7 @@ function TrajetsTab({ userId }: { userId: string }) {
 const MISSION_STATUS_LABELS: Record<string, string> = {
   ASSIGNE: 'Assignée',
   EN_COURS: 'En cours',
-  LIVRE: 'Livré',
+  LIVRE: 'Arrivé au relais',
 };
 
 // Missions Tab
@@ -955,7 +955,7 @@ function MissionsTab({ userId, onRefreshStats }: { userId: string; onRefreshStat
         body: JSON.stringify({ status }),
       });
       if (res.ok) {
-        const labels: Record<string, string> = { EN_COURS: 'Transport démarré', LIVRE: 'Colis livré au relais' };
+        const labels: Record<string, string> = { EN_COURS: 'Transport démarré', LIVRE: 'Arrivée au relais confirmée' };
         toast({ title: labels[status] || 'Statut mis à jour' });
         fetchMissions();
         if (status === 'LIVRE') onRefreshStats?.(true);
@@ -986,7 +986,7 @@ function MissionsTab({ userId, onRefreshStats }: { userId: string; onRefreshStat
               <SelectItem value="all">Toutes</SelectItem>
               <SelectItem value="ASSIGNE">Assignées</SelectItem>
               <SelectItem value="EN_COURS">En cours</SelectItem>
-              <SelectItem value="LIVRE">Livrées</SelectItem>
+              <SelectItem value="LIVRE">Arrivées relais</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -1032,9 +1032,9 @@ function MissionsTab({ userId, onRefreshStats }: { userId: string; onRefreshStat
                       </Button>
                     )}
                     {m.status === 'EN_COURS' && (
-                      <Button size="sm" className="bg-green-600 hover:bg-green-700" disabled={processingId === m.id} onClick={() => handleStatusChange(m.id, 'LIVRE')}>
+                      <Button size="sm" className="bg-teal-600 hover:bg-teal-700" disabled={processingId === m.id} onClick={() => handleStatusChange(m.id, 'LIVRE')}>
                         {processingId === m.id ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <CheckCircle className="h-3 w-3 mr-1" />}
-                        Livré
+                        Confirmer arrivée relais
                       </Button>
                     )}
                   </div>
@@ -1419,7 +1419,7 @@ function WalletTab({ userId }: { userId: string }) {
               <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Toutes</SelectItem>
-                <SelectItem value="LIVRE">Livrées</SelectItem>
+                <SelectItem value="LIVRE">Arrivées relais</SelectItem>
                 <SelectItem value="EN_COURS">En cours</SelectItem>
                 <SelectItem value="ASSIGNE">Assignées</SelectItem>
               </SelectContent>

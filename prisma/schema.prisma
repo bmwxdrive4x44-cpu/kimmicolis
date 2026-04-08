@@ -239,9 +239,13 @@ model Colis {
   status          String   @default("CREATED") // CREATED | PENDING_PAYMENT | PAID | READY_FOR_DEPOSIT | PAID_RELAY | DEPOSITED_RELAY | RECU_RELAIS | WAITING_PICKUP | EN_TRANSPORT | ARRIVE_RELAIS_DESTINATION | LIVRE | ANNULE | RETOUR | EN_DISPUTE | REFUSE_RELAIS | COLIS_PERDU | COLIS_ENDOMMAGE | ABSENT_DESTINATAIRE
   qrCode          String   // QR code data
   qrToken         String?  @unique // token sécurisé embarqué dans le QR (anti-replay)
+  qrExpiresAt     DateTime? // QR expiration time for security
+  withdrawalPin   String?  // 4-digit PIN for client security
   custody         String   @default("CLIENT") // CLIENT | RELAIS_DEPART | TRANSPORTEUR | RELAIS_DEST
   qrCodeImage     String?  // QR code image URL
   photoProof      String?  // JSON array of proof photo URLs
+  injectionBlocked Boolean @default(false) // Blocked if geographic/logical inconsistency detected
+  blockReason     String?  // Reason for injection block (debugging)
   isPriority      Boolean  @default(false) // true for pro client parcels
   dateCreation    DateTime @default(now())
   dateLimit       DateTime?
@@ -314,6 +318,9 @@ model Mission {
   trajetId        String?
   status          String   @default("ASSIGNE") // ASSIGNE, EN_COURS, LIVRE
   assignedAt      DateTime @default(now())
+  assignmentDeadline DateTime? // Timeout for acceptance (30 min default)
+  relaisConfirmed Boolean @default(false) // Relay confirmed handoff to transporter
+  transporteurConfirmed Boolean @default(false) // Transporter confirmed receipt from relay
   completedAt     DateTime?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -363,9 +370,11 @@ model TransporterWallet {
   id                String   @id @default(cuid())
   transporteurId    String   @unique
   pendingEarnings   Float    @default(0)  // En attente (colis en cours)
+  escrowedEarnings  Float    @default(0)  // Bloqué jusqu'à LIVRE (anti-fraud)
   availableEarnings Float    @default(0)  // Disponibles au retrait
   totalEarned       Float    @default(0)  // Total historique gagné
   totalWithdrawn    Float    @default(0)  // Total retiré
+  totalPenalties    Float    @default(0)  // Total pénalités appliquées
   updatedAt         DateTime @updatedAt
   createdAt         DateTime @default(now())
 }
@@ -510,4 +519,65 @@ model CashPickup {
 
   @@index([relaisId, createdAt])
   @@index([status, scheduledAt])
+}
+
+// Transporter performance scoring (for intelligent matching)
+model TransporterScore {
+  id                String   @id @default(cuid())
+  transporteurId    String   @unique
+  successRate       Float    @default(100) // Completion success rate (%)
+  avgCompletionTime Float    @default(0)  // Average delivery time (hours)
+  cancellationRate  Float    @default(0)  // Cancellation rate (%)
+  averageRating     Float    @default(5)  // Customer rating (0-5)
+  totalDeliveries   Int      @default(0)  // Total completed deliveries
+  totalCancellations Int     @default(0)  // Total cancelled missions
+  totalLate         Int      @default(0)  // Total late deliveries
+  score             Float    @default(50) // Composite score (0-100) for matching
+  lastUpdated       DateTime @default(now()) @updatedAt
+  createdAt         DateTime @default(now())
+
+  @@index([score])
+  @@index([transporteurId])
+}
+
+// Transporter penalties (auto-deductions)
+model TransporterPenalty {
+  id             String   @id @default(cuid())
+  transporteurId String
+  colisId        String?  // Related parcel if applicable
+  type           String   // LATE_DELIVERY | LOST_PARCEL | CANCELLATION | USER_COMPLAINT
+  amount         Float    // Penalty amount (DA)
+  reason         String
+  status         String   @default("PENDING") // PENDING | APPLIED | WAIVED | DISPUTED
+  appliedAt      DateTime?
+  waivedAt       DateTime?
+  waivedBy       String?  // Admin user ID if waived
+  waiveReason    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([transporteurId, createdAt])
+  @@index([status])
+  @@index([colisId])
+}
+
+// QR security audit trail
+model QrSecurityLog {
+  id             String   @id @default(cuid())
+  colisId        String
+  qrToken        String
+  scanLocation   String?  // City where scanned
+  scannerRole    String?  // RELAIS | TRANSPORTER
+  pinAttempts    Int      @default(0)
+  pinVerified    Boolean  @default(false)
+  tokenValid     Boolean  @default(true)
+  expiryStatus   String?  // ACTIVE | EXPIRED
+  fraudFlagRaised Boolean @default(false)
+  fraudReason    String?
+  scanTimestamp  DateTime @default(now())
+  createdAt      DateTime @default(now())
+
+  @@index([colisId])
+  @@index([fraudFlagRaised])
+  @@index([scanTimestamp])
 }
