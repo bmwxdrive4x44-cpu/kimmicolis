@@ -9,6 +9,7 @@ import { evaluateImplicitProEligibility } from '@/lib/pro-eligibility';
 import { getImplicitLoyaltyConfig } from '@/lib/loyalty-config';
 import { createHash, randomBytes } from 'crypto';
 import { findActiveLineByCities } from '@/lib/logistics';
+import { generateWithdrawalPin, calculateQRExpiration } from '@/lib/qr-security';
 
 function normalizePhone(value: string): string {
   return value.replace(/\s+/g, '').replace(/[^+\d]/g, '');
@@ -392,6 +393,8 @@ export async function POST(request: NextRequest) {
     // Generate tracking number and secure QR token
     const trackingNumber = generateTrackingNumber();
     const qrToken = randomBytes(24).toString('hex');
+    const withdrawalPin = generateWithdrawalPin(); // 🔒 NEW: 4-digit PIN for security
+    const qrExpiresAt = calculateQRExpiration(24); // 🔒 NEW: QR expires in 24 hours
     const expectedDeliveryAt = new Date(Date.now() + 72 * 60 * 60 * 1000);
     const placeholderQrPayload = JSON.stringify({ token: qrToken });
 
@@ -420,6 +423,8 @@ export async function POST(request: NextRequest) {
         netTransporteur,
         qrCode: placeholderQrPayload,
         qrToken,
+        withdrawalPin, // 🔒 NEW
+        qrExpiresAt, // 🔒 NEW: QR code expiration for security
         custody: 'CLIENT',
         status: 'CREATED',
         dateLimit: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
@@ -431,6 +436,8 @@ export async function POST(request: NextRequest) {
       parcelId: createdColis.id,
       token: qrToken,
       tracking: trackingNumber,
+      pin: withdrawalPin, // Include PIN in QR payload
+      expiresAt: qrExpiresAt.toISOString(),
     });
     const qrCodeImage = await generateQRCodeImage(secureQrPayload);
 

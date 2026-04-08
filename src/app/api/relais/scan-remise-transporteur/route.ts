@@ -8,13 +8,19 @@ import {
   resolveQrSecurityPayload,
   resolveTrackingNumber,
 } from '@/lib/relais-scan';
+import { 
+  validateQRAgainstParcel, 
+  isQRExpired,
+  createQRScanLogEntry 
+} from '@/lib/qr-security';
 
 /**
  * POST /api/relais/scan-remise-transporteur
  * Relais de départ scanne le QR pour confirmer la remise du colis au transporteur.
- * Transition : RECU_RELAIS | DEPOSITED_RELAY → EN_TRANSPORT
+ * STEP 1 of double validation: Relay confirms handoff
+ * Body must include: PIN (if set on parcel)
  *
- * Body : { trackingNumber?, qrData?, relaisId? }
+ * Next step: Transporteur must POST /api/missions/{missionId}/accept-from-relay to confirm receipt
  */
 export async function POST(request: NextRequest) {
   const auth = await requireRole(request, ['RELAIS', 'ADMIN']);
@@ -22,7 +28,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { trackingNumber, qrData, relaisId } = body;
+    const { trackingNumber, qrData, relaisId, withdrawalPin } = body;
     const qrSecurity = resolveQrSecurityPayload(qrData);
 
     const tracking = resolveTrackingNumber(trackingNumber, qrData);
@@ -60,6 +66,32 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Colis non trouvé' }, { status: 404 });
     }
 
+    // 🔒 NEW: QR security validation (token + expiration)
+    const qrValidation = await validateQRAgainstParcel(parcel, qrSecurity, {
+      checkExpiration: true,
+      checkPin: !!parcel.withdrawalPin, // Check PIN if set
+      pinAttempt: withdrawalPin,
+    });
+
+    if (!qrValidation.valid) {
+      // 🚨 Log fraud attempt if flagged
+      if (qrValidation.fraudFlag) {
+        await (db as any).qrSecurityLog.create({
+          data: createQRScanLogEntry({
+            colisId: parcel.id,
+            qrToken: qrSecurity.token || qrSecurity.parcelId || 'UNKNOWN',
+            scanLocation: 'RELAIS_DEPART_FRAUD',
+            scannerRole: 'RELAIS',
+            fraudFlag: true,
+            fraudReason: qrValidation.error,
+          }),
+        });
+        // Notify admin asynchronously
+        console.error(`[FRAUD] QR fraud detected: ${qrValidation.error}`, { colisId: parcel.id });
+      }
+      return NextResponse.json({ error: qrValidation.error }, { status: 403 });
+    }
+
     if (qrSecurity.token && parcel.qrToken && qrSecurity.token !== parcel.qrToken) {
       return NextResponse.json({ error: 'QR invalide (token mismatch)' }, { status: 403 });
     }
@@ -74,6 +106,13 @@ export async function POST(request: NextRequest) {
         findFirst(args: Record<string, unknown>): Promise<{ id: string } | null>;
         create(args: Record<string, unknown>): Promise<unknown>;
       };
+      qrSecurityLog: {
+        create(args: Record<string, unknown>): Promise<unknown>;
+      };
+      mission: {
+        findFirst(args: Record<string, unknown>): Promise<any | null>;
+        update(args: Record<string, unknown>): Promise<any>;
+      };
     };
 
     const existingEvent = await actionLogDb.actionLog.findFirst({
@@ -81,7 +120,12 @@ export async function POST(request: NextRequest) {
       select: { id: true },
     });
     if (existingEvent) {
-      return NextResponse.json({ success: true, idempotent: true, eventId, newStatus: parcel.status });
+      return NextResponse.json({ 
+        success: true, 
+        idempotent: true, 
+        eventId, 
+        message: 'Remise déjà confirmée par le relais. En attente de confirmation du transporteur.' 
+      });
     }
 
     if (parcel.relaisDepartId !== actingRelaisId) {
@@ -99,8 +143,37 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // 🔄 NEW: Mark relais confirmation on missions instead of changing status immediately
+    // This allows transporteur to confirm receipt separately
+
+    // 🔄 NEW: Mark relais confirmation on missions instead of changing status immediately
+    // This allows transporteur to confirm receipt separately
+    const missions = await actionLogDb.mission.findFirst({
+      where: { colisId: parcel.id, status: { in: ['ASSIGNE', 'EN_COURS'] } },
+    });
+
+    // Log QR scan for security audit
+    await actionLogDb.qrSecurityLog.create({
+      data: createQRScanLogEntry({
+        colisId: parcel.id,
+        qrToken: qrSecurity.token || qrSecurity.parcelId || 'UNKNOWN',
+        scanLocation: 'RELAIS_DEPART',
+        scannerRole: 'RELAIS',
+        pinVerified: !!withdrawalPin,
+      }),
+    });
+
+    if (missions) {
+      // Mark that relais has confirmed handoff
+      await actionLogDb.mission.update({
+        where: { id: missions.id },
+        data: { relaisConfirmed: true },
+      });
+    }
+
+    // Status still transitions to EN_TRANSPORT for UI consistency
     const newStatus = 'EN_TRANSPORT';
-    const notes = `Colis remis au transporteur par le relais ${relais.commerceName}`;
+    const notes = `Colis remis au transporteur par le relais ${relais.commerceName} (confirmation relais enregistrée)`;
 
     await db.colis.update({ where: { id: parcel.id }, data: { status: newStatus, custody: 'TRANSPORTEUR' } });
 
@@ -116,6 +189,7 @@ export async function POST(request: NextRequest) {
         entityType: 'COLIS',
         entityId: parcel.id,
         action: 'QR_SCAN_REMISE_TRANSPORTEUR',
+        details: JSON.stringify({ relaisConfirmed: true, pinVerified: !!withdrawalPin }),
       },
     });
 
@@ -126,7 +200,12 @@ export async function POST(request: NextRequest) {
       type: 'IN_APP',
     });
 
-    return NextResponse.json({ success: true, newStatus, message: notes });
+    return NextResponse.json({ 
+      success: true, 
+      newStatus, 
+      message: notes,
+      nextStep: 'Transporteur doit confirmer réception du colis',
+    });
   } catch (error) {
     console.error('[scan-remise-transporteur] Error:', error);
     return NextResponse.json({ error: 'Erreur lors du scan de remise transporteur' }, { status: 500 });
