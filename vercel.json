@@ -3,6 +3,18 @@
   "framework": "nextjs",
   "crons": [
     {
+      "path": "/api/missions/check-timeouts/cron",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/admin/payouts/sync/cron",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/payments/reconcile/cron",
+      "schedule": "*/10 * * * *"
+    },
+    {
       "path": "/api/matching/auto-assign/cron",
       "schedule": "0 2 * * *"
     },
