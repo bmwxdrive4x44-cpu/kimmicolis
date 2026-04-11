@@ -1,7 +1,7 @@
 let db;
 
 (async () => {
-  const { PrismaClient } = await import('@prisma/client');
+  const { PrismaClient } = await import('../src/generated/prisma/index.js');
   db = new PrismaClient();
 
   const total = await db.ligne.count();

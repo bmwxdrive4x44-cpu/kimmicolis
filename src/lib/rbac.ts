@@ -2,15 +2,28 @@ import { NextRequest, NextResponse } from 'next/server';
 import { jwtVerify } from 'jose';
 import { getToken } from 'next-auth/jwt';
 import { normalizeRole } from './roles';
+import { db } from './db';
+import { env } from './env';
 
-const JWT_SECRET = new TextEncoder().encode(process.env.NEXTAUTH_SECRET || 'secret');
+const JWT_SECRET = new TextEncoder().encode(env.NEXTAUTH_SECRET ?? 'dev-only-nextauth-secret');
+
+const TRANSPORTER_APPROVAL_BYPASS_PATHS = ['/api/transporters', '/api/notifications'];
+const RELAIS_APPROVAL_BYPASS_PATHS = ['/api/relais', '/api/notifications'];
+
+function isTransporterApprovalBypassed(pathname: string): boolean {
+  return TRANSPORTER_APPROVAL_BYPASS_PATHS.some((basePath) => pathname === basePath || pathname.startsWith(`${basePath}/`));
+}
+
+function isRelaisApprovalBypassed(pathname: string): boolean {
+  return RELAIS_APPROVAL_BYPASS_PATHS.some((basePath) => pathname === basePath || pathname.startsWith(`${basePath}/`));
+}
 
 export interface JWTPayload {
   email: string;
   id: string;
   role: string;
   name: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 /**
@@ -32,7 +45,7 @@ export async function verifyJWT(request: NextRequest): Promise<{
 
     const nextAuthToken = await getToken({
       req: request,
-      secret: process.env.NEXTAUTH_SECRET,
+        secret: env.NEXTAUTH_SECRET,
     });
 
     if (!nextAuthToken) {
@@ -71,13 +84,53 @@ export async function requireRole(
   }
 
   const normalizedAllowedRoles = allowedRoles.map((role) => normalizeRole(role));
-  if (!normalizedAllowedRoles.includes(normalizeRole(payload.role))) {
+  const normalizedPayloadRole = normalizeRole(payload.role);
+
+  if (!normalizedAllowedRoles.includes(normalizedPayloadRole)) {
     return {
       success: false,
       response: NextResponse.json({
         error: `Forbidden: requires one of roles [${allowedRoles.join(', ')}]`,
       }, { status: 403 }),
     };
+  }
+
+  // Transporter business APIs are blocked until admin approval.
+  if (normalizedPayloadRole === 'TRANSPORTER' && !isTransporterApprovalBypassed(request.nextUrl.pathname)) {
+    const application = await db.transporterApplication.findUnique({
+      where: { userId: payload.id },
+      select: { status: true },
+    });
+
+    if (!application || application.status !== 'APPROVED') {
+      return {
+        success: false,
+        response: NextResponse.json({
+          error: 'Compte transporteur en attente de validation des documents',
+          code: 'TRANSPORTER_NOT_APPROVED',
+          status: application?.status || 'MISSING_APPLICATION',
+        }, { status: 403 }),
+      };
+    }
+  }
+
+  // Relais business APIs are blocked until admin approval.
+  if (normalizedPayloadRole === 'RELAIS' && !isRelaisApprovalBypassed(request.nextUrl.pathname)) {
+    const relais = await db.relais.findUnique({
+      where: { userId: payload.id },
+      select: { status: true },
+    });
+
+    if (!relais || relais.status !== 'APPROVED') {
+      return {
+        success: false,
+        response: NextResponse.json({
+          error: 'Compte relais en attente de validation des documents',
+          code: 'RELAIS_NOT_APPROVED',
+          status: relais?.status || 'MISSING_APPLICATION',
+        }, { status: 403 }),
+      };
+    }
   }
 
   return { success: true, payload };

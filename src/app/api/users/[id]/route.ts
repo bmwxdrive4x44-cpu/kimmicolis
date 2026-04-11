@@ -2,10 +2,20 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { hashPassword } from '@/lib/auth';
 import { isAlgerianCommerceRegisterNumber, normalizeCommerceRegisterNumber } from '@/lib/validators';
+import { describeBlockedIdentity, findBlockedRelayIdentity } from '@/lib/banned-identities';
+import { getClientIpFromHeaders } from '@/lib/request-ip';
 
 function isMissingClientTypeColumnError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error || '');
   return message.toLowerCase().includes('clienttype');
+}
+
+function isRecordNotFoundError(error: unknown): boolean {
+  const prismaCode = typeof error === 'object' && error !== null && 'code' in error
+    ? String((error as { code?: unknown }).code || '')
+    : '';
+  const message = error instanceof Error ? error.message : String(error || '');
+  return prismaCode === 'P2025' || message.includes('No record was found for an update');
 }
 
 // GET single user
@@ -116,12 +126,38 @@ export async function PUT(
   try {
     const { id } = await params;
     const body = await request.json();
+
+    const existingUser = await db.user.findUnique({
+      where: { id },
+      select: { id: true },
+    });
+
+    if (!existingUser) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
     
     const { name, firstName, lastName, address, phone, email, password, isActive, siret, clientType } = body;
 
     const normalizedFirstName = firstName !== undefined ? String(firstName || '').trim() : undefined;
     const normalizedLastName = lastName !== undefined ? String(lastName || '').trim() : undefined;
     const normalizedAddress = address !== undefined ? String(address || '').trim() : undefined;
+    const normalizedEmail = email !== undefined ? String(email || '').trim().toLowerCase() : undefined;
+    const normalizedSiret = siret !== undefined ? normalizeCommerceRegisterNumber(String(siret || '')) : undefined;
+
+    const blockedIdentity = await findBlockedRelayIdentity({
+      email: normalizedEmail,
+      siret: normalizedSiret,
+      ip: getClientIpFromHeaders(request.headers),
+    });
+
+    if (blockedIdentity) {
+      return NextResponse.json({
+        error: 'Blocked identity',
+        code: 'BANNED_IDENTITY',
+        blockedType: blockedIdentity.type,
+        details: describeBlockedIdentity(blockedIdentity),
+      }, { status: 403 });
+    }
 
     // Build update data
     const updateData: any = {};
@@ -130,16 +166,50 @@ export async function PUT(
     if (normalizedLastName !== undefined) updateData.lastName = normalizedLastName || null;
     if (normalizedAddress !== undefined) updateData.address = normalizedAddress || null;
     if (phone !== undefined) updateData.phone = phone;
-    if (email !== undefined) updateData.email = email;
+    if (normalizedEmail !== undefined) updateData.email = normalizedEmail;
     if (isActive !== undefined) updateData.isActive = isActive;
     if (siret !== undefined) {
-      const normalizedSiret = normalizeCommerceRegisterNumber(String(siret || ''));
       if (normalizedSiret && !isAlgerianCommerceRegisterNumber(normalizedSiret)) {
         return NextResponse.json({
           error: 'Invalid commerce register number format',
           details: 'Format RC algérien invalide (ex: RC-16/1234567B21)',
         }, { status: 400 });
       }
+
+      if (normalizedSiret) {
+        const [conflictingRelais, conflictingTransporter] = await Promise.all([
+          db.relais.findFirst({
+            where: {
+              userId: { not: id },
+              status: { in: ['PENDING', 'APPROVED'] },
+              user: { siret: normalizedSiret },
+            },
+            select: { id: true, status: true },
+          }),
+          db.transporterApplication.findFirst({
+            where: {
+              userId: { not: id },
+              status: { in: ['PENDING', 'APPROVED'] },
+              user: { siret: normalizedSiret },
+            },
+            select: { id: true, status: true },
+          }),
+        ]);
+
+        if (conflictingRelais || conflictingTransporter) {
+          return NextResponse.json({
+            error: 'Ce numéro RC/SIRET est déjà utilisé par un autre profil professionnel actif.',
+            code: conflictingTransporter ? 'DUPLICATE_TRANSPORTER_RC' : 'DUPLICATE_RELAIS_RC',
+            details: {
+              conflictingRelaisId: conflictingRelais?.id ?? null,
+              conflictingRelaisStatus: conflictingRelais?.status ?? null,
+              conflictingTransporterApplicationId: conflictingTransporter?.id ?? null,
+              conflictingTransporterStatus: conflictingTransporter?.status ?? null,
+            },
+          }, { status: 409 });
+        }
+      }
+
       updateData.siret = normalizedSiret || null;
     }
     if (password) {
@@ -176,6 +246,10 @@ export async function PUT(
         },
       });
     } catch (error) {
+      if (isRecordNotFoundError(error)) {
+        return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      }
+
       if (!isMissingClientTypeColumnError(error)) {
         throw error;
       }

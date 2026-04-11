@@ -10,9 +10,17 @@ import { getImplicitLoyaltyConfig } from '@/lib/loyalty-config';
 import { createHash, randomBytes } from 'crypto';
 import { findActiveLineByCities } from '@/lib/logistics';
 import { generateWithdrawalPin, calculateQRExpiration } from '@/lib/qr-security';
+import { checkRelayTrialQuota } from '@/lib/relais-trial';
 
 function normalizePhone(value: string): string {
   return value.replace(/\s+/g, '').replace(/[^+\d]/g, '');
+}
+
+function normalizeOptionalEmail(value: unknown): string | null {
+  if (value === undefined || value === null) return null;
+  const normalized = String(value).trim().toLowerCase();
+  if (!normalized) return null;
+  return normalized;
 }
 
 function hashWithdrawalCode(code: string): string {
@@ -55,6 +63,23 @@ function trajetSupportsParcel(
   return depIndex >= 0 && arrIndex > depIndex;
 }
 
+function isRelayVisibleToExternal(relay: { status?: string | null; operationalStatus?: string | null } | null | undefined) {
+  return Boolean(relay && relay.status === 'APPROVED' && relay.operationalStatus !== 'SUSPENDU');
+}
+
+function sanitizeRelayForExternal<T>(relay: T & { status?: string | null; operationalStatus?: string | null } | null | undefined) {
+  if (!relay) return null;
+  return isRelayVisibleToExternal(relay) ? relay : null;
+}
+
+function sanitizeParcelRelaysForExternal<T extends { relaisDepart?: any; relaisArrivee?: any }>(parcel: T): T {
+  return {
+    ...parcel,
+    relaisDepart: sanitizeRelayForExternal(parcel.relaisDepart),
+    relaisArrivee: sanitizeRelayForExternal(parcel.relaisArrivee),
+  };
+}
+
 async function getPricingConfig() {
   const keys = [
     'pricingAdminFee',
@@ -64,6 +89,7 @@ async function getPricingConfig() {
     'pricingRelayArrivalRate',
     'pricingRelayPrintFee',
     'pricingRoundTo',
+    'platformCommission',
   ];
 
   const settings = await db.setting.findMany({ where: { key: { in: keys } } });
@@ -82,6 +108,7 @@ async function getPricingConfig() {
     relayArrivalRate: getNumber('pricingRelayArrivalRate', 0.1),
     relayPrintFee: getNumber('pricingRelayPrintFee', 30),
     roundTo: getNumber('pricingRoundTo', 10),
+    platformCommissionRate: getNumber('platformCommission', 10) / 100,
   };
 }
 
@@ -108,10 +135,10 @@ export async function GET(request: NextRequest) {
           status: true,
           createdAt: true,
           relaisDepart: {
-            select: { commerceName: true },
+            select: { commerceName: true, status: true, operationalStatus: true },
           },
           relaisArrivee: {
-            select: { commerceName: true },
+            select: { commerceName: true, status: true, operationalStatus: true },
           },
           trackingHistory: {
             select: { status: true, notes: true, createdAt: true },
@@ -121,7 +148,7 @@ export async function GET(request: NextRequest) {
         orderBy: { createdAt: 'desc' },
       });
 
-      return NextResponse.json(parcels);
+      return NextResponse.json(parcels.map((parcel) => sanitizeParcelRelaysForExternal(parcel)));
     }
 
     const auth = await requireRole(request, ['CLIENT', 'RELAIS', 'TRANSPORTER', 'ADMIN']);
@@ -146,6 +173,8 @@ export async function GET(request: NextRequest) {
       // Only parcels without an active mission
       where.missions = { none: { status: { in: ['ASSIGNE', 'PICKED_UP'] } } };
       where.lineId = { not: null };
+      where.relaisDepart = { is: { status: 'APPROVED', operationalStatus: 'ACTIF' } };
+      where.relaisArrivee = { is: { status: 'APPROVED', operationalStatus: 'ACTIF' } };
     }
     if (tracking) {
       where.trackingNumber = tracking;
@@ -174,6 +203,10 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: 'desc' },
     });
 
+    const parcelsForExternalRoles = payload.role === 'CLIENT' || payload.role === 'TRANSPORTER'
+      ? parcels.map((parcel) => sanitizeParcelRelaysForExternal(parcel))
+      : parcels;
+
     if (available === 'true' && payload.role === 'TRANSPORTER') {
       const futureTrajets = await db.trajet.findMany({
         where: {
@@ -185,7 +218,7 @@ export async function GET(request: NextRequest) {
       });
 
       return NextResponse.json(
-        parcels.filter((parcel) =>
+        parcelsForExternalRoles.filter((parcel) =>
           futureTrajets.some((trajet) => {
             if (parcel.lineId && trajet.lineId && parcel.lineId !== trajet.lineId) {
               return false;
@@ -197,7 +230,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    return NextResponse.json(parcels);
+    return NextResponse.json(parcelsForExternalRoles);
   } catch (error) {
     console.error('Error fetching parcels:', error);
 
@@ -248,6 +281,7 @@ export async function POST(request: NextRequest) {
       recipientFirstName,
       recipientLastName,
       recipientPhone,
+      recipientEmail,
       labelPrintMode,
       withdrawalCode,
       relaisDepartId,
@@ -285,6 +319,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const normalizedRecipientEmail = normalizeOptionalEmail(recipientEmail);
+    if (normalizedRecipientEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedRecipientEmail)) {
+      return NextResponse.json(
+        { error: 'Email destinataire invalide' },
+        { status: 400 }
+      );
+    }
+
     const parsedWeight = Number(weight ?? 0);
     if (!Number.isFinite(parsedWeight) || parsedWeight <= 0) {
       return NextResponse.json(
@@ -314,6 +356,20 @@ export async function POST(request: NextRequest) {
         { 
           error: 'Relais d\'arrivée suspendu', 
           details: relaisArrivee?.suspensionReason || 'Raison non spécifiée'
+        },
+        { status: 400 }
+      );
+    }
+
+    const trialQuota = await checkRelayTrialQuota({
+      relaisId: relaisDepartId,
+      additionalParcels: 1,
+    });
+    if (trialQuota.limited) {
+      return NextResponse.json(
+        {
+          error: 'Relais en période d\'essai: quota quotidien atteint',
+          details: `Maximum ${trialQuota.maxPerDay} colis/jour pendant l'essai`,
         },
         { status: 400 }
       );
@@ -362,7 +418,7 @@ export async function POST(request: NextRequest) {
       formatMultiplier: 1,
       relayDepartureCommissionRate: pricingConfig.relayDepartureRate,
       relayArrivalCommissionRate: pricingConfig.relayArrivalRate,
-      platformMarginRate: 0,
+      platformMarginRate: pricingConfig.platformCommissionRate,
       roundTo: pricingConfig.roundTo,
     });
 
@@ -410,6 +466,7 @@ export async function POST(request: NextRequest) {
         recipientFirstName: recipientFirstName.trim(),
         recipientLastName: recipientLastName.trim(),
         recipientPhone: normalizedRecipientPhone,
+        recipientEmail: normalizedRecipientEmail,
         withdrawalCodeHash: hashWithdrawalCode(effectiveWithdrawalCode),
         relaisDepartId,
         relaisArriveeId,

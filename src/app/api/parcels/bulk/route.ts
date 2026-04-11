@@ -13,11 +13,19 @@ import { evaluateImplicitProEligibility } from '@/lib/pro-eligibility';
 import { findActiveLineByCities } from '@/lib/logistics';
 import { createHash } from 'crypto';
 import { checkRateLimit, RATE_LIMIT_PRESETS } from '@/lib/ratelimit';
+import { checkRelayTrialQuota } from '@/lib/relais-trial';
 
 const MAX_BULK = 50;
 
 function normalizePhone(v: string) {
   return v.replace(/\s+/g, '').replace(/[^+\d]/g, '');
+}
+
+function normalizeOptionalEmail(value: unknown): string | null {
+  if (value === undefined || value === null) return null;
+  const normalized = String(value).trim().toLowerCase();
+  if (!normalized) return null;
+  return normalized;
 }
 
 function generateWithdrawalCode(): string {
@@ -29,17 +37,18 @@ function hashCode(code: string): string {
 }
 
 async function getPricingConfig() {
-  const keys = ['pricingAdminFee', 'pricingRatePerKg', 'pricingRatePerKm', 'pricingRelayDepartureRate', 'pricingRelayArrivalRate', 'pricingRoundTo'];
+  const keys = ['pricingAdminFee', 'pricingRatePerKg', 'pricingRatePerKm', 'pricingRelayDepartureRate', 'pricingRelayArrivalRate', 'pricingRoundTo', 'platformCommission'];
   const settings = await db.setting.findMany({ where: { key: { in: keys } } });
   const map = new Map(settings.map((s) => [s.key, s.value]));
   const getN = (k: string, f: number) => { const v = Number(map.get(k)); return Number.isFinite(v) ? v : f; };
   return {
     adminFee: getN('pricingAdminFee', 50),
-    ratePerKg: getN('pricingRatePerKg', 50),
+    ratePerKg: getN('pricingRatePerKg', 120),
     ratePerKm: getN('pricingRatePerKm', 2.5),
     relayDepartureRate: getN('pricingRelayDepartureRate', 0.1),
     relayArrivalRate: getN('pricingRelayArrivalRate', 0.1),
     roundTo: getN('pricingRoundTo', 10),
+    platformCommissionRate: getN('platformCommission', 10) / 100,
   };
 }
 
@@ -56,7 +65,7 @@ async function getPricingConfig() {
  *   villeArrivee: string,
  *   parcels: Array<{
  *     senderFirstName, senderLastName, senderPhone,
- *     recipientFirstName, recipientLastName, recipientPhone,
+ *     recipientFirstName, recipientLastName, recipientPhone, recipientEmail?,
  *     weight: number,
  *     description?: string,
  *   }>
@@ -125,6 +134,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Relais ne correspondent pas aux villes' }, { status: 400 });
     }
 
+    const trialQuota = await checkRelayTrialQuota({
+      relaisId: relaisDepartId,
+      additionalParcels: parcels.length,
+    });
+    if (trialQuota.limited) {
+      return NextResponse.json(
+        {
+          error: 'Relais en période d\'essai: quota quotidien dépassé',
+          details: `Demande: ${parcels.length}, autorisé: ${trialQuota.maxPerDay}/jour, déjà créés: ${trialQuota.todayCount}`,
+        },
+        { status: 400 }
+      );
+    }
+
     const activeLine = await findActiveLineByCities(villeDepart, villeArrivee);
     if (!activeLine) {
       return NextResponse.json({ error: 'Aucune ligne active pour cet itinéraire' }, { status: 400 });
@@ -139,6 +162,10 @@ export async function POST(request: NextRequest) {
       }
       if (!p.recipientFirstName?.trim() || !p.recipientLastName?.trim() || !p.recipientPhone?.trim()) {
         return NextResponse.json({ error: `Colis #${index} : informations destinataire incomplètes` }, { status: 400 });
+      }
+      const normalizedRecipientEmail = normalizeOptionalEmail(p.recipientEmail);
+      if (normalizedRecipientEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedRecipientEmail)) {
+        return NextResponse.json({ error: `Colis #${index} : email destinataire invalide` }, { status: 400 });
       }
       const w = Number(p.weight ?? 0);
       if (!Number.isFinite(w) || w <= 0) {
@@ -163,7 +190,7 @@ export async function POST(request: NextRequest) {
         formatMultiplier: 1,
         relayDepartureCommissionRate: pricingConfig.relayDepartureRate,
         relayArrivalCommissionRate: pricingConfig.relayArrivalRate,
-        platformMarginRate: 0,
+        platformMarginRate: pricingConfig.platformCommissionRate,
         roundTo: pricingConfig.roundTo,
       });
 
@@ -212,6 +239,7 @@ export async function POST(request: NextRequest) {
             recipientFirstName: item.raw.recipientFirstName.trim(),
             recipientLastName: item.raw.recipientLastName.trim(),
             recipientPhone: normalizePhone(item.raw.recipientPhone),
+            recipientEmail: normalizeOptionalEmail(item.raw.recipientEmail),
             withdrawalCodeHash: hashCode(item.withdrawalCode),
             relaisDepartId,
             relaisArriveeId,

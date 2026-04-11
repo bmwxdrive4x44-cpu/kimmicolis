@@ -11,6 +11,8 @@ import { generateQRCodeImage, buildQRCodePayload } from '@/lib/qrcode';
 import { calculateDynamicParcelPricing, estimateSafeDistanceKmByWilayas } from '@/lib/pricing';
 import { findActiveLineByCities } from '@/lib/logistics';
 import { createHash } from 'crypto';
+import { sendEmail } from '@/lib/email';
+import { checkRelayTrialQuota } from '@/lib/relais-trial';
 
 function hashWithdrawalCode(code: string): string {
   return createHash('sha256').update(code).digest('hex');
@@ -20,10 +22,17 @@ function generateWithdrawalCode(): string {
   return String(Math.floor(100000 + Math.random() * 900000));
 }
 
+function normalizeOptionalEmail(value: unknown): string | null {
+  if (value === undefined || value === null) return null;
+  const normalized = String(value).trim().toLowerCase();
+  if (!normalized) return null;
+  return normalized;
+}
+
 async function getPricingConfig() {
   const keys = [
     'pricingAdminFee', 'pricingRatePerKg', 'pricingRatePerKm',
-    'pricingRelayDepartureRate', 'pricingRelayArrivalRate', 'pricingRoundTo',
+    'pricingRelayDepartureRate', 'pricingRelayArrivalRate', 'pricingRoundTo', 'platformCommission',
   ];
   const settings = await db.setting.findMany({ where: { key: { in: keys } } });
   const map = new Map(settings.map((s) => [s.key, s.value]));
@@ -38,6 +47,7 @@ async function getPricingConfig() {
     relayDepartureRate: n('pricingRelayDepartureRate', 0.1),
     relayArrivalRate: n('pricingRelayArrivalRate', 0.1),
     roundTo: n('pricingRoundTo', 10),
+    platformCommissionRate: n('platformCommission', 10) / 100,
   };
 }
 
@@ -53,6 +63,7 @@ export async function POST(request: NextRequest) {
       recipientFirstName,
       recipientLastName,
       recipientPhone,
+      recipientEmail,
       // Route
       villeDepart,
       villeArrivee,
@@ -69,6 +80,10 @@ export async function POST(request: NextRequest) {
     // Basic validation
     if (!recipientFirstName?.trim() || !recipientLastName?.trim() || !recipientPhone?.trim()) {
       return NextResponse.json({ error: 'Informations destinataire incomplètes (prénom, nom, téléphone)' }, { status: 400 });
+    }
+    const normalizedRecipientEmail = normalizeOptionalEmail(recipientEmail);
+    if (normalizedRecipientEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedRecipientEmail)) {
+      return NextResponse.json({ error: 'Email destinataire invalide' }, { status: 400 });
     }
     if (!villeDepart?.trim() || !villeArrivee?.trim()) {
       return NextResponse.json({ error: 'Villes de départ et arrivée obligatoires' }, { status: 400 });
@@ -131,6 +146,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Relais d\'arrivée indisponible' }, { status: 400 });
     }
 
+    const trialQuota = await checkRelayTrialQuota({
+      relaisId: relaisDepartId,
+      additionalParcels: 1,
+    });
+    if (trialQuota.limited) {
+      return NextResponse.json(
+        {
+          error: 'Relais en période d\'essai: quota quotidien atteint',
+          details: `Maximum ${trialQuota.maxPerDay} colis/jour pendant l'essai (${trialQuota.daysRemaining} jour(s) restant(s))`,
+        },
+        { status: 400 }
+      );
+    }
+
     // Find active line
     const activeLine = await findActiveLineByCities(villeDepart, villeArrivee);
     if (!activeLine) {
@@ -149,7 +178,7 @@ export async function POST(request: NextRequest) {
       formatMultiplier: 1,
       relayDepartureCommissionRate: pricingConfig.relayDepartureRate,
       relayArrivalCommissionRate: pricingConfig.relayArrivalRate,
-      platformMarginRate: 0,
+      platformMarginRate: pricingConfig.platformCommissionRate,
       roundTo: pricingConfig.roundTo,
     });
 
@@ -164,6 +193,13 @@ export async function POST(request: NextRequest) {
     // Phone cleanup
     const cleanPhone = (p: string) => p.replace(/\s+/g, '').replace(/[^+\d]/g, '');
 
+
+    // Récupérer infos relais arrivée pour l'email
+    const relaisArriveeInfo = await db.relais.findUnique({
+      where: { id: relaisArriveeId },
+      select: { commerceName: true, address: true, ville: true },
+    });
+
     // Create colis
     const colis = await db.colis.create({
       data: {
@@ -176,6 +212,7 @@ export async function POST(request: NextRequest) {
         recipientFirstName: recipientFirstName.trim(),
         recipientLastName: recipientLastName.trim(),
         recipientPhone: cleanPhone(recipientPhone),
+        recipientEmail: normalizedRecipientEmail,
         withdrawalCodeHash: hashWithdrawalCode(withdrawalCode),
         relaisDepartId,
         relaisArriveeId,
@@ -193,6 +230,38 @@ export async function POST(request: NextRequest) {
         dateLimit: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
       },
     });
+
+    // Envoi email au destinataire avec code de retrait et adresse relais
+    if (normalizedRecipientEmail && relaisArriveeInfo) {
+      const html = `
+        <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;">
+          <h2 style="color:#065f46;">Votre colis SwiftColis est prêt à être retiré</h2>
+          <p>Bonjour ${recipientFirstName} ${recipientLastName},</p>
+          <p>Un colis à votre nom a été créé sur SwiftColis.</p>
+          <p><strong>Code de retrait&nbsp;:</strong> <span style="font-size:1.5em;letter-spacing:2px;color:#2563eb;">${withdrawalCode}</span></p>
+          <p><strong>Relais d'arrivée&nbsp;:</strong><br/>
+            ${relaisArriveeInfo.commerceName ? `<b>${relaisArriveeInfo.commerceName}</b><br/>` : ''}
+            ${relaisArriveeInfo.address ? `${relaisArriveeInfo.address}<br/>` : ''}
+            ${relaisArriveeInfo.ville ? relaisArriveeInfo.ville : ''}
+          </p>
+          <ul style="margin:16px 0 24px 0;padding-left:20px;">
+            <li>Présentez ce code au relais pour retirer votre colis.</li>
+            <li>N'oubliez pas une pièce d'identité valide (CNI, passeport, permis...)</li>
+            <li>Si le colis contient un objet réglementé, munissez-vous du permis ou document requis.</li>
+          </ul>
+          <p style="color:#64748b;font-size:13px;">Ne partagez jamais ce code avec un inconnu. Pour toute question, contactez le support SwiftColis.</p>
+        </div>
+      `;
+      try {
+        await sendEmail({
+          to: normalizedRecipientEmail,
+          subject: `Votre code de retrait SwiftColis: ${withdrawalCode}`,
+          html,
+        });
+      } catch (e) {
+        console.error('[quick-create] Erreur envoi email code retrait:', e);
+      }
+    }
 
     // Tracking history
     await db.trackingHistory.create({

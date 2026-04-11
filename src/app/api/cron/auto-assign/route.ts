@@ -19,7 +19,10 @@ export async function GET(request: NextRequest) {
     const scheduleFilter = searchParams.get('schedule') || null; // DAILY_8AM | DAILY_6PM | WEEKLY
 
     const cronSecret = process.env.CRON_SECRET;
-    if (cronSecret && secret !== cronSecret) {
+    if (!cronSecret) {
+      return NextResponse.json({ error: 'Server misconfiguration: CRON_SECRET is missing' }, { status: 500 });
+    }
+    if (!secret || secret !== cronSecret) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 

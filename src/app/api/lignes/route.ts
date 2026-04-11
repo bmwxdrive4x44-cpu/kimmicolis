@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { requireRole } from '@/lib/rbac';
-import { Prisma } from '@prisma/client';
+import { Prisma } from '@/generated/prisma';
 
 // GET all lignes (PUBLIC)
 export async function GET(request: NextRequest) {

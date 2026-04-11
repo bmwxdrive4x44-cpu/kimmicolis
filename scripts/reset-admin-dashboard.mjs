@@ -1,14 +1,6 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '../src/generated/prisma/index.js';
 
 const prisma = new PrismaClient();
-
-const DEMO_EMAILS_TO_KEEP = [
-  'admin@swiftcolis.dz',
-  'client@demo.dz',
-  'transport@demo.dz',
-  'relais@demo.dz',
-  'enseigne@demo.dz',
-];
 
 function parseArgs(argv) {
   const args = new Set(argv.slice(2));
@@ -39,10 +31,7 @@ async function main() {
 
   const keepUsers = await prisma.user.findMany({
     where: {
-      OR: [
-        { email: { in: DEMO_EMAILS_TO_KEEP } },
-        { role: 'ADMIN' },
-      ],
+      role: 'ADMIN',
     },
     select: { id: true, email: true, role: true },
   });
@@ -64,6 +53,11 @@ async function main() {
     await tx.trackingHistory.deleteMany();
     await tx.mission.deleteMany();
     await tx.payment.deleteMany();
+    await tx.deliveryProof.deleteMany();
+
+    await tx.qrSecurityLog.deleteMany();
+    await tx.transporterPenalty.deleteMany();
+    await tx.transporterScore.deleteMany();
 
     await tx.colis.deleteMany();
     await tx.trajet.deleteMany();

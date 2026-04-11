@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { requireRole, hasAccess, verifyJWT } from '@/lib/rbac';
+import { banRelayIdentities } from '@/lib/banned-identities';
 
 // GET single relais (PUBLIC)
 export async function GET(
@@ -52,6 +53,7 @@ export async function PUT(
     // Extract all possible fields
     const { 
       status, 
+      trialMode,
       operationalStatus,
       suspensionReason,
       commissionPetit, 
@@ -69,7 +71,19 @@ export async function PUT(
 
     const existingRelais = await db.relais.findUnique({
       where: { id },
-      select: { userId: true },
+      select: {
+        userId: true,
+        operationalStatus: true,
+        commerceName: true,
+        status: true,
+        activationDate: true,
+        user: {
+          select: {
+            email: true,
+            siret: true,
+          },
+        },
+      },
     });
 
     if (!existingRelais) {
@@ -107,6 +121,14 @@ export async function PUT(
     const data: any = {};
     
     if (status !== undefined) data.status = status;
+
+    if (isAdmin && status === 'APPROVED') {
+      const shouldStartOrResetTrial = trialMode === true || !existingRelais.activationDate || existingRelais.status !== 'APPROVED';
+      if (shouldStartOrResetTrial) {
+        data.activationDate = new Date();
+        data.cautionStatus = 'PENDING';
+      }
+    }
     if (operationalStatus !== undefined) {
       data.operationalStatus = operationalStatus;
       // When suspending, record the suspension time
@@ -138,9 +160,57 @@ export async function PUT(
       });
     }
 
-    const relais = await db.relais.update({
-      where: { id },
-      data,
+    const shouldBanIdentities = isAdmin
+      && operationalStatus === 'SUSPENDU'
+      && existingRelais.operationalStatus !== 'SUSPENDU';
+
+    const relais = await db.$transaction(async (tx) => {
+      const updatedRelais = await tx.relais.update({
+        where: { id },
+        data,
+      });
+
+      if (shouldBanIdentities) {
+        const latestKnownIpLog = await tx.actionLog.findFirst({
+          where: {
+            ipAddress: { not: null },
+            OR: [
+              { userId: existingRelais.userId },
+              { entityType: 'USER', entityId: existingRelais.userId },
+              { entityType: 'RELAIS', entityId: id },
+            ],
+          },
+          orderBy: { createdAt: 'desc' },
+          select: { ipAddress: true },
+        });
+
+        const banResult = await banRelayIdentities({
+          email: existingRelais.user?.email,
+          siret: existingRelais.user?.siret,
+          ip: latestKnownIpLog?.ipAddress,
+          sourceRelaisId: id,
+          sourceUserId: existingRelais.userId,
+          reason: suspensionReason || 'Relais suspendu par administration',
+        }, tx as any);
+
+        await tx.actionLog.create({
+          data: {
+            userId: payload.id,
+            entityType: 'RELAIS',
+            entityId: id,
+            action: 'RELAIS_SUSPENSION_BAN_APPLIED',
+            details: JSON.stringify({
+              commerceName: existingRelais.commerceName,
+              bannedEmail: existingRelais.user?.email || null,
+              bannedSiret: existingRelais.user?.siret || null,
+              bannedIp: latestKnownIpLog?.ipAddress || null,
+              addedEntries: banResult.added,
+            }),
+          },
+        });
+      }
+
+      return updatedRelais;
     });
 
     return NextResponse.json(relais);

@@ -1,0 +1,2 @@
+ALTER TABLE "Colis"
+ADD COLUMN IF NOT EXISTS "recipientEmail" TEXT;

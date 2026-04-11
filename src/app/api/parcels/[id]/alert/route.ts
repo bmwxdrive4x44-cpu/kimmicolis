@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/rbac";
+import { getErrorMessage } from "@/lib/errors";
 import { sendManualAlert, notifyBlockedParcel, detectBlockedParcels } from "@/lib/parcel-alerts";
 
 interface RouteParams {
@@ -81,10 +82,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       message: "Alert sent successfully",
       recipients: notifyRole,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[parcel-alert] Error:", error);
     return NextResponse.json(
-      { success: false, error: error.message || "Internal server error" },
+      { success: false, error: getErrorMessage(error, "Internal server error") },
       { status: 500 }
     );
   }

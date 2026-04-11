@@ -3,23 +3,56 @@ import { db } from '@/lib/db';
 import { requireRole } from '@/lib/rbac';
 import { isAlgerianCommerceRegisterNumber, normalizeCommerceRegisterNumber } from '@/lib/validators';
 import { checkRateLimit, RATE_LIMIT_PRESETS } from '@/lib/ratelimit';
+import { describeBlockedIdentity, findBlockedRelayIdentity } from '@/lib/banned-identities';
+import { getClientIpFromHeaders } from '@/lib/request-ip';
 
-function pickPrimaryRelais<T extends { status?: string | null; operationalStatus?: string | null; updatedAt?: Date | string | null; createdAt?: Date | string | null }>(
+function pickPrimaryRelais<
+  T extends {
+    status?: string | null;
+    operationalStatus?: string | null;
+    commerceName?: string | null;
+    address?: string | null;
+    ville?: string | null;
+    commerceDocuments?: string | null;
+    updatedAt?: Date | string | null;
+    createdAt?: Date | string | null;
+  }
+>(
   relais: T[]
 ): T | null {
   if (!Array.isArray(relais) || relais.length === 0) return null;
 
+  const hasDocuments = (value?: string | null) => {
+    try {
+      const docs = JSON.parse(value || '[]');
+      return Array.isArray(docs) && docs.length > 0;
+    } catch {
+      return false;
+    }
+  };
+
+  const isComplete = (item: T) => {
+    return Boolean(
+      item.commerceName?.trim() &&
+      item.address?.trim() &&
+      item.ville?.trim() &&
+      hasDocuments(item.commerceDocuments)
+    );
+  };
+
   const score = (item: T) => {
+    const completenessScore = isComplete(item) ? 1 : 0;
     const statusScore = item.status === 'APPROVED' ? 3 : item.status === 'PENDING' ? 2 : 1;
     const operationalScore = item.operationalStatus === 'ACTIF' ? 1 : 0;
     const updated = item.updatedAt ? new Date(item.updatedAt).getTime() : 0;
     const created = item.createdAt ? new Date(item.createdAt).getTime() : 0;
-    return { statusScore, operationalScore, updated, created };
+    return { completenessScore, statusScore, operationalScore, updated, created };
   };
 
   return [...relais].sort((a, b) => {
     const sa = score(a);
     const sb = score(b);
+    if (sb.completenessScore !== sa.completenessScore) return sb.completenessScore - sa.completenessScore;
     if (sb.statusScore !== sa.statusScore) return sb.statusScore - sa.statusScore;
     if (sb.operationalScore !== sa.operationalScore) return sb.operationalScore - sa.operationalScore;
     if (sb.updated !== sa.updated) return sb.updated - sa.updated;
@@ -83,6 +116,12 @@ export async function GET(request: NextRequest) {
       where,
       include: {
         user: { select: { id: true, name: true, email: true, phone: true } },
+        _count: {
+          select: {
+            parcelsDepart: true,
+            parcelsArrivee: true,
+          },
+        },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -116,8 +155,12 @@ export async function POST(request: NextRequest) {
     if (!auth.success) return auth.response;
 
     const body = await request.json();
-    const { userId, commerceName, address, ville, latitude, longitude, photos, commerceRegisterNumber } = body;
+    const { userId, commerceName, address, ville, latitude, longitude, photos, commerceDocuments, commerceRegisterNumber } = body;
     const rcNumber = normalizeCommerceRegisterNumber(String(commerceRegisterNumber || ''));
+    const serializedCommerceDocuments = Array.isArray(commerceDocuments)
+      ? JSON.stringify(commerceDocuments)
+      : null;
+    const clientIp = getClientIpFromHeaders(request.headers);
 
     if (!userId || !commerceName || !address || !ville || !rcNumber) {
       return NextResponse.json({
@@ -140,10 +183,38 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
+    const targetUser = await db.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true },
+    });
+
+    if (!targetUser) {
+      return NextResponse.json({
+        error: 'User not found',
+        code: 'USER_NOT_FOUND',
+      }, { status: 404 });
+    }
+
+    const blockedIdentity = await findBlockedRelayIdentity({
+      email: targetUser?.email,
+      siret: rcNumber,
+      ip: clientIp,
+    });
+
+    if (blockedIdentity) {
+      return NextResponse.json({
+        error: 'Blocked identity',
+        code: 'BANNED_IDENTITY',
+        blockedType: blockedIdentity.type,
+        details: describeBlockedIdentity(blockedIdentity),
+      }, { status: 403 });
+    }
+
     // Prevent duplicate relay applications across different accounts using the same RC/SIRET.
     const existingRelaisWithSameRc = await db.relais.findFirst({
       where: {
         userId: { not: userId },
+        status: { in: ['PENDING', 'APPROVED'] },
         user: {
           siret: rcNumber,
         },
@@ -174,6 +245,36 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Prevent collisions with active transporter applications using the same RC/SIRET.
+    const existingTransporterWithSameRc = await db.transporterApplication.findFirst({
+      where: {
+        userId: { not: userId },
+        status: { in: ['PENDING', 'APPROVED'] },
+        user: {
+          siret: rcNumber,
+        },
+      },
+      select: {
+        id: true,
+        status: true,
+      },
+      orderBy: { updatedAt: 'desc' },
+    });
+
+    if (existingTransporterWithSameRc) {
+      return NextResponse.json(
+        {
+          error: 'Ce numéro RC/SIRET est déjà utilisé par un transporteur actif',
+          code: 'DUPLICATE_TRANSPORTER_RC',
+          details: {
+            existingTransporterApplicationId: existingTransporterWithSameRc.id,
+            existingStatus: existingTransporterWithSameRc.status,
+          },
+        },
+        { status: 409 }
+      );
+    }
+
     const existingRelais = await db.relais.findUnique({
       where: { userId },
     });
@@ -198,6 +299,12 @@ export async function POST(request: NextRequest) {
         },
       });
 
+      await db.$executeRaw`
+        UPDATE "Relais"
+        SET "commerceDocuments" = ${serializedCommerceDocuments}
+        WHERE "userId" = ${userId}
+      `;
+
       return NextResponse.json(relais);
     }
 
@@ -219,9 +326,16 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    await db.$executeRaw`
+      UPDATE "Relais"
+      SET "commerceDocuments" = ${serializedCommerceDocuments}
+      WHERE "userId" = ${userId}
+    `;
+
     return NextResponse.json(relais);
   } catch (error) {
     console.error('Error creating relais:', error);
-    return NextResponse.json({ error: 'Failed to create relais' }, { status: 500 });
+    const details = error instanceof Error ? error.message : 'Unknown error';
+    return NextResponse.json({ error: 'Failed to create relais', details }, { status: 500 });
   }
 }

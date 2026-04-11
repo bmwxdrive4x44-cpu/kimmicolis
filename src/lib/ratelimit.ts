@@ -5,6 +5,7 @@
  */
 
 import { NextRequest } from 'next/server';
+import { getClientIpFromHeaders } from '@/lib/request-ip';
 
 interface RateLimitConfig {
   windowMs: number; // Time window in ms
@@ -33,22 +34,7 @@ export const RATE_LIMIT_PRESETS = {
  * Handles X-Forwarded-For, CF-Connecting-IP (Cloudflare), and direct IP
  */
 function getClientIp(request: NextRequest): string {
-  const forwarded = request.headers.get('x-forwarded-for');
-  if (forwarded) {
-    return forwarded.split(',')[0].trim();
-  }
-
-  const cloudflare = request.headers.get('cf-connecting-ip');
-  if (cloudflare) {
-    return cloudflare;
-  }
-
-  const realIp = request.headers.get('x-real-ip');
-  if (realIp) {
-    return realIp;
-  }
-
-  return 'unknown';
+  return getClientIpFromHeaders(request.headers) || 'unknown';
 }
 
 /**

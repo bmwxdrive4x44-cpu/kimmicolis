@@ -3,7 +3,7 @@ import { checkRateLimit, RATE_LIMIT_PRESETS } from '@/lib/ratelimit';
 import { sendEmail } from '@/lib/email';
 import { db } from '@/lib/db';
 
-const SUPPORT_EMAIL = process.env.CONTACT_EMAIL ?? process.env.RESEND_FROM ?? 'onboarding@resend.dev';
+const SUPPORT_EMAIL = process.env.CONTACT_EMAIL ?? process.env.SMTP_FROM ?? process.env.SMTP_USER ?? 'no-reply@swiftcolis.com';
 
 export async function POST(request: NextRequest) {
   const rl = await checkRateLimit(request, RATE_LIMIT_PRESETS.strict);

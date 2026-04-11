@@ -12,6 +12,7 @@ async function getPricingConfig() {
     'pricingRelayDepartureRate',
     'pricingRelayArrivalRate',
     'pricingRoundTo',
+    'platformCommission',
   ];
 
   const settings = await db.setting.findMany({ where: { key: { in: keys } } });
@@ -28,6 +29,7 @@ async function getPricingConfig() {
     relayDepartureRate: getN('pricingRelayDepartureRate', 0.1),
     relayArrivalRate: getN('pricingRelayArrivalRate', 0.1),
     roundTo: getN('pricingRoundTo', 10),
+    platformCommissionRate: getN('platformCommission', 10) / 100,
   };
 }
 
@@ -186,6 +188,17 @@ export async function PATCH(
       updates.recipientPhone = value;
     }
 
+    if (body.recipientEmail !== undefined) {
+      const value = String(body.recipientEmail ?? '').trim().toLowerCase();
+      if (value.length === 0) {
+        updates.recipientEmail = null;
+      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+        return NextResponse.json({ error: 'recipientEmail invalide' }, { status: 400 });
+      } else {
+        updates.recipientEmail = value;
+      }
+    }
+
     if (body.weight !== undefined) {
       const value = Number(body.weight);
       if (!Number.isFinite(value) || value <= 0) {
@@ -203,7 +216,7 @@ export async function PATCH(
         ratePerKm: pricing.ratePerKm,
         relayDepartureCommissionRate: pricing.relayDepartureRate,
         relayArrivalCommissionRate: pricing.relayArrivalRate,
-        platformMarginRate: 0,
+        platformMarginRate: pricing.platformCommissionRate,
         roundTo: pricing.roundTo,
       });
 

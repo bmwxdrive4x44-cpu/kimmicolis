@@ -1,8 +1,11 @@
 import { spawnSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 
 const isWindows = process.platform === 'win32';
 const MAX_WINDOWS_RETRIES = 3;
 const WINDOWS_RETRY_DELAY_MS = 1500;
+const WINDOWS_ENGINE_PATH = join(process.cwd(), 'src', 'generated', 'prisma', 'query-engine-windows.exe');
 
 const runGenerate = (args) => {
   const result = spawnSync('npx', args, {
@@ -34,12 +37,20 @@ const isWindowsLockError = (result) => {
   }
 
   const output = `${result.stdout ?? ''}\n${result.stderr ?? ''}`.toLowerCase();
-  return output.includes('query_engine-windows.dll.node') && (
+  const referencesPrismaEngine = output.includes('query_engine-windows.dll.node') ||
+    output.includes('query-engine-windows.exe') ||
+    output.includes('query-engine-windows.exe.tmp');
+
+  return referencesPrismaEngine && (
     output.includes('eperm') ||
     output.includes('ebusy') ||
     output.includes('access is denied') ||
     output.includes('being used by another process')
   );
+};
+
+const canReuseExistingWindowsEngine = (result) => {
+  return isWindowsLockError(result) && existsSync(WINDOWS_ENGINE_PATH);
 };
 
 const runWithWindowsRetry = (args) => {
@@ -59,6 +70,11 @@ const runWithWindowsRetry = (args) => {
 let result = runWithWindowsRetry(['prisma', 'generate']);
 
 if (result.status !== 0 && isWindows) {
+  if (canReuseExistingWindowsEngine(result)) {
+    console.warn('[prisma-generate] Windows engine rename is locked, reusing existing query-engine-windows.exe.');
+    process.exit(0);
+  }
+
   if (process.env.PRISMA_ALLOW_NO_ENGINE === 'true') {
     console.warn('[prisma-generate] Native generate failed on Windows, fallback to --no-engine (PRISMA_ALLOW_NO_ENGINE=true).');
     result = runWithWindowsRetry(['prisma', 'generate', '--no-engine']);

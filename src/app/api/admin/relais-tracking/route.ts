@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireRole } from '@/lib/rbac';
 import { db } from '@/lib/db';
+import { getRelayTrialState } from '@/lib/relais-trial';
 
 /**
  * GET /api/admin/relais-tracking
@@ -84,6 +85,7 @@ export async function GET(request: NextRequest) {
         reliabilityScore = Math.max(0, Math.min(100, reliabilityScore));
 
         const complianceScore = Math.round(r.complianceScore ?? 100);
+        const trial = getRelayTrialState(r.activationDate);
         const trustLevel = complianceScore >= 90
           ? 'excellent'
           : complianceScore >= 75
@@ -109,6 +111,9 @@ export async function GET(request: NextRequest) {
         if (amountToPay > 50000) {
           alerts.push({ level: 'warning', message: `Montant dû important: ${amountToPay.toFixed(0)} DA` });
         }
+        if (trial.isActive) {
+          alerts.push({ level: 'warning', message: `Période d'essai active (${trial.daysRemaining} jour(s) restant(s))` });
+        }
 
         return {
           id: r.id,
@@ -121,6 +126,7 @@ export async function GET(request: NextRequest) {
           approvalStatus: r.status,
           cautionStatus: r.cautionStatus,
           cautionAmount: r.cautionAmount,
+          trial,
           activeSanctionsCount: r.sanctions.length,
           trustLevel,
           contactName: r.user.name,

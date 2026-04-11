@@ -2,9 +2,25 @@ import type { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import bcrypt from 'bcryptjs';
 import { db } from './db';
+import { env } from './env';
 import { normalizeRole } from './roles';
+import { banRelayIdentities, describeBlockedIdentity, findBlockedRelayIdentity } from './banned-identities';
+import { getClientIpFromHeaders } from './request-ip';
 
 const BCRYPT_ROUNDS = 12;
+
+type MaybeClientType = {
+  clientType?: string | null;
+};
+
+function readClientType(value: unknown) {
+  const clientType = (value as MaybeClientType | null | undefined)?.clientType;
+  return typeof clientType === 'string' && clientType.length > 0 ? clientType : 'STANDARD';
+}
+
+function isDevDemoAuthEnabled() {
+  return process.env.NODE_ENV !== 'production' && process.env.ENABLE_DEV_DEMO_AUTH === 'true';
+}
 
 type DemoAccountConfig = {
   email: string;
@@ -107,13 +123,16 @@ async function findUserForAuth(email: string) {
         email: true,
         name: true,
         role: true,
+        isActive: true,
         phone: true,
+        siret: true,
         password: true,
         clientType: true,
         relais: {
           select: {
             id: true,
             status: true,
+            operationalStatus: true,
           },
         },
       },
@@ -130,12 +149,15 @@ async function findUserForAuth(email: string) {
         email: true,
         name: true,
         role: true,
+        isActive: true,
         phone: true,
+        siret: true,
         password: true,
         relais: {
           select: {
             id: true,
             status: true,
+            operationalStatus: true,
           },
         },
       },
@@ -158,10 +180,13 @@ export async function hashPassword(password: string): Promise<string> {
 }
 
 async function ensureDevelopmentDemoUser(email: string, password: string) {
+  // Désactive la création de comptes démo en production
+  if (process.env.NODE_ENV === 'production') {
+    return null;
+  }
   const demoAccount = DEMO_ACCOUNTS.find(
     (account) => account.email === email.toLowerCase() && account.password === password
   );
-
   if (!demoAccount) {
     return null;
   }
@@ -191,13 +216,16 @@ async function ensureDevelopmentDemoUser(email: string, password: string) {
       email: true,
       name: true,
       role: true,
+      isActive: true,
       phone: true,
+      siret: true,
       password: true,
       clientType: true,
       relais: {
         select: {
           id: true,
           status: true,
+          operationalStatus: true,
         },
       },
     },
@@ -253,47 +281,102 @@ export const authOptions: NextAuthOptions = {
         email: { label: 'Email', type: 'email' },
         password: { label: 'Password', type: 'password' },
       },
-      async authorize(credentials) {
+      async authorize(credentials, req) {
         if (!credentials?.email || !credentials?.password) {
           return null;
         }
 
-        // Ensure demo users are created / updated in dev for every login attempt.
-        if (process.env.NODE_ENV !== 'production') {
-          await ensureDevelopmentDemoUser(credentials.email, credentials.password);
+        const normalizedEmail = credentials.email.toLowerCase().trim();
+        const clientIp = getClientIpFromHeaders((req as { headers?: Headers | Record<string, string | string[] | undefined> } | undefined)?.headers);
+
+        const blockedIdentity = await findBlockedRelayIdentity({
+          email: normalizedEmail,
+          ip: clientIp,
+        });
+
+        if (blockedIdentity) {
+          await db.actionLog.create({
+            data: {
+              entityType: 'USER',
+              entityId: blockedIdentity.sourceUserId || normalizedEmail,
+              action: 'LOGIN_BLOCKED_BANNED_IDENTITY',
+              details: JSON.stringify({
+                email: normalizedEmail,
+                ipAddress: clientIp,
+                blockedType: blockedIdentity.type,
+                reason: describeBlockedIdentity(blockedIdentity),
+              }),
+              ipAddress: clientIp || undefined,
+            },
+          });
+
+          throw new Error(`BANNED_IDENTITY:${blockedIdentity.type}`);
         }
 
-        let user = await findUserForAuth(credentials.email);
+        // Optional local helper: demo account auto-provisioning is disabled by default.
+        if (isDevDemoAuthEnabled()) {
+          await ensureDevelopmentDemoUser(normalizedEmail, credentials.password);
+        }
 
-        if (!user) {
-          console.warn('[auth] user not found, force demo user creation', credentials.email);
-          user = await ensureDevelopmentDemoUser(credentials.email, credentials.password);
+        let user = await findUserForAuth(normalizedEmail);
+
+        if (!user && isDevDemoAuthEnabled()) {
+          console.warn('[auth] user not found, force demo user creation', normalizedEmail);
+          user = await ensureDevelopmentDemoUser(normalizedEmail, credentials.password);
         }
 
         if (!user || !user.password) {
-          console.warn('[auth] user is missing or has no password', credentials.email, user);
+          console.warn('[auth] user is missing or has no password', normalizedEmail, user);
           return null;
         }
 
-        let isValid = await verifyPassword(credentials.password, user.password);
-        console.log('[auth] verifyPassword', credentials.email, isValid);
+        if (!user.isActive) {
+          throw new Error('EMAIL_NOT_VERIFIED');
+        }
 
-        if (!isValid && process.env.NODE_ENV !== 'production') {
+        let isValid = await verifyPassword(credentials.password, user.password);
+        console.log('[auth] verifyPassword', normalizedEmail, isValid);
+
+        if (!isValid && isDevDemoAuthEnabled()) {
           // Re-hash / upsert possible stale demo user password and retry.
-          console.log('[auth] retry demo user sync for', credentials.email);
-          await ensureDevelopmentDemoUser(credentials.email, credentials.password);
+          console.log('[auth] retry demo user sync for', normalizedEmail);
+          await ensureDevelopmentDemoUser(normalizedEmail, credentials.password);
           const reloaded = await db.user.findUnique({
-            where: { email: credentials.email.toLowerCase() },
+            where: { email: normalizedEmail },
           });
           if (reloaded?.password) {
             isValid = await verifyPassword(credentials.password, reloaded.password);
-            console.log('[auth] verifyPassword retry', credentials.email, isValid);
+            console.log('[auth] verifyPassword retry', normalizedEmail, isValid);
           }
         }
 
         if (!isValid) {
-          console.warn('[auth] invalid credentials', credentials.email);
+          console.warn('[auth] invalid credentials', normalizedEmail);
           return null;
+        }
+
+        if (normalizeRole(user.role) === 'RELAIS' && user.relais?.operationalStatus === 'SUSPENDU') {
+          await banRelayIdentities({
+            email: user.email,
+            siret: user.siret,
+            ip: clientIp,
+            sourceRelaisId: user.relais.id,
+            sourceUserId: user.id,
+            reason: 'Relais suspendu - bannissement appliqué lors de la tentative de connexion',
+          });
+
+          await db.actionLog.create({
+            data: {
+              userId: user.id,
+              entityType: 'RELAIS',
+              entityId: user.relais.id,
+              action: 'LOGIN_BLOCKED_SUSPENDED_RELAY',
+              details: JSON.stringify({ email: user.email, ipAddress: clientIp }),
+              ipAddress: clientIp || undefined,
+            },
+          });
+
+          throw new Error('BANNED_IDENTITY:EMAIL');
         }
 
         if (passwordNeedsRehash(user.password)) {
@@ -304,6 +387,17 @@ export const authOptions: NextAuthOptions = {
           });
         }
 
+        await db.actionLog.create({
+          data: {
+            userId: user.id,
+            entityType: 'USER',
+            entityId: user.id,
+            action: 'LOGIN_SUCCESS',
+            details: JSON.stringify({ role: normalizeRole(user.role), email: user.email }),
+            ipAddress: clientIp || undefined,
+          },
+        });
+
         return {
           id: user.id,
           email: user.email,
@@ -312,13 +406,13 @@ export const authOptions: NextAuthOptions = {
           phone: user.phone ?? undefined,
           relaisId: user.relais?.id ?? null,
           relaisStatus: user.relais?.status ?? undefined,
-          clientType: (user as any).clientType ?? 'STANDARD',
+          clientType: readClientType(user),
         };
       },
     }),
   ],
-  secret: process.env.NEXTAUTH_SECRET,
-  debug: process.env.NODE_ENV === 'development',
+  secret: env.NEXTAUTH_SECRET,
+  debug: env.NODE_ENV === 'development',
   session: {
     strategy: 'jwt',
   },
@@ -329,7 +423,7 @@ export const authOptions: NextAuthOptions = {
         token.phone = user.phone;
         token.relaisId = user.relaisId;
         token.relaisStatus = user.relaisStatus;
-        token.clientType = (user as any).clientType ?? 'STANDARD';
+        token.clientType = readClientType(user);
       } else if (token.role) {
         token.role = normalizeRole(token.role);
       }

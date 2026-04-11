@@ -7,10 +7,22 @@ import { authOptions } from '@/lib/auth';
 import { isAlgerianCommerceRegisterNumber, normalizeCommerceRegisterNumber } from '@/lib/validators';
 import { checkRateLimit, RATE_LIMIT_PRESETS } from '@/lib/ratelimit';
 import { normalizeRole } from '@/lib/roles';
+import { describeBlockedIdentity, findBlockedRelayIdentity } from '@/lib/banned-identities';
+import { getClientIpFromHeaders } from '@/lib/request-ip';
+import { sendRegistrationConfirmationEmail } from '@/lib/email';
+import { createEmailVerificationToken } from '@/lib/email-verification';
 
 function isMissingClientTypeColumnError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error || '');
   return message.toLowerCase().includes('clienttype');
+}
+
+function isValidPersonName(value: string): boolean {
+  return /^[A-Za-zÀ-ÿ'\-\s]{2,60}$/.test(value);
+}
+
+function isValidPhone(value: string): boolean {
+  return /^\+?[0-9]{8,15}$/.test(value);
 }
 
 // GET all users (ADMIN ONLY)
@@ -170,14 +182,17 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { name, firstName, lastName, address, email, password, phone, role, siret } = body;
     const normalizedRole = normalizeRole(role);
+    const normalizedEmail = String(email || '').trim().toLowerCase();
+    const clientIp = getClientIpFromHeaders(request.headers);
 
     const normalizedFirstName = String(firstName || '').trim();
     const normalizedLastName = String(lastName || '').trim();
     const normalizedAddress = String(address || '').trim();
+    const normalizedPhone = String(phone || '').trim();
     const fullName = String(name || `${normalizedFirstName} ${normalizedLastName}`.trim()).trim();
 
     // Validate required fields
-    if (!fullName || !email || !password) {
+    if (!fullName || !normalizedEmail || !password) {
       return NextResponse.json({ 
         error: 'Missing required fields',
         details: 'Name, email and password are required' 
@@ -186,7 +201,7 @@ export async function POST(request: NextRequest) {
 
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
+    if (!emailRegex.test(normalizedEmail)) {
       return NextResponse.json({ 
         error: 'Invalid email format' 
       }, { status: 400 });
@@ -200,16 +215,52 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    const normalizedSiret = normalizeCommerceRegisterNumber(String(siret || ''));
-
-    if ((normalizedRole === 'TRANSPORTER' || normalizedRole === 'RELAIS') && !normalizedSiret) {
+    if (normalizedFirstName && !isValidPersonName(normalizedFirstName)) {
       return NextResponse.json({
-        error: 'Missing required fields',
-        details: 'Le numéro du registre du commerce est obligatoire pour les transporteurs et les points relais',
+        error: 'Invalid first name format',
+        details: 'Le prenom contient des caracteres non autorises',
       }, { status: 400 });
     }
 
-    if ((normalizedRole === 'TRANSPORTER' || normalizedRole === 'RELAIS') && !isAlgerianCommerceRegisterNumber(normalizedSiret)) {
+    if (normalizedLastName && !isValidPersonName(normalizedLastName)) {
+      return NextResponse.json({
+        error: 'Invalid last name format',
+        details: 'Le nom contient des caracteres non autorises',
+      }, { status: 400 });
+    }
+
+    if (normalizedPhone && !isValidPhone(normalizedPhone)) {
+      return NextResponse.json({
+        error: 'Invalid phone format',
+        details: 'Le format du telephone est invalide',
+      }, { status: 400 });
+    }
+
+    if (normalizedAddress && normalizedAddress.length > 200) {
+      return NextResponse.json({
+        error: 'Invalid address format',
+        details: 'Adresse trop longue (maximum 200 caracteres)',
+      }, { status: 400 });
+    }
+
+    const normalizedSiret = normalizeCommerceRegisterNumber(String(siret || ''));
+
+    const blockedIdentity = await findBlockedRelayIdentity({
+      email: normalizedEmail,
+      siret: normalizedSiret,
+      ip: clientIp,
+    });
+
+    if (blockedIdentity) {
+      return NextResponse.json({
+        error: 'Blocked identity',
+        code: 'BANNED_IDENTITY',
+        blockedType: blockedIdentity.type,
+        details: describeBlockedIdentity(blockedIdentity),
+      }, { status: 403 });
+    }
+
+    if (normalizedRole === 'TRANSPORTER' && normalizedSiret && !isAlgerianCommerceRegisterNumber(normalizedSiret)) {
       return NextResponse.json({
         error: 'Invalid commerce register number format',
         details: 'Format RC algérien invalide (ex: RC-16/1234567B21)',
@@ -218,7 +269,7 @@ export async function POST(request: NextRequest) {
 
     // Check if user exists
     const existingUser = await db.user.findUnique({
-      where: { email: email.toLowerCase() },
+      where: { email: normalizedEmail },
     });
 
     if (existingUser) {
@@ -239,13 +290,35 @@ export async function POST(request: NextRequest) {
         firstName: normalizedFirstName || null,
         lastName: normalizedLastName || null,
         address: normalizedAddress || null,
-        email: email.toLowerCase(),
+        email: normalizedEmail,
         password: hashedPassword,
-        phone: phone || null,
+        phone: normalizedPhone || null,
         role: normalizedRole,
-        siret: (normalizedRole === 'TRANSPORTER' || normalizedRole === 'RELAIS') ? normalizedSiret : null,
+        // Transporter accounts can be created first, then complete the RC in the application flow.
+        siret: normalizedRole === 'TRANSPORTER' ? (normalizedSiret || null) : null,
+        isActive: normalizedRole === 'ADMIN',
       },
     });
+
+    let emailConfirmationSent = false;
+    try {
+      const token = createEmailVerificationToken({
+        userId: user.id,
+        email: user.email,
+      });
+      const locale = request.nextUrl.searchParams.get('locale') || 'fr';
+      const verificationUrl = `${request.nextUrl.origin}/api/auth/verify-email?token=${encodeURIComponent(token)}&locale=${encodeURIComponent(locale)}`;
+
+      await sendRegistrationConfirmationEmail({
+        to: user.email,
+        name: user.name,
+        role: user.role,
+        verificationUrl,
+      });
+      emailConfirmationSent = true;
+    } catch (mailError) {
+      console.error('[users] registration confirmation email failed:', mailError);
+    }
 
     return NextResponse.json({
       id: user.id,
@@ -255,6 +328,8 @@ export async function POST(request: NextRequest) {
       lastName: user.lastName,
       address: user.address,
       role: user.role,
+      emailConfirmationSent,
+      requiresEmailVerification: user.role !== 'ADMIN',
     });
   } catch (error) {
     console.error('Error creating user:', error);

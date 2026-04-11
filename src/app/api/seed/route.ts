@@ -2,7 +2,16 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { hashPassword } from '@/lib/auth';
 
+function isDevSeedApiEnabled() {
+  return process.env.NODE_ENV !== 'production' && process.env.ENABLE_DEV_SEED_API === 'true';
+}
+
 export async function GET() {
+  // Inaccessible by default; enable explicitly for local seed workflows.
+  if (!isDevSeedApiEnabled()) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
+
   try {
     console.log('Starting database seed...');
 

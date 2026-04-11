@@ -3,6 +3,8 @@ import { db } from '@/lib/db';
 import { requireRole } from '@/lib/rbac';
 import { createHash } from 'crypto';
 import { createNotificationDedup } from '@/lib/notifications';
+import { sendEmail } from '@/lib/email';
+import { sendWhatsAppTextMessage } from '@/lib/whatsapp';
 import { evaluateImplicitProEligibility } from '@/lib/pro-eligibility';
 import {
   getRelaisCashBlockIssue,
@@ -99,8 +101,14 @@ export async function POST(request: NextRequest) {
     }
 
     const parcel = qrSecurity.parcelId
-      ? await db.colis.findUnique({ where: { id: qrSecurity.parcelId } })
-      : await db.colis.findUnique({ where: { trackingNumber: tracking } });
+      ? await db.colis.findUnique({
+          where: { id: qrSecurity.parcelId },
+          include: { client: { select: { id: true, email: true, name: true } } },
+        })
+      : await db.colis.findUnique({
+          where: { trackingNumber: tracking },
+          include: { client: { select: { id: true, email: true, name: true } } },
+        });
     if (!parcel) {
       return NextResponse.json({ error: 'Colis non trouvé' }, { status: 404 });
     }
@@ -222,6 +230,63 @@ export async function POST(request: NextRequest) {
       message: `${notes} — Suivi: ${tracking}`,
       type: 'IN_APP',
     });
+
+    const normalizedRecipientPhone = normalizePhone(parcel.recipientPhone || recipientPhone || '');
+    const rawRecipientPhone = parcel.recipientPhone || recipientPhone || '';
+    const normalizedRecipientNoPlus = normalizedRecipientPhone.replace(/^\+/, '');
+
+    const recipientUser = rawRecipientPhone
+      ? await db.user.findFirst({
+          where: {
+            OR: [
+              { phone: rawRecipientPhone },
+              { phone: normalizedRecipientPhone },
+              { phone: normalizedRecipientNoPlus },
+            ],
+          },
+          select: { id: true, email: true, name: true },
+        })
+      : null;
+
+    const recipientDisplayName = `${recipientFirstName} ${recipientLastName}`.trim();
+    const deliveredAtLabel = new Intl.DateTimeFormat('fr-DZ', {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    }).format(new Date());
+
+    const recipientEmail = parcel.recipientEmail || recipientUser?.email || parcel.client?.email || null;
+    if (recipientEmail) {
+      try {
+        await sendEmail({
+          to: recipientEmail,
+          subject: `SwiftColis - Colis ${tracking} retiré au relais`,
+          html: `
+            <div style="font-family:Arial,sans-serif;max-width:640px;margin:0 auto;padding:20px;color:#0f172a;">
+              <h2 style="margin:0 0 16px;color:#065f46;">Retrait confirmé</h2>
+              <p style="margin:0 0 12px;">Bonjour${recipientDisplayName ? ` ${recipientDisplayName}` : ''},</p>
+              <p style="margin:0 0 12px;">Votre colis <strong>${tracking}</strong> a bien été remis au destinataire au relais <strong>${relais.commerceName}</strong>.</p>
+              <p style="margin:0 0 12px;">Date/heure: <strong>${deliveredAtLabel}</strong></p>
+              <p style="margin:0 0 24px;">Merci d'avoir utilisé SwiftColis.</p>
+              <hr style="border:none;border-top:1px solid #e2e8f0;margin:16px 0;" />
+              <p style="margin:0;color:#64748b;font-size:12px;">SwiftColis - Notification automatique</p>
+            </div>
+          `,
+        });
+      } catch (emailError) {
+        console.error('[scan-livraison] email delivery notification failed:', emailError);
+      }
+    }
+
+    if (rawRecipientPhone) {
+      try {
+        await sendWhatsAppTextMessage({
+          to: rawRecipientPhone,
+          message: `SwiftColis: Votre colis ${tracking} a ete retire au relais ${relais.commerceName} le ${deliveredAtLabel}. Merci.`,
+        });
+      } catch (whatsAppError) {
+        console.error('[scan-livraison] WhatsApp delivery notification failed:', whatsAppError);
+      }
+    }
 
     try {
       await evaluateImplicitProEligibility(parcel.clientId);

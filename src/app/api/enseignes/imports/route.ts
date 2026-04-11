@@ -10,6 +10,7 @@ type ImportRowInput = {
   recipientFirstName: string;
   recipientLastName: string;
   recipientPhone: string;
+  recipientEmail?: string;
   weight: number;
   description?: string;
 };

@@ -24,6 +24,7 @@ export async function GET(request: NextRequest) {
     const transportersCount = await db.$queryRaw<[{count: bigint}]>`SELECT COUNT(*) as count FROM "User" WHERE role = 'TRANSPORTER'`;
     const relaisCount = await db.$queryRaw<[{count: bigint}]>`SELECT COUNT(*) as count FROM "Relais" WHERE status = 'APPROVED'`;
     const pendingRelaisCount = await db.$queryRaw<[{count: bigint}]>`SELECT COUNT(*) as count FROM "Relais" WHERE status = 'PENDING'`;
+    const pendingTransportersCount = await db.$queryRaw<[{count: bigint}]>`SELECT COUNT(*) as count FROM "TransporterApplication" WHERE status = 'PENDING'`;
 
     // Get parcels by status
     const parcelsByStatus = await db.$queryRaw<Array<{status: string; count: bigint}>>`
@@ -75,11 +76,40 @@ export async function GET(request: NextRequest) {
       ORDER BY month ASC
     `;
 
+    const completedMissions = await db.mission.findMany({
+      where: { status: 'LIVRE' },
+      select: {
+        colis: {
+          select: {
+            prixClient: true,
+            commissionRelais: true,
+            commissionPlateforme: true,
+            netTransporteur: true,
+          },
+        },
+      },
+    });
+
+    const financialSummary = completedMissions.reduce(
+      (acc, mission) => {
+        const colis = mission.colis;
+        if (!colis) return acc;
+        acc.count += 1;
+        acc.clientTotal += Number(colis.prixClient || 0);
+        acc.relayTotal += Number(colis.commissionRelais || 0);
+        acc.adminTotal += Number(colis.commissionPlateforme || 0);
+        acc.netTransporteurTotal += Number(colis.netTransporteur || 0);
+        return acc;
+      },
+      { count: 0, clientTotal: 0, relayTotal: 0, adminTotal: 0, netTransporteurTotal: 0 }
+    );
+
     return NextResponse.json({
       counts: {
         users: Number(usersCount[0]?.count || 0),
         parcels: Number(parcelsCount[0]?.count || 0),
         transporters: Number(transportersCount[0]?.count || 0),
+        pendingTransporters: Number(pendingTransportersCount[0]?.count || 0),
         relais: Number(relaisCount[0]?.count || 0),
         pendingRelais: Number(pendingRelaisCount[0]?.count || 0),
       },
@@ -106,6 +136,7 @@ export async function GET(request: NextRequest) {
         month: m.month,
         count: Number(m.count),
       })),
+      financialSummary,
     }, { headers: noStoreHeaders });
   } catch (error) {
     console.error('Error fetching stats:', error);

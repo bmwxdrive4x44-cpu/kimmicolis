@@ -62,6 +62,10 @@ export async function PUT(
       return NextResponse.json({ error: 'Mission not found' }, { status: 404 });
     }
 
+    if (auth.payload.role === 'TRANSPORTER' && currentMission.transporteurId !== auth.payload.id) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
     // Update mission
     const mission = await db.mission.update({
       where: { id },

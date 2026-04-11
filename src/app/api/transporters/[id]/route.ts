@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { Prisma } from '@/generated/prisma';
 import { db } from '@/lib/db';
+import { getErrorMessage } from '@/lib/errors';
 import { requireRole } from '@/lib/rbac';
 
 export async function PUT(
@@ -11,8 +13,17 @@ export async function PUT(
 
   try {
     const { id } = await params;
+    if (!id) {
+      return NextResponse.json({ error: 'Missing transporter application id' }, { status: 400 });
+    }
+
     const body = await request.json();
-    const { fullName, phone, vehicle, license, experience, regions, description } = body;
+    const { fullName, phone, vehicle, license, experience, regions, description, documents } = body;
+    const serializedDocuments = Array.isArray(documents)
+      ? JSON.stringify(documents)
+      : typeof documents === 'string'
+        ? documents
+        : null;
 
     const existing = await db.transporterApplication.findUnique({
       where: { id },
@@ -27,7 +38,7 @@ export async function PUT(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const data: any = {};
+    const data: Prisma.TransporterApplicationUpdateInput = {};
     if (fullName !== undefined) data.fullName = fullName;
     if (phone !== undefined) data.phone = phone;
     if (vehicle !== undefined) data.vehicle = vehicle;
@@ -37,15 +48,25 @@ export async function PUT(
       data.regions = Array.isArray(regions) ? JSON.stringify(regions) : regions;
     }
     if (description !== undefined) data.description = description;
-
     const updated = await db.transporterApplication.update({
       where: { id },
       data,
     });
 
+    if (documents !== undefined) {
+      await db.$executeRaw`
+        UPDATE "TransporterApplication"
+        SET "documents" = ${serializedDocuments}
+        WHERE "id" = ${id}
+      `;
+    }
+
     return NextResponse.json(updated);
   } catch (error) {
     console.error('Error updating transporter application:', error);
-    return NextResponse.json({ error: 'Failed to update' }, { status: 500 });
+    return NextResponse.json({
+      error: 'Failed to update',
+      details: getErrorMessage(error),
+    }, { status: 500 });
   }
 }

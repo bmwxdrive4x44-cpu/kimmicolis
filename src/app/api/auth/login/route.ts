@@ -3,6 +3,14 @@ import { db } from '@/lib/db';
 import { hashPassword, passwordNeedsRehash, verifyPassword } from '@/lib/auth';
 import { checkRateLimit, RATE_LIMIT_PRESETS } from '@/lib/ratelimit';
 
+function isRecordNotFoundError(error: unknown): boolean {
+  const prismaCode = typeof error === 'object' && error !== null && 'code' in error
+    ? String((error as { code?: unknown }).code || '')
+    : '';
+  const message = error instanceof Error ? error.message : String(error || '');
+  return prismaCode === 'P2025' || message.includes('No record was found for an update');
+}
+
 /**
  * POST /api/auth/login
  * Manual login endpoint with rate limiting
@@ -76,10 +84,20 @@ export async function POST(request: NextRequest) {
     }
 
     if (passwordNeedsRehash(user.password)) {
-      await db.user.update({
-        where: { id: user.id },
-        data: { password: await hashPassword(password) },
-      });
+      try {
+        await db.user.update({
+          where: { id: user.id },
+          data: { password: await hashPassword(password) },
+        });
+      } catch (error) {
+        if (isRecordNotFoundError(error)) {
+          return NextResponse.json(
+            { error: 'Invalid email or password' },
+            { status: 401 }
+          );
+        }
+        throw error;
+      }
     }
 
     // Return success (frontend will handle token generation via NextAuth)

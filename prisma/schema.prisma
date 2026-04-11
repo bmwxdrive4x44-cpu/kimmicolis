@@ -3,6 +3,7 @@
 
 generator client {
   provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
 }
 
 datasource db {
@@ -106,6 +107,7 @@ model Relais {
   latitude         Float?
   longitude        Float?
   photos           String?  // JSON array of photo URLs
+  commerceDocuments String? // JSON array of document URLs
   commissionPetit  Float    @default(100)
   commissionMoyen  Float    @default(200)
   commissionGros   Float    @default(300)
@@ -147,6 +149,7 @@ model TransporterApplication {
   experience      Int
   regions         String   // JSON array of regions
   description     String?
+  documents       String?  // JSON array of {url, filename, size}
   status          String   @default("PENDING") // PENDING, APPROVED, REJECTED
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -225,6 +228,7 @@ model Colis {
   recipientFirstName String?
   recipientLastName  String?
   recipientPhone     String?
+  recipientEmail     String?
   withdrawalCodeHash String?
   relaisDepartId  String
   relaisArriveeId String

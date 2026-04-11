@@ -34,6 +34,7 @@ export async function POST(request: NextRequest) {
             'pricingRelayArrivalRate',
             'pricingRelayPrintFee',
             'pricingRoundTo',
+            'platformCommission',
           ],
         },
       },
@@ -54,6 +55,7 @@ export async function POST(request: NextRequest) {
       ratePerKm: getNumber('pricingRatePerKm', 2.5),
       relayDepartureCommissionRate: getNumber('pricingRelayDepartureRate', 0.1),
       relayArrivalCommissionRate: getNumber('pricingRelayArrivalRate', 0.1),
+      platformMarginRate: getNumber('platformCommission', 10) / 100,
       roundTo: getNumber('pricingRoundTo', 10),
     });
 
