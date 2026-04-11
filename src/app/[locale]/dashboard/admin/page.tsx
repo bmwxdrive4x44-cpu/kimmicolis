@@ -16,6 +16,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { MatchingAutoAssignPanel } from '@/components/dashboard/admin/matching-auto-assign-panel';
 import {
   DashboardHero,
@@ -138,6 +139,7 @@ export default function AdminDashboard() {
               <>
                 <Badge variant="outline" className="border-white/70 bg-white/70 text-slate-700">Connecté: {session?.user?.name}</Badge>
                 <Badge variant="outline" className="border-white/70 bg-white/70 text-slate-700">{stats?.counts?.pendingRelais || 0} relais à valider</Badge>
+                <Badge variant="outline" className="border-white/70 bg-white/70 text-slate-700">{stats?.counts?.pendingTransporters || 0} transporteurs à valider</Badge>
               </>
             }
           />
@@ -145,31 +147,40 @@ export default function AdminDashboard() {
           <DashboardStatsGrid className="xl:grid-cols-5">
             <DashboardMetricCard tone="admin" label="Utilisateurs" value={stats?.counts?.users || 0} icon={<Users className="h-5 w-5" />} />
             <DashboardMetricCard tone="admin" label="Colis" value={stats?.counts?.parcels || 0} icon={<Package className="h-5 w-5" />} />
-            <DashboardMetricCard tone="admin" label="Transporteurs" value={stats?.counts?.transporters || 0} icon={<Truck className="h-5 w-5" />} />
+            <DashboardMetricCard tone="admin" label="Transporteurs" value={stats?.counts?.transporters || 0} icon={<Truck className="h-5 w-5" />} detail={stats?.counts?.pendingTransporters > 0 ? `${stats.counts.pendingTransporters} en attente` : 'Aucun dossier en attente'} />
             <DashboardMetricCard tone="admin" label="Points relais" value={stats?.counts?.relais || 0} icon={<Store className="h-5 w-5" />} detail={stats?.counts?.pendingRelais > 0 ? `${stats.counts.pendingRelais} en attente` : 'Aucun dossier en attente'} />
             <DashboardMetricCard tone="admin" label="Revenus" value={`${(stats?.revenue || 0).toFixed(0)} DA`} icon={<DollarSign className="h-5 w-5" />} />
           </DashboardStatsGrid>
 
           <DashboardPanel tone="admin">
             <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className={`${dashboardTabsListClass} grid grid-cols-2 lg:grid-cols-10`}>
-                <TabsTrigger value="overview" className={getDashboardTabsTriggerClass('admin')}><BarChart3 className="h-4 w-4 mr-2" />Vue d'ensemble</TabsTrigger>
-                <TabsTrigger value="users" className={getDashboardTabsTriggerClass('admin')}><Users className="h-4 w-4 mr-2" />Utilisateurs</TabsTrigger>
-                <TabsTrigger value="parcels" className={getDashboardTabsTriggerClass('admin')}><Package className="h-4 w-4 mr-2" />Colis</TabsTrigger>
-                <TabsTrigger value="relays" className={getDashboardTabsTriggerClass('admin')}><Store className="h-4 w-4 mr-2" />Relais</TabsTrigger>
-                <TabsTrigger value="lines" className={getDashboardTabsTriggerClass('admin')}><MapPin className="h-4 w-4 mr-2" />Lignes</TabsTrigger>
-                <TabsTrigger value="loyalty" className={getDashboardTabsTriggerClass('admin')}><Award className="h-4 w-4 mr-2" />Fidélité</TabsTrigger>
-                <TabsTrigger value="audit" className={getDashboardTabsTriggerClass('admin')}><ScrollText className="h-4 w-4 mr-2" />Audit</TabsTrigger>
-                <TabsTrigger value="disputes" className={getDashboardTabsTriggerClass('admin')}><AlertCircle className="h-4 w-4 mr-2" />Litiges</TabsTrigger>
-                <TabsTrigger value="messages" className={getDashboardTabsTriggerClass('admin')}>
-                  <Inbox className="h-4 w-4 mr-2" />
-                  Messages
-                  {unreadMessagesCount > 0 && (
-                    <Badge className="ml-2 bg-red-500 px-1.5 py-0 text-[10px] text-white">{unreadMessagesCount}</Badge>
-                  )}
-                </TabsTrigger>
-                <TabsTrigger value="settings" className={getDashboardTabsTriggerClass('admin')}><Settings className="h-4 w-4 mr-2" />Paramètres</TabsTrigger>
-              </TabsList>
+              <div className="mb-6 overflow-x-auto pb-1">
+                <TabsList className={`${dashboardTabsListClass} mb-0 inline-flex h-auto w-max min-w-full flex-nowrap`}>
+                  <TabsTrigger value="overview" className={`${getDashboardTabsTriggerClass('admin')} shrink-0 whitespace-nowrap`}><BarChart3 className="h-4 w-4 mr-2" />Vue d'ensemble</TabsTrigger>
+                  <TabsTrigger value="users" className={`${getDashboardTabsTriggerClass('admin')} shrink-0 whitespace-nowrap`}><Users className="h-4 w-4 mr-2" />Utilisateurs</TabsTrigger>
+                  <TabsTrigger value="parcels" className={`${getDashboardTabsTriggerClass('admin')} shrink-0 whitespace-nowrap`}><Package className="h-4 w-4 mr-2" />Colis</TabsTrigger>
+                  <TabsTrigger value="relays" className={`${getDashboardTabsTriggerClass('admin')} shrink-0 whitespace-nowrap`}><Store className="h-4 w-4 mr-2" />Relais</TabsTrigger>
+                  <TabsTrigger value="transporters" className={`${getDashboardTabsTriggerClass('admin')} shrink-0 whitespace-nowrap`}>
+                    <Truck className="h-4 w-4 mr-2" />
+                    Transporteurs
+                    {stats?.counts?.pendingTransporters > 0 && (
+                      <Badge className="ml-2 bg-orange-500 px-1.5 py-0 text-[10px] text-white">{stats.counts.pendingTransporters}</Badge>
+                    )}
+                  </TabsTrigger>
+                  <TabsTrigger value="lines" className={`${getDashboardTabsTriggerClass('admin')} shrink-0 whitespace-nowrap`}><MapPin className="h-4 w-4 mr-2" />Lignes</TabsTrigger>
+                  <TabsTrigger value="loyalty" className={`${getDashboardTabsTriggerClass('admin')} shrink-0 whitespace-nowrap`}><Award className="h-4 w-4 mr-2" />Fidélité</TabsTrigger>
+                  <TabsTrigger value="audit" className={`${getDashboardTabsTriggerClass('admin')} shrink-0 whitespace-nowrap`}><ScrollText className="h-4 w-4 mr-2" />Audit</TabsTrigger>
+                  <TabsTrigger value="disputes" className={`${getDashboardTabsTriggerClass('admin')} shrink-0 whitespace-nowrap`}><AlertCircle className="h-4 w-4 mr-2" />Litiges</TabsTrigger>
+                  <TabsTrigger value="messages" className={`${getDashboardTabsTriggerClass('admin')} shrink-0 whitespace-nowrap`}>
+                    <Inbox className="h-4 w-4 mr-2" />
+                    Messages
+                    {unreadMessagesCount > 0 && (
+                      <Badge className="ml-2 bg-red-500 px-1.5 py-0 text-[10px] text-white">{unreadMessagesCount}</Badge>
+                    )}
+                  </TabsTrigger>
+                  <TabsTrigger value="settings" className={`${getDashboardTabsTriggerClass('admin')} shrink-0 whitespace-nowrap`}><Settings className="h-4 w-4 mr-2" />Paramètres</TabsTrigger>
+                </TabsList>
+              </div>
 
               <TabsContent value="overview">
                 <OverviewTab stats={stats} setActiveTab={setActiveTab} />
@@ -183,6 +194,9 @@ export default function AdminDashboard() {
               <TabsContent value="relays">
                 <RelaysTab />
               </TabsContent>
+               <TabsContent value="transporters">
+                 <TransportersTab />
+               </TabsContent>
               <TabsContent value="lines">
                 <LinesTab />
               </TabsContent>
@@ -199,7 +213,7 @@ export default function AdminDashboard() {
                 <MessagesTab onUnreadCountChange={setUnreadMessagesCount} />
               </TabsContent>
               <TabsContent value="settings">
-                <SettingsTab />
+                <SettingsTab stats={stats} />
               </TabsContent>
             </Tabs>
           </DashboardPanel>
@@ -500,10 +514,24 @@ function UsersTab() {
 
   const getAddressLines = (user: any) => {
     if (user.role === 'RELAIS') {
+      if (!user.relais) {
+        return [
+          user.isActive
+            ? 'Candidature relais non finalisée'
+            : 'Compte relais créé - email non vérifié',
+        ];
+      }
       return [user.relais?.address, getWilayaName(user.relais?.ville)].filter(Boolean);
     }
 
     if (user.role === 'ENSEIGNE') {
+      if (!user.enseigne) {
+        return [
+          user.isActive
+            ? 'Profil enseigne non finalisé'
+            : 'Compte enseigne créé - email non vérifié',
+        ];
+      }
       return [user.address, getWilayaName(user.enseigne?.operationalCity)].filter(Boolean);
     }
 
@@ -545,6 +573,31 @@ function UsersTab() {
     };
   };
 
+  const renderAddressLine = (line: string, className: string, key: string) => {
+    const maxChars = 72;
+    if (line.length <= maxChars) {
+      return (
+        <p key={key} className={className}>
+          {line}
+        </p>
+      );
+    }
+
+    const truncated = `${line.slice(0, maxChars - 1)}...`;
+    return (
+      <Tooltip key={key}>
+        <TooltipTrigger asChild>
+          <p className={`${className} cursor-help`} title={line}>
+            {truncated}
+          </p>
+        </TooltipTrigger>
+        <TooltipContent className="max-w-md break-words text-xs">
+          {line}
+        </TooltipContent>
+      </Tooltip>
+    );
+  };
+
   return (
     <>
       <Card>
@@ -567,7 +620,7 @@ function UsersTab() {
           {isLoading ? (
             <div className="flex justify-center py-8"><Loader2 className="h-8 w-8 animate-spin text-emerald-600" /></div>
           ) : (
-            <Table>
+            <Table className="min-w-[1050px]">
               <TableHeader>
                 <TableRow>
                   <TableHead>Nom</TableHead>
@@ -591,20 +644,22 @@ function UsersTab() {
                         ) : null}
                       </div>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="whitespace-normal align-top">
                       <div className="space-y-1 text-sm">
-                        <p>{user.email}</p>
+                        <p className="break-all">{user.email}</p>
                         <p className="text-xs text-slate-500">{user.phone || 'Téléphone non renseigné'}</p>
                       </div>
                     </TableCell>
                     <TableCell><Badge variant="outline">{USER_ROLES.find(r => r.id === user.role)?.label || user.role}</Badge></TableCell>
-                    <TableCell>
-                      <div className="space-y-1 text-sm max-w-xs">
+                    <TableCell className="whitespace-normal align-top">
+                      <div className="space-y-1 text-sm max-w-sm">
                         {getAddressLines(user).length > 0 ? (
                           getAddressLines(user).map((line, index) => (
-                            <p key={`${user.id}-address-${index}`} className={index === 0 ? 'text-slate-900 dark:text-slate-100' : 'text-xs text-slate-500'}>
-                              {line}
-                            </p>
+                            renderAddressLine(
+                              String(line),
+                              `${index === 0 ? 'text-slate-900 dark:text-slate-100' : 'text-xs text-slate-500'} break-words`,
+                              `${user.id}-address-${index}`,
+                            )
                           ))
                         ) : (
                           <span className="text-xs text-slate-400">Adresse non renseignée</span>
@@ -726,6 +781,228 @@ function UsersTab() {
         </DialogContent>
       </Dialog>
     </>
+  );
+}
+
+// Transporters Tab
+function TransportersTab() {
+  const { toast } = useToast();
+  const [applications, setApplications] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [filter, setFilter] = useState('PENDING');
+  const [rejectReasons, setRejectReasons] = useState<Record<string, string>>({});
+  const [processingId, setProcessingId] = useState<string | null>(null);
+  const [expandedDocs, setExpandedDocs] = useState<Record<string, boolean>>({});
+
+  useEffect(() => { fetchApplications(); }, []);
+
+  const fetchApplications = async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch('/api/transporters');
+      const data = await response.json();
+      setApplications(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error('Error fetching transporter applications:', error);
+      setApplications([]);
+      toast({ title: 'Erreur', description: 'Impossible de charger les dossiers transporteurs', variant: 'destructive' });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleValidate = async (applicationId: string, action: 'approve' | 'reject') => {
+    setProcessingId(applicationId);
+    try {
+      const response = await fetch('/api/admin/transporters/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          applicationId,
+          action,
+          reason: action === 'reject' ? (rejectReasons[applicationId] || undefined) : undefined,
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data?.error || 'Erreur lors de la validation');
+
+      const nextStatus = action === 'approve' ? 'APPROVED' : 'REJECTED';
+      setApplications((prev) => prev.map((app) => (
+        app.id === applicationId
+          ? { ...app, status: nextStatus }
+          : app
+      )));
+      setFilter(nextStatus);
+      setRejectReasons((prev) => {
+        const next = { ...prev };
+        delete next[applicationId];
+        return next;
+      });
+
+      toast({
+        title: action === 'approve' ? 'Dossier approuvé' : 'Dossier rejeté',
+        description: data?.message || 'La décision a été enregistrée. Le filtre a été mis à jour pour afficher ce dossier.',
+      });
+      void fetchApplications();
+    } catch (error) {
+      toast({ title: 'Erreur', description: error instanceof Error ? error.message : 'Impossible de traiter le dossier', variant: 'destructive' });
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const parseDocuments = (raw: string | null | undefined): Array<{ url: string; filename: string; size: number }> => {
+    if (!raw) return [];
+    try { return JSON.parse(raw) || []; } catch { return []; }
+  };
+
+  const parseRegions = (raw: string | null | undefined): string[] => {
+    if (!raw) return [];
+    try { return JSON.parse(raw) || []; } catch { return []; }
+  };
+
+  const filtered = filter === 'all' ? applications : applications.filter((a) => a.status === filter);
+
+  const emptyStateMessage = (() => {
+    if (filter === 'PENDING') return 'Aucun dossier en attente. Passez sur Approuvés ou Tous pour revoir les dossiers traités.';
+    if (filter === 'APPROVED') return 'Aucun dossier approuvé pour le moment.';
+    if (filter === 'REJECTED') return 'Aucun dossier rejeté pour le moment.';
+    return 'Aucun dossier à afficher.';
+  })();
+
+  const statusBadge = (status: string) => {
+    if (status === 'APPROVED') return <Badge className="bg-emerald-600 text-white">Approuvé</Badge>;
+    if (status === 'REJECTED') return <Badge className="bg-red-600 text-white">Rejeté</Badge>;
+    return <Badge className="bg-amber-500 text-white">En attente</Badge>;
+  };
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <CardTitle>Dossiers transporteurs</CardTitle>
+              <CardDescription>Examinez et validez les candidatures des transporteurs (RC, véhicule, permis, documents)</CardDescription>
+            </div>
+            <div className="flex gap-2 flex-wrap">
+              <Select value={filter} onValueChange={setFilter}>
+                <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="PENDING">En attente</SelectItem>
+                  <SelectItem value="APPROVED">Approuvés</SelectItem>
+                  <SelectItem value="REJECTED">Rejetés</SelectItem>
+                  <SelectItem value="all">Tous</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button variant="outline" onClick={fetchApplications} disabled={isLoading}>
+                <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />Actualiser
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="flex justify-center py-8"><Loader2 className="h-8 w-8 animate-spin text-blue-600" /></div>
+          ) : filtered.length === 0 ? (
+            <p className="text-center text-slate-500 py-8">{emptyStateMessage}</p>
+          ) : (
+            <div className="space-y-4">
+              {filtered.map((app) => {
+                const docs = parseDocuments(app.documents);
+                const regions = parseRegions(app.regions);
+                const isProcessing = processingId === app.id;
+                const docsExpanded = expandedDocs[app.id];
+
+                return (
+                  <div key={app.id} className="rounded-xl border p-4 space-y-4">
+                    <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="font-semibold text-lg">{app.fullName}</p>
+                          {statusBadge(app.status)}
+                          {docs.length > 0 ? (
+                            <Badge variant="outline">{docs.length} doc{docs.length > 1 ? 's' : ''}</Badge>
+                          ) : (
+                            <Badge className="bg-orange-500 text-white">Sans document</Badge>
+                          )}
+                        </div>
+                        <p className="text-sm text-slate-600 dark:text-slate-400">{app.user?.email} - {app.phone}</p>
+                        <div className="flex flex-wrap gap-2 text-sm text-slate-600 dark:text-slate-400">
+                          <span>RC: <span className="font-mono font-medium text-slate-800 dark:text-slate-200">{app.user?.siret || '-'}</span></span>
+                          <span>·</span>
+                          <span>Véhicule: <strong>{app.vehicle}</strong></span>
+                          <span>·</span>
+                          <span>Permis: <strong>{app.license}</strong></span>
+                          <span>·</span>
+                          <span>Expérience: <strong>{app.experience} an{app.experience > 1 ? 's' : ''}</strong></span>
+                        </div>
+                        {regions.length > 0 && <p className="text-sm text-slate-600 dark:text-slate-400">Régions: {regions.join(', ')}</p>}
+                        {app.description && <p className="text-sm italic text-slate-500">{app.description}</p>}
+                        <p className="text-xs text-slate-400">Dossier soumis le {new Date(app.createdAt).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })}</p>
+                      </div>
+
+                      {app.status === 'PENDING' && (
+                        <div className="flex flex-col gap-2 min-w-[260px]">
+                          <Textarea
+                            placeholder="Motif de refus (optionnel)"
+                            value={rejectReasons[app.id] || ''}
+                            onChange={(e) => setRejectReasons((prev) => ({ ...prev, [app.id]: e.target.value }))}
+                            rows={2}
+                            className="text-sm"
+                          />
+                          <div className="flex gap-2">
+                            <Button className="flex-1 bg-emerald-600 hover:bg-emerald-700" onClick={() => handleValidate(app.id, 'approve')} disabled={isProcessing}>
+                              {isProcessing ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <CheckCircle className="h-4 w-4 mr-1" />}
+                              Approuver
+                            </Button>
+                            <Button variant="destructive" className="flex-1" onClick={() => handleValidate(app.id, 'reject')} disabled={isProcessing}>
+                              {isProcessing ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <XCircle className="h-4 w-4 mr-1" />}
+                              Rejeter
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {docs.length > 0 && (
+                      <div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="text-blue-600 hover:text-blue-700 p-0 h-auto"
+                          onClick={() => setExpandedDocs((prev) => ({ ...prev, [app.id]: !docsExpanded }))}
+                        >
+                          {docsExpanded ? <ChevronDown className="h-4 w-4 mr-1" /> : <ChevronRight className="h-4 w-4 mr-1" />}
+                          {docsExpanded ? 'Masquer' : 'Voir'} les documents ({docs.length})
+                        </Button>
+                        {docsExpanded && (
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {docs.map((doc, idx) => (
+                              <a
+                                key={idx}
+                                href={doc.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-md hover:bg-blue-100 transition-colors"
+                              >
+                                <Eye className="h-3.5 w-3.5" />
+                                {doc.filename}
+                              </a>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 }
 
@@ -933,6 +1210,32 @@ function RelaysTab() {
     }
   };
 
+  const handleApproveTrial = async (id: string) => {
+    try {
+      const response = await fetch(`/api/relais/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'APPROVED', trialMode: true }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data?.error || 'Impossible d\'approuver le relais en essai');
+      }
+      toast({
+        title: 'Relais approuvé en essai',
+        description: 'Période d\'essai activée (quota journalier appliqué).',
+      });
+      fetchRelais();
+      fetchTracking();
+    } catch (error) {
+      toast({
+        title: 'Erreur',
+        description: error instanceof Error ? error.message : 'Impossible d\'approuver le relais en essai',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const handleReject = async (id: string) => {
     try {
       const response = await fetch(`/api/relais/${id}`, {
@@ -997,16 +1300,21 @@ function RelaysTab() {
       const response = await fetch(`/api/relais/${deleteRelaisId}`, {
         method: 'DELETE',
       });
+      const data = await response.json().catch(() => ({}));
       if (response.ok) {
-        toast({ title: 'Relais supprimé' });
+        toast({ title: 'Relais supprimé', description: data?.message || 'Le point relais a été supprimé.' });
         setDeleteRelaisId(null);
         fetchRelais();
         fetchTracking();
       } else {
-        throw new Error('Failed');
+        throw new Error(data?.details || data?.error || 'Impossible de supprimer le relais');
       }
-    } catch {
-      toast({ title: 'Erreur', description: 'Impossible de supprimer le relais', variant: 'destructive' });
+    } catch (error) {
+      toast({
+        title: 'Erreur',
+        description: error instanceof Error ? error.message : 'Impossible de supprimer le relais',
+        variant: 'destructive',
+      });
     } finally {
       setIsSaving(false);
     }
@@ -1231,7 +1539,19 @@ function RelaysTab() {
     }, new Map<string, any>()).values()
   );
 
-  const filteredRelais = filter === 'all' ? dedupedRelais : dedupedRelais.filter(r => r.status === filter);
+  const getAssociatedParcelsCount = (relay: any) => {
+    const departCount = Number(relay?._count?.parcelsDepart || 0);
+    const arriveeCount = Number(relay?._count?.parcelsArrivee || 0);
+    return departCount + arriveeCount;
+  };
+
+  const archivedRelais = dedupedRelais.filter((r) => r.operationalStatus === 'SUSPENDU');
+  const activeRelais = dedupedRelais.filter((r) => r.operationalStatus !== 'SUSPENDU');
+  const filteredRelais = filter === 'all'
+    ? activeRelais
+    : filter === 'ARCHIVED'
+      ? archivedRelais
+      : activeRelais.filter(r => r.status === filter);
 
   return (
     <>
@@ -1335,6 +1655,11 @@ function RelaysTab() {
                           <Badge variant="outline">Score {relay.metrics?.reliabilityScore || 0}%</Badge>
                           <Badge variant="outline">Conformité {relay.metrics?.complianceScore || 0}%</Badge>
                           <Badge variant="outline">Caution {relay.cautionStatus || 'PENDING'}</Badge>
+                          {relay.trial?.isActive && (
+                            <Badge className="bg-amber-100 text-amber-700">
+                              Essai: {relay.trial.daysRemaining}j restants
+                            </Badge>
+                          )}
                           {relay.activeSanctionsCount > 0 && (
                             <Badge className="bg-red-100 text-red-700">Sanctions actives: {relay.activeSanctionsCount}</Badge>
                           )}
@@ -1518,7 +1843,9 @@ function RelaysTab() {
           <div className="flex items-center justify-between">
             <div>
               <CardTitle>Validation des points relais</CardTitle>
-              <CardDescription>{dedupedRelais.filter(r => r.status === 'PENDING').length} demandes en attente</CardDescription>
+              <CardDescription>
+                {activeRelais.filter(r => r.status === 'PENDING').length} demandes en attente · {archivedRelais.length} archivés
+              </CardDescription>
             </div>
             <Select value={filter} onValueChange={setFilter}>
               <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
@@ -1526,6 +1853,7 @@ function RelaysTab() {
                 <SelectItem value="PENDING">En attente</SelectItem>
                 <SelectItem value="APPROVED">Approuvés</SelectItem>
                 <SelectItem value="REJECTED">Rejetés</SelectItem>
+                <SelectItem value="ARCHIVED">Archivés</SelectItem>
                 <SelectItem value="all">Tous</SelectItem>
               </SelectContent>
             </Select>
@@ -1546,16 +1874,57 @@ function RelaysTab() {
                       <p className="font-semibold">{r.commerceName}</p>
                       <p className="text-sm text-slate-600 dark:text-slate-400">{r.address}, {WILAYAS.find(w => w.id === r.ville)?.name}</p>
                       <p className="text-xs text-slate-500">{r.user?.name} - {r.user?.email}</p>
+                      {r.operationalStatus === 'SUSPENDU' && (
+                        <p className="text-xs text-slate-600 mt-1">Relais archivé car suspendu</p>
+                      )}
+                      {getAssociatedParcelsCount(r) > 0 && (
+                        <p className="text-xs text-amber-700 mt-1">
+                          Suppression désactivée: {getAssociatedParcelsCount(r)} colis associé(s)
+                        </p>
+                      )}
+                      {(() => {
+                        if (!r.commerceDocuments) return null;
+                        try {
+                          const docs = JSON.parse(r.commerceDocuments);
+                          if (!Array.isArray(docs) || docs.length === 0) return null;
+                          return (
+                            <div className="mt-2">
+                              <p className="text-xs font-medium text-slate-600 dark:text-slate-300">Pièces justificatives:</p>
+                              <div className="mt-1 flex flex-wrap gap-2">
+                                {docs.map((doc: any, idx: number) => (
+                                  <a
+                                    key={`${r.id}-doc-${idx}`}
+                                    href={doc.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-xs px-2 py-1 rounded border border-slate-300 text-slate-700 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+                                  >
+                                    {doc.filename || `Document ${idx + 1}`}
+                                  </a>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        } catch {
+                          return null;
+                        }
+                      })()}
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
                     <Badge className={`${RELAIS_STATUS.find(s => s.id === r.status)?.color} text-white`}>
                       {RELAIS_STATUS.find(s => s.id === r.status)?.label}
                     </Badge>
+                    {r.operationalStatus === 'SUSPENDU' && (
+                      <Badge className="bg-slate-600 text-white">Archivé</Badge>
+                    )}
                     {r.status === 'PENDING' && (
                       <>
                         <Button size="sm" onClick={() => handleApprove(r.id)} className="bg-green-600 hover:bg-green-700">
                           <CheckCircle className="h-4 w-4 mr-1" />Approuver
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => handleApproveTrial(r.id)}>
+                          Essai 30j
                         </Button>
                         <Button size="sm" variant="destructive" onClick={() => handleReject(r.id)}>
                           <XCircle className="h-4 w-4 mr-1" />Rejeter
@@ -1565,9 +1934,31 @@ function RelaysTab() {
                     <Button size="sm" variant="outline" onClick={() => setEditRelais(r)}>
                       <Pencil className="h-4 w-4" />
                     </Button>
-                    <Button size="sm" variant="destructive" onClick={() => setDeleteRelaisId(r.id)}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    {r.operationalStatus === 'SUSPENDU' ? (
+                      <Button size="sm" onClick={() => handleOperationalStatusChange(r.id, 'ACTIF')} disabled={isSaving} className="bg-emerald-600 hover:bg-emerald-700">
+                        <CheckCircle className="h-4 w-4 mr-1" />Réactiver
+                      </Button>
+                    ) : (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span tabIndex={0} className="inline-flex">
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => setDeleteRelaisId(r.id)}
+                              disabled={getAssociatedParcelsCount(r) > 0}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </span>
+                        </TooltipTrigger>
+                        {getAssociatedParcelsCount(r) > 0 && (
+                          <TooltipContent side="top">
+                            Suppression impossible: {getAssociatedParcelsCount(r)} colis associé(s)
+                          </TooltipContent>
+                        )}
+                      </Tooltip>
+                    )}
                   </div>
                 </div>
               ))}
@@ -1577,8 +1968,71 @@ function RelaysTab() {
         </CardContent>
       </Card>
 
+      {archivedRelais.length > 0 && filter !== 'ARCHIVED' && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Relais archivés</CardTitle>
+            <CardDescription>Relais suspendus retirés des points relais disponibles</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {archivedRelais.map((r) => (
+                <div key={r.id} className="flex items-center justify-between p-4 border rounded-lg bg-slate-50/80 opacity-90">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-full bg-slate-200 flex items-center justify-center">
+                      <Store className="h-6 w-6 text-slate-500" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-semibold">{r.commerceName}</p>
+                        <Badge className="bg-slate-600 text-white">Archivé</Badge>
+                        <Badge className="bg-red-600 text-white">SUSPENDU</Badge>
+                      </div>
+                      <p className="text-sm text-slate-600 dark:text-slate-400">{r.address}, {WILAYAS.find(w => w.id === r.ville)?.name}</p>
+                      <p className="text-xs text-slate-500">{r.user?.name} - {r.user?.email}</p>
+                      {(() => {
+                        if (!r.commerceDocuments) return null;
+                        try {
+                          const docs = JSON.parse(r.commerceDocuments);
+                          if (!Array.isArray(docs) || docs.length === 0) return null;
+                          return (
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              {docs.map((doc: any, idx: number) => (
+                                <a
+                                  key={`${r.id}-archive-doc-${idx}`}
+                                  href={doc.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-xs px-2 py-1 rounded border border-slate-300 text-slate-700 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+                                >
+                                  {doc.filename || `Document ${idx + 1}`}
+                                </a>
+                              ))}
+                            </div>
+                          );
+                        } catch {
+                          return null;
+                        }
+                      })()}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button size="sm" variant="outline" onClick={() => setEditRelais(r)}>
+                      <Pencil className="h-4 w-4 mr-1" />Modifier
+                    </Button>
+                    <Button size="sm" onClick={() => handleOperationalStatusChange(r.id, 'ACTIF')} disabled={isSaving} className="bg-emerald-600 hover:bg-emerald-700">
+                      <CheckCircle className="h-4 w-4 mr-1" />Réactiver
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Edit Relais Dialog */}
-      <Dialog open={!!editRelais} onOpenChange={() => setEditRelais(null)}>
+      <Dialog open={!!editRelais} onOpenChange={(open) => { if (!open) setEditRelais(null); }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Modifier le relais</DialogTitle>
@@ -1656,7 +2110,7 @@ function RelaysTab() {
       </Dialog>
 
       {/* Delete Confirmation Dialog */}
-      <Dialog open={!!deleteRelaisId} onOpenChange={() => setDeleteRelaisId(null)}>
+      <Dialog open={!!deleteRelaisId} onOpenChange={(open) => { if (!open) setDeleteRelaisId(null); }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Confirmer la suppression</DialogTitle>
@@ -2628,7 +3082,7 @@ function MessagesTab({ onUnreadCountChange }: { onUnreadCountChange?: (count: nu
         toast({ title: 'Erreur', description: data.error ?? `HTTP ${res.status}`, variant: 'destructive' });
         return;
       }
-      const desc = data.emailSent ? `Email envoyé à ${selected.email}` : `Réponse enregistrée (email non envoyé — vérifier RESEND_API_KEY)`;
+      const desc = data.emailSent ? `Email envoyé à ${selected.email}` : `Réponse enregistrée (email non envoyé — vérifier la configuration SMTP)`;
       toast({ title: 'Réponse envoyée', description: desc });
       setReplyText('');
       const savedReply = replyText.trim();
@@ -2832,7 +3286,7 @@ function MessagesTab({ onUnreadCountChange }: { onUnreadCountChange?: (count: nu
 }
 
 // Settings Tab
-function SettingsTab() {
+function SettingsTab({ stats }: { stats: any }) {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -2941,8 +3395,44 @@ function SettingsTab() {
     <div className="space-y-6">
       <Card>
         <CardHeader>
+          <CardTitle>Résumé financier global</CardTitle>
+          <CardDescription>Totaux calculés sur les missions terminées à l'arrivée relais sur toute la plateforme.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 md:grid-cols-5">
+            <div className="rounded-lg border p-4 bg-slate-50 dark:bg-slate-800/60">
+              <p className="text-xs text-slate-500">Missions</p>
+              <p className="text-2xl font-bold">{stats?.financialSummary?.count ?? 0}</p>
+            </div>
+            <div className="rounded-lg border p-4 bg-slate-50 dark:bg-slate-800/60">
+              <p className="text-xs text-slate-500">Tarif client</p>
+              <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">{Number(stats?.financialSummary?.clientTotal ?? 0).toFixed(0)} DA</p>
+            </div>
+            <div className="rounded-lg border p-4 bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200">
+              <p className="text-xs text-emerald-700">Commission relais</p>
+              <p className="text-2xl font-bold text-emerald-700">{Number(stats?.financialSummary?.relayTotal ?? 0).toFixed(0)} DA</p>
+            </div>
+            <div className="rounded-lg border p-4 bg-blue-50 dark:bg-blue-900/20 border-blue-200">
+              <p className="text-xs text-blue-700">Commission admin</p>
+              <p className="text-2xl font-bold text-blue-700">{Number(stats?.financialSummary?.adminTotal ?? 0).toFixed(0)} DA</p>
+            </div>
+            <div className="rounded-lg border p-4 bg-purple-50 dark:bg-purple-900/20 border-purple-200">
+              <p className="text-xs text-purple-700">Net transporteur</p>
+              <p className="text-2xl font-bold text-purple-700">{Number(stats?.financialSummary?.netTransporteurTotal ?? 0).toFixed(0)} DA</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle>Paramètres de la plateforme</CardTitle>
-          <CardDescription>Configurez les commissions et paramètres globaux</CardDescription>
+          <CardDescription>
+            Définissez ici les règles de calcul des prix et des commissions pour toute la plateforme. 
+            <br />
+            <span className="block mt-1">Exemples&nbsp;: pourcentage prélevé par la plateforme, barème des relais, tarifs au kilo ou au kilomètre, etc.</span>
+            <span className="block mt-1">Tous les taux de commission affichés ici sont modifiables par l'admin et servent aux nouveaux colis.</span>
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           {isLoading ? (

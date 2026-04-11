@@ -11,21 +11,95 @@ export function Hero() {
   const [trackingNumber, setTrackingNumber] = useState('');
 
   return (
-    <section className="relative overflow-hidden">
-      {/* Background Image with Overlay */}
-      <div className="absolute inset-0 z-0">
-        <img
-          src="/images/hero-delivery.png"
-          alt="SwiftColis Delivery"
-          className="h-full w-full object-cover object-center"
-        />
-        <div className="absolute inset-0 bg-gradient-to-r from-slate-900/95 via-slate-900/80 to-slate-900/60" />
-      </div>
+    <section className="relative overflow-hidden bg-slate-950">
+      {/* Gradient background */}
+      <div className="absolute inset-0 z-0 bg-[radial-gradient(ellipse_at_top_left,_#064e3b_0%,_#0f172a_55%,_#020617_100%)]" />
 
-      {/* Decorative Elements */}
-      <div className="absolute inset-0 z-0">
-        <div className="absolute top-20 left-10 w-72 h-72 bg-emerald-500/20 rounded-full blur-3xl" />
-        <div className="absolute bottom-20 right-10 w-96 h-96 bg-teal-500/20 rounded-full blur-3xl" />
+      {/* Algeria logistics network — SVG background */}
+      <svg
+        className="absolute inset-0 z-0 w-full h-full"
+        viewBox="0 0 1400 700"
+        preserveAspectRatio="xMidYMid slice"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <defs>
+          <filter id="nodeGlow" x="-60%" y="-60%" width="220%" height="220%">
+            <feGaussianBlur stdDeviation="3" result="blur" />
+            <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+        </defs>
+
+        {/* Route connections — glowing lines */}
+        {([
+          [630,145, 290,200],
+          [630,145, 970,220],
+          [630,145, 750,310],
+          [630,145, 880,170],
+          [290,200, 200,310],
+          [290,200, 420,380],
+          [970,220, 1050,340],
+          [970,220, 820,420],
+          [750,310, 820,420],
+          [750,310, 580,520],
+          [420,380, 350,490],
+          [420,380, 480,460],
+          [480,460, 580,520],
+          [820,420, 1050,340],
+          [200,310, 350,490],
+          [880,170, 1050,340],
+        ] as [number,number,number,number][]).map(([x1,y1,x2,y2], i) => (
+          <line
+            key={i}
+            x1={x1} y1={y1} x2={x2} y2={y2}
+            stroke="#10b981"
+            strokeWidth="1.5"
+            strokeOpacity="0.45"
+            strokeDasharray="8 5"
+          />
+        ))}
+
+        {/* Secondary city nodes */}
+        {([
+          [290, 200, 'Oran'],
+          [970, 220, 'Constantine'],
+          [750, 310, 'Sétif'],
+          [420, 380, 'Djelfa'],
+          [480, 460, 'Ghardaïa'],
+          [820, 420, 'Batna'],
+          [200, 310, 'Tlemcen'],
+          [1050, 340, 'Annaba'],
+          [580, 520, 'Ouargla'],
+          [350, 490, 'Laghouat'],
+          [880, 170, 'Skikda'],
+        ] as [number,number,string][]).map(([cx, cy, label], i) => (
+          <g key={i} filter="url(#nodeGlow)">
+            <circle cx={cx} cy={cy} r="5" fill="#22c55e" fillOpacity="0.9" />
+            <circle cx={cx} cy={cy} r="10" fill="none" stroke="#22c55e" strokeWidth="1" strokeOpacity="0.35" />
+            <text
+              x={cx + 14} y={cy + 4}
+              fontSize="11"
+              fill="#6ee7b7"
+              fillOpacity="0.75"
+              fontFamily="Inter, Arial, sans-serif"
+              fontWeight="500"
+            >{label}</text>
+          </g>
+        ))}
+
+        {/* Alger — main hub, brighter */}
+        {/* Alger — main hub */}
+        <g filter="url(#nodeGlow)">
+          <circle cx="630" cy="145" r="16" fill="none" stroke="#22c55e" strokeWidth="1.5" strokeOpacity="0.5" />
+          <circle cx="630" cy="145" r="6" fill="#4ade80" fillOpacity="1" />
+          <text x="652" y="141" fontSize="13" fill="#86efac" fillOpacity="0.9" fontFamily="Inter, Arial, sans-serif" fontWeight="700">Alger</text>
+          <text x="652" y="156" fontSize="9.5" fill="#6ee7b7" fillOpacity="0.55" fontFamily="Inter, Arial, sans-serif">Hub central</text>
+        </g>
+      </svg>
+
+      {/* Ambient glow blobs */}
+      <div className="absolute inset-0 z-0 overflow-hidden">
+        <div className="absolute -top-20 -left-20 w-[500px] h-[500px] bg-emerald-600/15 rounded-full blur-[100px]" />
+        <div className="absolute bottom-0 right-0 w-[600px] h-[500px] bg-teal-700/10 rounded-full blur-[120px]" />
       </div>
 
       <div className="container relative z-10 px-4 py-16 md:py-24 lg:py-32">

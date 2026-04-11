@@ -42,7 +42,7 @@ export function CTA() {
           </div>
 
             <p className="text-sm text-slate-500 mb-8 max-w-2xl mx-auto">
-              Pour les points relais : activation après vérification du dossier, conformité opérationnelle et caution possible selon le profil.
+              Pour les points relais : activation apres verification du dossier avec periode d essai de 30 jours, puis validation operationnelle complete.
             </p>
 
           {/* CTA Buttons */}

@@ -1,6 +1,7 @@
 'use client';
 
 import { Suspense, useState, useEffect, useMemo } from 'react';
+import dynamic from 'next/dynamic';
 import { useSession } from 'next-auth/react';
 import { useTranslations, useLocale } from 'next-intl';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -33,8 +34,14 @@ import { Package, Plus, History, MapPin, Loader2, CreditCard, Search, Truck, Che
 import { PRO_DISCOUNT_TIERS, getProBatchDiscountRate, getProBatchDiscountTier } from '@/lib/pricing';
 import { useToast } from '@/hooks/use-toast';
 import { ParcelDeleteButton, ParcelEditDialog } from '@/components/dashboard/parcel-edit-dialog';
+import { AddressAutocompleteInput } from '@/components/ui/address-autocomplete-input';
 
 const LABEL_STORAGE_KEY = 'swiftcolis.parcel-labels';
+
+const RelaySelectionMap = dynamic(
+  () => import('@/components/maps/relay-selection-map').then((mod) => mod.RelaySelectionMap),
+  { ssr: false }
+);
 
 // Helper function for role-based dashboard path
 function getRoleBasedDashboardPath(role: string, locale: string): string {
@@ -265,7 +272,7 @@ function ClientDashboardContent() {
             </TabsTrigger>
                 <TabsTrigger value="profil" className={`${getDashboardTabsTriggerClass('client')} flex items-center gap-2`}>
               <User className="h-4 w-4" />
-              Profil
+              Infos perso
             </TabsTrigger>
                 <TabsTrigger value="litiges" className={`${getDashboardTabsTriggerClass('client')} flex items-center gap-2`}>
               <AlertTriangle className="h-4 w-4" />
@@ -323,6 +330,18 @@ function ClientDashboardContent() {
 }
 
 // Create Parcel Form
+function haversineDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number) {
+  const toRad = (value: number) => (value * Math.PI) / 180;
+  const earthRadiusKm = 6371;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return earthRadiusKm * c;
+}
+
 function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart }: { userId: string; onCreated: () => void; onGoToHistory: () => void; onGoToCart: () => void }) {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
@@ -337,6 +356,7 @@ function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart }: { us
     pricingRelayArrivalRate: 0.1,
     pricingRelayPrintFee: 30,
     pricingRoundTo: 10,
+    platformCommission: 10,
   });
   const [createdParcel, setCreatedParcel] = useState<any>(null);
   const [formData, setFormData] = useState({
@@ -352,8 +372,11 @@ function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart }: { us
     recipientFirstName: '',
     recipientLastName: '',
     recipientPhone: '',
+    recipientEmail: '',
     labelPrintMode: 'HOME',
   });
+  const [homeAddress, setHomeAddress] = useState('');
+  const [homeCoords, setHomeCoords] = useState<{ lat: number; lon: number } | null>(null);
   const [calculatedPrice, setCalculatedPrice] = useState<any>(null);
 
   const formatRelayHours = (relay: any) => {
@@ -425,6 +448,7 @@ function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart }: { us
         pricingRelayArrivalRate: Number(data.pricingRelayArrivalRate || 0.1),
         pricingRelayPrintFee: Number(data.pricingRelayPrintFee || 30),
         pricingRoundTo: Number(data.pricingRoundTo || 10),
+        platformCommission: Number(data.platformCommission || 10),
       });
     } catch {
       // keep defaults
@@ -449,7 +473,7 @@ function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart }: { us
       formatMultiplier: 1,
       relayDepartureCommissionRate: pricingConfig.pricingRelayDepartureRate,
       relayArrivalCommissionRate: pricingConfig.pricingRelayArrivalRate,
-      platformMarginRate: 0,
+      platformMarginRate: pricingConfig.platformCommission / 100,
       roundTo: pricingConfig.pricingRoundTo,
     });
 
@@ -463,7 +487,7 @@ function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart }: { us
   };
 
   const resetForm = () => {
-    setFormData({ villeDepart: '', villeArrivee: '', relaisDepartId: '', relaisArriveeId: '', description: '', weight: '', senderFirstName: '', senderLastName: '', senderPhone: '', recipientFirstName: '', recipientLastName: '', recipientPhone: '', labelPrintMode: 'HOME' });
+    setFormData({ villeDepart: '', villeArrivee: '', relaisDepartId: '', relaisArriveeId: '', description: '', weight: '', senderFirstName: '', senderLastName: '', senderPhone: '', recipientFirstName: '', recipientLastName: '', recipientPhone: '', recipientEmail: '', labelPrintMode: 'HOME' });
     setCalculatedPrice(null);
     setCreatedParcel(null);
   };
@@ -639,6 +663,7 @@ function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart }: { us
         recipientFirstName: formData.recipientFirstName,
         recipientLastName: formData.recipientLastName,
         recipientPhone: formData.recipientPhone,
+        recipientEmail: formData.recipientEmail,
         relaisDepartName: departRelay?.commerceName || '',
         relaisDepartAddress: departRelay?.address || '',
         relaisArriveeName: arriveeRelay?.commerceName || '',
@@ -675,6 +700,7 @@ function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart }: { us
           recipientFirstName: formData.recipientFirstName,
           recipientLastName: formData.recipientLastName,
           recipientPhone: formData.recipientPhone,
+          recipientEmail: formData.recipientEmail,
           labelPrintMode: formData.labelPrintMode,
           prixClient: calculatedPrice?.finalClientPrice || 0,
           commissionPlateforme: calculatedPrice?.platformMargin || 0,
@@ -737,14 +763,38 @@ function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart }: { us
   }, [activeRelayCityIds, lignesActives, formData.villeDepart]);
 
   const isRelayPrintMode = formData.labelPrintMode === 'RELAY';
-  const relaisDepart = relais.filter((r: any) => {
+  const relaisDepartCandidates = relais.filter((r: any) => {
     if (r.ville !== formData.villeDepart) return false;
     if (!isRelayPrintMode) return true;
     return relayPrinterStatusById[r.id] === 'READY';
   });
+  const departureDistanceById = useMemo(() => {
+    const distances: Record<string, number> = {};
+    if (!homeCoords) return distances;
+    for (const relay of relaisDepartCandidates) {
+      if (typeof relay.latitude === 'number' && typeof relay.longitude === 'number') {
+        distances[relay.id] = haversineDistanceKm(homeCoords.lat, homeCoords.lon, relay.latitude, relay.longitude);
+      }
+    }
+    return distances;
+  }, [homeCoords, relaisDepartCandidates]);
+
+  const relaisDepart = useMemo(() => {
+    const copy = [...relaisDepartCandidates];
+    if (!homeCoords) return copy;
+    copy.sort((a: any, b: any) => {
+      const da = departureDistanceById[a.id] ?? Number.POSITIVE_INFINITY;
+      const db = departureDistanceById[b.id] ?? Number.POSITIVE_INFINITY;
+      if (da !== db) return da - db;
+      return String(a.commerceName || '').localeCompare(String(b.commerceName || ''));
+    });
+    return copy;
+  }, [departureDistanceById, homeCoords, relaisDepartCandidates]);
+
   const relaisArrivee = relais.filter((r: any) => r.ville === formData.villeArrivee);
   const selectedRelayDepart = relais.find((r: any) => r.id === formData.relaisDepartId);
   const selectedRelayArrivee = relais.find((r: any) => r.id === formData.relaisArriveeId);
+  const nearestRelayDepart = relaisDepart.find((relay: any) => Number.isFinite(departureDistanceById[relay.id]));
   const estimatedDistanceKm =
     formData.villeDepart && formData.villeArrivee
       ? estimateSafeDistanceKmByWilayas(formData.villeDepart, formData.villeArrivee)
@@ -921,6 +971,51 @@ function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart }: { us
                 <span className="w-6 h-6 rounded-full bg-emerald-600 text-white text-sm flex items-center justify-center">2</span>
                 Points relais
               </h3>
+              <div className="mb-4 space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                <Label className="text-sm">Adresse du domicile (pour trier les relais proches)</Label>
+                <AddressAutocompleteInput
+                  value={homeAddress}
+                  onChange={(value) => {
+                    setHomeAddress(value);
+                    setHomeCoords(null);
+                  }}
+                  onSelect={(suggestion) => {
+                    setHomeAddress(suggestion.label);
+                    setHomeCoords({ lat: suggestion.lat, lon: suggestion.lon });
+                  }}
+                  placeholder="Ex: Bab Ezzouar, Alger"
+                  className="h-10"
+                />
+                <p className="text-xs text-slate-500">Astuce: choisissez votre adresse pour voir les relais les plus proches sur la carte.</p>
+                {nearestRelayDepart && homeCoords && (
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
+                    <span className="rounded bg-emerald-100 px-2 py-1 text-emerald-700">Plus proche: {nearestRelayDepart.commerceName}</span>
+                    <span className="rounded bg-slate-200 px-2 py-1">{(departureDistanceById[nearestRelayDepart.id] || 0).toFixed(1)} km</span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-7"
+                      onClick={() => setFormData((prev) => ({ ...prev, relaisDepartId: nearestRelayDepart.id }))}
+                    >
+                      Choisir le plus proche
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              {homeCoords && relaisDepart.some((relay: any) => typeof relay.latitude === 'number' && typeof relay.longitude === 'number') && (
+                <div className="mb-4">
+                  <RelaySelectionMap
+                    home={homeCoords}
+                    relays={relaisDepart}
+                    selectedRelayId={formData.relaisDepartId}
+                    nearestRelayId={nearestRelayDepart?.id || null}
+                    onSelectRelay={(relayId) => setFormData((prev) => ({ ...prev, relaisDepartId: relayId }))}
+                  />
+                </div>
+              )}
+
               <div className="grid gap-3 lg:grid-cols-2">
                 <div className="min-w-0 space-y-2">
                   <Label className="text-sm">Relais départ</Label>
@@ -928,13 +1023,24 @@ function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart }: { us
                     <SelectTrigger className="h-10 w-full min-w-0"><SelectValue placeholder="Sélectionner" /></SelectTrigger>
                     <SelectContent>
                       {relaisDepart.map(r => (
-                        <SelectItem key={r.id} value={r.id}>{r.commerceName}</SelectItem>
+                        <SelectItem key={r.id} value={r.id}>
+                          {r.commerceName}
+                          {Number.isFinite(departureDistanceById[r.id]) ? ` - ${departureDistanceById[r.id].toFixed(1)} km` : ''}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                   {selectedRelayDepart && (
                     <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
                       <p className="truncate font-medium text-slate-800">{selectedRelayDepart.commerceName}</p>
+                      {nearestRelayDepart && selectedRelayDepart.id === nearestRelayDepart.id && homeCoords && (
+                        <p className="mt-1 inline-block rounded bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
+                          Plus proche de votre domicile
+                        </p>
+                      )}
+                      {homeCoords && Number.isFinite(departureDistanceById[selectedRelayDepart.id]) && (
+                        <p className="mt-1 text-slate-500">Distance: {departureDistanceById[selectedRelayDepart.id].toFixed(1)} km</p>
+                      )}
                       <p className="mt-1 break-words">{selectedRelayDepart.address}</p>
                       <p className="mt-1 text-slate-500">Horaires : {formatRelayHours(selectedRelayDepart)}</p>
                     </div>
@@ -1050,6 +1156,10 @@ function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart }: { us
                 <div className="space-y-2">
                   <Label className="text-sm">Tél. destinataire</Label>
                   <Input className="h-10" value={formData.recipientPhone} onChange={(e) => setFormData({ ...formData, recipientPhone: e.target.value })} placeholder="0660123456" />
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <Label className="text-sm">Email destinataire (optionnel)</Label>
+                  <Input className="h-10" type="email" value={formData.recipientEmail} onChange={(e) => setFormData({ ...formData, recipientEmail: e.target.value })} placeholder="destinataire@email.com" />
                 </div>
               </div>
               </div>
@@ -2154,6 +2264,7 @@ interface BulkRow {
   recipientFirstName: string;
   recipientLastName: string;
   recipientPhone: string;
+  recipientEmail: string;
 }
 
 function newRow(): BulkRow {
@@ -2167,6 +2278,7 @@ function newRow(): BulkRow {
     recipientFirstName: '',
     recipientLastName: '',
     recipientPhone: '',
+    recipientEmail: '',
   };
 }
 
@@ -2251,6 +2363,7 @@ function BulkProCreateForm({ userId, onCreated }: { userId: string; onCreated: (
             recipientFirstName: r.recipientFirstName,
             recipientLastName: r.recipientLastName,
             recipientPhone: r.recipientPhone,
+            recipientEmail: r.recipientEmail || undefined,
           })),
         }),
       });
@@ -2454,6 +2567,7 @@ function BulkProCreateForm({ userId, onCreated }: { userId: string; onCreated: (
                     <Input value={row.recipientFirstName} onChange={e => updateRow(row.id, 'recipientFirstName', e.target.value)} placeholder="Prénom" className="h-8 text-xs" />
                   </div>
                   <Input value={row.recipientPhone} onChange={e => updateRow(row.id, 'recipientPhone', e.target.value)} placeholder="Téléphone" className="h-8 text-xs" />
+                  <Input type="email" value={row.recipientEmail} onChange={e => updateRow(row.id, 'recipientEmail', e.target.value)} placeholder="Email (optionnel)" className="h-8 text-xs" />
                 </div>
               </div>
             </div>

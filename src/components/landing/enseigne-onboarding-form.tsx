@@ -194,7 +194,24 @@ export function EnseigneOnboardingForm() {
         setFieldErrors((prev) => ({ ...prev, email: 'Cet email est deja utilise.' }));
         throw new Error('Un compte existe deja avec cet email. Connectez-vous puis completez votre profil enseigne.');
       }
+      if (createUserRes.status === 403 || createUserData?.code === 'BANNED_IDENTITY') {
+        if (createUserData?.blockedType === 'EMAIL') {
+          setFieldErrors((prev) => ({ ...prev, email: 'Cette adresse email est bannie.' }));
+        }
+        throw new Error(createUserData?.details || 'Cette identité est bannie suite à la suspension d un point relais.');
+      }
       throw new Error(createUserData?.details || createUserData?.error || 'Impossible de creer le compte.');
+    }
+
+    if (createUserData?.emailConfirmationSent) {
+      toast({
+        title: 'Email de confirmation envoye',
+        description: 'Votre inscription enseigne est confirmee par email.',
+      });
+    }
+
+    if (createUserData?.requiresEmailVerification) {
+      throw new Error('EMAIL_NOT_VERIFIED_REGISTRATION');
     }
 
     const signInResult = await signIn('credentials', {
@@ -270,12 +287,21 @@ export function EnseigneOnboardingForm() {
         description: 'Bienvenue sur votre espace enseigne.',
       });
 
-      router.push(`/${locale}/dashboard/enseigne`);
-      router.refresh();
+      router.replace(`/${locale}/dashboard/enseigne`);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Une erreur est survenue.';
+      const rawMessage = error instanceof Error ? error.message : 'Une erreur est survenue.';
+      const message = rawMessage === 'EMAIL_NOT_VERIFIED_REGISTRATION'
+        ? 'Compte cree. Votre profil enseigne est en attente de finalisation: verifiez votre email, puis reconnectez-vous pour terminer votre dossier. Il sera ensuite pris en compte dans votre espace.'
+        : rawMessage;
       setSubmitError(message);
-      toast({ title: 'Erreur', description: message, variant: 'destructive' });
+      toast({
+        title: rawMessage === 'EMAIL_NOT_VERIFIED_REGISTRATION' ? 'Action requise' : 'Erreur',
+        description: message,
+        variant: rawMessage === 'EMAIL_NOT_VERIFIED_REGISTRATION' ? 'default' : 'destructive',
+      });
+      if (rawMessage === 'EMAIL_NOT_VERIFIED_REGISTRATION') {
+        router.replace(`/${locale}/auth/login?notice=enseigne-email-verification`);
+      }
     } finally {
       setIsSubmitting(false);
     }

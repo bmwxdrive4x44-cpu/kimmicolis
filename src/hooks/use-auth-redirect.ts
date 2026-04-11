@@ -31,7 +31,7 @@ export function useAuthRedirect(requiredRole: UserRole) {
       if (userRole !== expectedRole) {
         // Redirect to correct dashboard
         const correctPath = getDashboardPath(userRole, locale);
-        window.location.href = correctPath;
+        router.replace(correctPath);
       }
     }
   }, [status, session, router, locale, requiredRole]);

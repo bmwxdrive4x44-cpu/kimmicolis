@@ -12,6 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { FormFieldError, FormGlobalError } from '@/components/ui/form-error';
+import { AddressAutocompleteInput } from '@/components/ui/address-autocomplete-input';
 import { useToast } from '@/hooks/use-toast';
 import { WILAYAS } from '@/lib/constants';
 import { isAlgerianCommerceRegisterNumber, normalizeCommerceRegisterNumber } from '@/lib/validators';
@@ -39,6 +40,8 @@ type FormState = {
   experience: string;
   regions: string[];
   description: string;
+  latitude: number | null;
+  longitude: number | null;
 };
 
 const initialFormState: FormState = {
@@ -57,6 +60,8 @@ const initialFormState: FormState = {
   experience: '',
   regions: [],
   description: '',
+  latitude: null,
+  longitude: null,
 };
 
 export function PartnerApplicationForm({ role }: PartnerApplicationFormProps) {
@@ -70,7 +75,7 @@ export function PartnerApplicationForm({ role }: PartnerApplicationFormProps) {
         accent: 'emerald',
         icon: Store,
         title: 'Postuler comme point relais',
-        description: 'Déposez votre dossier en ligne. Activation après vérification, conformité opérationnelle et caution possible selon le profil.',
+        description: 'Deposez votre dossier en ligne. Activation avec periode d essai de 30 jours, puis validation operationnelle complete.',
         dashboardPath: `/${locale}/dashboard/relais`,
       }
     : {
@@ -138,6 +143,8 @@ export function PartnerApplicationForm({ role }: PartnerApplicationFormProps) {
         commerceName: existing?.commerceName || '',
         address: existing?.address || '',
         ville: existing?.ville || '',
+        latitude: typeof existing?.latitude === 'number' ? existing.latitude : null,
+        longitude: typeof existing?.longitude === 'number' ? existing.longitude : null,
         vehicle: existing?.vehicle || '',
         license: existing?.license || '',
         experience: existing?.experience !== undefined ? String(existing.experience) : '',
@@ -172,15 +179,24 @@ export function PartnerApplicationForm({ role }: PartnerApplicationFormProps) {
     void fetchExistingApplication();
   }, [fetchExistingApplication, status]);
 
+  // Redirect approved partners to their dashboard — no need to re-apply
+  useEffect(() => {
+    if (existingStatus === 'APPROVED' && status === 'authenticated') {
+      router.replace(theme.dashboardPath);
+    }
+  }, [existingStatus, status, router, theme.dashboardPath]);
+
   const validateForm = () => {
     const errors: Partial<Record<keyof FormState, string>> = {};
     const rcNumber = normalizeCommerceRegisterNumber(form.commerceRegisterNumber);
     const phoneRegex = /^\+?[0-9]{8,15}$/;
 
-    if (!rcNumber) {
-      errors.commerceRegisterNumber = 'Le numéro du registre du commerce est obligatoire.';
-    } else if (!isAlgerianCommerceRegisterNumber(rcNumber)) {
-      errors.commerceRegisterNumber = 'Format RC invalide. Exemple : 16/0012345B22';
+    if (!isRelais && status === 'authenticated') {
+      if (!rcNumber) {
+        errors.commerceRegisterNumber = 'Le numéro du registre du commerce est obligatoire.';
+      } else if (!isAlgerianCommerceRegisterNumber(rcNumber)) {
+        errors.commerceRegisterNumber = 'Format RC invalide. Exemple : 16/0012345B22';
+      }
     }
 
     if (status !== 'authenticated') {
@@ -208,11 +224,16 @@ export function PartnerApplicationForm({ role }: PartnerApplicationFormProps) {
       }
     }
 
-    if (isRelais) {
+    if (isRelais && status === 'authenticated') {
+      if (!rcNumber) {
+        errors.commerceRegisterNumber = 'Le numéro du registre du commerce est obligatoire.';
+      } else if (!isAlgerianCommerceRegisterNumber(rcNumber)) {
+        errors.commerceRegisterNumber = 'Format RC invalide. Exemple : 16/0012345B22';
+      }
       if (!form.commerceName.trim()) errors.commerceName = 'Le nom du commerce est obligatoire.';
       if (!form.address.trim()) errors.address = 'L\'adresse complète est obligatoire.';
       if (!form.ville.trim()) errors.ville = 'La ville est obligatoire.';
-    } else {
+    } else if (!isRelais && status === 'authenticated') {
       if (!form.vehicle.trim()) errors.vehicle = 'Le type de véhicule est obligatoire.';
       if (!form.license.trim()) errors.license = 'Le numéro de permis est obligatoire.';
     }
@@ -246,7 +267,7 @@ export function PartnerApplicationForm({ role }: PartnerApplicationFormProps) {
         phone: form.phone,
         password: form.password,
         role,
-        siret: normalizeCommerceRegisterNumber(form.commerceRegisterNumber),
+        siret: !isRelais ? normalizeCommerceRegisterNumber(form.commerceRegisterNumber) : undefined,
       }),
     });
 
@@ -255,10 +276,21 @@ export function PartnerApplicationForm({ role }: PartnerApplicationFormProps) {
       const isExistingAccount = createUserRes.status === 409
         || createUserData?.code === 'EMAIL_ALREADY_EXISTS'
         || String(createUserData?.error || '').toLowerCase().includes('email already exists');
+      const isBlockedIdentity = createUserRes.status === 403 || createUserData?.code === 'BANNED_IDENTITY';
 
       if (isExistingAccount) {
         setFieldErrors((prev) => ({ ...prev, email: 'Cet email est déjà utilisé.' }));
         throw new Error('Un compte existe déjà avec cet email. Connectez-vous puis complétez votre dossier.');
+      }
+
+      if (isBlockedIdentity) {
+        if (createUserData?.blockedType === 'EMAIL') {
+          setFieldErrors((prev) => ({ ...prev, email: 'Cette adresse email est bannie.' }));
+        }
+        if (createUserData?.blockedType === 'SIRET') {
+          setFieldErrors((prev) => ({ ...prev, commerceRegisterNumber: 'Ce numéro RC est banni.' }));
+        }
+        throw new Error(createUserData?.details || 'Cette identité est bannie suite à la suspension d un point relais.');
       }
 
       if (createUserData?.code === 'INVALID_COMMERCE_REGISTER_NUMBER') {
@@ -266,6 +298,17 @@ export function PartnerApplicationForm({ role }: PartnerApplicationFormProps) {
       }
 
       throw new Error(createUserData?.details || createUserData?.error || 'Impossible de créer le compte.');
+    }
+
+    if (createUserData?.emailConfirmationSent) {
+      toast({
+        title: 'Email de confirmation envoye',
+        description: 'Votre inscription est confirmee par email.',
+      });
+    }
+
+    if (createUserData?.requiresEmailVerification) {
+      throw new Error('EMAIL_NOT_VERIFIED_REGISTRATION');
     }
 
     const signInResult = await signIn('credentials', {
@@ -282,16 +325,22 @@ export function PartnerApplicationForm({ role }: PartnerApplicationFormProps) {
   };
 
   const updateUserProfile = async (userId: string) => {
+    const normalizedRc = normalizeCommerceRegisterNumber(form.commerceRegisterNumber);
+    const payload: Record<string, string | undefined> = {
+      firstName: form.firstName || undefined,
+      lastName: form.lastName || undefined,
+      name: fullName || undefined,
+      phone: form.phone || undefined,
+    };
+
+    if (normalizedRc) {
+      payload.siret = normalizedRc;
+    }
+
     const response = await fetch(`/api/users/${userId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        firstName: form.firstName || undefined,
-        lastName: form.lastName || undefined,
-        name: fullName || undefined,
-        phone: form.phone || undefined,
-        siret: normalizeCommerceRegisterNumber(form.commerceRegisterNumber),
-      }),
+      body: JSON.stringify(payload),
     });
 
     if (!response.ok) {
@@ -306,6 +355,8 @@ export function PartnerApplicationForm({ role }: PartnerApplicationFormProps) {
       commerceName: form.commerceName,
       address: form.address,
       ville: form.ville,
+      latitude: form.latitude,
+      longitude: form.longitude,
       commerceRegisterNumber: normalizeCommerceRegisterNumber(form.commerceRegisterNumber),
     };
 
@@ -388,6 +439,16 @@ export function PartnerApplicationForm({ role }: PartnerApplicationFormProps) {
     setIsSubmitting(true);
     try {
       const userId = await ensureAuthenticatedUser();
+
+      if (!isRelais && status !== 'authenticated') {
+        toast({
+          title: 'Compte créé',
+          description: 'Connectez-vous pour compléter votre dossier transporteur (étape 2).',
+        });
+        router.replace(`/${locale}/auth/login?notice=complete-transporter-profile`);
+        return;
+      }
+
       await updateUserProfile(userId);
 
       if (isRelais) {
@@ -403,16 +464,21 @@ export function PartnerApplicationForm({ role }: PartnerApplicationFormProps) {
           : 'Votre dossier transporteur est enregistré. Vous pouvez suivre son statut depuis votre espace.',
       });
 
-      router.push(theme.dashboardPath);
-      router.refresh();
+      router.replace(theme.dashboardPath);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Une erreur est survenue.';
+      const rawMessage = error instanceof Error ? error.message : 'Une erreur est survenue.';
+      const message = rawMessage === 'EMAIL_NOT_VERIFIED_REGISTRATION'
+        ? 'Compte cree. Votre candidature est en attente de finalisation: verifiez votre email, puis reconnectez-vous pour continuer. Une fois le dossier envoye, il passera en revue admin.'
+        : rawMessage;
       setSubmitError(message);
       toast({
-        title: 'Erreur',
+        title: rawMessage === 'EMAIL_NOT_VERIFIED_REGISTRATION' ? 'Action requise' : 'Erreur',
         description: message,
-        variant: 'destructive',
+        variant: rawMessage === 'EMAIL_NOT_VERIFIED_REGISTRATION' ? 'default' : 'destructive',
       });
+      if (rawMessage === 'EMAIL_NOT_VERIFIED_REGISTRATION') {
+        router.replace(`/${locale}/auth/login?notice=partner-email-verification`);
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -432,6 +498,15 @@ export function PartnerApplicationForm({ role }: PartnerApplicationFormProps) {
         </div>
       </CardHeader>
       <CardContent>
+        {existingStatus === 'APPROVED' && !wrongRole && (
+          <div className="flex flex-col items-center justify-center gap-4 py-10 text-center">
+            <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
+            <p className="text-sm text-slate-500">Votre compte est déjà actif. Redirection vers votre espace…</p>
+          </div>
+        )}
+
+        {existingStatus !== 'APPROVED' && (
+          <>
         {wrongRole && (
           <div className="mb-6 flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
             <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0" />
@@ -441,7 +516,7 @@ export function PartnerApplicationForm({ role }: PartnerApplicationFormProps) {
           </div>
         )}
 
-        {existingStatus && !wrongRole && (
+        {existingStatus && existingStatus !== 'APPROVED' && !wrongRole && (
           <div className="mb-6 flex items-start gap-3 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
             <CheckCircle className="mt-0.5 h-5 w-5 flex-shrink-0" />
             <div>
@@ -516,19 +591,36 @@ export function PartnerApplicationForm({ role }: PartnerApplicationFormProps) {
             </div>
           )}
 
-          <div className="space-y-2">
-            <Label>Numéro du registre du commerce</Label>
-            <Input
-              placeholder="Ex: 16/0012345B22"
-              value={form.commerceRegisterNumber}
-              onChange={(e) => setField('commerceRegisterNumber', e.target.value)}
-            />
-            <FormFieldError message={fieldErrors.commerceRegisterNumber} />
-            <p className="text-xs text-slate-500">Format CNRC : WW/NNNNNNNLAA. Exemple : 16/0012345B22</p>
-          </div>
+          {!isRelais && status === 'authenticated' && (
+            <div className="space-y-2">
+              <Label>Numéro du registre du commerce</Label>
+              <Input
+                placeholder="Ex: 16/0012345B22"
+                value={form.commerceRegisterNumber}
+                onChange={(e) => setField('commerceRegisterNumber', e.target.value)}
+              />
+              <FormFieldError message={fieldErrors.commerceRegisterNumber} />
+              <p className="text-xs text-slate-500">Format CNRC : WW/NNNNNNNLAA. Exemple : 16/0012345B22</p>
+            </div>
+          )}
 
-          {isRelais ? (
+          {isRelais && status !== 'authenticated' ? (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+              Première étape: création du compte uniquement. Après vérification email et connexion,
+              vous compléterez le dossier commerce (RC, nom du commerce, adresse, ville) pour validation admin.
+            </div>
+          ) : isRelais ? (
             <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2 md:col-span-2">
+                <Label>Numéro du registre du commerce</Label>
+                <Input
+                  placeholder="Ex: 16/0012345B22"
+                  value={form.commerceRegisterNumber}
+                  onChange={(e) => setField('commerceRegisterNumber', e.target.value)}
+                />
+                <FormFieldError message={fieldErrors.commerceRegisterNumber} />
+                <p className="text-xs text-slate-500">Format CNRC : WW/NNNNNNNLAA. Exemple : 16/0012345B22</p>
+              </div>
               <div className="space-y-2 md:col-span-2">
                 <Label>Nom du commerce</Label>
                 <Input value={form.commerceName} onChange={(e) => setField('commerceName', e.target.value)} />
@@ -536,7 +628,25 @@ export function PartnerApplicationForm({ role }: PartnerApplicationFormProps) {
               </div>
               <div className="space-y-2 md:col-span-2">
                 <Label>Adresse complète</Label>
-                <Textarea rows={3} value={form.address} onChange={(e) => setField('address', e.target.value)} />
+                <AddressAutocompleteInput
+                  value={form.address}
+                  onChange={(value) => {
+                    setField('address', value);
+                    setForm((prev) => ({ ...prev, latitude: null, longitude: null }));
+                  }}
+                  onSelect={(suggestion) => {
+                    setForm((prev) => ({
+                      ...prev,
+                      address: suggestion.label,
+                      ville: suggestion.wilayaId || prev.ville,
+                      latitude: suggestion.lat,
+                      longitude: suggestion.lon,
+                    }));
+                    setFieldErrors((prev) => ({ ...prev, address: undefined, ville: undefined }));
+                  }}
+                  placeholder="Ex: 12 Rue Didouche Mourad, Alger"
+                />
+                <p className="text-xs text-slate-500">Adresse avec autocomplete OpenStreetMap (Algérie).</p>
                 <FormFieldError message={fieldErrors.address} />
               </div>
               <div className="space-y-2 md:col-span-2">
@@ -555,6 +665,10 @@ export function PartnerApplicationForm({ role }: PartnerApplicationFormProps) {
                 </Select>
                 <FormFieldError message={fieldErrors.ville} />
               </div>
+            </div>
+          ) : status !== 'authenticated' ? (
+            <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
+              Première étape: création du compte transporteur uniquement. Après connexion, vous compléterez le dossier transporteur (RC, véhicule, permis, régions, description).
             </div>
           ) : (
             <div className="space-y-4">
@@ -612,6 +726,8 @@ export function PartnerApplicationForm({ role }: PartnerApplicationFormProps) {
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Enregistrement en cours...
               </>
+            ) : status !== 'authenticated' && !isRelais ? (
+              'Créer mon compte transporteur'
             ) : existingRecordId ? (
               'Mettre à jour mon dossier'
             ) : (
@@ -619,6 +735,8 @@ export function PartnerApplicationForm({ role }: PartnerApplicationFormProps) {
             )}
           </Button>
         </form>
+          </>
+        )}
       </CardContent>
     </Card>
   );

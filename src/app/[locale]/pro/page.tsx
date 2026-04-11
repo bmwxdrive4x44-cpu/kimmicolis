@@ -20,7 +20,7 @@ const PRO_ROLES = [
   },
   {
     title: 'Point relais',
-    description: 'Depot/retrait colis et operation de relais de proximite.',
+    description: 'Depot/retrait colis, avec periode d essai terrain de 30 jours avant validation complete.',
     href: '/become-relay',
     icon: Store,
     classes: 'border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100',

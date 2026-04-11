@@ -15,7 +15,7 @@ import { FormFieldError, FormGlobalError } from '@/components/ui/form-error';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Loader2, Store, Truck, CheckCircle, AlertCircle } from 'lucide-react';
+import { Loader2, Store, Truck, CheckCircle, AlertCircle, Upload, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { WILAYAS } from '@/lib/constants';
 import { isAlgerianCommerceRegisterNumber, normalizeCommerceRegisterNumber } from '@/lib/validators';
@@ -63,6 +63,116 @@ export default function CompleteProfilePage() {
       ? { commerceName: '', address: '', ville: '', commerceRegisterNumber: '' }
       : { phone: '', vehicle: '', license: '', experience: '', regions: [], description: '', commerceRegisterNumber: '' }
   );
+    const [uploadedDocs, setUploadedDocs] = useState<Array<{ url: string; filename: string; size: number }>>([]);
+    const [isUploading, setIsUploading] = useState(false);
+    const [uploadError, setUploadError] = useState<string | null>(null);
+  
+    // Load existing documents when profile exists
+    useEffect(() => {
+      if (isRelais && session?.user?.id) {
+        const loadExistingDocs = async () => {
+          try {
+            const response = await fetch(`/api/relais?userId=${session.user.id}&_=${Date.now()}`, {
+              cache: 'no-store',
+            });
+            const data = await response.json();
+            if (Array.isArray(data) && data[0]?.commerceDocuments) {
+              const docs = JSON.parse(data[0].commerceDocuments || '[]');
+              setUploadedDocs(Array.isArray(docs) ? docs : []);
+            }
+          } catch (error) {
+            console.error('Error loading documents:', error);
+          }
+        };
+        loadExistingDocs();
+      }
+    }, [isRelais, session?.user?.id]);
+
+      // Load existing transporter documents
+      useEffect(() => {
+        if (isTransporter && session?.user?.id) {
+          const loadTransporterDocs = async () => {
+            try {
+              const response = await fetch(`/api/transporters?userId=${session.user.id}&_=${Date.now()}`, {
+                cache: 'no-store',
+              });
+              const data = await response.json();
+              if (Array.isArray(data) && data[0]?.documents) {
+                const docs = JSON.parse(data[0].documents || '[]');
+                setUploadedDocs(Array.isArray(docs) ? docs : []);
+              }
+            } catch (error) {
+              console.error('Error loading transporter documents:', error);
+            }
+          };
+          loadTransporterDocs();
+        }
+      }, [isTransporter, session?.user?.id]);
+  
+    const handleDocumentUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const inputEl = e.currentTarget;
+      const files = inputEl.files;
+      if (!files) return;
+  
+      for (const file of Array.from(files)) {
+        setIsUploading(true);
+        setUploadError(null);
+  
+        try {
+          const formDataToSend = new FormData();
+          formDataToSend.append('file', file);
+  
+            const uploadEndpoint = isRelais ? '/api/relais/upload' : '/api/transporters/upload';
+            const response = await fetch(uploadEndpoint, {
+            method: 'POST',
+            body: formDataToSend,
+          });
+  
+          if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Erreur lors de l\'upload');
+          }
+  
+          const result = await response.json();
+          setUploadedDocs((prev) => [
+            ...prev,
+            { url: result.url, filename: result.filename, size: result.size },
+          ]);
+  
+          toast({
+            title: 'Succès',
+            description: `Document "${file.name}" uploadé avec succès`,
+          });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Erreur lors de l\'upload';
+          setUploadError(message);
+          toast({
+            title: 'Erreur upload',
+            description: message,
+            variant: 'destructive',
+          });
+        } finally {
+          setIsUploading(false);
+        }
+      }
+  
+      // Reset file input safely after async operations
+      if (inputEl) {
+        inputEl.value = '';
+      }
+    };
+  
+    const handleRemoveDocument = (url: string) => {
+      setUploadedDocs((prev) => prev.filter((doc) => doc.url !== url));
+    };
+  
+    const getFormattedFileSize = (bytes: number) => {
+      if (bytes === 0) return '0 B';
+      const k = 1024;
+      const sizes = ['B', 'KB', 'MB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
+    };
 
   // Check if user already has a profile of this type
   useEffect(() => {
@@ -71,7 +181,9 @@ export default function CompleteProfilePage() {
 
       try {
         const endpoint = isRelais ? '/api/relais' : '/api/transporters';
-        const response = await fetch(`${endpoint}?userId=${session.user.id}`);
+        const response = await fetch(`${endpoint}?userId=${session.user.id}&_=${Date.now()}`, {
+          cache: 'no-store',
+        });
         const data = await response.json();
 
         if (Array.isArray(data) && data.length > 0) {
@@ -79,9 +191,18 @@ export default function CompleteProfilePage() {
           const userRes = await fetch(`/api/users/${session.user.id}`);
           const userData = userRes.ok ? await userRes.json() : null;
           const hasRc = Boolean(userData?.siret?.trim());
+          const hasCommerceDocuments = (() => {
+            try {
+              const docs = JSON.parse(existingProfile?.commerceDocuments || '[]');
+              return Array.isArray(docs) && docs.length > 0;
+            } catch {
+              return false;
+            }
+          })();
+          const isApproved = existingProfile?.status === 'APPROVED';
           const isProfileComplete = isRelais
-            ? Boolean(existingProfile?.commerceName?.trim() && existingProfile?.address?.trim() && existingProfile?.ville?.trim() && hasRc)
-            : Boolean(existingProfile?.vehicle?.trim() && existingProfile?.license?.trim() && hasRc);
+            ? Boolean(existingProfile?.commerceName?.trim() && existingProfile?.address?.trim() && existingProfile?.ville?.trim() && hasRc && hasCommerceDocuments && isApproved)
+            : Boolean(existingProfile?.vehicle?.trim() && existingProfile?.license?.trim() && hasRc && isApproved);
 
           if (isProfileComplete) {
             setHasProfile(true);
@@ -183,9 +304,18 @@ export default function CompleteProfilePage() {
       } else if (!isAlgerianCommerceRegisterNumber(rcNumber)) {
         errors.commerceRegisterNumber = 'Format RC invalide (ex: RC-16/1234567B21).';
       }
+
+      if (uploadedDocs.length === 0) {
+        setSubmitError('Veuillez uploader au moins un document de preuve du commerce.');
+        return false;
+      }
     } else if (isTransporter) {
       const data = formData as any;
       const phone = String(data.phone || '').trim();
+            if (uploadedDocs.length === 0) {
+              setSubmitError('Veuillez uploader au moins un document justificatif (permis, RC, carte grise...).');
+              return false;
+            }
       const vehicle = String(data.vehicle || '').trim();
       const license = String(data.license || '').trim();
       const rcNumber = normalizeCommerceRegisterNumber(String(data.commerceRegisterNumber || ''));
@@ -241,6 +371,14 @@ export default function CompleteProfilePage() {
         if (!updateUserResponse.ok) {
           const error = await updateUserResponse.json().catch(() => null);
           const msg = error?.details || error?.error || 'Erreur lors de l\'enregistrement du numéro RC';
+          if (updateUserResponse.status === 409 && error?.code === 'DUPLICATE_RELAIS_RC') {
+            setFieldErrors((prev) => ({ ...prev, commerceRegisterNumber: 'Ce numéro RC est déjà utilisé par un autre point relais actif.' }));
+            throw new Error('Ce numéro RC est déjà utilisé par un autre point relais actif.');
+          }
+          if (updateUserResponse.status === 409 && error?.code === 'DUPLICATE_TRANSPORTER_RC') {
+            setFieldErrors((prev) => ({ ...prev, commerceRegisterNumber: 'Ce numéro RC est déjà utilisé par un transporteur actif.' }));
+            throw new Error('Ce numéro RC est déjà utilisé par un transporteur actif.');
+          }
           if (String(msg).toLowerCase().includes('commerce register') || String(msg).toLowerCase().includes('registre')) {
             setFieldErrors((prev) => ({ ...prev, commerceRegisterNumber: 'Numéro RC invalide côté serveur.' }));
           }
@@ -257,6 +395,7 @@ export default function CompleteProfilePage() {
             ville: data.ville,
             phone: session.user.phone || '',
             commerceRegisterNumber: normalizeCommerceRegisterNumber(data.commerceRegisterNumber),
+            commerceDocuments: uploadedDocs,
           }),
         });
 
@@ -265,6 +404,14 @@ export default function CompleteProfilePage() {
           const msg = error?.details || error?.error || 'Erreur lors de la création du point relais';
           if (error?.code === 'MISSING_REQUIRED_FIELDS') {
             setSubmitError('Des champs obligatoires sont manquants.');
+          }
+          if (response.status === 409 && error?.code === 'DUPLICATE_RELAIS_RC') {
+            setFieldErrors((prev) => ({ ...prev, commerceRegisterNumber: 'Ce numéro RC est déjà utilisé par un autre point relais actif.' }));
+            throw new Error('Ce numéro RC est déjà utilisé par un autre point relais actif.');
+          }
+          if (response.status === 409 && error?.code === 'DUPLICATE_TRANSPORTER_RC') {
+            setFieldErrors((prev) => ({ ...prev, commerceRegisterNumber: 'Ce numéro RC est déjà utilisé par un transporteur actif.' }));
+            throw new Error('Ce numéro RC est déjà utilisé par un transporteur actif.');
           }
           if (error?.code === 'INVALID_COMMERCE_REGISTER_NUMBER' || error?.field === 'commerceRegisterNumber') {
             setFieldErrors((prev) => ({ ...prev, commerceRegisterNumber: 'Numéro RC invalide côté serveur.' }));
@@ -291,6 +438,14 @@ export default function CompleteProfilePage() {
         if (!updateUserResponse.ok) {
           const error = await updateUserResponse.json().catch(() => null);
           const msg = error?.details || error?.error || 'Erreur lors de l\'enregistrement du numéro RC';
+          if (updateUserResponse.status === 409 && error?.code === 'DUPLICATE_TRANSPORTER_RC') {
+            setFieldErrors((prev) => ({ ...prev, commerceRegisterNumber: 'Ce numéro RC est déjà utilisé par un autre transporteur actif.' }));
+            throw new Error('Ce numéro RC est déjà utilisé par un autre transporteur actif.');
+          }
+          if (updateUserResponse.status === 409 && error?.code === 'DUPLICATE_RELAIS_RC') {
+            setFieldErrors((prev) => ({ ...prev, commerceRegisterNumber: 'Ce numéro RC est déjà utilisé par un point relais actif.' }));
+            throw new Error('Ce numéro RC est déjà utilisé par un point relais actif.');
+          }
           if (String(msg).toLowerCase().includes('commerce register') || String(msg).toLowerCase().includes('registre')) {
             setFieldErrors((prev) => ({ ...prev, commerceRegisterNumber: 'Numéro RC invalide côté serveur.' }));
           }
@@ -310,12 +465,21 @@ export default function CompleteProfilePage() {
             experience: parseInt(data.experience) || 0,
             regions: data.regions || [],
             description: data.description,
+            documents: uploadedDocs,
           }),
         });
 
         if (!response.ok) {
           const error = await response.json();
           const msg = error?.details || error?.error || 'Erreur lors de la création du profil transporteur';
+          if (response.status === 409 && error?.code === 'DUPLICATE_TRANSPORTER_RC') {
+            setFieldErrors((prev) => ({ ...prev, commerceRegisterNumber: 'Ce numéro RC est déjà utilisé par un autre transporteur actif.' }));
+            throw new Error('Ce numéro RC est déjà utilisé par un autre transporteur actif.');
+          }
+          if (response.status === 409 && error?.code === 'DUPLICATE_RELAIS_RC') {
+            setFieldErrors((prev) => ({ ...prev, commerceRegisterNumber: 'Ce numéro RC est déjà utilisé par un point relais actif.' }));
+            throw new Error('Ce numéro RC est déjà utilisé par un point relais actif.');
+          }
           if (error?.code === 'APPLICATION_ALREADY_SUBMITTED') {
             throw new Error('Votre dossier transporteur existe déjà. Modifiez-le depuis cette page ou contactez le support.');
           }
@@ -448,20 +612,21 @@ export default function CompleteProfilePage() {
                     <Label htmlFor="address" className="text-base font-semibold">
                       Adresse complète <span className="text-red-500">*</span>
                     </Label>
-                    <Textarea
+                    <Input
                       id="address"
                       placeholder="Ex: 123 Rue Didouche Mourad, Alger Centre"
-                      value={(formData as any).address}
+                      value={(formData as any).address || ''}
                       onChange={(e) => {
                         setSubmitError(null);
                         setFieldErrors((prev) => ({ ...prev, address: undefined }));
                         setFormData({ ...formData, address: e.target.value });
                       }}
                       required
-                      rows={3}
+                      className="h-11"
                     />
                     <FormFieldError message={fieldErrors.address} />
                   </div>
+
 
                   <div className="space-y-2">
                     <Label htmlFor="ville" className="text-base font-semibold">
@@ -487,6 +652,61 @@ export default function CompleteProfilePage() {
                       </SelectContent>
                     </Select>
                     <FormFieldError message={fieldErrors.ville} />
+                  </div>
+
+                  <div className="space-y-3 p-4 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <Upload className="h-5 w-5 text-amber-600" />
+                      <Label htmlFor="commerceDocs" className="text-base font-semibold">
+                        Preuves du commerce <span className="text-red-500">*</span>
+                      </Label>
+                    </div>
+                    <p className="text-sm text-slate-700 dark:text-slate-300">
+                      Ajoutez les pièces justificatives (RC, certificat, etc.). Formats: PDF, JPEG, PNG. Taille max: 5 MB par fichier.
+                    </p>
+
+                    {uploadError && (
+                      <div className="p-3 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded text-sm text-red-700 dark:text-red-300">
+                        {uploadError}
+                      </div>
+                    )}
+
+                    <input
+                      id="commerceDocs"
+                      type="file"
+                      multiple
+                      accept=".pdf,.jpg,.jpeg,.png"
+                      onChange={handleDocumentUpload}
+                      disabled={isUploading}
+                      className="block w-full text-sm file:mr-4 file:rounded-md file:border file:border-slate-300 file:bg-white file:px-3 file:py-2 file:text-sm"
+                    />
+
+                    {isUploading && (
+                      <p className="text-sm text-slate-600 flex items-center gap-2">
+                        <Loader2 className="h-4 w-4 animate-spin" /> Upload en cours...
+                      </p>
+                    )}
+
+                    {uploadedDocs.length > 0 && (
+                      <div className="space-y-2">
+                        <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                          Documents ajoutés ({uploadedDocs.length})
+                        </p>
+                        <div className="space-y-2">
+                          {uploadedDocs.map((doc) => (
+                            <div key={doc.url} className="flex items-center justify-between p-2 bg-white dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700">
+                              <div className="min-w-0">
+                                <p className="text-sm truncate">{doc.filename}</p>
+                                <p className="text-xs text-slate-500">{getFormattedFileSize(doc.size)}</p>
+                              </div>
+                              <Button type="button" variant="ghost" size="icon" onClick={() => handleRemoveDocument(doc.url)}>
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </>
               ) : (
@@ -619,6 +839,61 @@ export default function CompleteProfilePage() {
                       }}
                       rows={3}
                     />
+                  </div>
+
+                  <div className="space-y-3 p-4 bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <Upload className="h-5 w-5 text-blue-600" />
+                      <Label htmlFor="transporterDocs" className="text-base font-semibold">
+                        Documents justificatifs <span className="text-red-500">*</span>
+                      </Label>
+                    </div>
+                    <p className="text-sm text-slate-700 dark:text-slate-300">
+                      Joignez vos pièces justificatives : permis de conduire, RC, carte grise... Formats: PDF, JPEG, PNG. Taille max: 5 MB.
+                    </p>
+
+                    {uploadError && (
+                      <div className="p-3 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded text-sm text-red-700 dark:text-red-300">
+                        {uploadError}
+                      </div>
+                    )}
+
+                    <input
+                      id="transporterDocs"
+                      type="file"
+                      multiple
+                      accept=".pdf,.jpg,.jpeg,.png"
+                      onChange={handleDocumentUpload}
+                      disabled={isUploading}
+                      className="block w-full text-sm file:mr-4 file:rounded-md file:border file:border-slate-300 file:bg-white file:px-3 file:py-2 file:text-sm"
+                    />
+
+                    {isUploading && (
+                      <p className="text-sm text-slate-600 flex items-center gap-2">
+                        <Loader2 className="h-4 w-4 animate-spin" /> Upload en cours...
+                      </p>
+                    )}
+
+                    {uploadedDocs.length > 0 && (
+                      <div className="space-y-2">
+                        <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                          Documents ajoutés ({uploadedDocs.length})
+                        </p>
+                        <div className="space-y-2">
+                          {uploadedDocs.map((doc) => (
+                            <div key={doc.url} className="flex items-center justify-between p-2 bg-white dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700">
+                              <div className="min-w-0">
+                                <p className="text-sm truncate">{doc.filename}</p>
+                                <p className="text-xs text-slate-500">{getFormattedFileSize(doc.size)}</p>
+                              </div>
+                              <Button type="button" variant="ghost" size="icon" onClick={() => handleRemoveDocument(doc.url)}>
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </>
               )}

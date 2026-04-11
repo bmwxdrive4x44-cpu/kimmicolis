@@ -19,12 +19,13 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Pencil, Trash2 } from 'lucide-react';
 
-type EditableParcel = {
+export type EditableParcel = {
   id: string;
   status: string;
   recipientFirstName?: string | null;
   recipientLastName?: string | null;
   recipientPhone?: string | null;
+  recipientEmail?: string | null;
   weight?: number | null;
   description?: string | null;
 };
@@ -37,7 +38,7 @@ export function ParcelEditDialog({
   buttonLabel = 'Modifier',
 }: {
   parcel: EditableParcel;
-  onSaved?: () => void;
+  onSaved?: (updatedParcel: EditableParcel) => void;
   buttonLabel?: string;
 }) {
   const { toast } = useToast();
@@ -47,6 +48,7 @@ export function ParcelEditDialog({
     recipientFirstName: parcel.recipientFirstName || '',
     recipientLastName: parcel.recipientLastName || '',
     recipientPhone: parcel.recipientPhone || '',
+    recipientEmail: parcel.recipientEmail || '',
     weight: parcel.weight ? String(parcel.weight) : '1',
     description: parcel.description || '',
   });
@@ -69,6 +71,12 @@ export function ParcelEditDialog({
       return;
     }
 
+    const trimmedRecipientEmail = form.recipientEmail.trim().toLowerCase();
+    if (trimmedRecipientEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedRecipientEmail)) {
+      toast({ title: 'Erreur', description: 'Email destinataire invalide.', variant: 'destructive' });
+      return;
+    }
+
     const weight = Number(form.weight);
     if (!Number.isFinite(weight) || weight <= 0) {
       toast({ title: 'Erreur', description: 'Poids invalide.', variant: 'destructive' });
@@ -84,6 +92,7 @@ export function ParcelEditDialog({
           recipientFirstName: form.recipientFirstName.trim(),
           recipientLastName: form.recipientLastName.trim(),
           recipientPhone: form.recipientPhone.replace(/\s+/g, '').trim(),
+          recipientEmail: trimmedRecipientEmail || null,
           weight,
           description: form.description.trim(),
         }),
@@ -96,7 +105,15 @@ export function ParcelEditDialog({
 
       toast({ title: 'Colis modifié', description: 'Les changements ont été enregistrés.' });
       setOpen(false);
-      onSaved?.();
+      onSaved?.({
+        ...parcel,
+        recipientFirstName: form.recipientFirstName.trim(),
+        recipientLastName: form.recipientLastName.trim(),
+        recipientPhone: form.recipientPhone.replace(/\s+/g, '').trim(),
+        recipientEmail: trimmedRecipientEmail || null,
+        weight,
+        description: form.description.trim(),
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Erreur inattendue';
       toast({ title: 'Erreur', description: message, variant: 'destructive' });
@@ -138,9 +155,14 @@ export function ParcelEditDialog({
               <Input value={form.recipientPhone} onChange={(e) => setForm((p) => ({ ...p, recipientPhone: e.target.value }))} placeholder="0555123456" />
             </div>
             <div className="space-y-1.5">
-              <Label>Poids (kg)</Label>
-              <Input type="number" step="0.1" min="0.1" value={form.weight} onChange={(e) => setForm((p) => ({ ...p, weight: e.target.value }))} />
+              <Label>Email destinataire (optionnel)</Label>
+              <Input type="email" value={form.recipientEmail} onChange={(e) => setForm((p) => ({ ...p, recipientEmail: e.target.value }))} placeholder="destinataire@email.com" />
             </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Poids (kg)</Label>
+            <Input type="number" step="0.1" min="0.1" value={form.weight} onChange={(e) => setForm((p) => ({ ...p, weight: e.target.value }))} />
           </div>
 
           <div className="space-y-1.5">
@@ -166,7 +188,7 @@ export function ParcelDeleteButton({
   onSaved,
 }: {
   parcel: EditableParcel;
-  onSaved?: () => void;
+  onSaved?: (deletedParcelId: string) => void;
 }) {
   const { toast } = useToast();
   const [deleting, setDeleting] = useState(false);
@@ -185,7 +207,7 @@ export function ParcelDeleteButton({
       if (!res.ok) throw new Error(data?.error || 'Impossible de supprimer ce colis');
 
       toast({ title: 'Colis supprimé', description: 'Suppression définitive effectuée.' });
-      onSaved?.();
+      onSaved?.(parcel.id);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Erreur inattendue';
       toast({ title: 'Erreur', description: message, variant: 'destructive' });

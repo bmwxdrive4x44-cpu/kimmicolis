@@ -1,8 +1,8 @@
 'use client';
 
-import { ParcelDeleteButton, ParcelEditDialog } from '@/components/dashboard/parcel-edit-dialog';
+import { useEffect, useState } from 'react';
+import { ParcelDeleteButton, ParcelEditDialog, type EditableParcel } from '@/components/dashboard/parcel-edit-dialog';
 import { ParcelLabelButton, ParcelLabelsBulkButton, type LabelParcel } from '@/components/dashboard/parcel-label-button';
-import { useRouter } from 'next/navigation';
 
 function getStatusMeta(status: string): { label: string; className: string } {
   switch (status) {
@@ -35,9 +35,21 @@ export function EnseigneTrackingTable({
     createdAt: string | Date;
   }>;
 }) {
-  const router = useRouter();
+  const [items, setItems] = useState(parcels);
 
-  if (parcels.length === 0) {
+  useEffect(() => {
+    setItems(parcels);
+  }, [parcels]);
+
+  const handleParcelSaved = (updatedParcel: EditableParcel) => {
+    setItems((current) => current.map((parcel) => (parcel.id === updatedParcel.id ? { ...parcel, ...updatedParcel } : parcel)));
+  };
+
+  const handleParcelDeleted = (deletedParcelId: string) => {
+    setItems((current) => current.filter((parcel) => parcel.id !== deletedParcelId));
+  };
+
+  if (items.length === 0) {
     return (
       <div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-600">
         Aucun colis pour le moment. Commencez par un import CSV ou une creation manuelle.
@@ -48,8 +60,8 @@ export function EnseigneTrackingTable({
   return (
     <div className="mt-4">
       <div className="mb-3 flex items-center justify-between gap-3">
-        <p className="text-sm text-slate-600">{parcels.length} colis</p>
-        <ParcelLabelsBulkButton parcels={parcels} />
+        <p className="text-sm text-slate-600">{items.length} colis</p>
+        <ParcelLabelsBulkButton parcels={items} />
       </div>
       <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
       <table className="min-w-full divide-y divide-slate-200 text-sm">
@@ -65,7 +77,7 @@ export function EnseigneTrackingTable({
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100 bg-white">
-          {parcels.map((parcel) => {
+          {items.map((parcel) => {
             const statusMeta = getStatusMeta(parcel.status);
             return (
               <tr key={parcel.id}>
@@ -82,8 +94,8 @@ export function EnseigneTrackingTable({
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-2 flex-wrap">
                     <ParcelLabelButton parcel={parcel} />
-                    <ParcelEditDialog parcel={parcel} onSaved={() => router.refresh()} buttonLabel="Modifier" />
-                    <ParcelDeleteButton parcel={parcel} onSaved={() => router.refresh()} />
+                    <ParcelEditDialog parcel={parcel} onSaved={handleParcelSaved} buttonLabel="Modifier" />
+                    <ParcelDeleteButton parcel={parcel} onSaved={handleParcelDeleted} />
                   </div>
                 </td>
               </tr>

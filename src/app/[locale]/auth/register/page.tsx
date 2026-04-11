@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { FormFieldError, FormGlobalError } from '@/components/ui/form-error';
+import { AddressAutocompleteInput } from '@/components/ui/address-autocomplete-input';
 import { Loader2, Mail, Lock, User, Phone, Eye, EyeOff } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -52,9 +53,12 @@ function RegisterForm() {
   const validateForm = () => {
     const errors: typeof fieldErrors = {};
     const phoneRegex = /^\+?[0-9]{8,15}$/;
+    const nameRegex = /^[A-Za-zÀ-ÿ'\-\s]{2,60}$/;
 
     if (!formData.firstName.trim()) errors.firstName = 'Le prénom est obligatoire.';
+    else if (!nameRegex.test(formData.firstName.trim())) errors.firstName = 'Le prénom contient des caractères invalides.';
     if (!formData.lastName.trim()) errors.lastName = 'Le nom est obligatoire.';
+    else if (!nameRegex.test(formData.lastName.trim())) errors.lastName = 'Le nom contient des caractères invalides.';
     if (!formData.phone.trim()) {
       errors.phone = 'Le téléphone est obligatoire.';
     } else if (!phoneRegex.test(formData.phone.trim())) {
@@ -75,6 +79,10 @@ function RegisterForm() {
 
     if (formData.password && formData.password !== formData.confirmPassword) {
       errors.confirmPassword = 'Les mots de passe ne correspondent pas.';
+    }
+
+    if (formData.personalAddress && formData.personalAddress.length > 200) {
+      errors.address = 'Adresse trop longue (maximum 200 caractères).';
     }
 
     if (Object.keys(errors).length > 0) {
@@ -108,8 +116,8 @@ function RegisterForm() {
           firstName: formData.firstName,
           lastName: formData.lastName,
           address: formData.personalAddress,
-          email: formData.email,
-          phone: formData.phone,
+          email: formData.email.trim().toLowerCase(),
+          phone: formData.phone.trim(),
           password: formData.password,
           role: 'CLIENT',
         }),
@@ -121,10 +129,16 @@ function RegisterForm() {
         const isExistingEmail = response.status === 409
           || data?.code === 'EMAIL_ALREADY_EXISTS'
           || rawError.includes('email already exists');
+        const isBlockedIdentity = response.status === 403 || data?.code === 'BANNED_IDENTITY';
 
         if (isExistingEmail) {
           setFieldErrors(prev => ({ ...prev, email: 'Cet email est déjà utilisé. Connectez-vous ou utilisez une autre adresse.' }));
           throw new Error('Un compte existe déjà avec cet email. Connectez-vous pour continuer.');
+        } else if (isBlockedIdentity) {
+          if (data?.blockedType === 'EMAIL') {
+            setFieldErrors(prev => ({ ...prev, email: 'Cette adresse email est bannie.' }));
+          }
+          throw new Error(data?.details || 'Cette identité est bannie suite à la suspension d un point relais.');
         } else if (rawError.includes('invalid email format')) {
           setFieldErrors(prev => ({ ...prev, email: 'Le format de l\'email est invalide.' }));
           throw new Error('Email invalide.');
@@ -136,24 +150,13 @@ function RegisterForm() {
         }
       }
 
-      const userId = data.id;
-
-      // 2. Auto login before protected profile creation
-      const result = await signIn('credentials', {
-        email: formData.email,
-        password: formData.password,
-        redirect: false,
+      toast({
+        title: 'Compte créé',
+        description: data?.emailConfirmationSent
+          ? 'Un email de confirmation vous a ete envoye. Verifiez votre boite mail avant de vous connecter.'
+          : 'Compte cree. Verification email requise avant connexion.',
       });
-
-      if (!result?.ok) {
-        toast({ title: 'Compte créé', description: 'Vous pouvez maintenant vous connecter' });
-        router.push(`/${locale}/auth/login`);
-        return;
-      }
-
-      toast({ title: 'Compte créé', description: 'Bienvenue sur SwiftColis!' });
-      const dashboardPath = `/${locale}/dashboard/client`;
-      window.location.href = dashboardPath;
+      router.replace(`/${locale}/auth/login`);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Impossible de creer le compte';
       setSubmitError(message);
@@ -195,7 +198,7 @@ function RegisterForm() {
                   <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                   <Input id="firstName" placeholder="Votre prénom" value={formData.firstName}
                     onChange={(e) => { setFormData({ ...formData, firstName: e.target.value }); setFieldErrors(p => ({ ...p, firstName: undefined })); setSubmitError(null); }}
-                    className="pl-10 h-11 bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700" required />
+                    className="pl-10 h-11 bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700" maxLength={60} required />
                 </div>
                 <FormFieldError message={fieldErrors.firstName} />
               </div>
@@ -205,7 +208,7 @@ function RegisterForm() {
                   <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                   <Input id="lastName" placeholder="Votre nom" value={formData.lastName}
                     onChange={(e) => { setFormData({ ...formData, lastName: e.target.value }); setFieldErrors(p => ({ ...p, lastName: undefined })); setSubmitError(null); }}
-                    className="pl-10 h-11 bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700" required />
+                    className="pl-10 h-11 bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700" maxLength={60} required />
                 </div>
                 <FormFieldError message={fieldErrors.lastName} />
               </div>
@@ -229,7 +232,7 @@ function RegisterForm() {
                   <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                   <Input id="phone" type="tel" placeholder="+213 XX XX XX XX" value={formData.phone}
                     onChange={(e) => { setFormData({ ...formData, phone: e.target.value }); setFieldErrors(p => ({ ...p, phone: undefined })); setSubmitError(null); }}
-                    className={`pl-10 h-11 bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 ${fieldErrors.phone ? 'border-red-400' : ''}`} required />
+                    className={`pl-10 h-11 bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 ${fieldErrors.phone ? 'border-red-400' : ''}`} maxLength={16} required />
                 </div>
                 <FormFieldError message={fieldErrors.phone} />
               </div>
@@ -239,9 +242,21 @@ function RegisterForm() {
               <Label htmlFor="personalAddress" className="text-sm font-medium text-slate-700 dark:text-slate-300">
                 Adresse personnelle <span className="text-slate-400 font-normal">(optionnel)</span>
               </Label>
-              <Input id="personalAddress" placeholder="Ex: 12 Rue Didouche Mourad" value={formData.personalAddress}
-                onChange={(e) => setFormData({ ...formData, personalAddress: e.target.value })}
-                className="h-11 bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700" />
+              <AddressAutocompleteInput
+                value={formData.personalAddress}
+                onChange={(value) => {
+                  setFormData({ ...formData, personalAddress: value });
+                  setFieldErrors((prev) => ({ ...prev, address: undefined }));
+                }}
+                onSelect={(suggestion) => {
+                  setFormData({ ...formData, personalAddress: suggestion.label });
+                  setFieldErrors((prev) => ({ ...prev, address: undefined }));
+                }}
+                placeholder="Ex: 12 Rue Didouche Mourad"
+                className="h-11 bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700"
+              />
+              <p className="text-xs text-slate-500">Suggestions d'adresse via OpenStreetMap (Algérie).</p>
+              <FormFieldError message={fieldErrors.address} />
             </div>
 
             <div className="grid gap-4 md:grid-cols-2">
@@ -288,18 +303,16 @@ function RegisterForm() {
 
             <p className="text-center text-sm text-muted-foreground">
               Vous avez un compte ?{' '}
-              <Link href={`/${locale}/auth/login`} className="text-emerald-600 hover:underline font-medium">
+              <Link href="/auth/login" className="text-emerald-600 hover:underline font-medium">
                 Connectez-vous
               </Link>
             </p>
 
             <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 p-4 space-y-2">
               <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 text-center">Je suis professionnel</p>
-              <p className="text-center text-xs text-slate-500 dark:text-slate-400">
-                Vous pourrez activer un profil pro plus tard.
-              </p>
+             
               <Link
-                href={`/${locale}/pro`}
+                href="/pro"
                 className="flex items-center justify-center rounded-lg border border-slate-300 bg-white dark:bg-slate-800 px-3 py-2.5 text-center text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
               >
                 Acceder a l'espace professionnel

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useSession } from 'next-auth/react';
 import { useLocale } from 'next-intl';
 import { useRouter } from 'next/navigation';
@@ -72,6 +72,7 @@ export default function TransporterDashboard() {
   const [stats, setStats] = useState({ trajets: 0, missions: 0, completed: 0, earnings: 0 });
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [hasProfile, setHasProfile] = useState(false);
+  const [applicationStatus, setApplicationStatus] = useState<'APPROVED' | 'PENDING' | 'REJECTED' | 'MISSING'>('MISSING');
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -93,7 +94,9 @@ export default function TransporterDashboard() {
         const data = await response.json();
         if (Array.isArray(data) && data.length > 0) {
           setHasProfile(true);
+          setApplicationStatus(data[0]?.status === 'APPROVED' ? 'APPROVED' : data[0]?.status === 'REJECTED' ? 'REJECTED' : 'PENDING');
         } else {
+          setApplicationStatus('MISSING');
           // Redirect to profile completion page
           router.push(`/${locale}/complete-profile/transporter`);
         }
@@ -108,13 +111,13 @@ export default function TransporterDashboard() {
   }, [status, session, router, locale]);
 
   useEffect(() => {
-    if (session?.user?.id && hasProfile) {
+    if (session?.user?.id && hasProfile && applicationStatus === 'APPROVED') {
       fetchStats(false);
     }
-  }, [session?.user?.id, hasProfile]);
+  }, [session?.user?.id, hasProfile, applicationStatus]);
 
   useEffect(() => {
-    if (!session?.user?.id || !hasProfile) return;
+    if (!session?.user?.id || !hasProfile || applicationStatus !== 'APPROVED') return;
 
     const intervalId = window.setInterval(() => {
       fetchStats(true);
@@ -129,7 +132,7 @@ export default function TransporterDashboard() {
       window.clearInterval(intervalId);
       window.removeEventListener('focus', handleFocus);
     };
-  }, [session?.user?.id, hasProfile]);
+  }, [session?.user?.id, hasProfile, applicationStatus]);
 
   const fetchStats = async (background = false) => {
     if (!background) {
@@ -160,7 +163,7 @@ export default function TransporterDashboard() {
     }
   };
 
-  if (status === 'loading' || (isInitialLoading && hasProfile)) {
+  if (status === 'loading' || (isInitialLoading && hasProfile && applicationStatus === 'APPROVED')) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
         <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
@@ -170,6 +173,40 @@ export default function TransporterDashboard() {
 
   if (!session?.user || normalizeRole(session.user.role) !== 'TRANSPORTER' || !hasProfile) {
     return null;
+  }
+
+  if (applicationStatus !== 'APPROVED') {
+    const isRejected = applicationStatus === 'REJECTED';
+    return (
+      <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-900">
+        <Header />
+        <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8">
+          <DashboardShell tone="transporteur" className="mx-auto max-w-3xl">
+            <DashboardPanel tone="transporteur">
+              <Card>
+                <CardHeader>
+                  <CardTitle>{isRejected ? 'Dossier transporteur refusé' : 'Dossier transporteur en cours de validation'}</CardTitle>
+                  <CardDescription>
+                    {isRejected
+                      ? 'Votre dossier n\'est pas encore validé. Mettez à jour vos justificatifs pour réactiver le service.'
+                      : 'Vous ne pouvez pas utiliser les services transporteur tant que vos documents ne sont pas validés par un administrateur.'}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="flex flex-wrap gap-3">
+                  <Button onClick={() => router.push(`/${locale}/complete-profile/transporter`)}>
+                    Mettre à jour mon dossier
+                  </Button>
+                  <Badge variant="outline" className="border-orange-300 bg-orange-50 text-orange-700">
+                    Statut: {isRejected ? 'Refusé' : 'En attente'}
+                  </Badge>
+                </CardContent>
+              </Card>
+            </DashboardPanel>
+          </DashboardShell>
+        </main>
+        <Footer />
+      </div>
+    );
   }
 
   return (
@@ -193,7 +230,7 @@ export default function TransporterDashboard() {
           <DashboardStatsGrid>
             <DashboardMetricCard tone="transporteur" label="Mes trajets" value={stats.trajets} icon={<Route className="h-5 w-5" />} />
             <DashboardMetricCard tone="transporteur" label="Missions actives" value={stats.missions} icon={<Truck className="h-5 w-5" />} />
-            <DashboardMetricCard tone="transporteur" label="Livrés" value={stats.completed} icon={<CheckCircle className="h-5 w-5" />} />
+            <DashboardMetricCard tone="transporteur" label="Missions terminées" value={stats.completed} icon={<CheckCircle className="h-5 w-5" />} />
             <DashboardMetricCard tone="transporteur" label="Gains" value={`${stats.earnings} DA`} icon={<DollarSign className="h-5 w-5" />} />
           </DashboardStatsGrid>
 
@@ -206,7 +243,7 @@ export default function TransporterDashboard() {
                 <TabsTrigger value="scan" className={getDashboardTabsTriggerClass('transporteur')}><QrCode className="h-4 w-4 mr-1 hidden sm:inline" />Scanner</TabsTrigger>
                 <TabsTrigger value="wallet" className={getDashboardTabsTriggerClass('transporteur')}><Wallet className="h-4 w-4 mr-1 hidden sm:inline" />Portefeuille</TabsTrigger>
                 <TabsTrigger value="auto-assign" className={getDashboardTabsTriggerClass('transporteur')}><Zap className="h-4 w-4 mr-1 hidden sm:inline" />Auto-assign</TabsTrigger>
-                <TabsTrigger value="profil" className={getDashboardTabsTriggerClass('transporteur')}><Truck className="h-4 w-4 mr-1 hidden sm:inline" />Mon profil</TabsTrigger>
+                <TabsTrigger value="profil" className={getDashboardTabsTriggerClass('transporteur')}><Truck className="h-4 w-4 mr-1 hidden sm:inline" />Infos perso</TabsTrigger>
               </TabsList>
 
               <TabsContent value="overview">
@@ -219,7 +256,7 @@ export default function TransporterDashboard() {
                 <MissionsTab userId={session.user.id} onRefreshStats={fetchStats} />
               </TabsContent>
               <TabsContent value="scan">
-                <ScanTab onRefreshStats={fetchStats} />
+                <ScanTab userId={session.user.id} onRefreshStats={fetchStats} />
               </TabsContent>
               <TabsContent value="wallet">
                 <WalletTab userId={session.user.id} />
@@ -1062,7 +1099,7 @@ function MissionsTab({ userId, onRefreshStats }: { userId: string; onRefreshStat
 }
 
 // Scan Tab
-function ScanTab({ onRefreshStats }: { onRefreshStats?: (background?: boolean) => void }) {
+function ScanTab({ userId, onRefreshStats }: { userId: string; onRefreshStats?: (background?: boolean) => void }) {
   const { toast } = useToast();
   const [scanResult, setScanResult] = useState<string>('');
   const [parcel, setParcel] = useState<any>(null);
@@ -1097,18 +1134,28 @@ function ScanTab({ onRefreshStats }: { onRefreshStats?: (background?: boolean) =
 
   const handleUpdateStatus = async (status: string) => {
     if (!parcel) return;
+    const activeMission = asArray<any>(parcel.missions).find((mission) => mission.transporteurId === userId);
+    if (!activeMission) {
+      toast({ title: 'Mission introuvable', description: 'Aucune mission active liée à ce colis pour ce transporteur', variant: 'destructive' });
+      return;
+    }
+
+    const missionStatus = status === 'EN_TRANSPORT' ? 'EN_COURS' : status === 'ARRIVE_RELAIS_DESTINATION' ? 'LIVRE' : status;
     setIsUpdating(true);
     try {
-      const response = await fetch(`/api/parcels/${parcel.id}`, {
+      const response = await fetch(`/api/missions/${activeMission.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status }),
+        body: JSON.stringify({ status: missionStatus }),
       });
       
       if (response.ok) {
-        toast({ title: 'Statut mis à jour', description: `Le colis est maintenant: ${PARCEL_STATUS.find(s => s.id === status)?.label}` });
-        setParcel({ ...parcel, status });
-        if (status === 'ARRIVE_RELAIS_DESTINATION') onRefreshStats?.(true);
+        toast({ title: 'Mission mise à jour', description: `Le colis est maintenant: ${PARCEL_STATUS.find(s => s.id === status)?.label}` });
+        const refreshedParcelRes = await fetch(`/api/parcels?tracking=${parcel.trackingNumber}`);
+        const refreshedParcelData = await refreshedParcelRes.json().catch(() => null);
+        const refreshedParcel = Array.isArray(refreshedParcelData) ? refreshedParcelData[0] : refreshedParcelData;
+        setParcel(refreshedParcel || { ...parcel, status });
+        onRefreshStats?.(true);
       } else {
         throw new Error('Failed');
       }
@@ -1218,7 +1265,7 @@ function ScanTab({ onRefreshStats }: { onRefreshStats?: (background?: boolean) =
                   </Button>
                 )}
                 {['ARRIVE_RELAIS_DESTINATION', 'LIVRE'].includes(parcel.status) && (
-                  <Badge className="bg-green-100 text-green-700 px-4 py-2">✓ Colis livré / au relais</Badge>
+                  <Badge className="bg-green-100 text-green-700 px-4 py-2">✓ Mission terminée au relais d'arrivée</Badge>
                 )}
               </div>
 
@@ -1315,6 +1362,21 @@ function WalletTab({ userId }: { userId: string }) {
   const filteredMissions = missionFilter === 'all' ? missions : missions.filter((m: any) => m.status === missionFilter);
   const available = wallet?.availableEarnings ?? 0;
   const withdrawn = wallet?.totalWithdrawn ?? 0;
+  const financialSummary = useMemo(() => {
+    const completedMissions = missions.filter((mission: any) => mission.status === 'LIVRE');
+
+    return completedMissions.reduce(
+      (acc, mission: any) => {
+        acc.count += 1;
+        acc.clientTotal += Number(mission.colis?.prixClient ?? 0);
+        acc.relayTotal += Number(mission.colis?.commissionRelais ?? 0);
+        acc.adminTotal += Number(mission.colis?.commissionPlateforme ?? 0);
+        acc.netTotal += Number(mission.colis?.netTransporteur ?? 0);
+        return acc;
+      },
+      { count: 0, clientTotal: 0, relayTotal: 0, adminTotal: 0, netTotal: 0 }
+    );
+  }, [missions]);
 
   if (isLoading) return <div className="flex justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-emerald-600" /></div>;
 
@@ -1327,7 +1389,7 @@ function WalletTab({ userId }: { userId: string }) {
             <Clock className="h-5 w-5 text-yellow-600 mx-auto mb-2" />
             <p className="text-xs text-yellow-700 mb-1">En attente</p>
             <p className="text-2xl font-bold text-yellow-700">{gainsInfo.pending.toFixed(0)} DA</p>
-            <p className="text-xs text-yellow-500 mt-1">Livraisons en cours</p>
+            <p className="text-xs text-yellow-500 mt-1">Missions en cours ou non financées</p>
           </CardContent>
         </Card>
         <Card className="bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-900/20 border-emerald-200">
@@ -1335,7 +1397,7 @@ function WalletTab({ userId }: { userId: string }) {
             <Wallet className="h-5 w-5 text-emerald-600 mx-auto mb-2" />
             <p className="text-xs text-emerald-700 mb-1">Disponible</p>
             <p className="text-2xl font-bold text-emerald-700">{available.toFixed(0)} DA</p>
-            <p className="text-xs text-emerald-500 mt-1">Prêt au retrait</p>
+            <p className="text-xs text-emerald-500 mt-1">Mission terminée et cash relayé</p>
           </CardContent>
         </Card>
         <Card className="bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-900/20 border-blue-200">
@@ -1351,7 +1413,7 @@ function WalletTab({ userId }: { userId: string }) {
             <TrendingUp className="h-5 w-5 text-purple-600 mx-auto mb-2" />
             <p className="text-xs text-purple-700 mb-1">Total gains confirmés</p>
             <p className="text-2xl font-bold text-purple-700">{gainsInfo.total.toFixed(0)} DA</p>
-            <p className="text-xs text-purple-500 mt-1">Livraisons terminées</p>
+            <p className="text-xs text-purple-500 mt-1">Missions terminées à l'arrivée</p>
           </CardContent>
         </Card>
       </div>
@@ -1381,6 +1443,49 @@ function WalletTab({ userId }: { userId: string }) {
               </Button>
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Détail du calcul</CardTitle>
+          <CardDescription>Le net transporteur est calculé pour chaque colis avant paiement, avec des taux réglables par l'administrateur.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-2 text-sm text-slate-600">
+          <p>Net transporteur = tarif client - commission admin - commission relais.</p>
+          <p>Le montant passe en attente quand la mission démarre, puis devient disponible quand la mission est terminée au relais d'arrivée et que le cash du relais de départ a été reversé.</p>
+          <p>Quand l'administrateur modifie les taux dans les paramètres, ces nouvelles valeurs s'appliquent aux nouveaux colis créés ensuite.</p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Résumé financier global</CardTitle>
+          <CardDescription>Totaux calculés sur les missions terminées à l'arrivée.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 md:grid-cols-5">
+            <div className="rounded-lg border p-4 bg-slate-50 dark:bg-slate-800/60">
+              <p className="text-xs text-slate-500">Missions</p>
+              <p className="text-2xl font-bold">{financialSummary.count}</p>
+            </div>
+            <div className="rounded-lg border p-4 bg-slate-50 dark:bg-slate-800/60">
+              <p className="text-xs text-slate-500">Tarif client</p>
+              <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">{financialSummary.clientTotal.toFixed(0)} DA</p>
+            </div>
+            <div className="rounded-lg border p-4 bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200">
+              <p className="text-xs text-emerald-700">Commission relais</p>
+              <p className="text-2xl font-bold text-emerald-700">{financialSummary.relayTotal.toFixed(0)} DA</p>
+            </div>
+            <div className="rounded-lg border p-4 bg-blue-50 dark:bg-blue-900/20 border-blue-200">
+              <p className="text-xs text-blue-700">Commission admin</p>
+              <p className="text-2xl font-bold text-blue-700">{financialSummary.adminTotal.toFixed(0)} DA</p>
+            </div>
+            <div className="rounded-lg border p-4 bg-purple-50 dark:bg-purple-900/20 border-purple-200">
+              <p className="text-xs text-purple-700">Net transporteur</p>
+              <p className="text-2xl font-bold text-purple-700">{financialSummary.netTotal.toFixed(0)} DA</p>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
@@ -1419,7 +1524,7 @@ function WalletTab({ userId }: { userId: string }) {
               <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Toutes</SelectItem>
-                <SelectItem value="LIVRE">Arrivées relais</SelectItem>
+                <SelectItem value="LIVRE">Terminées à l'arrivée</SelectItem>
                 <SelectItem value="EN_COURS">En cours</SelectItem>
                 <SelectItem value="ASSIGNE">Assignées</SelectItem>
               </SelectContent>
@@ -1445,11 +1550,18 @@ function WalletTab({ userId }: { userId: string }) {
                       {' · '}
                       {new Date(m.completedAt ?? m.updatedAt ?? m.createdAt).toLocaleDateString('fr-FR', { day:'2-digit', month:'2-digit', year:'numeric' })}
                     </p>
+                    <p className="text-xs text-slate-500">
+                      Tarif client: {(m.colis?.prixClient ?? 0).toFixed(0)} DA
+                      {' · '}
+                      Relais: {(m.colis?.commissionRelais ?? 0).toFixed(0)} DA
+                      {' · '}
+                      Admin: {(m.colis?.commissionPlateforme ?? 0).toFixed(0)} DA
+                    </p>
                   </div>
                   <div className="text-right shrink-0 ml-4">
                     <p className="font-bold text-emerald-600">{(m.colis?.netTransporteur ?? 0).toFixed(0)} DA</p>
                     <Badge className={`text-xs mt-1 ${m.status === 'LIVRE' ? 'bg-green-100 text-green-700' : m.status === 'EN_COURS' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'}`}>
-                      {m.status === 'LIVRE' ? 'Livré' : m.status === 'EN_COURS' ? 'En cours' : 'Assignée'}
+                      {m.status === 'LIVRE' ? 'Terminée' : m.status === 'EN_COURS' ? 'En cours' : 'Assignée'}
                     </Badge>
                   </div>
                 </div>

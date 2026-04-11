@@ -16,6 +16,7 @@ type CsvParcel = {
   recipientFirstName: string;
   recipientLastName: string;
   recipientPhone: string;
+  recipientEmail?: string;
   weight: number;
   description?: string;
 };
@@ -59,6 +60,7 @@ function parseCsv(content: string): CsvParcel[] {
     recipientFirstName: findHeader(['recipientfirstname', 'recipient_first_name', 'destinataireprenom', 'destinataire_prenom']),
     recipientLastName: findHeader(['recipientlastname', 'recipient_last_name', 'destinatairenom', 'destinataire_nom']),
     recipientPhone: findHeader(['recipientphone', 'recipient_phone', 'destinatairetelephone', 'destinataire_telephone']),
+    recipientEmail: findHeader(['recipientemail', 'recipient_email', 'destinataireemail', 'destinataire_email']),
     weight: findHeader(['weight', 'poids']),
     description: findHeader(['description', 'contenu']),
   };
@@ -93,6 +95,7 @@ function parseCsv(content: string): CsvParcel[] {
       recipientFirstName: cols[idx.recipientFirstName] || '',
       recipientLastName: cols[idx.recipientLastName] || '',
       recipientPhone: cols[idx.recipientPhone] || '',
+      recipientEmail: idx.recipientEmail >= 0 ? (cols[idx.recipientEmail] || '') : '',
       weight,
       description: idx.description >= 0 ? (cols[idx.description] || '') : '',
     });
@@ -242,9 +245,9 @@ export function EnseigneCsvImportCard({ clientId }: { clientId: string }) {
   };
 
   const downloadTemplate = () => {
-    const header = 'senderFirstName,senderLastName,senderPhone,recipientFirstName,recipientLastName,recipientPhone,weight,description';
-    const sample1 = 'Karim,Benaissa,0555000001,Leila,Hamdi,0666000001,2.5,Accessoires mode';
-    const sample2 = 'Nadia,Mansouri,0555000002,Yacine,Meziani,0666000002,1.2,Produit cosmetique';
+    const header = 'senderFirstName,senderLastName,senderPhone,recipientFirstName,recipientLastName,recipientPhone,recipientEmail,weight,description';
+    const sample1 = 'Karim,Benaissa,0555000001,Leila,Hamdi,0666000001,leila@example.com,2.5,Accessoires mode';
+    const sample2 = 'Nadia,Mansouri,0555000002,Yacine,Meziani,0666000002,,1.2,Produit cosmetique';
     const content = [header, sample1, sample2].join('\n');
     const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);

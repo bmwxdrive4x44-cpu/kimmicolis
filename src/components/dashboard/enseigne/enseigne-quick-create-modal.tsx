@@ -18,6 +18,7 @@ type SimpleForm = {
   recipientFirstName: string;
   recipientLastName: string;
   recipientPhone: string;
+  recipientEmail: string;
   villeArrivee: string;
   weight: string;
 };
@@ -76,6 +77,7 @@ export function EnseigneQuickCreateModal({ defaultVilleDepart = '', onCreated }:
     recipientFirstName: '',
     recipientLastName: '',
     recipientPhone: '',
+    recipientEmail: '',
     villeArrivee: '',
     weight: '1',
   };
@@ -203,6 +205,9 @@ export function EnseigneQuickCreateModal({ defaultVilleDepart = '', onCreated }:
     if (!form.recipientFirstName.trim()) e.recipientFirstName = 'Prénom requis';
     if (!form.recipientLastName.trim()) e.recipientLastName = 'Nom requis';
     if (!form.recipientPhone.trim()) e.recipientPhone = 'Téléphone requis';
+    if (form.recipientEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.recipientEmail.trim())) {
+      e.recipientEmail = 'Email invalide';
+    }
     if (!form.villeArrivee) e.villeArrivee = 'Ville arrivée requise';
     if (advanced && !form.villeDepart) e.villeDepart = 'Ville départ requise';
     const w = Number(form.weight);
@@ -224,6 +229,7 @@ export function EnseigneQuickCreateModal({ defaultVilleDepart = '', onCreated }:
           recipientFirstName: form.recipientFirstName.trim(),
           recipientLastName: form.recipientLastName.trim(),
           recipientPhone: form.recipientPhone.trim(),
+          recipientEmail: form.recipientEmail.trim() || undefined,
           villeDepart: advanced ? form.villeDepart : (defaultVilleDepart || undefined),
           villeArrivee: form.villeArrivee,
           relaisArriveeId: form.relaisArriveeId || undefined,
@@ -360,6 +366,16 @@ export function EnseigneQuickCreateModal({ defaultVilleDepart = '', onCreated }:
                     className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-100 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
                   />
                   {errors.recipientPhone && <p className="mt-1 text-xs text-red-600">{errors.recipientPhone}</p>}
+                </div>
+                <div>
+                  <input
+                    type="email"
+                    placeholder="Email (optionnel)"
+                    value={form.recipientEmail}
+                    onChange={(e) => setForm({ ...form, recipientEmail: e.target.value })}
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-100 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                  />
+                  {errors.recipientEmail && <p className="mt-1 text-xs text-red-600">{errors.recipientEmail}</p>}
                 </div>
               </fieldset>
 

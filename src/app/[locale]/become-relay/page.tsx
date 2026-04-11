@@ -58,8 +58,20 @@ const RELAY_CONDITIONS = [
 ];
 
 export default function BecomeRelayPage() {
+  const scrollToSection = (id: string) => {
+    const element = document.getElementById(id);
+    if (!element) return;
+
+    const y = element.getBoundingClientRect().top + window.scrollY - 96;
+    window.scrollTo({ top: y, behavior: 'smooth' });
+  };
+
   const handleSignUp = () => {
-    document.getElementById('relay-application-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    scrollToSection('relay-application-section');
+  };
+
+  const handleLearnMore = () => {
+    scrollToSection('relay-conditions-section');
   };
 
   return (
@@ -110,7 +122,7 @@ export default function BecomeRelayPage() {
                     Rejoindre maintenant
                     <ArrowRight className="h-5 w-5" />
                   </Button>
-                  <Button variant="outline" className="px-8 py-6 text-lg" onClick={handleSignUp}>
+                  <Button variant="outline" className="px-8 py-6 text-lg" onClick={handleLearnMore}>
                     En savoir plus
                   </Button>
                 </div>
@@ -160,7 +172,7 @@ export default function BecomeRelayPage() {
           </div>
         </section>
 
-        <section className="py-12 md:py-20 bg-slate-50 dark:bg-slate-900/60">
+        <section id="relay-conditions-section" className="py-12 md:py-20 bg-slate-50 dark:bg-slate-900/60">
           <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center mb-12">
               <h2 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-4">
@@ -191,7 +203,7 @@ export default function BecomeRelayPage() {
           </div>
         </section>
 
-        <section className="py-12 md:py-20 bg-slate-50 dark:bg-slate-900/60">
+        <section id="relay-application-section" className="py-12 md:py-20 bg-slate-50 dark:bg-slate-900/60">
           <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center mb-10 space-y-3">
               <h2 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white">
