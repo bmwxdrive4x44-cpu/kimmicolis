@@ -27,9 +27,20 @@ async function testPgWithOptions(url: string | null | undefined, label: string, 
   }
 }
 
+function withNoVerifySslMode(url: string | null | undefined) {
+  if (!url) return url;
+  try {
+    const parsed = new URL(url);
+    parsed.searchParams.set('sslmode', 'no-verify');
+    return parsed.toString();
+  } catch {
+    return url;
+  }
+}
+
 export async function GET() {
   const poolerStandard = await testPgWithOptions(process.env.DATABASE_URL, 'POOLER_STANDARD');
-  const poolerNoReject = await testPgWithOptions(process.env.DATABASE_URL, 'POOLER_NO_REJECT', {
+  const poolerNoReject = await testPgWithOptions(withNoVerifySslMode(process.env.DATABASE_URL), 'POOLER_NO_REJECT', {
     ssl: {
       rejectUnauthorized: false,
     },

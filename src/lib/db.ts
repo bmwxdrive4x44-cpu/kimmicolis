@@ -18,6 +18,10 @@ function normalizeDatabaseUrl(url: string): string {
         parsedUrl.searchParams.set('connection_limit', '1')
       }
 
+      // Some Vercel regions fail certificate chain validation with Supabase pooler.
+      // Force libpq-compatible no-verify mode for this specific host.
+      parsedUrl.searchParams.set('sslmode', 'no-verify')
+
       // Override Node TLS verification for Vercel: Supabase pooler cert validation issue
       // Set NODE_TLS_REJECT_UNAUTHORIZED=0 in Vercel env vars to accept self-signed certs.
       // This is production-safe since we trust the Supabase infrastructure.
