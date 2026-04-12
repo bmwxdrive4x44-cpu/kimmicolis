@@ -146,10 +146,14 @@ export async function GET() {
     )
   );
   let fixedUsername: string | null = null;
+  let fixedUrlPreview: string | null = null;
+  const directPasswordPresent = Boolean(inferSupabasePasswordFromDirectUrl());
   try {
     fixedUsername = fixedUrl ? decodeURIComponent(new URL(fixedUrl).username || '') : null;
+    fixedUrlPreview = fixedUrl ? fixedUrl.replace(/:([^:@]+)@/, ':***@') : null;
   } catch {
     fixedUsername = null;
+    fixedUrlPreview = null;
   }
 
   const poolerStandard = await testPgWithOptions(process.env.DATABASE_URL, 'POOLER_STANDARD');
@@ -170,7 +174,9 @@ export async function GET() {
 
   return NextResponse.json({
     inferredProjectRef,
+    directPasswordPresent,
     fixedUsername,
+    fixedUrlPreview,
     poolerStandard,
     poolerNoReject,
     poolerFixedUserNoReject,
