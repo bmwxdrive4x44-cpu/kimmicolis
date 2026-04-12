@@ -116,12 +116,11 @@ async function getPricingConfig() {
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const available = searchParams.get('available'); // "true" = show available for transport
+  const clientId = searchParams.get('clientId');
+  const status = searchParams.get('status');
+  const tracking = searchParams.get('tracking');
 
   try {
-    const clientId = searchParams.get('clientId');
-    const status = searchParams.get('status');
-    const tracking = searchParams.get('tracking');
-
     // Public tracking lookup: limited data only
     if (tracking && !clientId && !status && available !== 'true') {
       const parcels = await db.colis.findMany({
@@ -294,7 +293,8 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('Error fetching parcels:', error);
 
-    if (available === 'true') {
+    // Keep a stable array shape for client-scoped list requests.
+    if (available === 'true' || Boolean(clientId)) {
       return NextResponse.json([]);
     }
 
