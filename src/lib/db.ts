@@ -5,12 +5,26 @@ const globalForPrisma = globalThis as unknown as {
 }
 
 function inferSupabaseProjectRefFromDirectUrl(): string | null {
+  const explicitRef = process.env.SUPABASE_PROJECT_REF?.trim()
+  if (explicitRef) return explicitRef
+
   const directUrl = process.env.DIRECT_DATABASE_URL
-  if (!directUrl) return null
+  if (directUrl) {
+    try {
+      const parsed = new URL(directUrl)
+      const match = parsed.hostname.match(/^db\.([a-z0-9]+)\.supabase\.co$/i)
+      if (match?.[1]) return match[1]
+    } catch {
+      // continue with other fallbacks
+    }
+  }
+
+  const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
+  if (!supabaseUrl) return null
 
   try {
-    const parsed = new URL(directUrl)
-    const match = parsed.hostname.match(/^db\.([a-z0-9]+)\.supabase\.co$/i)
+    const parsed = new URL(supabaseUrl)
+    const match = parsed.hostname.match(/^([a-z0-9]+)\.supabase\.co$/i)
     return match?.[1] || null
   } catch {
     return null

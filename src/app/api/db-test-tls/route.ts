@@ -5,12 +5,26 @@ export const runtime = 'nodejs';
 export const preferredRegion = ['cdg1', 'fra1'];
 
 function inferSupabaseProjectRefFromDirectUrl(): string | null {
+  const explicitRef = process.env.SUPABASE_PROJECT_REF?.trim();
+  if (explicitRef) return explicitRef;
+
   const directUrl = process.env.DIRECT_DATABASE_URL;
-  if (!directUrl) return null;
+  if (directUrl) {
+    try {
+      const parsed = new URL(directUrl);
+      const match = parsed.hostname.match(/^db\.([a-z0-9]+)\.supabase\.co$/i);
+      if (match?.[1]) return match[1];
+    } catch {
+      // continue with other fallbacks
+    }
+  }
+
+  const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!supabaseUrl) return null;
 
   try {
-    const parsed = new URL(directUrl);
-    const match = parsed.hostname.match(/^db\.([a-z0-9]+)\.supabase\.co$/i);
+    const parsed = new URL(supabaseUrl);
+    const match = parsed.hostname.match(/^([a-z0-9]+)\.supabase\.co$/i);
     return match?.[1] || null;
   } catch {
     return null;
@@ -72,6 +86,15 @@ function withNoVerifySslMode(url: string | null | undefined) {
 }
 
 export async function GET() {
+  const inferredProjectRef = inferSupabaseProjectRefFromDirectUrl();
+  const fixedUrl = withNoVerifySslMode(withPoolerUsernameFix(process.env.DATABASE_URL));
+  let fixedUsername: string | null = null;
+  try {
+    fixedUsername = fixedUrl ? decodeURIComponent(new URL(fixedUrl).username || '') : null;
+  } catch {
+    fixedUsername = null;
+  }
+
   const poolerStandard = await testPgWithOptions(process.env.DATABASE_URL, 'POOLER_STANDARD');
   const poolerNoReject = await testPgWithOptions(withNoVerifySslMode(process.env.DATABASE_URL), 'POOLER_NO_REJECT', {
     ssl: {
@@ -79,7 +102,7 @@ export async function GET() {
     },
   });
   const poolerFixedUserNoReject = await testPgWithOptions(
-    withNoVerifySslMode(withPoolerUsernameFix(process.env.DATABASE_URL)),
+    fixedUrl,
     'POOLER_FIXED_USER_NO_REJECT',
     {
       ssl: {
@@ -89,6 +112,8 @@ export async function GET() {
   );
 
   return NextResponse.json({
+    inferredProjectRef,
+    fixedUsername,
     poolerStandard,
     poolerNoReject,
     poolerFixedUserNoReject,
