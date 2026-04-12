@@ -19,6 +19,7 @@
     "db:migrate": "prisma migrate dev",
     "db:migrate:status": "prisma migrate status",
     "db:migrate:deploy": "prisma migrate deploy",
+    "db:prod:fix-actionlog": "prisma db execute --schema prisma/schema.prisma --file ./scripts/prod-fix-actionlog-eventid.sql",
     "db:reset": "prisma migrate reset",
     "admin:reset": "node scripts/reset-admin-dashboard.mjs --yes",
     "prepare": "husky",
