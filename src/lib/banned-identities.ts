@@ -55,12 +55,18 @@ function parseStoredRecords(raw: string | null | undefined): BannedIdentityRecor
 }
 
 async function readBannedIdentityRecords(dbLike: DbLike = db): Promise<BannedIdentityRecord[]> {
-  const setting = await dbLike.setting.findUnique({
-    where: { key: BANNED_RELAY_IDENTITIES_KEY },
-    select: { value: true },
-  });
+  try {
+    const setting = await dbLike.setting.findUnique({
+      where: { key: BANNED_RELAY_IDENTITIES_KEY },
+      select: { value: true },
+    });
 
-  return parseStoredRecords(setting?.value);
+    return parseStoredRecords(setting?.value);
+  } catch (error) {
+    // This anti-fraud helper must not block authentication if DB is transiently unavailable.
+    console.warn('[banned-identities] read skipped:', error);
+    return [];
+  }
 }
 
 async function writeBannedIdentityRecords(records: BannedIdentityRecord[], dbLike: DbLike = db) {

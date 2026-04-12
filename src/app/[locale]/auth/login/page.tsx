@@ -86,7 +86,6 @@ function LoginForm() {
       const errorCode = typeof result?.error === 'string' ? result.error : '';
 
       if (!result?.ok) {
-        const errorMessage = errorCode || 'Connexion impossible pour le moment. Réessayez.';
         if (errorCode === 'CredentialsSignin') {
           setFieldErrors({
             email: 'Vérifiez votre email.',
@@ -103,10 +102,15 @@ function LoginForm() {
           setIsLoading(false);
           return;
         }
+        if (errorCode === 'SERVICE_UNAVAILABLE') {
+          setLoginError('Connexion temporairement indisponible. Réessayez dans 1 a 2 minutes.');
+          setIsLoading(false);
+          return;
+        }
         setLoginError(
           errorCode === 'CredentialsSignin'
             ? 'Email ou mot de passe incorrect. Vérifiez vos identifiants.'
-            : `Connexion impossible pour le moment. (${errorMessage})`
+            : 'Connexion impossible pour le moment. Réessayez.'
         );
         console.warn('signIn failed', {
           ok: result?.ok ?? null,

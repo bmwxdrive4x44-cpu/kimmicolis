@@ -298,126 +298,137 @@ export const authOptions: NextAuthOptions = {
         password: { label: 'Password', type: 'password' },
       },
       async authorize(credentials, req) {
-        if (!credentials?.email || !credentials?.password) {
-          return null;
-        }
-
-        const normalizedEmail = credentials.email.toLowerCase().trim();
-        const clientIp = getClientIpFromHeaders((req as { headers?: Headers | Record<string, string | string[] | undefined> } | undefined)?.headers);
-
-        const blockedIdentity = await findBlockedRelayIdentity({
-          email: normalizedEmail,
-          ip: clientIp,
-        });
-
-        if (blockedIdentity) {
-          await safeCreateActionLog({
-            entityType: 'USER',
-            entityId: blockedIdentity.sourceUserId || normalizedEmail,
-            action: 'LOGIN_BLOCKED_BANNED_IDENTITY',
-            details: JSON.stringify({
-              email: normalizedEmail,
-              ipAddress: clientIp,
-              blockedType: blockedIdentity.type,
-              reason: describeBlockedIdentity(blockedIdentity),
-            }),
-            ipAddress: clientIp || undefined,
-          });
-
-          throw new Error(`BANNED_IDENTITY:${blockedIdentity.type}`);
-        }
-
-        // Optional local helper: demo account auto-provisioning is disabled by default.
-        if (isDevDemoAuthEnabled()) {
-          await ensureDevelopmentDemoUser(normalizedEmail, credentials.password);
-        }
-
-        let user = await findUserForAuth(normalizedEmail);
-
-        if (!user && isDevDemoAuthEnabled()) {
-          console.warn('[auth] user not found, force demo user creation', normalizedEmail);
-          user = await ensureDevelopmentDemoUser(normalizedEmail, credentials.password);
-        }
-
-        if (!user || !user.password) {
-          console.warn('[auth] user is missing or has no password', normalizedEmail, user);
-          return null;
-        }
-
-        if (!user.isActive) {
-          throw new Error('EMAIL_NOT_VERIFIED');
-        }
-
-        let isValid = await verifyPassword(credentials.password, user.password);
-        console.log('[auth] verifyPassword', normalizedEmail, isValid);
-
-        if (!isValid && isDevDemoAuthEnabled()) {
-          // Re-hash / upsert possible stale demo user password and retry.
-          console.log('[auth] retry demo user sync for', normalizedEmail);
-          await ensureDevelopmentDemoUser(normalizedEmail, credentials.password);
-          const reloaded = await db.user.findUnique({
-            where: { email: normalizedEmail },
-          });
-          if (reloaded?.password) {
-            isValid = await verifyPassword(credentials.password, reloaded.password);
-            console.log('[auth] verifyPassword retry', normalizedEmail, isValid);
+        try {
+          if (!credentials?.email || !credentials?.password) {
+            return null;
           }
-        }
 
-        if (!isValid) {
-          console.warn('[auth] invalid credentials', normalizedEmail);
-          return null;
-        }
+          const normalizedEmail = credentials.email.toLowerCase().trim();
+          const clientIp = getClientIpFromHeaders((req as { headers?: Headers | Record<string, string | string[] | undefined> } | undefined)?.headers);
 
-        if (normalizeRole(user.role) === 'RELAIS' && user.relais?.operationalStatus === 'SUSPENDU') {
-          await banRelayIdentities({
-            email: user.email,
-            siret: user.siret,
+          const blockedIdentity = await findBlockedRelayIdentity({
+            email: normalizedEmail,
             ip: clientIp,
-            sourceRelaisId: user.relais.id,
-            sourceUserId: user.id,
-            reason: 'Relais suspendu - bannissement appliqué lors de la tentative de connexion',
           });
+
+          if (blockedIdentity) {
+            await safeCreateActionLog({
+              entityType: 'USER',
+              entityId: blockedIdentity.sourceUserId || normalizedEmail,
+              action: 'LOGIN_BLOCKED_BANNED_IDENTITY',
+              details: JSON.stringify({
+                email: normalizedEmail,
+                ipAddress: clientIp,
+                blockedType: blockedIdentity.type,
+                reason: describeBlockedIdentity(blockedIdentity),
+              }),
+              ipAddress: clientIp || undefined,
+            });
+
+            throw new Error(`BANNED_IDENTITY:${blockedIdentity.type}`);
+          }
+
+          // Optional local helper: demo account auto-provisioning is disabled by default.
+          if (isDevDemoAuthEnabled()) {
+            await ensureDevelopmentDemoUser(normalizedEmail, credentials.password);
+          }
+
+          let user = await findUserForAuth(normalizedEmail);
+
+          if (!user && isDevDemoAuthEnabled()) {
+            console.warn('[auth] user not found, force demo user creation', normalizedEmail);
+            user = await ensureDevelopmentDemoUser(normalizedEmail, credentials.password);
+          }
+
+          if (!user || !user.password) {
+            console.warn('[auth] user is missing or has no password', normalizedEmail, user);
+            return null;
+          }
+
+          if (!user.isActive) {
+            throw new Error('EMAIL_NOT_VERIFIED');
+          }
+
+          let isValid = await verifyPassword(credentials.password, user.password);
+          console.log('[auth] verifyPassword', normalizedEmail, isValid);
+
+          if (!isValid && isDevDemoAuthEnabled()) {
+            // Re-hash / upsert possible stale demo user password and retry.
+            console.log('[auth] retry demo user sync for', normalizedEmail);
+            await ensureDevelopmentDemoUser(normalizedEmail, credentials.password);
+            const reloaded = await db.user.findUnique({
+              where: { email: normalizedEmail },
+            });
+            if (reloaded?.password) {
+              isValid = await verifyPassword(credentials.password, reloaded.password);
+              console.log('[auth] verifyPassword retry', normalizedEmail, isValid);
+            }
+          }
+
+          if (!isValid) {
+            console.warn('[auth] invalid credentials', normalizedEmail);
+            return null;
+          }
+
+          if (normalizeRole(user.role) === 'RELAIS' && user.relais?.operationalStatus === 'SUSPENDU') {
+            await banRelayIdentities({
+              email: user.email,
+              siret: user.siret,
+              ip: clientIp,
+              sourceRelaisId: user.relais.id,
+              sourceUserId: user.id,
+              reason: 'Relais suspendu - bannissement appliqué lors de la tentative de connexion',
+            });
+
+            await safeCreateActionLog({
+              userId: user.id,
+              entityType: 'RELAIS',
+              entityId: user.relais.id,
+              action: 'LOGIN_BLOCKED_SUSPENDED_RELAY',
+              details: JSON.stringify({ email: user.email, ipAddress: clientIp }),
+              ipAddress: clientIp || undefined,
+            });
+
+            throw new Error('BANNED_IDENTITY:EMAIL');
+          }
+
+          if (passwordNeedsRehash(user.password)) {
+            const upgradedPassword = await hashPassword(credentials.password);
+            await db.user.update({
+              where: { id: user.id },
+              data: { password: upgradedPassword },
+            });
+          }
 
           await safeCreateActionLog({
             userId: user.id,
-            entityType: 'RELAIS',
-            entityId: user.relais.id,
-            action: 'LOGIN_BLOCKED_SUSPENDED_RELAY',
-            details: JSON.stringify({ email: user.email, ipAddress: clientIp }),
+            entityType: 'USER',
+            entityId: user.id,
+            action: 'LOGIN_SUCCESS',
+            details: JSON.stringify({ role: normalizeRole(user.role), email: user.email }),
             ipAddress: clientIp || undefined,
           });
 
-          throw new Error('BANNED_IDENTITY:EMAIL');
+          return {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            role: normalizeRole(user.role),
+            phone: user.phone ?? undefined,
+            relaisId: user.relais?.id ?? null,
+            relaisStatus: user.relais?.status ?? undefined,
+            clientType: readClientType(user),
+          };
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error || '');
+          if (message.startsWith('BANNED_IDENTITY:') || message === 'EMAIL_NOT_VERIFIED') {
+            throw error;
+          }
+
+          // Prevent leaking raw Prisma/DB internals to the login page.
+          console.error('[auth] authorize failed:', error);
+          throw new Error('SERVICE_UNAVAILABLE');
         }
-
-        if (passwordNeedsRehash(user.password)) {
-          const upgradedPassword = await hashPassword(credentials.password);
-          await db.user.update({
-            where: { id: user.id },
-            data: { password: upgradedPassword },
-          });
-        }
-
-        await safeCreateActionLog({
-          userId: user.id,
-          entityType: 'USER',
-          entityId: user.id,
-          action: 'LOGIN_SUCCESS',
-          details: JSON.stringify({ role: normalizeRole(user.role), email: user.email }),
-          ipAddress: clientIp || undefined,
-        });
-
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          role: normalizeRole(user.role),
-          phone: user.phone ?? undefined,
-          relaisId: user.relais?.id ?? null,
-          relaisStatus: user.relais?.status ?? undefined,
-          clientType: readClientType(user),
-        };
       },
     }),
   ],

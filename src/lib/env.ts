@@ -38,8 +38,8 @@ function loadEnv(): ServerEnv {
       throw new Error('[env] NEXTAUTH_SECRET est obligatoire en production.');
     }
 
-    if (!validated.DATABASE_URL && !validated.DIRECT_DATABASE_URL) {
-      throw new Error('[env] DATABASE_URL ou DIRECT_DATABASE_URL est obligatoire en production.');
+    if (!validated.DATABASE_URL) {
+      throw new Error('[env] DATABASE_URL est obligatoire en production.');
     }
   }
 

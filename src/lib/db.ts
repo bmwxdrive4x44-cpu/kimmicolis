@@ -25,9 +25,18 @@ function normalizeDatabaseUrl(url: string): string {
   }
 }
 
+function isSupabaseDirect5432(url: string): boolean {
+  try {
+    const parsedUrl = new URL(url)
+    return parsedUrl.hostname.endsWith('.supabase.co') && parsedUrl.port === '5432'
+  } catch {
+    return false
+  }
+}
+
 // Runtime should use DATABASE_URL (typically Supabase pooler on Vercel).
-// DIRECT_DATABASE_URL is mainly for Prisma CLI/migrations.
-const databaseUrl = process.env.DATABASE_URL || process.env.DIRECT_DATABASE_URL
+// DIRECT_DATABASE_URL is mainly for Prisma CLI/migrations and must not be used by runtime in production.
+const databaseUrl = process.env.DATABASE_URL
 
 if (!databaseUrl && process.env.NODE_ENV !== 'test') {
   // During build time (no DB URL available), we use a placeholder to allow compilation.
@@ -35,6 +44,10 @@ if (!databaseUrl && process.env.NODE_ENV !== 'test') {
   if (typeof window === 'undefined' && process.env.NEXT_PHASE !== 'phase-production-build') {
     console.warn('[db] DATABASE_URL is not set. Database operations will fail at runtime.');
   }
+}
+
+if (process.env.NODE_ENV === 'production' && databaseUrl && isSupabaseDirect5432(databaseUrl)) {
+  throw new Error('[db] Invalid DATABASE_URL for production runtime: direct Supabase host :5432 detected. Use Supabase pooler :6543.')
 }
 
 // Use placeholder URL during build phase only; runtime requires a real DATABASE_URL.
