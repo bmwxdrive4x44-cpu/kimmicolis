@@ -43,6 +43,16 @@ function inferLegacyParcelFormat(weightKg: number): 'PETIT' | 'MOYEN' | 'GROS' {
   return 'GROS';
 }
 
+function shouldFallbackToUltraLegacy(error: unknown): boolean {
+  if (!error || typeof error !== 'object' || !('code' in error)) {
+    return false;
+  }
+
+  const code = String((error as any).code);
+  // P2022: colonne absente ; P2010: échec SQL brut (souvent colonne/contrainte côté schéma legacy)
+  return code === 'P2022' || code === 'P2010';
+}
+
 type LegacyColisRecord = {
   id: string;
   trackingNumber: string;
@@ -827,12 +837,8 @@ export async function POST(request: NextRequest) {
           try {
             createdColis = await createLegacyColisRaw(legacyCreateData);
           } catch (legacyCreateError) {
-            const legacyPrismaCode =
-              typeof legacyCreateError === 'object' && legacyCreateError && 'code' in legacyCreateError
-                ? String((legacyCreateError as any).code)
-                : null;
             console.warn('[api/parcels] legacy schema payload failed, retrying with ultra-legacy payload:', legacyCreateError);
-            if (legacyPrismaCode === 'P2022') {
+            if (shouldFallbackToUltraLegacy(legacyCreateError)) {
               createdColis = await createUltraLegacyColisRaw(ultraLegacyCreateData);
             } else {
               throw legacyCreateError;
@@ -864,11 +870,7 @@ export async function POST(request: NextRequest) {
         try {
           colis = await updateLegacyColisQrRaw(createdColis.id, secureQrPayload, qrCodeImage || null);
         } catch (legacyUpdateError) {
-          const legacyUpdatePrismaCode =
-            typeof legacyUpdateError === 'object' && legacyUpdateError && 'code' in legacyUpdateError
-              ? String((legacyUpdateError as any).code)
-              : null;
-          if (legacyUpdatePrismaCode === 'P2022') {
+          if (shouldFallbackToUltraLegacy(legacyUpdateError)) {
             colis = await updateUltraLegacyColisQrRaw(createdColis.id, secureQrPayload);
           } else {
             throw legacyUpdateError;
