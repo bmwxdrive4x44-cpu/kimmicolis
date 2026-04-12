@@ -331,7 +331,9 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  let errorStep = 'INIT';
   try {
+    errorStep = 'PARSE_BODY';
     const body = await request.json();
     const {
       clientId,
@@ -395,6 +397,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    errorStep = 'RELAIS_VALIDATE';
     // Check if relais are operational (with compatibility fallback for older schemas)
     let relaisDepart: any;
     let relaisArrivee: any;
@@ -431,6 +434,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    errorStep = 'TRIAL_QUOTA';
     let trialQuota: { limited: boolean; maxPerDay?: number } = { limited: false };
     try {
       trialQuota = await checkRelayTrialQuota({
@@ -457,6 +461,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    errorStep = 'ACTIVE_LINE';
     const activeLine = await findActiveLineByCities(villeDepart, villeArrivee);
     if (!activeLine) {
       return NextResponse.json(
@@ -481,6 +486,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    errorStep = 'PRICING';
     // Calculate prices: distance auto-estimated from departure/arrival wilayas
     const estimatedDistanceKm = estimateSafeDistanceKmByWilayas(villeDepart, villeArrivee);
     const pricingConfig = await getPricingConfig();
@@ -527,6 +533,7 @@ export async function POST(request: NextRequest) {
       finalClientPrice: prixClient,
     };
 
+    errorStep = 'CREATE_PREPARE';
     // Generate tracking number and secure QR token
     const trackingNumber = generateTrackingNumber();
     const qrToken = randomBytes(24).toString('hex');
@@ -583,6 +590,7 @@ export async function POST(request: NextRequest) {
       createdAt: true,
     };
 
+    errorStep = 'CREATE_COLIS';
     let createdColis;
     try {
       createdColis = await db.colis.create({
@@ -612,6 +620,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    errorStep = 'QR_GENERATE';
     const secureQrPayload = JSON.stringify({
       parcelId: createdColis.id,
       token: qrToken,
@@ -621,6 +630,7 @@ export async function POST(request: NextRequest) {
     });
     const qrCodeImage = await generateQRCodeImage(secureQrPayload);
 
+    errorStep = 'UPDATE_COLIS_QR';
     let colis;
     try {
       colis = await db.colis.update({
@@ -637,6 +647,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create tracking history
+    errorStep = 'TRACKING_CREATE';
     try {
       await db.trackingHistory.create({
         data: {
@@ -651,12 +662,14 @@ export async function POST(request: NextRequest) {
       console.warn('[api/parcels] tracking history create failed (non-blocking):', trackingError);
     }
 
+    errorStep = 'POST_ELIGIBILITY_REFRESH';
     try {
       await evaluateImplicitProEligibility(clientId);
     } catch (eligibilityError) {
       console.error('[implicit-pro] post-create evaluation failed:', eligibilityError);
     }
 
+    errorStep = 'RESPONSE';
     return NextResponse.json({
       ...colis,
       withdrawalCode: effectiveWithdrawalCode,
@@ -665,7 +678,16 @@ export async function POST(request: NextRequest) {
       pricingBreakdown,
     });
   } catch (error) {
-    console.error('Error creating parcel:', error);
-    return NextResponse.json({ error: 'Failed to create parcel' }, { status: 500 });
+    const prismaCode = typeof error === 'object' && error && 'code' in error ? String((error as any).code) : null;
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    console.error('Error creating parcel:', { step: errorStep, prismaCode, message, error });
+    return NextResponse.json(
+      {
+        error: 'Failed to create parcel',
+        step: errorStep,
+        code: prismaCode,
+      },
+      { status: 500 }
+    );
   }
 }
