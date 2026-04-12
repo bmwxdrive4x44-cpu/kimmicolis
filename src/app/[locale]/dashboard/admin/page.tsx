@@ -1555,6 +1555,57 @@ function RelaysTab() {
       ? archivedRelais
       : activeRelais.filter(r => r.status === filter);
 
+  const fallbackTrackingRelais = activeRelais.map((r) => ({
+    id: r.id,
+    commerceName: r.commerceName,
+    ville: r.ville,
+    address: r.address,
+    operationalStatus: r.operationalStatus || 'ACTIF',
+    suspensionReason: r.suspensionReason || null,
+    suspendedAt: r.suspendedAt || null,
+    approvalStatus: r.status,
+    cautionStatus: r.cautionStatus || 'PENDING',
+    cautionAmount: r.cautionAmount || 0,
+    trial: { isActive: false, daysRemaining: 0 },
+    activeSanctionsCount: 0,
+    trustLevel: 'good',
+    contactName: r.user?.name || '-',
+    phone: r.user?.phone || '-',
+    email: r.user?.email || '-',
+    metrics: {
+      nbDeposites: Number(r?._count?.parcelsDepart || 0),
+      nbLivres: Number(r?._count?.parcelsArrivee || 0),
+      cashCollected: 0,
+      cashReversed: 0,
+      netCashCollected: 0,
+      commissionRelaisTotal: 0,
+      commissionPlateformeTotal: 0,
+      amountToPay: 0,
+      amountPaid: 0,
+      nbDelayed: 0,
+      reliabilityScore: 100,
+      complianceScore: 100,
+    },
+    alerts: [],
+  }));
+
+  const effectiveTrackingRelais = trackingRelais.length > 0 ? trackingRelais : fallbackTrackingRelais;
+  const effectiveTrackingTotals = trackingTotals || {
+    totalRelais: effectiveTrackingRelais.length,
+    actifRelais: effectiveTrackingRelais.filter((r: any) => r.operationalStatus === 'ACTIF').length,
+    suspendedRelais: effectiveTrackingRelais.filter((r: any) => r.operationalStatus === 'SUSPENDU').length,
+    totalCashCollected: effectiveTrackingRelais.reduce((sum: number, r: any) => sum + Number(r.metrics?.cashCollected || 0), 0),
+    totalMoneyPending: effectiveTrackingRelais.reduce((sum: number, r: any) => sum + Number(r.metrics?.amountToPay || 0), 0),
+    avgReliabilityScore: Math.round(
+      effectiveTrackingRelais.reduce((sum: number, r: any) => sum + Number(r.metrics?.reliabilityScore || 0), 0) /
+      Math.max(effectiveTrackingRelais.length, 1)
+    ),
+    avgComplianceScore: Math.round(
+      effectiveTrackingRelais.reduce((sum: number, r: any) => sum + Number(r.metrics?.complianceScore || 0), 0) /
+      Math.max(effectiveTrackingRelais.length, 1)
+    ),
+  };
+
   return (
     <>
       <div className="space-y-6 mb-6">
@@ -1600,27 +1651,27 @@ function RelaysTab() {
             <div className="grid gap-4 md:grid-cols-6">
               <div className="rounded-lg border p-4 bg-slate-50 dark:bg-slate-800/60">
                 <p className="text-sm text-slate-600 dark:text-slate-400">Relais total</p>
-                <p className="text-2xl font-bold mt-1">{trackingTotals?.totalRelais || 0}</p>
+                <p className="text-2xl font-bold mt-1">{effectiveTrackingTotals.totalRelais}</p>
               </div>
               <div className="rounded-lg border p-4 bg-emerald-50 dark:bg-emerald-950/20">
                 <p className="text-sm text-emerald-700 dark:text-emerald-300">Actifs</p>
-                <p className="text-2xl font-bold mt-1 text-emerald-600">{trackingTotals?.actifRelais || 0}</p>
+                <p className="text-2xl font-bold mt-1 text-emerald-600">{effectiveTrackingTotals.actifRelais}</p>
               </div>
               <div className="rounded-lg border p-4 bg-red-50 dark:bg-red-950/20">
                 <p className="text-sm text-red-700 dark:text-red-300">Suspendus</p>
-                <p className="text-2xl font-bold mt-1 text-red-600">{trackingTotals?.suspendedRelais || 0}</p>
+                <p className="text-2xl font-bold mt-1 text-red-600">{effectiveTrackingTotals.suspendedRelais}</p>
               </div>
               <div className="rounded-lg border p-4 bg-slate-50 dark:bg-slate-800/60">
                 <p className="text-sm text-slate-600 dark:text-slate-400">Fiabilité moyenne</p>
-                <p className="text-2xl font-bold mt-1">{trackingTotals?.avgReliabilityScore || 0}%</p>
+                <p className="text-2xl font-bold mt-1">{effectiveTrackingTotals.avgReliabilityScore}%</p>
               </div>
               <div className="rounded-lg border p-4 bg-blue-50 dark:bg-blue-950/20">
                 <p className="text-sm text-blue-700 dark:text-blue-300">Conformité moyenne</p>
-                <p className="text-2xl font-bold mt-1 text-blue-600">{trackingTotals?.avgComplianceScore || 0}%</p>
+                <p className="text-2xl font-bold mt-1 text-blue-600">{effectiveTrackingTotals.avgComplianceScore}%</p>
               </div>
               <div className="rounded-lg border p-4 bg-orange-50 dark:bg-orange-950/20">
                 <p className="text-sm text-orange-700 dark:text-orange-300">Montant dû plateforme</p>
-                <p className="text-2xl font-bold mt-1 text-orange-600">{(trackingTotals?.totalMoneyPending || 0).toFixed(0)} DA</p>
+                <p className="text-2xl font-bold mt-1 text-orange-600">{(effectiveTrackingTotals.totalMoneyPending || 0).toFixed(0)} DA</p>
               </div>
             </div>
           </CardContent>
@@ -1634,11 +1685,11 @@ function RelaysTab() {
           <CardContent>
             {isTrackingLoading ? (
               <div className="flex justify-center py-8"><Loader2 className="h-8 w-8 animate-spin text-emerald-600" /></div>
-            ) : trackingRelais.length === 0 ? (
+            ) : effectiveTrackingRelais.length === 0 ? (
               <p className="text-center text-slate-500 py-8">Aucun relais à afficher</p>
             ) : (
               <div className="space-y-4">
-                {trackingRelais.map((relay) => (
+                {effectiveTrackingRelais.map((relay) => (
                   <div key={relay.id} className="rounded-xl border p-4 space-y-4">
                     {(() => {
                       const arrivalReliability = getArrivalReliabilityBadge(relay.metrics?.complianceScore || 0);
