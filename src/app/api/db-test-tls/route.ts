@@ -51,6 +51,32 @@ function withPoolerUsernameFix(url: string | null | undefined) {
   }
 }
 
+function inferSupabasePasswordFromDirectUrl(): string | null {
+  const directUrl = process.env.DIRECT_DATABASE_URL;
+  if (!directUrl) return null;
+
+  try {
+    const parsed = new URL(directUrl);
+    return decodeURIComponent(parsed.password || '') || null;
+  } catch {
+    return null;
+  }
+}
+
+function withPoolerPasswordFromDirect(url: string | null | undefined) {
+  if (!url) return url;
+  try {
+    const parsed = new URL(url);
+    const directPassword = inferSupabasePasswordFromDirectUrl();
+    if (directPassword) {
+      parsed.password = directPassword;
+    }
+    return parsed.toString();
+  } catch {
+    return url;
+  }
+}
+
 async function testPgWithOptions(url: string | null | undefined, label: string, options: any = {}) {
   if (!url) {
     return { ok: false, error: 'URL_NOT_SET', label };
@@ -87,7 +113,9 @@ function withNoVerifySslMode(url: string | null | undefined) {
 
 export async function GET() {
   const inferredProjectRef = inferSupabaseProjectRefFromDirectUrl();
-  const fixedUrl = withNoVerifySslMode(withPoolerUsernameFix(process.env.DATABASE_URL));
+  const fixedUrl = withNoVerifySslMode(
+    withPoolerPasswordFromDirect(withPoolerUsernameFix(process.env.DATABASE_URL))
+  );
   let fixedUsername: string | null = null;
   try {
     fixedUsername = fixedUrl ? decodeURIComponent(new URL(fixedUrl).username || '') : null;

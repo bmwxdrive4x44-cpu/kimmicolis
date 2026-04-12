@@ -31,6 +31,18 @@ function inferSupabaseProjectRefFromDirectUrl(): string | null {
   }
 }
 
+function inferSupabasePasswordFromDirectUrl(): string | null {
+  const directUrl = process.env.DIRECT_DATABASE_URL
+  if (!directUrl) return null
+
+  try {
+    const parsed = new URL(directUrl)
+    return decodeURIComponent(parsed.password || '') || null
+  } catch {
+    return null
+  }
+}
+
 function normalizeDatabaseUrl(url: string): string {
   try {
     const parsedUrl = new URL(url)
@@ -38,12 +50,17 @@ function normalizeDatabaseUrl(url: string): string {
 
     if (isSupabasePooler) {
       const username = decodeURIComponent(parsedUrl.username || '')
-      if (username === 'postgres') {
+      if (username === 'postgres' || (username.startsWith('postgres') && !username.includes('.'))) {
         const projectRef = inferSupabaseProjectRefFromDirectUrl()
         if (projectRef) {
           parsedUrl.username = `postgres.${projectRef}`
           console.warn('[db] DATABASE_URL pooler username fixed at runtime to postgres.<project_ref>.')
         }
+      }
+
+      const directPassword = inferSupabasePasswordFromDirectUrl()
+      if (directPassword) {
+        parsedUrl.password = directPassword
       }
 
       if (!parsedUrl.searchParams.has('pgbouncer')) {
