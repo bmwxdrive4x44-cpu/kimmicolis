@@ -11,6 +11,11 @@ import {
   resolveTrackingNumber,
 } from '@/lib/relais-scan';
 
+function isPrismaSchemaError(err: unknown): boolean {
+  const code = String((err as { code?: string }).code ?? '');
+  return code === 'P2022' || code === 'P2010';
+}
+
 /**
  * POST /api/relais/scan-depot
  * Relais de départ scanne le QR pour confirmer la réception physique du colis déposé par le client.
@@ -121,7 +126,6 @@ export async function POST(request: NextRequest) {
       const newUnreversed = newTotal - relais.cashReversed;
 
       await db.$transaction([
-        db.colis.update({ where: { id: parcel.id }, data: { status: newStatus, custody: 'RELAIS_DEPART' } }),
         db.relaisCash.create({
           data: {
             relaisId: actingRelaisId,
@@ -136,6 +140,14 @@ export async function POST(request: NextRequest) {
           data: { cashCollected: newTotal },
         }),
       ]);
+
+      try {
+        await db.colis.update({ where: { id: parcel.id }, data: { status: newStatus, custody: 'RELAIS_DEPART' } });
+      } catch (custodyErr) {
+        if (isPrismaSchemaError(custodyErr)) {
+          await db.$executeRaw`UPDATE "Colis" SET status = ${newStatus}, "updatedAt" = NOW() WHERE id = ${parcel.id}`;
+        } else throw custodyErr;
+      }
 
       // Alerter les admins si seuil atteint
       if (newUnreversed >= RELAY_BLOCK_THRESHOLD_DA) {
@@ -153,7 +165,13 @@ export async function POST(request: NextRequest) {
       }
     } else {
       // Cash déjà enregistré lors d'une étape précédente
-      await db.colis.update({ where: { id: parcel.id }, data: { status: newStatus, custody: 'RELAIS_DEPART' } });
+      try {
+        await db.colis.update({ where: { id: parcel.id }, data: { status: newStatus, custody: 'RELAIS_DEPART' } });
+      } catch (custodyErr) {
+        if (isPrismaSchemaError(custodyErr)) {
+          await db.$executeRaw`UPDATE "Colis" SET status = ${newStatus}, "updatedAt" = NOW() WHERE id = ${parcel.id}`;
+        } else throw custodyErr;
+      }
     }
 
     await db.trackingHistory.create({

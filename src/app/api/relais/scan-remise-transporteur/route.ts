@@ -14,6 +14,11 @@ import {
   createQRScanLogEntry 
 } from '@/lib/qr-security';
 
+function isPrismaSchemaError(err: unknown): boolean {
+  const code = String((err as { code?: string }).code ?? '');
+  return code === 'P2022' || code === 'P2010';
+}
+
 /**
  * POST /api/relais/scan-remise-transporteur
  * Relais de départ scanne le QR pour confirmer la remise du colis au transporteur.
@@ -175,7 +180,13 @@ export async function POST(request: NextRequest) {
     const newStatus = 'EN_TRANSPORT';
     const notes = `Colis remis au transporteur par le relais ${relais.commerceName} (confirmation relais enregistrée)`;
 
-    await db.colis.update({ where: { id: parcel.id }, data: { status: newStatus, custody: 'TRANSPORTEUR' } });
+    try {
+      await db.colis.update({ where: { id: parcel.id }, data: { status: newStatus, custody: 'TRANSPORTEUR' } });
+    } catch (custodyErr) {
+      if (isPrismaSchemaError(custodyErr)) {
+        await db.$executeRaw`UPDATE "Colis" SET status = ${newStatus}, "updatedAt" = NOW() WHERE id = ${parcel.id}`;
+      } else throw custodyErr;
+    }
 
     await db.trackingHistory.create({
       data: { colisId: parcel.id, status: newStatus, notes, userId: auth.payload.id, relaisId: actingRelaisId },

@@ -4,6 +4,11 @@ import { createNotificationDedup } from '@/lib/notifications';
 import { requireRole } from '@/lib/rbac';
 import { applyTransition, canTransition } from '@/lib/parcelStateMachine';
 
+function isPrismaSchemaError(err: unknown): boolean {
+  const code = String((err as { code?: string }).code ?? '');
+  return code === 'P2022' || code === 'P2010';
+}
+
 /**
  * POST /api/delivery/confirm
  * Transporter scans QR code at key steps.
@@ -169,10 +174,25 @@ export async function POST(request: NextRequest) {
     }
 
     // Update parcel
-    const updatedParcel = await db.colis.update({
-      where: { id: parcel.id },
-      data: { status: newParcelStatus, ...parcelUpdateData },
-    });
+    let updatedParcel: Awaited<ReturnType<typeof db.colis.update>>;
+    try {
+      updatedParcel = await db.colis.update({
+        where: { id: parcel.id },
+        data: { status: newParcelStatus, ...parcelUpdateData },
+      });
+    } catch (custodyErr) {
+      if (isPrismaSchemaError(custodyErr)) {
+        // Fallback: update without custody field
+        const { custody: _custody, ...safeUpdateData } = parcelUpdateData as Record<string, unknown> & { custody?: unknown };
+        void _custody;
+        updatedParcel = await db.colis.update({
+          where: { id: parcel.id },
+          data: { status: newParcelStatus, ...safeUpdateData },
+        });
+      } else {
+        throw custodyErr;
+      }
+    }
 
     // Update mission
     if (mission) {

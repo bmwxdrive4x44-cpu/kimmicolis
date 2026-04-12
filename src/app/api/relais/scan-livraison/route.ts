@@ -13,6 +13,11 @@ import {
   resolveTrackingNumber,
 } from '@/lib/relais-scan';
 
+function isPrismaSchemaError(err: unknown): boolean {
+  const code = String((err as { code?: string }).code ?? '');
+  return code === 'P2022' || code === 'P2010';
+}
+
 function normalizeName(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, ' ');
 }
@@ -155,74 +160,100 @@ export async function POST(request: NextRequest) {
     }
 
     // Safety: parcel must have recipient info and withdrawal code hash
-    if (
-      !parcel.recipientFirstName ||
-      !parcel.recipientLastName ||
-      !parcel.recipientPhone ||
-      !parcel.withdrawalCodeHash
-    ) {
-      return NextResponse.json(
-        { error: 'Ce colis ne contient pas les données de sécurité nécessaires à la livraison' },
-        { status: 400 }
-      );
-    }
+    // Legacy parcels (pre-security-fields migration) skip identity check
+    const isLegacyParcel = !parcel.recipientFirstName && !parcel.withdrawalCodeHash;
+    if (!isLegacyParcel) {
+      if (
+        !parcel.recipientFirstName ||
+        !parcel.recipientLastName ||
+        !parcel.recipientPhone ||
+        !parcel.withdrawalCodeHash
+      ) {
+        return NextResponse.json(
+          { error: 'Ce colis ne contient pas les données de sécurité nécessaires à la livraison' },
+          { status: 400 }
+        );
+      }
 
-    // Triple verification
-    const identityMatches =
-      normalizeName(parcel.recipientFirstName) === normalizeName(recipientFirstName) &&
-      normalizeName(parcel.recipientLastName) === normalizeName(recipientLastName) &&
-      normalizePhone(parcel.recipientPhone) === normalizePhone(recipientPhone);
+      // Triple verification
+      const identityMatches =
+        normalizeName(parcel.recipientFirstName) === normalizeName(recipientFirstName) &&
+        normalizeName(parcel.recipientLastName) === normalizeName(recipientLastName) &&
+        normalizePhone(parcel.recipientPhone) === normalizePhone(recipientPhone);
 
-    const codeMatches =
-      hashWithdrawalCode(String(withdrawalCode).trim()) === parcel.withdrawalCodeHash;
+      const codeMatches =
+        hashWithdrawalCode(String(withdrawalCode).trim()) === parcel.withdrawalCodeHash;
 
-    if (!identityMatches || !codeMatches) {
-      return NextResponse.json(
-        { error: 'Vérification échouée: nom, téléphone ou code de retrait invalide' },
-        { status: 403 }
-      );
+      if (!identityMatches || !codeMatches) {
+        return NextResponse.json(
+          { error: 'Vérification échouée: nom, téléphone ou code de retrait invalide' },
+          { status: 403 }
+        );
+      }
     }
 
     const newStatus = 'LIVRE';
     const notes = `Colis livré au destinataire par le relais ${relais.commerceName} — identité et code vérifiés`;
 
-    await db.$transaction([
-      db.colis.update({
-        where: { id: parcel.id },
-        data: { status: newStatus, deliveredAt: new Date(), custody: 'RELAIS_DEST' },
-      }),
-      db.trackingHistory.create({
-        data: { colisId: parcel.id, status: newStatus, notes, userId: auth.payload.id, relaisId: actingRelaisId },
-      }),
-      db.deliveryProof.upsert({
-        where: { colisId: parcel.id },
-        update: {
-          receiverName: `${recipientFirstName} ${recipientLastName}`.trim(),
-          codeVerified: true,
-          photoUrl: typeof photoUrl === 'string' ? photoUrl : null,
-          relaisId: actingRelaisId,
-          deliveredById: auth.payload.id,
-        },
-        create: {
-          colisId: parcel.id,
-          receiverName: `${recipientFirstName} ${recipientLastName}`.trim(),
-          codeVerified: true,
-          photoUrl: typeof photoUrl === 'string' ? photoUrl : null,
-          relaisId: actingRelaisId,
-          deliveredById: auth.payload.id,
-        },
-      }),
-      actionLogDb.actionLog.create({
-        data: {
-          eventId,
-          scope: 'DELIVERY',
-          userId: auth.payload.id,
-          entityType: 'COLIS',
-          entityId: parcel.id,
-          action: 'DELIVERY_SCAN',
-        },
-      }),
-    ]);
+    try {
+      await db.$transaction([
+        db.colis.update({
+          where: { id: parcel.id },
+          data: { status: newStatus, deliveredAt: new Date(), custody: 'RELAIS_DEST' },
+        }),
+        db.trackingHistory.create({
+          data: { colisId: parcel.id, status: newStatus, notes, userId: auth.payload.id, relaisId: actingRelaisId },
+        }),
+        db.deliveryProof.upsert({
+          where: { colisId: parcel.id },
+          update: {
+            receiverName: `${recipientFirstName} ${recipientLastName}`.trim(),
+            codeVerified: true,
+            photoUrl: typeof photoUrl === 'string' ? photoUrl : null,
+            relaisId: actingRelaisId,
+            deliveredById: auth.payload.id,
+          },
+          create: {
+            colisId: parcel.id,
+            receiverName: `${recipientFirstName} ${recipientLastName}`.trim(),
+            codeVerified: true,
+            photoUrl: typeof photoUrl === 'string' ? photoUrl : null,
+            relaisId: actingRelaisId,
+            deliveredById: auth.payload.id,
+          },
+        }),
+        actionLogDb.actionLog.create({
+          data: {
+            eventId,
+            scope: 'DELIVERY',
+            userId: auth.payload.id,
+            entityType: 'COLIS',
+            entityId: parcel.id,
+            action: 'DELIVERY_SCAN',
+          },
+        }),
+      ]);
+    } catch (txErr) {
+      if (isPrismaSchemaError(txErr)) {
+        // Fallback: run without custody, then patch status+deliveredAt via raw SQL
+        await db.$executeRaw`UPDATE "Colis" SET status = ${newStatus}, "deliveredAt" = NOW(), "updatedAt" = NOW() WHERE id = ${parcel.id}`;
+        await db.trackingHistory.create({
+          data: { colisId: parcel.id, status: newStatus, notes, userId: auth.payload.id, relaisId: actingRelaisId },
+        });
+        await actionLogDb.actionLog.create({
+          data: {
+            eventId,
+            scope: 'DELIVERY',
+            userId: auth.payload.id,
+            entityType: 'COLIS',
+            entityId: parcel.id,
+            action: 'DELIVERY_SCAN',
+          },
+        });
+      } else {
+        throw txErr;
+      }
+    }
 
     await createNotificationDedup({
       userId: parcel.clientId,

@@ -9,6 +9,11 @@ import {
   resolveTrackingNumber,
 } from '@/lib/relais-scan';
 
+function isPrismaSchemaError(err: unknown): boolean {
+  const code = String((err as { code?: string }).code ?? '');
+  return code === 'P2022' || code === 'P2010';
+}
+
 /**
  * POST /api/relais/scan-arrivee
  * Relais de destination scanne le QR pour confirmer la réception du colis depuis le transporteur.
@@ -102,7 +107,13 @@ export async function POST(request: NextRequest) {
     const newStatus = 'ARRIVE_RELAIS_DESTINATION';
     const notes = `Colis arrivé au relais de destination ${relais.commerceName}`;
 
-    await db.colis.update({ where: { id: parcel.id }, data: { status: newStatus, custody: 'RELAIS_DEST' } });
+    try {
+      await db.colis.update({ where: { id: parcel.id }, data: { status: newStatus, custody: 'RELAIS_DEST' } });
+    } catch (custodyErr) {
+      if (isPrismaSchemaError(custodyErr)) {
+        await db.$executeRaw`UPDATE "Colis" SET status = ${newStatus}, "updatedAt" = NOW() WHERE id = ${parcel.id}`;
+      } else throw custodyErr;
+    }
 
     await db.trackingHistory.create({
       data: { colisId: parcel.id, status: newStatus, notes, userId: auth.payload.id, relaisId: actingRelaisId },
