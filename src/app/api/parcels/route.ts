@@ -16,6 +16,10 @@ function normalizePhone(value: string): string {
   return value.replace(/\s+/g, '').replace(/[^+\d]/g, '');
 }
 
+function isValidPhone(value: string): boolean {
+  return /^\+?\d{8,15}$/.test(value);
+}
+
 function normalizeOptionalEmail(value: unknown): string | null {
   if (value === undefined || value === null) return null;
   const normalized = String(value).trim().toLowerCase();
@@ -31,6 +35,196 @@ function generateWithdrawalCode(length: 4 | 6 = 6): string {
   const min = length === 4 ? 1000 : 100000;
   const max = length === 4 ? 9999 : 999999;
   return String(Math.floor(Math.random() * (max - min + 1)) + min);
+}
+
+function inferLegacyParcelFormat(weightKg: number): 'PETIT' | 'MOYEN' | 'GROS' {
+  if (weightKg <= 1) return 'PETIT';
+  if (weightKg <= 5) return 'MOYEN';
+  return 'GROS';
+}
+
+type LegacyColisRecord = {
+  id: string;
+  trackingNumber: string;
+  clientId: string;
+  relaisDepartId: string;
+  relaisArriveeId: string;
+  villeDepart: string;
+  villeArrivee: string;
+  status: string;
+  prixClient: number;
+  createdAt: Date;
+};
+
+async function createLegacyColisRaw(data: {
+  trackingNumber: string;
+  clientId: string;
+  relaisDepartId: string;
+  relaisArriveeId: string;
+  villeDepart: string;
+  villeArrivee: string;
+  format: 'PETIT' | 'MOYEN' | 'GROS';
+  weight: number;
+  description: string | null;
+  prixClient: number;
+  commissionPlateforme: number;
+  commissionRelais: number;
+  netTransporteur: number;
+  qrCode: string;
+  status: string;
+  dateLimit: Date;
+}) {
+  const rows = await db.$queryRaw<LegacyColisRecord[]>`
+    INSERT INTO "Colis" (
+      "trackingNumber",
+      "clientId",
+      "relaisDepartId",
+      "relaisArriveeId",
+      "villeDepart",
+      "villeArrivee",
+      "format",
+      "weight",
+      "description",
+      "prixClient",
+      "commissionPlateforme",
+      "commissionRelais",
+      "netTransporteur",
+      "qrCode",
+      "status",
+      "dateLimit"
+    ) VALUES (
+      ${data.trackingNumber},
+      ${data.clientId},
+      ${data.relaisDepartId},
+      ${data.relaisArriveeId},
+      ${data.villeDepart},
+      ${data.villeArrivee},
+      ${data.format},
+      ${data.weight},
+      ${data.description},
+      ${data.prixClient},
+      ${data.commissionPlateforme},
+      ${data.commissionRelais},
+      ${data.netTransporteur},
+      ${data.qrCode},
+      ${data.status},
+      ${data.dateLimit}
+    )
+    RETURNING
+      "id",
+      "trackingNumber",
+      "clientId",
+      "relaisDepartId",
+      "relaisArriveeId",
+      "villeDepart",
+      "villeArrivee",
+      "status",
+      "prixClient",
+      "createdAt"
+  `;
+
+  return rows[0];
+}
+
+async function createUltraLegacyColisRaw(data: {
+  trackingNumber: string;
+  clientId: string;
+  relaisDepartId: string;
+  relaisArriveeId: string;
+  villeDepart: string;
+  villeArrivee: string;
+  format: 'PETIT' | 'MOYEN' | 'GROS';
+  prixClient: number;
+  qrCode: string;
+  status: string;
+}) {
+  const now = new Date();
+  const rows = await db.$queryRaw<LegacyColisRecord[]>`
+    INSERT INTO "Colis" (
+      "trackingNumber",
+      "clientId",
+      "relaisDepartId",
+      "relaisArriveeId",
+      "villeDepart",
+      "villeArrivee",
+      "format",
+      "prixClient",
+      "qrCode",
+      "status",
+      "createdAt",
+      "updatedAt"
+    ) VALUES (
+      ${data.trackingNumber},
+      ${data.clientId},
+      ${data.relaisDepartId},
+      ${data.relaisArriveeId},
+      ${data.villeDepart},
+      ${data.villeArrivee},
+      ${data.format},
+      ${data.prixClient},
+      ${data.qrCode},
+      ${data.status},
+      ${now},
+      ${now}
+    )
+    RETURNING
+      "id",
+      "trackingNumber",
+      "clientId",
+      "relaisDepartId",
+      "relaisArriveeId",
+      "villeDepart",
+      "villeArrivee",
+      "status",
+      "prixClient",
+      "createdAt"
+  `;
+
+  return rows[0];
+}
+
+async function updateLegacyColisQrRaw(colisId: string, qrCode: string, qrCodeImage: string | null) {
+  const rows = await db.$queryRaw<LegacyColisRecord[]>`
+    UPDATE "Colis"
+    SET
+      "qrCode" = ${qrCode},
+      "qrCodeImage" = ${qrCodeImage}
+    WHERE "id" = ${colisId}
+    RETURNING
+      "id",
+      "trackingNumber",
+      "clientId",
+      "relaisDepartId",
+      "relaisArriveeId",
+      "villeDepart",
+      "villeArrivee",
+      "status",
+      "prixClient",
+      "createdAt"
+  `;
+
+  return rows[0];
+}
+
+async function updateUltraLegacyColisQrRaw(colisId: string, qrCode: string) {
+  const rows = await db.$queryRaw<LegacyColisRecord[]>`
+    UPDATE "Colis"
+    SET "qrCode" = ${qrCode}
+    WHERE "id" = ${colisId}
+    RETURNING
+      "id",
+      "trackingNumber",
+      "clientId",
+      "relaisDepartId",
+      "relaisArriveeId",
+      "villeDepart",
+      "villeArrivee",
+      "status",
+      "prixClient",
+      "createdAt"
+  `;
+
+  return rows[0];
 }
 
 function parseVillesEtapes(value: unknown): string[] {
@@ -381,8 +575,17 @@ export async function POST(request: NextRequest) {
 
     const normalizedSenderPhone = normalizePhone(senderPhone);
     const normalizedRecipientPhone = normalizePhone(recipientPhone);
-    if (normalizedSenderPhone.length < 8 || normalizedRecipientPhone.length < 8) {
-      return badRequest('INVALID_PHONE', 'Numéro de téléphone invalide');
+    if (!isValidPhone(normalizedSenderPhone) || !isValidPhone(normalizedRecipientPhone)) {
+      const invalidFields = [
+        !isValidPhone(normalizedSenderPhone) ? 'expediteur' : null,
+        !isValidPhone(normalizedRecipientPhone) ? 'destinataire' : null,
+      ].filter(Boolean).join(', ');
+
+      return badRequest(
+        'INVALID_PHONE',
+        'Numéro de téléphone invalide',
+        `Champ(s): ${invalidFields}. Format attendu: 8 a 15 chiffres, + autorise.`
+      );
     }
 
     const normalizedRecipientEmail = normalizeOptionalEmail(recipientEmail);
@@ -558,9 +761,40 @@ export async function POST(request: NextRequest) {
       prixClient: true,
       createdAt: true,
     };
+    const legacyCreateData = {
+      trackingNumber,
+      clientId,
+      relaisDepartId,
+      relaisArriveeId,
+      villeDepart,
+      villeArrivee,
+      format: inferLegacyParcelFormat(parsedWeight),
+      weight: parsedWeight,
+      description,
+      prixClient,
+      commissionPlateforme: platformFee,
+      commissionRelais: relayFee,
+      netTransporteur,
+      qrCode: placeholderQrPayload,
+      status: 'CREATED',
+      dateLimit: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    };
+    const ultraLegacyCreateData = {
+      trackingNumber,
+      clientId,
+      relaisDepartId,
+      relaisArriveeId,
+      villeDepart,
+      villeArrivee,
+      format: inferLegacyParcelFormat(parsedWeight),
+      prixClient,
+      qrCode: placeholderQrPayload,
+      status: 'CREATED',
+    };
 
     errorStep = 'CREATE_COLIS';
     let createdColis;
+    let isLegacySchema = false;
     try {
       createdColis = await db.colis.create({
         data: {
@@ -582,10 +816,29 @@ export async function POST(request: NextRequest) {
         });
       } catch (compatCreateError) {
         console.warn('[api/parcels] compatibility create failed, retrying with minimal payload:', compatCreateError);
-        createdColis = await db.colis.create({
-          data: minimalCreateData,
-          select: createSelect,
-        });
+        try {
+          createdColis = await db.colis.create({
+            data: minimalCreateData,
+            select: createSelect,
+          });
+        } catch (minimalCreateError) {
+          console.warn('[api/parcels] minimal create failed, retrying with legacy schema payload:', minimalCreateError);
+          isLegacySchema = true;
+          try {
+            createdColis = await createLegacyColisRaw(legacyCreateData);
+          } catch (legacyCreateError) {
+            const legacyPrismaCode =
+              typeof legacyCreateError === 'object' && legacyCreateError && 'code' in legacyCreateError
+                ? String((legacyCreateError as any).code)
+                : null;
+            console.warn('[api/parcels] legacy schema payload failed, retrying with ultra-legacy payload:', legacyCreateError);
+            if (legacyPrismaCode === 'P2022') {
+              createdColis = await createUltraLegacyColisRaw(ultraLegacyCreateData);
+            } else {
+              throw legacyCreateError;
+            }
+          }
+        }
       }
     }
 
@@ -607,6 +860,21 @@ export async function POST(request: NextRequest) {
     errorStep = 'UPDATE_COLIS_QR';
     let colis;
     try {
+      if (isLegacySchema) {
+        try {
+          colis = await updateLegacyColisQrRaw(createdColis.id, secureQrPayload, qrCodeImage || null);
+        } catch (legacyUpdateError) {
+          const legacyUpdatePrismaCode =
+            typeof legacyUpdateError === 'object' && legacyUpdateError && 'code' in legacyUpdateError
+              ? String((legacyUpdateError as any).code)
+              : null;
+          if (legacyUpdatePrismaCode === 'P2022') {
+            colis = await updateUltraLegacyColisQrRaw(createdColis.id, secureQrPayload);
+          } else {
+            throw legacyUpdateError;
+          }
+        }
+      } else {
       colis = await db.colis.update({
         where: { id: createdColis.id },
         data: {
@@ -615,6 +883,7 @@ export async function POST(request: NextRequest) {
         },
         select: createSelect,
       });
+      }
     } catch (updateError) {
       console.warn('[api/parcels] update QR payload failed, keeping initial parcel payload:', updateError);
       colis = createdColis;
