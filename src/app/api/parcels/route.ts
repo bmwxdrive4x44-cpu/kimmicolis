@@ -7,7 +7,7 @@ import { generateQRCodeImage } from '@/lib/qrcode';
 import { calculateDynamicParcelPricing, estimateSafeDistanceKmByWilayas } from '@/lib/pricing';
 import { evaluateImplicitProEligibility } from '@/lib/pro-eligibility';
 import { getImplicitLoyaltyConfig } from '@/lib/loyalty-config';
-import { createHash, randomBytes } from 'crypto';
+import { createHash, randomBytes, randomUUID } from 'crypto';
 import { findActiveLineByCities } from '@/lib/logistics';
 import { generateWithdrawalPin, calculateQRExpiration } from '@/lib/qr-security';
 import { checkRelayTrialQuota } from '@/lib/relais-trial';
@@ -84,8 +84,10 @@ async function createLegacyColisRaw(data: {
   status: string;
   dateLimit: Date;
 }) {
+  const id = randomUUID();
   const rows = await db.$queryRaw<LegacyColisRecord[]>`
     INSERT INTO "Colis" (
+      "id",
       "trackingNumber",
       "clientId",
       "relaisDepartId",
@@ -104,6 +106,7 @@ async function createLegacyColisRaw(data: {
       "dateLimit",
       "updatedAt"
     ) VALUES (
+      ${id},
       ${data.trackingNumber},
       ${data.clientId},
       ${data.relaisDepartId},
@@ -153,21 +156,17 @@ async function createUltraLegacyColisRaw(data: {
   qrCode: string;
   status: string;
 }) {
+  const id = randomUUID();
   const now = new Date();
   const rows = await db.$queryRaw<LegacyColisRecord[]>`
     INSERT INTO "Colis" (
+      "id",
       "trackingNumber",
       "clientId",
       "relaisDepartId",
       "relaisArriveeId",
       "villeDepart",
       "villeArrivee",
-      "format",
-      "prixClient",
-      "qrCode",
-      "status",
-      "createdAt",
-      "updatedAt"
       "format",
       "prixClient",
       "commissionPlateforme",
@@ -178,6 +177,7 @@ async function createUltraLegacyColisRaw(data: {
       "createdAt",
       "updatedAt"
     ) VALUES (
+      ${id},
       ${data.trackingNumber},
       ${data.clientId},
       ${data.relaisDepartId},
