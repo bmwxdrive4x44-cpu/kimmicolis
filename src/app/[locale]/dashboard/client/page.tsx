@@ -722,10 +722,14 @@ function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart }: { us
         let description = 'Impossible de créer le colis';
         try {
           const payload = await response.json();
-          if (payload?.step || payload?.code) {
-            description = `Impossible de créer le colis (${payload.step || 'UNKNOWN'}${payload.code ? ` / ${payload.code}` : ''})`;
-          } else if (payload?.error) {
+          if (payload?.error) {
             description = String(payload.error);
+          }
+          if (payload?.details) {
+            description = `${description} - ${String(payload.details)}`;
+          }
+          if (payload?.step || payload?.code) {
+            description = `${description} (${payload.step || 'REQUEST'}${payload.code ? ` / ${payload.code}` : ''})`;
           }
         } catch {
           // keep default message

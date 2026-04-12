@@ -332,6 +332,16 @@ export async function POST(request: NextRequest) {
   }
 
   let errorStep = 'INIT';
+  const badRequest = (code: string, error: string, details?: string) =>
+    NextResponse.json(
+      {
+        error,
+        code,
+        ...(details ? { details } : {}),
+      },
+      { status: 400 }
+    );
+
   try {
     errorStep = 'PARSE_BODY';
     const body = await request.json();
@@ -366,35 +376,23 @@ export async function POST(request: NextRequest) {
       !recipientLastName?.trim() ||
       !recipientPhone?.trim()
     ) {
-      return NextResponse.json(
-        { error: 'Informations expéditeur/destinataire incomplètes' },
-        { status: 400 }
-      );
+      return badRequest('MISSING_CONTACT_FIELDS', 'Informations expéditeur/destinataire incomplètes');
     }
 
     const normalizedSenderPhone = normalizePhone(senderPhone);
     const normalizedRecipientPhone = normalizePhone(recipientPhone);
     if (normalizedSenderPhone.length < 8 || normalizedRecipientPhone.length < 8) {
-      return NextResponse.json(
-        { error: 'Numéro de téléphone invalide' },
-        { status: 400 }
-      );
+      return badRequest('INVALID_PHONE', 'Numéro de téléphone invalide');
     }
 
     const normalizedRecipientEmail = normalizeOptionalEmail(recipientEmail);
     if (normalizedRecipientEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedRecipientEmail)) {
-      return NextResponse.json(
-        { error: 'Email destinataire invalide' },
-        { status: 400 }
-      );
+      return badRequest('INVALID_RECIPIENT_EMAIL', 'Email destinataire invalide');
     }
 
     const parsedWeight = Number(weight ?? 0);
     if (!Number.isFinite(parsedWeight) || parsedWeight <= 0) {
-      return NextResponse.json(
-        { error: 'Le poids du colis est obligatoire et doit être supérieur à 0 kg' },
-        { status: 400 }
-      );
+      return badRequest('INVALID_WEIGHT', 'Le poids du colis est obligatoire et doit être supérieur à 0 kg');
     }
 
     errorStep = 'RELAIS_VALIDATE';
@@ -415,23 +413,11 @@ export async function POST(request: NextRequest) {
     }
 
     if (!relaisDepart || relaisDepart.status !== 'APPROVED' || relaisDepart.operationalStatus === 'SUSPENDU') {
-      return NextResponse.json(
-        { 
-          error: 'Relais de départ suspendu', 
-          details: relaisDepart?.suspensionReason || 'Raison non spécifiée'
-        },
-        { status: 400 }
-      );
+      return badRequest('RELAIS_DEPART_UNAVAILABLE', 'Relais de départ suspendu', relaisDepart?.suspensionReason || 'Raison non spécifiée');
     }
 
     if (!relaisArrivee || relaisArrivee.status !== 'APPROVED' || relaisArrivee.operationalStatus === 'SUSPENDU') {
-      return NextResponse.json(
-        { 
-          error: 'Relais d\'arrivée suspendu', 
-          details: relaisArrivee?.suspensionReason || 'Raison non spécifiée'
-        },
-        { status: 400 }
-      );
+      return badRequest('RELAIS_ARRIVEE_UNAVAILABLE', 'Relais d\'arrivée suspendu', relaisArrivee?.suspensionReason || 'Raison non spécifiée');
     }
 
     errorStep = 'TRIAL_QUOTA';
@@ -445,45 +431,31 @@ export async function POST(request: NextRequest) {
       console.warn('[api/parcels] relay trial quota check failed, bypassing quota gate:', trialQuotaError);
     }
     if (trialQuota.limited) {
-      return NextResponse.json(
-        {
-          error: 'Relais en période d\'essai: quota quotidien atteint',
-          details: `Maximum ${trialQuota.maxPerDay} colis/jour pendant l'essai`,
-        },
-        { status: 400 }
+      return badRequest(
+        'RELAY_TRIAL_QUOTA_REACHED',
+        'Relais en période d\'essai: quota quotidien atteint',
+        `Maximum ${trialQuota.maxPerDay} colis/jour pendant l'essai`
       );
     }
 
     if (relaisDepart.ville !== villeDepart || relaisArrivee.ville !== villeArrivee) {
-      return NextResponse.json(
-        { error: 'Les relais sélectionnés ne correspondent pas aux villes choisies' },
-        { status: 400 }
-      );
+      return badRequest('RELAIS_CITY_MISMATCH', 'Les relais sélectionnés ne correspondent pas aux villes choisies');
     }
 
     errorStep = 'ACTIVE_LINE';
     const activeLine = await findActiveLineByCities(villeDepart, villeArrivee);
     if (!activeLine) {
-      return NextResponse.json(
-        { error: 'Aucune ligne active n\'est disponible pour cet itinéraire' },
-        { status: 400 }
-      );
+      return badRequest('NO_ACTIVE_LINE', 'Aucune ligne active n\'est disponible pour cet itinéraire', `${villeDepart} -> ${villeArrivee}`);
     }
 
     const effectiveWithdrawalCode = String(withdrawalCode ?? generateWithdrawalCode(6));
     if (!/^\d{4}$|^\d{6}$/.test(effectiveWithdrawalCode)) {
-      return NextResponse.json(
-        { error: 'Le code de retrait doit contenir 4 ou 6 chiffres' },
-        { status: 400 }
-      );
+      return badRequest('INVALID_WITHDRAWAL_CODE', 'Le code de retrait doit contenir 4 ou 6 chiffres');
     }
 
     const normalizedLabelPrintMode = String(labelPrintMode || 'HOME').toUpperCase();
     if (!['HOME', 'RELAY'].includes(normalizedLabelPrintMode)) {
-      return NextResponse.json(
-        { error: 'Mode impression invalide (HOME ou RELAY)' },
-        { status: 400 }
-      );
+      return badRequest('INVALID_LABEL_PRINT_MODE', 'Mode impression invalide (HOME ou RELAY)');
     }
 
     errorStep = 'PRICING';
