@@ -4,15 +4,15 @@
   "crons": [
     {
       "path": "/api/missions/check-timeouts/cron",
-      "schedule": "*/5 * * * *"
+      "schedule": "0 1 * * *"
     },
     {
       "path": "/api/admin/payouts/sync/cron",
-      "schedule": "*/15 * * * *"
+      "schedule": "15 1 * * *"
     },
     {
       "path": "/api/payments/reconcile/cron",
-      "schedule": "*/10 * * * *"
+      "schedule": "30 1 * * *"
     },
     {
       "path": "/api/matching/auto-assign/cron",
