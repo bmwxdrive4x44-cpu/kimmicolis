@@ -1,8 +1,16 @@
 import { spawnSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const isWindows = process.platform === 'win32';
+const schemaPath = join(process.cwd(), 'prisma', 'schema.prisma');
+let schemaContent = '';
+try {
+  schemaContent = readFileSync(schemaPath, 'utf-8');
+} catch (err) {
+  console.warn('[prisma-generate] Could not read schema:', err);
+}
+const usesClientEngine = schemaContent.includes('engineType = "client"');
 const MAX_WINDOWS_RETRIES = 3;
 const WINDOWS_RETRY_DELAY_MS = 1500;
 const WINDOWS_ENGINE_PATH = join(process.cwd(), 'src', 'generated', 'prisma', 'query-engine-windows.exe');
@@ -67,7 +75,20 @@ const runWithWindowsRetry = (args) => {
   return result;
 };
 
-let result = runWithWindowsRetry(['prisma', 'generate']);
+let args = ['prisma', 'generate'];
+if (usesClientEngine) {
+  console.log('[prisma-generate] Detected engineType = "client", using --no-engine.');
+  args.push('--no-engine');
+}
+
+let result = runWithWindowsRetry(args);
+
+if (result.status === 0) {
+  if (typeof result.status === 'number') {
+    process.exit(result.status);
+  }
+  process.exit(0);
+}
 
 if (result.status !== 0 && isWindows) {
   if (canReuseExistingWindowsEngine(result)) {
