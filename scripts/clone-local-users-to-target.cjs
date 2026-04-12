@@ -17,7 +17,8 @@ function parseArgs(argv) {
     wipeTarget: args.has('--wipe-target'),
     allowRemoteTarget: args.has('--allow-remote-target'),
     dryRun: args.has('--dry-run'),
-    excludeDemo: args.has('--exclude-demo'),
+    // Safe default: demo accounts are excluded unless explicitly requested.
+    excludeDemo: !args.has('--include-demo'),
     emails: parsedEmails,
   };
 }
@@ -144,7 +145,7 @@ async function main() {
 
     const sourceUsers = allSourceUsers.filter((user) => {
       const normalizedEmail = String(user.email || '').toLowerCase();
-      if (excludeDemo && normalizedEmail.includes('@demo.dz')) return false;
+      if (excludeDemo && (normalizedEmail.includes('@demo.dz') || normalizedEmail.startsWith('demo+'))) return false;
       if (emails.length > 0) return emails.includes(normalizedEmail);
       return true;
     });
