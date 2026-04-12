@@ -30,7 +30,9 @@ async function testPgWithOptions(url: string | null | undefined, label: string, 
 export async function GET() {
   const poolerStandard = await testPgWithOptions(process.env.DATABASE_URL, 'POOLER_STANDARD');
   const poolerNoReject = await testPgWithOptions(process.env.DATABASE_URL, 'POOLER_NO_REJECT', {
-    rejectUnauthorized: false,
+    ssl: {
+      rejectUnauthorized: false,
+    },
   });
 
   return NextResponse.json({

@@ -45,6 +45,15 @@ function isSupabaseDirect5432(url: string): boolean {
 // Runtime should use DATABASE_URL (typically Supabase pooler on Vercel).
 // DIRECT_DATABASE_URL is mainly for Prisma CLI/migrations and must not be used by runtime in production.
 const databaseUrl = process.env.DATABASE_URL
+const shouldDisableTlsValidation =
+  process.env.NODE_ENV === 'production' &&
+  typeof databaseUrl === 'string' &&
+  databaseUrl.includes('pooler.supabase.com')
+
+if (shouldDisableTlsValidation && process.env.NODE_TLS_REJECT_UNAUTHORIZED !== '0') {
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'
+  console.warn('[db] NODE_TLS_REJECT_UNAUTHORIZED=0 forced for Supabase pooler in production runtime.')
+}
 
 if (!databaseUrl && process.env.NODE_ENV !== 'test') {
   // During build time (no DB URL available), we use a placeholder to allow compilation.
