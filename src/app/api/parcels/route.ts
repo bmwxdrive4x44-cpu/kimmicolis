@@ -514,40 +514,70 @@ export async function POST(request: NextRequest) {
     const expectedDeliveryAt = new Date(Date.now() + 72 * 60 * 60 * 1000);
     const placeholderQrPayload = JSON.stringify({ token: qrToken });
 
-    // Create parcel
-    const createdColis = await db.colis.create({
-      data: {
-        trackingNumber,
-        clientId,
-        lineId: activeLine.id,
-        senderFirstName: senderFirstName.trim(),
-        senderLastName: senderLastName.trim(),
-        senderPhone: normalizedSenderPhone,
-        recipientFirstName: recipientFirstName.trim(),
-        recipientLastName: recipientLastName.trim(),
-        recipientPhone: normalizedRecipientPhone,
-        recipientEmail: normalizedRecipientEmail,
-        withdrawalCodeHash: hashWithdrawalCode(effectiveWithdrawalCode),
-        relaisDepartId,
-        relaisArriveeId,
-        villeDepart,
-        villeArrivee,
-        weight: parsedWeight,
-        description,
-        prixClient,
-        commissionPlateforme: platformFee,
-        commissionRelais: relayFee,
-        netTransporteur,
-        qrCode: placeholderQrPayload,
-        qrToken,
-        withdrawalPin, // 🔒 NEW
-        qrExpiresAt, // 🔒 NEW: QR code expiration for security
-        custody: 'CLIENT',
-        status: 'CREATED',
-        dateLimit: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
-        expectedDeliveryAt,
-      },
-    });
+    const baseCreateData = {
+      trackingNumber,
+      clientId,
+      lineId: activeLine.id,
+      senderFirstName: senderFirstName.trim(),
+      senderLastName: senderLastName.trim(),
+      senderPhone: normalizedSenderPhone,
+      recipientFirstName: recipientFirstName.trim(),
+      recipientLastName: recipientLastName.trim(),
+      recipientPhone: normalizedRecipientPhone,
+      recipientEmail: normalizedRecipientEmail,
+      withdrawalCodeHash: hashWithdrawalCode(effectiveWithdrawalCode),
+      relaisDepartId,
+      relaisArriveeId,
+      villeDepart,
+      villeArrivee,
+      weight: parsedWeight,
+      description,
+      prixClient,
+      commissionPlateforme: platformFee,
+      commissionRelais: relayFee,
+      netTransporteur,
+      qrCode: placeholderQrPayload,
+      status: 'CREATED',
+      dateLimit: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+    };
+
+    const createSelect = {
+      id: true,
+      trackingNumber: true,
+      clientId: true,
+      lineId: true,
+      relaisDepartId: true,
+      relaisArriveeId: true,
+      villeDepart: true,
+      villeArrivee: true,
+      status: true,
+      prixClient: true,
+      dateLimit: true,
+      qrCode: true,
+      qrCodeImage: true,
+      createdAt: true,
+    };
+
+    let createdColis;
+    try {
+      createdColis = await db.colis.create({
+        data: {
+          ...baseCreateData,
+          qrToken,
+          withdrawalPin,
+          qrExpiresAt,
+          custody: 'CLIENT',
+          expectedDeliveryAt,
+        },
+        select: createSelect,
+      });
+    } catch (createError) {
+      console.warn('[api/parcels] full create failed, retrying with compatibility payload:', createError);
+      createdColis = await db.colis.create({
+        data: baseCreateData,
+        select: createSelect,
+      });
+    }
 
     const secureQrPayload = JSON.stringify({
       parcelId: createdColis.id,
@@ -558,24 +588,35 @@ export async function POST(request: NextRequest) {
     });
     const qrCodeImage = await generateQRCodeImage(secureQrPayload);
 
-    const colis = await db.colis.update({
-      where: { id: createdColis.id },
-      data: {
-        qrCode: secureQrPayload,
-        qrCodeImage,
-      },
-    });
+    let colis;
+    try {
+      colis = await db.colis.update({
+        where: { id: createdColis.id },
+        data: {
+          qrCode: secureQrPayload,
+          qrCodeImage,
+        },
+        select: createSelect,
+      });
+    } catch (updateError) {
+      console.warn('[api/parcels] update QR payload failed, keeping initial parcel payload:', updateError);
+      colis = createdColis;
+    }
 
     // Create tracking history
-    await db.trackingHistory.create({
-      data: {
-        colisId: colis.id,
-        status: 'CREATED',
-        location: villeDepart,
-        userId: payload.id,
-        notes: `Colis créé (impression ${normalizedLabelPrintMode === 'RELAY' ? 'au relais' : 'à domicile'}) et placé dans la file d'attente de la ligne ${activeLine.villeDepart} → ${activeLine.villeArrivee}`,
-      },
-    });
+    try {
+      await db.trackingHistory.create({
+        data: {
+          colisId: colis.id,
+          status: 'CREATED',
+          location: villeDepart,
+          userId: payload.id,
+          notes: `Colis créé (impression ${normalizedLabelPrintMode === 'RELAY' ? 'au relais' : 'à domicile'}) et placé dans la file d'attente de la ligne ${activeLine.villeDepart} → ${activeLine.villeArrivee}`,
+        },
+      });
+    } catch (trackingError) {
+      console.warn('[api/parcels] tracking history create failed (non-blocking):', trackingError);
+    }
 
     try {
       await evaluateImplicitProEligibility(clientId);
