@@ -101,7 +101,8 @@ async function createLegacyColisRaw(data: {
       "netTransporteur",
       "qrCode",
       "status",
-      "dateLimit"
+      "dateLimit",
+      "updatedAt"
     ) VALUES (
       ${data.trackingNumber},
       ${data.clientId},
@@ -118,7 +119,8 @@ async function createLegacyColisRaw(data: {
       ${data.netTransporteur},
       ${data.qrCode},
       ${data.status},
-      ${data.dateLimit}
+      ${data.dateLimit},
+      NOW()
     )
     RETURNING
       "id",
@@ -145,6 +147,9 @@ async function createUltraLegacyColisRaw(data: {
   villeArrivee: string;
   format: 'PETIT' | 'MOYEN' | 'GROS';
   prixClient: number;
+  commissionPlateforme: number;
+  commissionRelais: number;
+  netTransporteur: number;
   qrCode: string;
   status: string;
 }) {
@@ -163,6 +168,15 @@ async function createUltraLegacyColisRaw(data: {
       "status",
       "createdAt",
       "updatedAt"
+      "format",
+      "prixClient",
+      "commissionPlateforme",
+      "commissionRelais",
+      "netTransporteur",
+      "qrCode",
+      "status",
+      "createdAt",
+      "updatedAt"
     ) VALUES (
       ${data.trackingNumber},
       ${data.clientId},
@@ -172,6 +186,9 @@ async function createUltraLegacyColisRaw(data: {
       ${data.villeArrivee},
       ${data.format},
       ${data.prixClient},
+      ${data.commissionPlateforme},
+      ${data.commissionRelais},
+      ${data.netTransporteur},
       ${data.qrCode},
       ${data.status},
       ${now},
@@ -790,6 +807,9 @@ export async function POST(request: NextRequest) {
       dateLimit: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
     };
     const ultraLegacyCreateData = {
+        commissionPlateforme: platformFee,
+        commissionRelais: relayFee,
+        netTransporteur,
       trackingNumber,
       clientId,
       relaisDepartId,
