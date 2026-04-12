@@ -112,6 +112,14 @@ function withNoVerifySslMode(url: string | null | undefined) {
 }
 
 export async function GET() {
+  // Neutralize ambient PG* variables so tests reflect the provided URLs only.
+  delete process.env.PGHOST;
+  delete process.env.PGPORT;
+  delete process.env.PGUSER;
+  delete process.env.PGPASSWORD;
+  delete process.env.PGDATABASE;
+  delete process.env.PGSSLMODE;
+
   const inferredProjectRef = inferSupabaseProjectRefFromDirectUrl();
   const fixedUrl = withNoVerifySslMode(
     withPoolerPasswordFromDirect(withPoolerUsernameFix(process.env.DATABASE_URL))

@@ -107,6 +107,16 @@ const shouldDisableTlsValidation =
   typeof databaseUrl === 'string' &&
   databaseUrl.includes('pooler.supabase.com')
 
+if (shouldDisableTlsValidation) {
+  // Prevent ambient PG* vars from overriding credentials encoded in DATABASE_URL.
+  delete process.env.PGHOST
+  delete process.env.PGPORT
+  delete process.env.PGUSER
+  delete process.env.PGPASSWORD
+  delete process.env.PGDATABASE
+  delete process.env.PGSSLMODE
+}
+
 if (shouldDisableTlsValidation && process.env.NODE_TLS_REJECT_UNAUTHORIZED !== '0') {
   process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'
   console.warn('[db] NODE_TLS_REJECT_UNAUTHORIZED=0 forced for Supabase pooler in production runtime.')
