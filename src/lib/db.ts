@@ -4,12 +4,34 @@ const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined
 }
 
+function inferSupabaseProjectRefFromDirectUrl(): string | null {
+  const directUrl = process.env.DIRECT_DATABASE_URL
+  if (!directUrl) return null
+
+  try {
+    const parsed = new URL(directUrl)
+    const match = parsed.hostname.match(/^db\.([a-z0-9]+)\.supabase\.co$/i)
+    return match?.[1] || null
+  } catch {
+    return null
+  }
+}
+
 function normalizeDatabaseUrl(url: string): string {
   try {
     const parsedUrl = new URL(url)
     const isSupabasePooler = parsedUrl.hostname.includes('pooler.supabase.com') || parsedUrl.port === '6543'
 
     if (isSupabasePooler) {
+      const username = decodeURIComponent(parsedUrl.username || '')
+      if (username === 'postgres') {
+        const projectRef = inferSupabaseProjectRefFromDirectUrl()
+        if (projectRef) {
+          parsedUrl.username = `postgres.${projectRef}`
+          console.warn('[db] DATABASE_URL pooler username fixed at runtime to postgres.<project_ref>.')
+        }
+      }
+
       if (!parsedUrl.searchParams.has('pgbouncer')) {
         parsedUrl.searchParams.set('pgbouncer', 'true')
       }
