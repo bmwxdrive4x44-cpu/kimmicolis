@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { hashPassword } from '@/lib/auth';
 import { requireRole } from '@/lib/rbac';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { isAlgerianCommerceRegisterNumber, normalizeCommerceRegisterNumber } from '@/lib/validators';
 import { checkRateLimit, RATE_LIMIT_PRESETS } from '@/lib/ratelimit';
 import { normalizeRole } from '@/lib/roles';
@@ -25,14 +23,38 @@ function isValidPhone(value: string): boolean {
   return /^\+?[0-9]{8,15}$/.test(value);
 }
 
+async function fetchUsersWithMinimalSelect() {
+  const users = await db.user.findMany({
+    select: {
+      id: true,
+      email: true,
+      name: true,
+      role: true,
+      createdAt: true,
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+
+  return users.map((user) => ({
+    ...user,
+    firstName: null,
+    lastName: null,
+    address: null,
+    phone: null,
+    siret: null,
+    isActive: true,
+    clientType: 'STANDARD',
+    relais: null,
+    enseigne: null,
+    transporterApplication: null,
+  }));
+}
+
 // GET all users (ADMIN ONLY)
 export async function GET(request: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-  if (session.user.role !== 'ADMIN') {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  const auth = await requireRole(request, ['ADMIN']);
+  if (!auth.success) {
+    return auth.response;
   }
 
   try {
@@ -131,35 +153,15 @@ export async function GET(request: NextRequest) {
           return NextResponse.json(users.map((user) => ({ ...user, clientType: 'STANDARD' })));
         } catch (fallbackError) {
           console.error('Fallback query failed:', fallbackError);
-          // Last resort: query without relais
-          const users = await db.user.findMany({
-            orderBy: { createdAt: 'desc' },
-          });
-          return NextResponse.json(
-            users.map((user) => ({
-              ...user,
-              clientType: 'STANDARD',
-              relais: null,
-              enseigne: null,
-              transporterApplication: null,
-            }))
-          );
+          // Last resort: use minimal known-safe fields to tolerate schema drift.
+          const users = await fetchUsersWithMinimalSelect();
+          return NextResponse.json(users);
         }
       } else {
-        // For any other error, try simple query without relations
+        // For any other error, use minimal known-safe fields.
         console.warn('Query with relais failed, retrying without relations:', error);
-        const users = await db.user.findMany({
-          orderBy: { createdAt: 'desc' },
-        });
-        return NextResponse.json(
-          users.map((user) => ({
-            ...user,
-            clientType: 'STANDARD',
-            relais: null,
-            enseigne: null,
-            transporterApplication: null,
-          }))
-        );
+        const users = await fetchUsersWithMinimalSelect();
+        return NextResponse.json(users);
       }
     }
   } catch (error) {
