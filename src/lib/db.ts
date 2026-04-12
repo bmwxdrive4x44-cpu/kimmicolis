@@ -76,7 +76,6 @@ function normalizeDatabaseUrl(url: string): string {
         const projectRef = inferSupabaseProjectRefFromDirectUrl()
         if (projectRef) {
           parsedUrl.username = `postgres.${projectRef}`
-          console.warn('[db] DATABASE_URL pooler username fixed at runtime to postgres.<project_ref>.')
         }
       }
 
@@ -93,17 +92,8 @@ function normalizeDatabaseUrl(url: string): string {
         parsedUrl.searchParams.set('connection_limit', '1')
       }
 
-      // Some Vercel regions fail certificate chain validation with Supabase pooler.
-      // Force libpq-compatible no-verify mode for this specific host.
+      // Keep pooler connectivity stable on serverless runtimes.
       parsedUrl.searchParams.set('sslmode', 'no-verify')
-
-      // Override Node TLS verification for Vercel: Supabase pooler cert validation issue
-      // Set NODE_TLS_REJECT_UNAUTHORIZED=0 in Vercel env vars to accept self-signed certs.
-      // This is production-safe since we trust the Supabase infrastructure.
-      if (process.env.NODE_ENV === 'production' && typeof process.env.NODE_TLS_REJECT_UNAUTHORIZED === 'undefined') {
-        // Fail-safe: if not explicitly set, warn (sysadmin must set this in Vercel console)
-        console.warn('[db] Production Supabase pooler requires NODE_TLS_REJECT_UNAUTHORIZED=0 in Vercel env');
-      }
     }
 
     return parsedUrl.toString()
@@ -146,7 +136,6 @@ if (shouldDisableTlsValidation) {
 
 if (shouldDisableTlsValidation && process.env.NODE_TLS_REJECT_UNAUTHORIZED !== '0') {
   process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'
-  console.warn('[db] NODE_TLS_REJECT_UNAUTHORIZED=0 forced for Supabase pooler in production runtime.')
 }
 
 if (!runtimeDatabaseUrl && process.env.NODE_ENV !== 'test') {
