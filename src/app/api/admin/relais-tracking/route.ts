@@ -17,23 +17,42 @@ export async function GET(request: NextRequest) {
     const sortBy = searchParams.get('sortBy') || 'reliabilityScore'; // reliabilityScore, moneyPending, delayCount
     const filterStatus = searchParams.get('filterStatus') || 'ALL'; // ALL, ACTIF, SUSPENDU
 
-    // Récupérer tous les relais avec stats
-    const relais = await db.relais.findMany({
-      include: {
-        user: { select: { id: true, name: true, email: true, phone: true } },
-        parcelsDepart: true,
-        parcelsArrivee: true,
-        cashTransactions: true,
-        sanctions: {
-          where: {
-            OR: [
-              { endDate: null },
-              { endDate: { gt: new Date() } },
-            ],
+    // Récupérer tous les relais avec stats.
+    // Some production environments can lag behind on newer relay/compliance migrations.
+    // We keep the endpoint available by retrying with a minimal compatible query.
+    let relais: any[] = [];
+    try {
+      relais = await db.relais.findMany({
+        include: {
+          user: { select: { id: true, name: true, email: true, phone: true } },
+          parcelsDepart: true,
+          parcelsArrivee: true,
+          cashTransactions: true,
+          sanctions: {
+            where: {
+              OR: [
+                { endDate: null },
+                { endDate: { gt: new Date() } },
+              ],
+            },
           },
         },
-      },
-    });
+      }) as any[];
+    } catch (queryError) {
+      console.warn('[admin/relais-tracking] full query failed, using compatibility fallback:', queryError);
+      relais = await db.relais.findMany({
+        select: {
+          id: true,
+          commerceName: true,
+          ville: true,
+          address: true,
+          status: true,
+          user: { select: { id: true, name: true, email: true, phone: true } },
+          parcelsDepart: true,
+          parcelsArrivee: true,
+        },
+      }) as any[];
+    }
 
     // Calculer les statistiques pour chaque relais
     const relaisWithStats = await Promise.all(
@@ -44,11 +63,12 @@ export async function GET(request: NextRequest) {
         const colisArrived = r.parcelsArrivee.filter((c: any) => c.status === 'LIVRE');
         const nbLivres = colisArrived.length;
 
-        const cashCollected = r.cashTransactions
+        const cashTransactions = Array.isArray(r.cashTransactions) ? r.cashTransactions : [];
+        const cashCollected = cashTransactions
           .filter((t: any) => t.type === 'COLLECTED')
           .reduce((sum: number, t: any) => sum + t.amount, 0);
 
-        const cashReversed = r.cashTransactions
+        const cashReversed = cashTransactions
           .filter((t: any) => t.type === 'REVERSED')
           .reduce((sum: number, t: any) => sum + t.amount, 0);
 
@@ -64,7 +84,8 @@ export async function GET(request: NextRequest) {
           0
         );
 
-        const amountToPay = Math.max(totalCommissionPlateforme - r.cashReversed, 0);
+        const relaisCashReversed = typeof r.cashReversed === 'number' ? r.cashReversed : 0;
+        const amountToPay = Math.max(totalCommissionPlateforme - relaisCashReversed, 0);
 
         const delayedParcels = r.parcelsDepart.filter((c: any) => {
           if (c.status === 'LIVRE' || c.status === 'ANNULE' || c.status === 'RETOUR') return false;
@@ -85,7 +106,7 @@ export async function GET(request: NextRequest) {
         reliabilityScore = Math.max(0, Math.min(100, reliabilityScore));
 
         const complianceScore = Math.round(r.complianceScore ?? 100);
-        const trial = getRelayTrialState(r.activationDate);
+        const trial = getRelayTrialState(r.activationDate ?? null);
         const trustLevel = complianceScore >= 90
           ? 'excellent'
           : complianceScore >= 75
@@ -96,7 +117,8 @@ export async function GET(request: NextRequest) {
 
         // Alertes
         const alerts: Array<{ level: 'warning' | 'critical', message: string }> = [];
-        if (r.operationalStatus === 'SUSPENDU') {
+        const operationalStatus = r.operationalStatus || 'ACTIF';
+        if (operationalStatus === 'SUSPENDU') {
           alerts.push({ level: 'critical', message: `Relais suspendu: ${r.suspensionReason || 'Raison non spécifiée'}` });
         }
         if (nbDelayed > 3) {
@@ -120,14 +142,14 @@ export async function GET(request: NextRequest) {
           commerceName: r.commerceName,
           ville: r.ville,
           address: r.address,
-          operationalStatus: r.operationalStatus,
+          operationalStatus,
           suspensionReason: r.suspensionReason,
           suspendedAt: r.suspendedAt,
           approvalStatus: r.status,
-          cautionStatus: r.cautionStatus,
-          cautionAmount: r.cautionAmount,
+          cautionStatus: r.cautionStatus || 'PENDING',
+          cautionAmount: r.cautionAmount || 0,
           trial,
-          activeSanctionsCount: r.sanctions.length,
+          activeSanctionsCount: Array.isArray(r.sanctions) ? r.sanctions.length : 0,
           trustLevel,
           contactName: r.user.name,
           phone: r.user.phone,
@@ -141,7 +163,7 @@ export async function GET(request: NextRequest) {
             commissionRelaisTotal: totalCommissionRelais,
             commissionPlateformeTotal: totalCommissionPlateforme,
             amountToPay,
-            amountPaid: r.cashReversed,
+            amountPaid: relaisCashReversed,
             nbDelayed,
             reliabilityScore: Math.round(reliabilityScore),
             complianceScore,
