@@ -789,7 +789,7 @@ function TransportersTab() {
   const { toast } = useToast();
   const [applications, setApplications] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [filter, setFilter] = useState('PENDING');
+  const [filter, setFilter] = useState('all');
   const [rejectReasons, setRejectReasons] = useState<Record<string, string>>({});
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [expandedDocs, setExpandedDocs] = useState<Record<string, boolean>>({});
@@ -1198,6 +1198,7 @@ function RelaysTab() {
       if (!response.ok) {
         throw new Error(data?.error || 'Impossible d\'approuver le relais');
       }
+      setFilter('APPROVED');
       toast({ title: 'Relais approuvé', description: 'La validation a été enregistrée.' });
       fetchRelais();
       fetchTracking();
@@ -1221,6 +1222,7 @@ function RelaysTab() {
       if (!response.ok) {
         throw new Error(data?.error || 'Impossible d\'approuver le relais en essai');
       }
+      setFilter('APPROVED');
       toast({
         title: 'Relais approuvé en essai',
         description: 'Période d\'essai activée (quota journalier appliqué).',
