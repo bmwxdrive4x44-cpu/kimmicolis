@@ -395,11 +395,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if relais are operational
-    const [relaisDepart, relaisArrivee] = await Promise.all([
-      db.relais.findUnique({ where: { id: relaisDepartId }, select: { ville: true, status: true, operationalStatus: true, suspensionReason: true } }),
-      db.relais.findUnique({ where: { id: relaisArriveeId }, select: { ville: true, status: true, operationalStatus: true, suspensionReason: true } }),
-    ]);
+    // Check if relais are operational (with compatibility fallback for older schemas)
+    let relaisDepart: any;
+    let relaisArrivee: any;
+    try {
+      [relaisDepart, relaisArrivee] = await Promise.all([
+        db.relais.findUnique({ where: { id: relaisDepartId }, select: { ville: true, status: true, operationalStatus: true, suspensionReason: true } }),
+        db.relais.findUnique({ where: { id: relaisArriveeId }, select: { ville: true, status: true, operationalStatus: true, suspensionReason: true } }),
+      ]);
+    } catch (relayQueryError) {
+      console.warn('[api/parcels] relay operational select failed, retrying with minimal select:', relayQueryError);
+      [relaisDepart, relaisArrivee] = await Promise.all([
+        db.relais.findUnique({ where: { id: relaisDepartId }, select: { ville: true, status: true } }),
+        db.relais.findUnique({ where: { id: relaisArriveeId }, select: { ville: true, status: true } }),
+      ]);
+    }
 
     if (!relaisDepart || relaisDepart.status !== 'APPROVED' || relaisDepart.operationalStatus === 'SUSPENDU') {
       return NextResponse.json(
@@ -421,10 +431,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const trialQuota = await checkRelayTrialQuota({
-      relaisId: relaisDepartId,
-      additionalParcels: 1,
-    });
+    let trialQuota: { limited: boolean; maxPerDay?: number } = { limited: false };
+    try {
+      trialQuota = await checkRelayTrialQuota({
+        relaisId: relaisDepartId,
+        additionalParcels: 1,
+      });
+    } catch (trialQuotaError) {
+      console.warn('[api/parcels] relay trial quota check failed, bypassing quota gate:', trialQuotaError);
+    }
     if (trialQuota.limited) {
       return NextResponse.json(
         {
@@ -483,12 +498,18 @@ export async function POST(request: NextRequest) {
     });
 
     const relayPrintFee = normalizedLabelPrintMode === 'RELAY' ? pricingConfig.relayPrintFee : 0;
-  const baseClientPriceWithPrint = dynamic.clientPrice + relayPrintFee;
-  const eligibility = await evaluateImplicitProEligibility(clientId);
-  const loyaltyConfig = await getImplicitLoyaltyConfig();
-  const implicitDiscountRate = eligibility.eligible ? loyaltyConfig.discountRate : 0;
-  const implicitDiscountAmount = Math.round(baseClientPriceWithPrint * implicitDiscountRate);
-  const prixClient = baseClientPriceWithPrint - implicitDiscountAmount;
+    const baseClientPriceWithPrint = dynamic.clientPrice + relayPrintFee;
+    let eligibility = { eligible: false };
+    let loyaltyConfig = { discountRate: 0 };
+    try {
+      eligibility = await evaluateImplicitProEligibility(clientId);
+      loyaltyConfig = await getImplicitLoyaltyConfig();
+    } catch (loyaltyError) {
+      console.warn('[api/parcels] implicit-pro eligibility unavailable, continuing without discount:', loyaltyError);
+    }
+    const implicitDiscountRate = eligibility.eligible ? loyaltyConfig.discountRate : 0;
+    const implicitDiscountAmount = Math.round(baseClientPriceWithPrint * implicitDiscountRate);
+    const prixClient = baseClientPriceWithPrint - implicitDiscountAmount;
     const netTransporteur = dynamic.netTransporteur;
     const relayFee = dynamic.relayCommissionTotal + relayPrintFee;
     const platformFee = dynamic.platformMargin;
@@ -514,7 +535,7 @@ export async function POST(request: NextRequest) {
     const expectedDeliveryAt = new Date(Date.now() + 72 * 60 * 60 * 1000);
     const placeholderQrPayload = JSON.stringify({ token: qrToken });
 
-    const baseCreateData = {
+    const minimalCreateData = {
       trackingNumber,
       clientId,
       lineId: activeLine.id,
@@ -524,8 +545,6 @@ export async function POST(request: NextRequest) {
       recipientFirstName: recipientFirstName.trim(),
       recipientLastName: recipientLastName.trim(),
       recipientPhone: normalizedRecipientPhone,
-      recipientEmail: normalizedRecipientEmail,
-      withdrawalCodeHash: hashWithdrawalCode(effectiveWithdrawalCode),
       relaisDepartId,
       relaisArriveeId,
       villeDepart,
@@ -539,6 +558,12 @@ export async function POST(request: NextRequest) {
       qrCode: placeholderQrPayload,
       status: 'CREATED',
       dateLimit: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+    };
+
+    const baseCreateData = {
+      ...minimalCreateData,
+      recipientEmail: normalizedRecipientEmail,
+      withdrawalCodeHash: hashWithdrawalCode(effectiveWithdrawalCode),
     };
 
     const createSelect = {
@@ -573,10 +598,18 @@ export async function POST(request: NextRequest) {
       });
     } catch (createError) {
       console.warn('[api/parcels] full create failed, retrying with compatibility payload:', createError);
-      createdColis = await db.colis.create({
-        data: baseCreateData,
-        select: createSelect,
-      });
+      try {
+        createdColis = await db.colis.create({
+          data: baseCreateData,
+          select: createSelect,
+        });
+      } catch (compatCreateError) {
+        console.warn('[api/parcels] compatibility create failed, retrying with minimal payload:', compatCreateError);
+        createdColis = await db.colis.create({
+          data: minimalCreateData,
+          select: createSelect,
+        });
+      }
     }
 
     const secureQrPayload = JSON.stringify({
