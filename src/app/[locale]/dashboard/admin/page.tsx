@@ -154,8 +154,8 @@ export default function AdminDashboard() {
 
           <DashboardPanel tone="admin">
             <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <div className="mb-6 overflow-x-auto pb-1">
-                <TabsList className={`${dashboardTabsListClass} mb-0 inline-flex h-auto w-max min-w-full flex-nowrap`}>
+              <div className="mb-6 overflow-x-auto pb-1 md:overflow-visible md:pb-0">
+                <TabsList className={`${dashboardTabsListClass} mb-0 inline-flex h-auto w-max min-w-full flex-nowrap md:w-full md:min-w-0 md:flex-wrap`}>
                   <TabsTrigger value="overview" className={`${getDashboardTabsTriggerClass('admin')} shrink-0 whitespace-nowrap`}><BarChart3 className="h-4 w-4 mr-2" />Vue d'ensemble</TabsTrigger>
                   <TabsTrigger value="users" className={`${getDashboardTabsTriggerClass('admin')} shrink-0 whitespace-nowrap`}><Users className="h-4 w-4 mr-2" />Utilisateurs</TabsTrigger>
                   <TabsTrigger value="parcels" className={`${getDashboardTabsTriggerClass('admin')} shrink-0 whitespace-nowrap`}><Package className="h-4 w-4 mr-2" />Colis</TabsTrigger>
