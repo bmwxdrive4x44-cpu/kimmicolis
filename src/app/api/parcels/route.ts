@@ -584,9 +584,6 @@ export async function POST(request: NextRequest) {
       villeArrivee: true,
       status: true,
       prixClient: true,
-      dateLimit: true,
-      qrCode: true,
-      qrCodeImage: true,
       createdAt: true,
     };
 
@@ -628,7 +625,12 @@ export async function POST(request: NextRequest) {
       pin: withdrawalPin, // Include PIN in QR payload
       expiresAt: qrExpiresAt.toISOString(),
     });
-    const qrCodeImage = await generateQRCodeImage(secureQrPayload);
+    let qrCodeImage = '';
+    try {
+      qrCodeImage = await generateQRCodeImage(secureQrPayload);
+    } catch (qrError) {
+      console.warn('[api/parcels] QR image generation failed, continuing without image:', qrError);
+    }
 
     errorStep = 'UPDATE_COLIS_QR';
     let colis;
@@ -637,7 +639,7 @@ export async function POST(request: NextRequest) {
         where: { id: createdColis.id },
         data: {
           qrCode: secureQrPayload,
-          qrCodeImage,
+          qrCodeImage: qrCodeImage || null,
         },
         select: createSelect,
       });

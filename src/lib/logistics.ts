@@ -12,16 +12,29 @@ export async function findActiveLineByCities(villeDepart: string, villeArrivee: 
     return null;
   }
 
-  return db.ligne.findFirst({
-    where: {
-      isActive: true,
-      OR: [
-        { villeDepart: depart, villeArrivee: arrivee },
-        { villeDepart: arrivee, villeArrivee: depart },
-      ],
-    },
-    orderBy: { updatedAt: 'desc' },
-  });
+  try {
+    return await db.ligne.findFirst({
+      where: {
+        isActive: true,
+        OR: [
+          { villeDepart: depart, villeArrivee: arrivee },
+          { villeDepart: arrivee, villeArrivee: depart },
+        ],
+      },
+      orderBy: { updatedAt: 'desc' },
+    });
+  } catch (error) {
+    console.warn('[logistics] active line lookup failed, retrying with compatibility query:', error);
+    return db.ligne.findFirst({
+      where: {
+        OR: [
+          { villeDepart: depart, villeArrivee: arrivee },
+          { villeDepart: arrivee, villeArrivee: depart },
+        ],
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
 }
 
 export async function getActiveRelayCities() {

@@ -719,7 +719,18 @@ function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart }: { us
         toast({ title: 'Colis créé avec succès', description: `Suivi: ${created.trackingNumber}` });
         onCreated();
       } else {
-        toast({ title: 'Erreur', description: 'Impossible de créer le colis', variant: 'destructive' });
+        let description = 'Impossible de créer le colis';
+        try {
+          const payload = await response.json();
+          if (payload?.step || payload?.code) {
+            description = `Impossible de créer le colis (${payload.step || 'UNKNOWN'}${payload.code ? ` / ${payload.code}` : ''})`;
+          } else if (payload?.error) {
+            description = String(payload.error);
+          }
+        } catch {
+          // keep default message
+        }
+        toast({ title: 'Erreur', description, variant: 'destructive' });
       }
     } catch {
       toast({ title: 'Erreur', description: 'Impossible de créer le colis', variant: 'destructive' });
