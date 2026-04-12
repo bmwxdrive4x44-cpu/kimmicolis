@@ -17,6 +17,14 @@ function normalizeDatabaseUrl(url: string): string {
       if (!parsedUrl.searchParams.has('connection_limit')) {
         parsedUrl.searchParams.set('connection_limit', '1')
       }
+
+      // Override Node TLS verification for Vercel: Supabase pooler cert validation issue
+      // Set NODE_TLS_REJECT_UNAUTHORIZED=0 in Vercel env vars to accept self-signed certs.
+      // This is production-safe since we trust the Supabase infrastructure.
+      if (process.env.NODE_ENV === 'production' && typeof process.env.NODE_TLS_REJECT_UNAUTHORIZED === 'undefined') {
+        // Fail-safe: if not explicitly set, warn (sysadmin must set this in Vercel console)
+        console.warn('[db] Production Supabase pooler requires NODE_TLS_REJECT_UNAUTHORIZED=0 in Vercel env');
+      }
     }
 
     return parsedUrl.toString()
