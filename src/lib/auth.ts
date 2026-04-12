@@ -272,6 +272,22 @@ export function passwordNeedsRehash(hashedPassword: string): boolean {
   return !isBcryptHash(hashedPassword);
 }
 
+async function safeCreateActionLog(data: {
+  userId?: string;
+  entityType: string;
+  entityId: string;
+  action: string;
+  details?: string;
+  ipAddress?: string;
+}) {
+  try {
+    await db.actionLog.create({ data });
+  } catch (error) {
+    // Logging must never block authentication flow.
+    console.warn('[auth] action log write skipped:', error);
+  }
+}
+
 // Configuration NextAuth
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -295,19 +311,17 @@ export const authOptions: NextAuthOptions = {
         });
 
         if (blockedIdentity) {
-          await db.actionLog.create({
-            data: {
-              entityType: 'USER',
-              entityId: blockedIdentity.sourceUserId || normalizedEmail,
-              action: 'LOGIN_BLOCKED_BANNED_IDENTITY',
-              details: JSON.stringify({
-                email: normalizedEmail,
-                ipAddress: clientIp,
-                blockedType: blockedIdentity.type,
-                reason: describeBlockedIdentity(blockedIdentity),
-              }),
-              ipAddress: clientIp || undefined,
-            },
+          await safeCreateActionLog({
+            entityType: 'USER',
+            entityId: blockedIdentity.sourceUserId || normalizedEmail,
+            action: 'LOGIN_BLOCKED_BANNED_IDENTITY',
+            details: JSON.stringify({
+              email: normalizedEmail,
+              ipAddress: clientIp,
+              blockedType: blockedIdentity.type,
+              reason: describeBlockedIdentity(blockedIdentity),
+            }),
+            ipAddress: clientIp || undefined,
           });
 
           throw new Error(`BANNED_IDENTITY:${blockedIdentity.type}`);
@@ -365,15 +379,13 @@ export const authOptions: NextAuthOptions = {
             reason: 'Relais suspendu - bannissement appliqué lors de la tentative de connexion',
           });
 
-          await db.actionLog.create({
-            data: {
-              userId: user.id,
-              entityType: 'RELAIS',
-              entityId: user.relais.id,
-              action: 'LOGIN_BLOCKED_SUSPENDED_RELAY',
-              details: JSON.stringify({ email: user.email, ipAddress: clientIp }),
-              ipAddress: clientIp || undefined,
-            },
+          await safeCreateActionLog({
+            userId: user.id,
+            entityType: 'RELAIS',
+            entityId: user.relais.id,
+            action: 'LOGIN_BLOCKED_SUSPENDED_RELAY',
+            details: JSON.stringify({ email: user.email, ipAddress: clientIp }),
+            ipAddress: clientIp || undefined,
           });
 
           throw new Error('BANNED_IDENTITY:EMAIL');
@@ -387,15 +399,13 @@ export const authOptions: NextAuthOptions = {
           });
         }
 
-        await db.actionLog.create({
-          data: {
-            userId: user.id,
-            entityType: 'USER',
-            entityId: user.id,
-            action: 'LOGIN_SUCCESS',
-            details: JSON.stringify({ role: normalizeRole(user.role), email: user.email }),
-            ipAddress: clientIp || undefined,
-          },
+        await safeCreateActionLog({
+          userId: user.id,
+          entityType: 'USER',
+          entityId: user.id,
+          action: 'LOGIN_SUCCESS',
+          details: JSON.stringify({ role: normalizeRole(user.role), email: user.email }),
+          ipAddress: clientIp || undefined,
         });
 
         return {
