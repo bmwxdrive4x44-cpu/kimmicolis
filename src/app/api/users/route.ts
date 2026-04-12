@@ -272,6 +272,7 @@ export async function POST(request: NextRequest) {
     // Check if user exists
     const existingUser = await db.user.findUnique({
       where: { email: normalizedEmail },
+      select: { id: true },
     });
 
     if (existingUser) {
@@ -299,6 +300,15 @@ export async function POST(request: NextRequest) {
         // Transporter accounts can be created first, then complete the RC in the application flow.
         siret: normalizedRole === 'TRANSPORTER' ? (normalizedSiret || null) : null,
         isActive: normalizedRole === 'ADMIN',
+      },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        firstName: true,
+        lastName: true,
+        address: true,
+        role: true,
       },
     });
 
