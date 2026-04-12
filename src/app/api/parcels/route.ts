@@ -180,28 +180,88 @@ export async function GET(request: NextRequest) {
       where.trackingNumber = tracking;
     }
 
-    const parcels = await db.colis.findMany({
-      where,
-      include: {
-        line: true,
-        client: {
-          select: { id: true, name: true, email: true, phone: true },
+    let parcels: any[] = [];
+    try {
+      parcels = await db.colis.findMany({
+        where,
+        include: {
+          line: true,
+          client: {
+            select: { id: true, name: true, email: true, phone: true },
+          },
+          relaisDepart: {
+            include: { user: { select: { name: true, phone: true } } },
+          },
+          relaisArrivee: {
+            include: { user: { select: { name: true, phone: true } } },
+          },
+          missions: {
+            include: {
+              transporteur: { select: { id: true, name: true, phone: true } },
+            },
+          },
+          trackingHistory: { orderBy: { createdAt: 'desc' } },
         },
-        relaisDepart: {
-          include: { user: { select: { name: true, phone: true } } },
-        },
-        relaisArrivee: {
-          include: { user: { select: { name: true, phone: true } } },
-        },
-        missions: {
-          include: {
-            transporteur: { select: { id: true, name: true, phone: true } },
+        orderBy: { createdAt: 'desc' },
+      }) as any[];
+    } catch (queryError) {
+      console.warn('[api/parcels] full query failed, using compatibility fallback:', queryError);
+      parcels = await db.colis.findMany({
+        where,
+        select: {
+          id: true,
+          trackingNumber: true,
+          clientId: true,
+          relaisDepartId: true,
+          relaisArriveeId: true,
+          villeDepart: true,
+          villeArrivee: true,
+          weight: true,
+          description: true,
+          status: true,
+          prixClient: true,
+          createdAt: true,
+          dateLimit: true,
+          qrCodeImage: true,
+          recipientFirstName: true,
+          recipientLastName: true,
+          recipientPhone: true,
+          recipientEmail: true,
+          relaisDepart: {
+            select: {
+              id: true,
+              commerceName: true,
+              address: true,
+              ville: true,
+              status: true,
+              operationalStatus: true,
+              user: { select: { name: true, phone: true } },
+            },
+          },
+          relaisArrivee: {
+            select: {
+              id: true,
+              commerceName: true,
+              address: true,
+              ville: true,
+              status: true,
+              operationalStatus: true,
+              user: { select: { name: true, phone: true } },
+            },
+          },
+          trackingHistory: {
+            select: {
+              id: true,
+              status: true,
+              notes: true,
+              createdAt: true,
+            },
+            orderBy: { createdAt: 'desc' },
           },
         },
-        trackingHistory: { orderBy: { createdAt: 'desc' } },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+        orderBy: { createdAt: 'desc' },
+      }) as any[];
+    }
 
     const parcelsForExternalRoles = payload.role === 'CLIENT' || payload.role === 'TRANSPORTER'
       ? parcels.map((parcel) => sanitizeParcelRelaysForExternal(parcel))

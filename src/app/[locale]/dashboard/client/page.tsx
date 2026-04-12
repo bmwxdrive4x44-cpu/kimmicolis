@@ -91,7 +91,8 @@ function ClientDashboardContent() {
         fetch('/api/loyalty/status'),
       ]);
 
-      const parcels = await parcelsRes.json();
+      const parcelsPayload = await parcelsRes.json();
+      const parcels = Array.isArray(parcelsPayload) ? parcelsPayload : [];
       const loyalty = await loyaltyRes.json();
 
       setCartCount(parcels.filter((p: any) => p.status === 'CREATED').length);
@@ -411,7 +412,8 @@ function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart }: { us
   const fetchRelais = async () => {
     try {
       const response = await fetch('/api/relais?status=APPROVED');
-      setRelais(await response.json());
+      const payload = await response.json();
+      setRelais(Array.isArray(payload) ? payload : []);
     } catch (error) {
       console.error('Error fetching relais:', error);
     }
@@ -1476,8 +1478,10 @@ function PaymentTab({ userId }: { userId: string }) {
         fetch(`/api/parcels?clientId=${userId}&status=CREATED`),
         fetch('/api/relais?status=APPROVED'),
       ]);
-      const parcelData = await parcelRes.json();
-      const relaisData = await relaisRes.json();
+      const parcelPayload = await parcelRes.json();
+      const relaisPayload = await relaisRes.json();
+      const parcelData = Array.isArray(parcelPayload) ? parcelPayload : [];
+      const relaisData = Array.isArray(relaisPayload) ? relaisPayload : [];
       
       // Map relais by ID for quick lookup
       const map = relaisData.reduce((acc: Record<string, any>, r: any) => {
@@ -1628,7 +1632,8 @@ function ParcelHistory({ userId, onTrack }: { userId: string; onTrack: (tn: stri
   const fetchColis = async () => {
     try {
       const response = await fetch(`/api/parcels?clientId=${userId}`);
-      setColis(await response.json());
+      const payload = await response.json();
+      setColis(Array.isArray(payload) ? payload : []);
     } catch (error) {
       console.error('Error fetching parcels:', error);
     } finally {
