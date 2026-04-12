@@ -1,108 +1,124 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { db } from '@/lib/db';
-import { normalizeRole } from '@/lib/roles';
+import { requireRole } from '@/lib/rbac';
 import { sendEmail } from '@/lib/email';
 
-async function requireAdmin() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) return null;
+function isMissingContactMessageTableError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error || '');
+  const maybeCode = (error as { code?: string } | null)?.code;
 
-  if (normalizeRole(session.user.role) === 'ADMIN') {
-    return session;
+  if (maybeCode === 'P2021' && message.toLowerCase().includes('contactmessage')) {
+    return true;
   }
 
-  const dbUser = await db.user.findUnique({
-    where: { id: session.user.id },
-    select: { role: true },
-  });
-
-  if (normalizeRole(dbUser?.role) !== 'ADMIN') return null;
-  return session;
+  return (
+    message.includes('The table') &&
+    message.includes('ContactMessage') &&
+    message.includes('does not exist')
+  );
 }
 
 // GET — liste des messages (avec filtre isRead optionnel)
 export async function GET(request: NextRequest) {
-  const session = await requireAdmin();
-  if (!session) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  const auth = await requireRole(request, ['ADMIN']);
+  if (!auth.success) return auth.response;
+
+  try {
+    const { searchParams } = new URL(request.url);
+    const filter = searchParams.get('filter'); // 'unread' | 'read' | null (all)
+    const page = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10));
+    const limit = 20;
+
+    const where =
+      filter === 'unread' ? { isRead: false }
+      : filter === 'read' ? { isRead: true }
+      : {};
+
+    const [messages, total] = await Promise.all([
+      db.contactMessage.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      db.contactMessage.count({ where }),
+    ]);
+
+    return NextResponse.json({ messages, total, page, limit });
+  } catch (error) {
+    if (isMissingContactMessageTableError(error)) {
+      return NextResponse.json({ messages: [], total: 0, page: 1, limit: 20, degraded: true });
+    }
+
+    console.error('[admin/messages GET] error:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch messages', detail: error instanceof Error ? error.message : String(error) },
+      { status: 500 }
+    );
   }
-
-  const { searchParams } = new URL(request.url);
-  const filter = searchParams.get('filter'); // 'unread' | 'read' | null (all)
-  const page = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10));
-  const limit = 20;
-
-  const where =
-    filter === 'unread' ? { isRead: false }
-    : filter === 'read' ? { isRead: true }
-    : {};
-
-  const [messages, total] = await Promise.all([
-    db.contactMessage.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-      skip: (page - 1) * limit,
-      take: limit,
-    }),
-    db.contactMessage.count({ where }),
-  ]);
-
-  return NextResponse.json({ messages, total, page, limit });
 }
 
 // PATCH — marquer comme lu / non-lu
 export async function PATCH(request: NextRequest) {
-  const session = await requireAdmin();
-  if (!session) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  const auth = await requireRole(request, ['ADMIN']);
+  if (!auth.success) return auth.response;
+
+  try {
+    const body = await request.json();
+    const id = typeof body?.id === 'string' ? body.id : null;
+    const isRead = typeof body?.isRead === 'boolean' ? body.isRead : true;
+
+    if (!id) {
+      return NextResponse.json({ error: 'id requis.' }, { status: 400 });
+    }
+
+    const updated = await db.contactMessage.update({
+      where: { id },
+      data: {
+        isRead,
+        ...(isRead ? { repliedAt: body?.replied ? new Date() : undefined } : {}),
+      },
+    });
+
+    return NextResponse.json(updated);
+  } catch (error) {
+    console.error('[admin/messages PATCH] error:', error);
+    return NextResponse.json(
+      { error: 'Failed to update message', detail: error instanceof Error ? error.message : String(error) },
+      { status: 500 }
+    );
   }
-
-  const body = await request.json();
-  const id = typeof body?.id === 'string' ? body.id : null;
-  const isRead = typeof body?.isRead === 'boolean' ? body.isRead : true;
-
-  if (!id) {
-    return NextResponse.json({ error: 'id requis.' }, { status: 400 });
-  }
-
-  const updated = await db.contactMessage.update({
-    where: { id },
-    data: {
-      isRead,
-      ...(isRead ? { repliedAt: body?.replied ? new Date() : undefined } : {}),
-    },
-  });
-
-  return NextResponse.json(updated);
 }
 
 // DELETE — supprimer un message
 export async function DELETE(request: NextRequest) {
-  const session = await requireAdmin();
-  if (!session) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  const auth = await requireRole(request, ['ADMIN']);
+  if (!auth.success) return auth.response;
+
+  try {
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+
+    if (!id) {
+      return NextResponse.json({ error: 'id requis.' }, { status: 400 });
+    }
+
+    await db.contactMessage.delete({ where: { id } });
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('[admin/messages DELETE] error:', error);
+    return NextResponse.json(
+      { error: 'Failed to delete message', detail: error instanceof Error ? error.message : String(error) },
+      { status: 500 }
+    );
   }
-
-  const { searchParams } = new URL(request.url);
-  const id = searchParams.get('id');
-
-  if (!id) {
-    return NextResponse.json({ error: 'id requis.' }, { status: 400 });
-  }
-
-  await db.contactMessage.delete({ where: { id } });
-  return NextResponse.json({ success: true });
 }
 
 // POST — envoyer une réponse par email
 export async function POST(request: NextRequest) {
   try {
-    const session = await requireAdmin();
-    if (!session) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
+    const auth = await requireRole(request, ['ADMIN']);
+    if (!auth.success) return auth.response;
 
     const body = await request.json();
     const id = typeof body?.id === 'string' ? body.id : null;
