@@ -29,8 +29,8 @@ jobs:
           --health-timeout=5s
           --health-retries=5
     env:
-      DATABASE_URL: ${{ secrets.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/swiftcolis?schema=public' }}
-      DIRECT_DATABASE_URL: ${{ secrets.DIRECT_DATABASE_URL || secrets.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/swiftcolis?schema=public' }}
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/swiftcolis?schema=public
+      DIRECT_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/swiftcolis?schema=public
       NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET || 'ci-nextauth-secret-not-for-prod' }}
       NEXTAUTH_URL: http://127.0.0.1:3000
       NEXT_PUBLIC_APP_URL: http://127.0.0.1:3000
@@ -57,6 +57,9 @@ jobs:
 
       - name: Prepare database schema
         run: npx prisma migrate deploy || npx prisma db push
+
+      - name: Seed demo users for smoke
+        run: npm run db:seed:demo -- --yes
 
       - name: Typecheck
         run: npm run typecheck
