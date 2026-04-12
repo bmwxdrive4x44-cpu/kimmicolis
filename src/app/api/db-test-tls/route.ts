@@ -77,6 +77,25 @@ function withPoolerPasswordFromDirect(url: string | null | undefined) {
   }
 }
 
+function buildPoolerUrlFromDirectUrl(url: string | null | undefined) {
+  if (!url) return url;
+  const projectRef = inferSupabaseProjectRefFromDirectUrl();
+  const password = inferSupabasePasswordFromDirectUrl();
+  if (!projectRef || !password) return url;
+
+  try {
+    const parsed = new URL(url);
+    const dbName = parsed.pathname || '/postgres';
+    const rebuilt = new URL(`postgresql://postgres.${projectRef}:${encodeURIComponent(password)}@aws-1-eu-west-1.pooler.supabase.com:6543${dbName}`);
+    rebuilt.searchParams.set('sslmode', 'no-verify');
+    rebuilt.searchParams.set('pgbouncer', 'true');
+    rebuilt.searchParams.set('connection_limit', '1');
+    return rebuilt.toString();
+  } catch {
+    return url;
+  }
+}
+
 async function testPgWithOptions(url: string | null | undefined, label: string, options: any = {}) {
   if (!url) {
     return { ok: false, error: 'URL_NOT_SET', label };
@@ -122,7 +141,9 @@ export async function GET() {
 
   const inferredProjectRef = inferSupabaseProjectRefFromDirectUrl();
   const fixedUrl = withNoVerifySslMode(
-    withPoolerPasswordFromDirect(withPoolerUsernameFix(process.env.DATABASE_URL))
+    buildPoolerUrlFromDirectUrl(
+      withPoolerPasswordFromDirect(withPoolerUsernameFix(process.env.DATABASE_URL))
+    )
   );
   let fixedUsername: string | null = null;
   try {

@@ -43,6 +43,28 @@ function inferSupabasePasswordFromDirectUrl(): string | null {
   }
 }
 
+function buildPoolerUrlFromDirectUrl(): string | null {
+  const directUrl = process.env.DIRECT_DATABASE_URL
+  if (!directUrl) return null
+
+  const projectRef = inferSupabaseProjectRefFromDirectUrl()
+  const password = inferSupabasePasswordFromDirectUrl()
+  if (!projectRef || !password) return null
+
+  try {
+    const directParsed = new URL(directUrl)
+    const dbName = directParsed.pathname || '/postgres'
+
+    const pooler = new URL(`postgresql://postgres.${projectRef}:${encodeURIComponent(password)}@aws-1-eu-west-1.pooler.supabase.com:6543${dbName}`)
+    pooler.searchParams.set('sslmode', 'no-verify')
+    pooler.searchParams.set('pgbouncer', 'true')
+    pooler.searchParams.set('connection_limit', '1')
+    return pooler.toString()
+  } catch {
+    return null
+  }
+}
+
 function normalizeDatabaseUrl(url: string): string {
   try {
     const parsedUrl = new URL(url)
@@ -102,10 +124,15 @@ function isSupabaseDirect5432(url: string): boolean {
 // Runtime should use DATABASE_URL (typically Supabase pooler on Vercel).
 // DIRECT_DATABASE_URL is mainly for Prisma CLI/migrations and must not be used by runtime in production.
 const databaseUrl = process.env.DATABASE_URL
+const rebuiltPoolerUrl = buildPoolerUrlFromDirectUrl()
+const runtimeDatabaseUrl =
+  process.env.NODE_ENV === 'production' && rebuiltPoolerUrl
+    ? rebuiltPoolerUrl
+    : databaseUrl
 const shouldDisableTlsValidation =
   process.env.NODE_ENV === 'production' &&
-  typeof databaseUrl === 'string' &&
-  databaseUrl.includes('pooler.supabase.com')
+  typeof runtimeDatabaseUrl === 'string' &&
+  runtimeDatabaseUrl.includes('pooler.supabase.com')
 
 if (shouldDisableTlsValidation) {
   // Prevent ambient PG* vars from overriding credentials encoded in DATABASE_URL.
@@ -122,7 +149,7 @@ if (shouldDisableTlsValidation && process.env.NODE_TLS_REJECT_UNAUTHORIZED !== '
   console.warn('[db] NODE_TLS_REJECT_UNAUTHORIZED=0 forced for Supabase pooler in production runtime.')
 }
 
-if (!databaseUrl && process.env.NODE_ENV !== 'test') {
+if (!runtimeDatabaseUrl && process.env.NODE_ENV !== 'test') {
   // During build time (no DB URL available), we use a placeholder to allow compilation.
   // At runtime, if DATABASE_URL is missing, queries will fail with a clear connection error.
   if (typeof window === 'undefined' && process.env.NEXT_PHASE !== 'phase-production-build') {
@@ -130,7 +157,7 @@ if (!databaseUrl && process.env.NODE_ENV !== 'test') {
   }
 }
 
-if (process.env.NODE_ENV === 'production' && databaseUrl && isSupabaseDirect5432(databaseUrl)) {
+if (process.env.NODE_ENV === 'production' && runtimeDatabaseUrl && isSupabaseDirect5432(runtimeDatabaseUrl)) {
   throw new Error('[db] Invalid DATABASE_URL for production runtime: direct Supabase host :5432 detected. Use Supabase pooler :6543.')
 }
 
@@ -139,7 +166,7 @@ if (process.env.NODE_ENV === 'production' && databaseUrl && isSupabaseDirect5432
 // This placeholder ONLY prevents a Prisma constructor validation error at build time.
 const resolvedUrl =
   normalizeDatabaseUrl(
-    databaseUrl || 'postgresql://localhost:5432/placeholder_build_only?schema=public'
+    runtimeDatabaseUrl || 'postgresql://localhost:5432/placeholder_build_only?schema=public'
   )
 
 export const db =
