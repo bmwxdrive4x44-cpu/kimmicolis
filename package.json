@@ -27,6 +27,7 @@
     "db:users:transfer:no-demo": "node scripts/clone-local-users-to-target.cjs --yes --wipe-target --exclude-demo",
     "db:users:transfer:no-demo:dry": "node scripts/clone-local-users-to-target.cjs --yes --dry-run --exclude-demo",
     "db:reset": "prisma migrate reset",
+    "release:check": "powershell -ExecutionPolicy Bypass -File ./scripts/release-check.ps1",
     "admin:reset": "node scripts/reset-admin-dashboard.mjs --yes",
     "prepare": "husky",
     "postinstall": "node scripts/prisma-generate.mjs"
