@@ -20,6 +20,7 @@
     "db:migrate:status": "prisma migrate status",
     "db:migrate:deploy": "prisma migrate deploy",
     "db:prod:fix-actionlog": "prisma db execute --schema prisma/schema.prisma --file ./scripts/prod-fix-actionlog-eventid.sql",
+    "db:prod:fix-user-clienttype": "prisma db execute --schema prisma/schema.prisma --file ./scripts/prod-fix-user-clienttype.sql",
     "db:seed:demo": "node scripts/seed-demo-users.cjs --yes",
     "db:users:transfer": "node scripts/clone-local-users-to-target.cjs --yes --wipe-target",
     "db:users:transfer:dry": "node scripts/clone-local-users-to-target.cjs --yes --dry-run",
