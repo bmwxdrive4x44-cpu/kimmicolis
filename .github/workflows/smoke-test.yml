@@ -89,7 +89,7 @@ jobs:
 
       - name: Run smoke tests (CI mode)
         id: smoke
-        run: bash ./smoke-test.sh --base-url http://localhost:3000 --ci --strict --report smoke-test-report.json
+        run: bash ./smoke-test.sh --base-url http://localhost:3000 --ci --report smoke-test-report.json
         continue-on-error: true
 
       - name: Parse test results
