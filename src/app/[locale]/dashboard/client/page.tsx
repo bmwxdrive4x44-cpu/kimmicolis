@@ -1010,12 +1010,15 @@ function ProfilClientTab({ userId }: { userId: string }) {
       if (passwordForm.password.length < 8) {
         errors.password = 'Le mot de passe doit contenir au moins 8 caractères';
       }
-      if (!passwordForm.confirm) {
-        errors.confirm = 'Veuillez confirmer le mot de passe';
-      } else if (passwordForm.password !== passwordForm.confirm) {
-        errors.confirm = 'Les mots de passe ne correspondent pas';
+      if (passwordForm.confirm || passwordForm.password) {
+        if (!passwordForm.confirm) {
+          errors.confirm = 'Veuillez confirmer le mot de passe';
+        } else if (passwordForm.password !== passwordForm.confirm) {
+          errors.confirm = 'Les mots de passe ne correspondent pas';
+        }
       }
     } else if (passwordForm.confirm) {
+      // Si on tape dans la confirmation sans mot de passe, message d'erreur
       errors.password = 'Saisissez un mot de passe avant la confirmation';
     }
 
