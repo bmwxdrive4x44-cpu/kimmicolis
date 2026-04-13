@@ -81,15 +81,6 @@ export function QrCameraScanner({ onScan, disabled = false, onError }: QrCameraS
           testStream?.getTracks().forEach((t) => t.stop());
         }
 
-        if (cancelled) return;
-
-        const qrScanner = new Html5Qrcode(SCANNER_ELEMENT_ID);
-        if (cancelled) {
-          try { qrScanner.clear(); } catch { /* ignore */ }
-          return;
-        }
-        scannerRef.current = qrScanner;
-
         const onDecoded = (decodedText: string) => {
           onScanRef.current(decodedText);
           stopScanner().then(() => {
@@ -121,33 +112,35 @@ export function QrCameraScanner({ onScan, disabled = false, onError }: QrCameraS
           ...cameras.map((camera) => camera.id),
         ].filter((id, idx, arr): id is string => Boolean(id) && arr.indexOf(id) === idx);
 
+        const strategies: Array<{ key: string; camera: string | { facingMode: 'environment' | 'user' } }> = [
+          ...orderedIds.map((deviceId) => ({ key: `device:${deviceId}`, camera: deviceId })),
+          { key: 'facing:environment', camera: { facingMode: 'environment' as const } },
+          { key: 'facing:user', camera: { facingMode: 'user' as const } },
+        ];
+
         let started = false;
 
-        for (const deviceId of orderedIds) {
+        for (const strategy of strategies) {
+          if (cancelled) return;
+          const attemptScanner = new Html5Qrcode(SCANNER_ELEMENT_ID);
+          scannerRef.current = attemptScanner;
           try {
-            await qrScanner.start(deviceId, config, onDecoded, undefined);
+            await attemptScanner.start(strategy.camera, config, onDecoded, undefined);
             started = true;
             break;
           } catch (e) {
-            attemptErrors.push(`device:${deviceId}:${extractErrString(e)}`);
-          }
-        }
-
-        if (!started) {
-          try {
-            await qrScanner.start({ facingMode: 'environment' }, config, onDecoded, undefined);
-            started = true;
-          } catch (e) {
-            attemptErrors.push(`facing:environment:${extractErrString(e)}`);
-          }
-        }
-
-        if (!started) {
-          try {
-            await qrScanner.start({ facingMode: 'user' }, config, onDecoded, undefined);
-            started = true;
-          } catch (e) {
-            attemptErrors.push(`facing:user:${extractErrString(e)}`);
+            attemptErrors.push(`${strategy.key}:${extractErrString(e)}`);
+            try {
+              await attemptScanner.stop();
+            } catch {
+              // scanner not started, ignore
+            }
+            try {
+              attemptScanner.clear();
+            } catch {
+              // ignore cleanup issues between attempts
+            }
+            scannerRef.current = null;
           }
         }
 
@@ -191,8 +184,8 @@ export function QrCameraScanner({ onScan, disabled = false, onError }: QrCameraS
 
         let message = 'Impossible de démarrer la caméra. Saisissez le code manuellement.';
 
-        if (errorName === 'NotFoundError' || /no cameras/i.test(errorMsg ?? '')) {
-          message = 'Aucune caméra compatible détectée sur cet appareil.';
+        if (errorName === 'NotFoundError' || /no cameras|requested device not found/i.test(errorMsg ?? '')) {
+          message = 'Caméra introuvable ou occupée. Vérifiez les permissions OS/navigateur puis fermez les apps qui utilisent déjà la caméra.';
         } else if (errorName === 'NotAllowedError') {
           message = 'Accès caméra refusé. Autorisez la caméra dans les réglages du navigateur (icône cadenas dans la barre d\'adresse).';
         } else if (errorName === 'NotReadableError') {
@@ -213,6 +206,7 @@ export function QrCameraScanner({ onScan, disabled = false, onError }: QrCameraS
           errorName,
           errorMsg,
           isSecureContext: window.isSecureContext,
+          attemptHint: 'Si Requested device not found persiste, le navigateur expose un deviceId invalide ou la caméra est indisponible',
         });
 
         await stopScanner();
