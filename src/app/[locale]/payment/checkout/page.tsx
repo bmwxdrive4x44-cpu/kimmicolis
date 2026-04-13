@@ -270,7 +270,7 @@ function CheckoutContent() {
               <CardTitle>Choisir un mode de paiement</CardTitle>
               <CardDescription>
                 {paymentConfig?.simulationMode
-                  ? 'Aucun PSP réel configuré: Stripe est proposé en mode simulation pour tester le parcours.'
+                  ? 'Aucun PSP réel configuré: les moyens de paiement sont disponibles en mode simulation pour tester le parcours.'
                   : 'Sélectionnez votre méthode de paiement préférée'}
               </CardDescription>
             </CardHeader>
@@ -305,17 +305,17 @@ function CheckoutContent() {
               )}
 
               <div className="rounded-lg border border-slate-200 bg-slate-50 dark:bg-slate-900 p-4 text-sm text-slate-700 dark:text-slate-300">
-                {paymentConfig?.simulationMode && selectedMethod === 'STRIPE_TEST'
-                  ? 'Mode simulation Stripe: aucun PSP externe ne sera appele. Le paiement sera traite directement par le backend pour tester le parcours utilisateur.'
+                {paymentConfig?.simulationMode
+                  ? 'Mode simulation PSP: aucun fournisseur externe ne sera appele. Le paiement sera traite directement par le backend pour tester le parcours utilisateur.'
                   : 'Vous allez etre redirige vers la page securisee du PSP pour finaliser le paiement. Le statut de votre colis sera mis a jour apres confirmation du webhook.'}
               </div>
 
               <Button onClick={handlePay} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white" size="lg">
-                <Lock className="h-4 w-4 mr-2" />{paymentConfig?.simulationMode && selectedMethod === 'STRIPE_TEST' ? 'Simuler le paiement Stripe' : `Continuer vers PSP (${payment?.amount.toFixed(2)} DA)`}
+                <Lock className="h-4 w-4 mr-2" />{paymentConfig?.simulationMode ? `Simuler le paiement (${payment?.amount.toFixed(2)} DA)` : `Continuer vers PSP (${payment?.amount.toFixed(2)} DA)`}
               </Button>
               <p className="text-xs text-center text-slate-500">
-                {paymentConfig?.simulationMode && selectedMethod === 'STRIPE_TEST'
-                  ? 'Simulation de paiement Stripe pour valider le parcours sans configuration PSP externe.'
+                {paymentConfig?.simulationMode
+                  ? 'Simulation de paiement pour valider le parcours sans configuration PSP externe.'
                   : `Paiement sécurisé via ${selectedMethod === 'BARIDI_MOB' ? 'Baridi (Algérie Poste)' : selectedMethod === 'STRIPE_TEST' ? 'Stripe test' : 'réseau SATIM'}.`}
               </p>
             </CardContent>

@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
         ? provider === 'SATIM'
           ? ['CIB', 'EDAHABIA', 'BARIDI_MOB']
           : ['STRIPE_TEST']
-        : ['STRIPE_TEST'];
+        : ['CIB', 'EDAHABIA', 'BARIDI_MOB', 'STRIPE_TEST'];
 
       return NextResponse.json({
         onlinePaymentAvailable,
@@ -171,7 +171,7 @@ export async function PUT(request: NextRequest) {
     }
 
     // Verify payment exists and user has access
-    const payment = await getPaymentStatus(paymentId);
+    let payment = await getPaymentStatus(paymentId);
     if (!payment) {
       return NextResponse.json(
         { error: 'Payment not found' },
@@ -191,7 +191,26 @@ export async function PUT(request: NextRequest) {
       const VALID_METHODS = ['CIB', 'EDAHABIA', 'BARIDI_MOB', 'STRIPE_TEST', 'SIM_STANDARD'];
       const paymentMethod = method && VALID_METHODS.includes(method) ? method : undefined;
 
-      const isSimulatedStripe = paymentMethod === 'STRIPE_TEST' && !isRealPspConfigured();
+      // If the session expired, transparently create a fresh payment session.
+      if (payment.status === 'FAILED' && payment.errorMessage === 'Payment session expired') {
+        const recreated = await createPayment(
+          payment.colisId,
+          payment.clientId,
+          payment.amount,
+          paymentMethod || payment.method || 'SIM_STANDARD'
+        );
+
+        if (!recreated.success || !recreated.payment) {
+          return NextResponse.json(
+            { error: recreated.error || 'Impossible de recréer une session de paiement' },
+            { status: 400 }
+          );
+        }
+
+        payment = recreated.payment;
+      }
+
+      const isSimulatedOnline = Boolean(paymentMethod && isOnlineMethod(paymentMethod) && !isRealPspConfigured());
 
       if (paymentMethod && isOnlineMethod(paymentMethod)) {
         if (isRealPspConfigured()) {
@@ -223,7 +242,7 @@ export async function PUT(request: NextRequest) {
           });
         }
 
-        if (!isSimulatedStripe && process.env.NODE_ENV === 'production') {
+        if (!isSimulatedOnline && process.env.NODE_ENV === 'production') {
           return NextResponse.json(
             {
               error: 'Le paiement en ligne est actuellement indisponible. Vous pouvez regler ce colis au relais de depart.',
@@ -234,7 +253,7 @@ export async function PUT(request: NextRequest) {
         }
       }
 
-      const result = await processPayment(paymentId, isSimulatedStripe ? 0.98 : 0.95, paymentMethod);
+      const result = await processPayment(payment.id, isSimulatedOnline ? 0.98 : 0.95, paymentMethod);
       if (!result.success) {
         return NextResponse.json(
           { error: result.error, payment: result.payment },
@@ -242,8 +261,8 @@ export async function PUT(request: NextRequest) {
         );
       }
       return NextResponse.json({
-        message: isSimulatedStripe ? 'Paiement Stripe simulé traité avec succès' : 'Payment processed successfully',
-        mode: isSimulatedStripe ? 'SIMULATED_STRIPE' : 'DIRECT_PROCESSING',
+        message: isSimulatedOnline ? 'Paiement simulé traité avec succès' : 'Payment processed successfully',
+        mode: isSimulatedOnline ? 'SIMULATED_PSP' : 'DIRECT_PROCESSING',
         payment: result.payment,
       });
     }
