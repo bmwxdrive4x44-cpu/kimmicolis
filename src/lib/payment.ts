@@ -148,6 +148,7 @@ export async function createPayment(
     await db.colis.update({
       where: { id: colisId },
       data: { status: 'PENDING_PAYMENT', updatedAt: new Date() },
+      select: { id: true, status: true },
     });
 
     return {
@@ -181,6 +182,7 @@ export async function getPaymentStatus(paymentId: string): Promise<IPayment | nu
     await db.colis.update({
       where: { id: payment.colisId },
       data: { status: 'CREATED', updatedAt: new Date() },
+      select: { id: true, status: true },
     }).catch(() => { /* best-effort */ });
     return paymentDb.payment.update({
       where: { id: paymentId },
@@ -264,6 +266,7 @@ export async function processPayment(
           status: 'READY_FOR_DEPOSIT',
           updatedAt: new Date(),
         },
+        select: { id: true, status: true },
       });
 
       return { success: true, payment: completedPayment };
@@ -289,6 +292,7 @@ export async function processPayment(
     await db.colis.update({
       where: { id: payment.colisId },
       data: { status: 'CREATED', updatedAt: new Date() },
+      select: { id: true, status: true },
     }).catch(() => { /* best-effort */ });
 
     return {
@@ -308,6 +312,7 @@ export async function processPayment(
     await db.colis.update({
       where: { id: payment.colisId },
       data: { status: 'CREATED', updatedAt: new Date() },
+      select: { id: true, status: true },
     }).catch(() => { /* best-effort */ });
 
     return {
@@ -356,6 +361,7 @@ export async function refundPayment(
     await db.colis.update({
       where: { id: payment.colisId },
       data: { status: 'CREATED' },
+      select: { id: true, status: true },
     });
 
     return { success: true, payment: refundedPayment };
