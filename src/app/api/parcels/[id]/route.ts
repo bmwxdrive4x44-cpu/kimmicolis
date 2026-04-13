@@ -437,15 +437,17 @@ export async function DELETE(
 
       return NextResponse.json({ success: true, deletedId: id });
     } catch (deleteError) {
-      if (!isForeignKeyConstraintError(deleteError)) {
-        throw deleteError;
-      }
+      const isKnownRelationalFailure = isForeignKeyConstraintError(deleteError);
+      console.warn('[parcels/:id DELETE] hard delete failed, attempting cancellation fallback:', {
+        knownRelationalFailure: isKnownRelationalFailure,
+        error: deleteError,
+      });
 
-      // Fallback UX: if hard delete is blocked by FK constraints unknown to this deployment,
-      // convert the operation into a cancellation so the user is no longer blocked.
+      // Universal fallback: keep UX working even when schema/runtime drift produces unexpected delete errors.
       const cancelled = await db.colis.update({
         where: { id },
         data: { status: 'ANNULE' },
+        select: { id: true },
       });
 
       await db.trackingHistory.create({
@@ -453,14 +455,16 @@ export async function DELETE(
           colisId: id,
           status: 'ANNULE',
           userId: auth.payload.id,
-          notes: 'Suppression demandée: colis annulé (suppression physique bloquée par contraintes de données).',
+          notes: isKnownRelationalFailure
+            ? 'Suppression demandée: colis annulé (suppression physique bloquée par contraintes de données).'
+            : 'Suppression demandée: colis annulé (fallback après erreur de suppression).',
         },
       }).catch(() => null);
 
       return NextResponse.json({
         success: true,
         cancelledId: cancelled.id,
-        message: 'Le colis a été annulé (suppression physique indisponible sur ce schéma).',
+        message: 'Le colis a été annulé.',
       });
     }
   } catch (error) {
