@@ -994,7 +994,8 @@ function ProfilClientTab({ userId }: { userId: string }) {
 
   const fetchData = async () => {
     try {
-      const res = await fetch(`/api/users/${userId}`);
+      const res = await fetch(`/api/users/${userId}`, { credentials: 'include' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setUserData(data);
       setForm({
@@ -1031,6 +1032,7 @@ function ProfilClientTab({ userId }: { userId: string }) {
       if (passwordForm.password) payload.password = passwordForm.password;
       const res = await fetch(`/api/users/${userId}`, {
         method: 'PUT',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
