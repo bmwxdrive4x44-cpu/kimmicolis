@@ -17,7 +17,12 @@ function isSchemaDriftError(error: unknown): boolean {
 
 function isForeignKeyConstraintError(error: unknown): boolean {
   const code = typeof error === 'object' && error && 'code' in error ? String((error as { code?: unknown }).code || '') : '';
-  return code === 'P2003';
+  if (code === 'P2003' || code === 'P2014' || code === 'P2010' || code === 'P2022') {
+    return true;
+  }
+
+  const message = error instanceof Error ? error.message.toLowerCase() : String(error || '').toLowerCase();
+  return message.includes('foreign key') || message.includes('constraint failed') || message.includes('relation violation');
 }
 
 async function getTableColumns(tableName: string): Promise<Set<string>> {
