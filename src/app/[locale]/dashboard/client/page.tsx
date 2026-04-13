@@ -27,7 +27,7 @@ import {
 } from '@/components/dashboard/dashboard-shell';
 import { WILAYAS, PARCEL_STATUS } from '@/lib/constants';
 import { normalizeRole } from '@/lib/roles';
-import { Package, Plus, History, MapPin, Loader2, CreditCard, Search, Truck, CheckCircle, Clock, QrCode, Printer, User, Pencil, Save, AlertTriangle, XCircle, MessageSquare, Smartphone, Banknote, Building2, Trash2, CircleHelp } from 'lucide-react';
+import { Package, Plus, History, MapPin, Loader2, CreditCard, Search, Truck, CheckCircle, Clock, QrCode, Printer, User, Pencil, Save, AlertTriangle, XCircle, MessageSquare, Smartphone, Building2, Trash2, CircleHelp } from 'lucide-react';
 import { PRO_DISCOUNT_TIERS, getProBatchDiscountRate, getProBatchDiscountTier } from '@/lib/pricing';
 import { useToast } from '@/hooks/use-toast';
 import { ParcelDeleteButton, ParcelEditDialog } from '@/components/dashboard/parcel-edit-dialog';
@@ -695,19 +695,6 @@ function PaymentTab({ userId }: { userId: string }) {
                       >
                         {payingId === parcel.id ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <CreditCard className="h-4 w-4 mr-1" />}
                         Payer en ligne
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => {
-                          toast({
-                            title: 'Paiement en espèces au relais',
-                            description: 'Le règlement en espèces se fait au relais de départ. Ouverture du suivi du colis.',
-                          });
-                          push(`/${locale}/dashboard/client?tab=track&track=${parcel.trackingNumber}`);
-                        }}
-                      >
-                        <Banknote className="h-4 w-4 mr-1" />Suivi / espèces
                       </Button>
                       <ParcelEditDialog parcel={parcel} buttonLabel="Modifier" onSaved={fetchData} />
                       <ParcelDeleteButton parcel={parcel} onSaved={fetchData} />
