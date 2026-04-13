@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   AlertDialog,
@@ -55,6 +55,20 @@ export function ParcelEditDialog({
   });
 
   const canEdit = useMemo(() => EDITABLE_STATUSES.has(parcel.status), [parcel.status]);
+
+  useEffect(() => {
+    if (!open) {
+      setForm({
+        recipientFirstName: parcel.recipientFirstName || '',
+        recipientLastName: parcel.recipientLastName || '',
+        recipientPhone: parcel.recipientPhone || '',
+        recipientEmail: parcel.recipientEmail || '',
+        weight: parcel.weight ? String(parcel.weight) : '1',
+        description: parcel.description || '',
+      });
+      setFieldErrors({});
+    }
+  }, [open, parcel]);
 
   const updateField = (field: keyof typeof form, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));

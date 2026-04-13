@@ -579,12 +579,18 @@ function PaymentTab({ userId }: { userId: string }) {
   const { push } = useRouter();
   const locale = useLocale();
   const [parcels, setParcels] = useState<any[]>([]);
+  const [storedLabels, setStoredLabels] = useState<Record<string, any>>({});
   const [relaisMap, setRelaisMap] = useState<Record<string, any>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [payingId, setPayingId] = useState<string | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
+    try {
+      setStoredLabels(JSON.parse(localStorage.getItem(LABEL_STORAGE_KEY) || '{}'));
+    } catch {
+      setStoredLabels({});
+    }
     fetchData();
   }, [userId]);
 
@@ -654,6 +660,16 @@ function PaymentTab({ userId }: { userId: string }) {
         ) : (
           <div className="space-y-4">
             {parcels.map((parcel) => {
+              const saved = storedLabels[parcel.trackingNumber] || {};
+              const mergedParcel = {
+                ...parcel,
+                weight: parcel.weight ?? saved.weight ?? null,
+                description: parcel.description ?? saved.description ?? null,
+                recipientFirstName: parcel.recipientFirstName ?? saved.recipientFirstName ?? '',
+                recipientLastName: parcel.recipientLastName ?? saved.recipientLastName ?? '',
+                recipientPhone: parcel.recipientPhone ?? saved.recipientPhone ?? '',
+                recipientEmail: parcel.recipientEmail ?? saved.recipientEmail ?? '',
+              };
               const relaisDept = relaisMap[parcel.relaisDepartId];
               return (
                 <Card key={parcel.id} className="border-blue-200 bg-blue-50">
@@ -665,7 +681,7 @@ function PaymentTab({ userId }: { userId: string }) {
                       </div>
                       <div>
                         <p className="text-sm text-muted-foreground">Poids</p>
-                        <p className="font-semibold">{parcel.weight ? `${parcel.weight} kg` : '—'}</p>
+                        <p className="font-semibold">{mergedParcel.weight ? `${mergedParcel.weight} kg` : '—'}</p>
                       </div>
                       <div>
                         <p className="text-sm text-muted-foreground">Itinéraire</p>
@@ -721,7 +737,7 @@ function PaymentTab({ userId }: { userId: string }) {
                         {payingId === parcel.id ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <CreditCard className="h-4 w-4 mr-1" />}
                         Payer en ligne
                       </Button>
-                      <ParcelEditDialog parcel={parcel} buttonLabel="Modifier" onSaved={fetchData} />
+                      <ParcelEditDialog parcel={mergedParcel} buttonLabel="Modifier" onSaved={fetchData} />
                       <ParcelDeleteButton parcel={parcel} onSaved={fetchData} />
                     </div>
                   </CardContent>
