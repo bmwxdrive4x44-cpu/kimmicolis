@@ -105,6 +105,7 @@ export function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart 
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof FormState, string>>>({});
   const [relais, setRelais] = useState<any[]>([]);
   const [relayPrinterStatusById, setRelayPrinterStatusById] = useState<Record<string, 'READY' | 'BROKEN' | 'OUT_OF_PAPER' | 'NOT_EQUIPPED'>>({});
   const [lignesActives, setLignesActives] = useState<any[]>([]);
@@ -232,6 +233,41 @@ export function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart 
     setCalculatedPrice(null);
     setCreatedParcel(null);
     setSubmitError(null);
+    setFieldErrors({});
+  };
+
+  const updateField = <K extends keyof FormState>(field: K, value: FormState[K]) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+    setFieldErrors((prev) => {
+      if (!prev[field]) return prev;
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+  };
+
+  const validateRequiredFields = () => {
+    const errors: Partial<Record<keyof FormState, string>> = {};
+    const parsedWeight = parseLocaleFloat(formData.weight);
+
+    if (!formData.villeDepart) errors.villeDepart = 'La ville de départ est obligatoire.';
+    if (!formData.villeArrivee) errors.villeArrivee = 'La ville d\'arrivée est obligatoire.';
+    if (!formData.relaisDepartId) errors.relaisDepartId = 'Le relais de départ est obligatoire.';
+    if (!formData.relaisArriveeId) errors.relaisArriveeId = 'Le relais d\'arrivée est obligatoire.';
+    if (!formData.weight.trim()) {
+      errors.weight = 'Le poids est obligatoire.';
+    } else if (!Number.isFinite(parsedWeight) || parsedWeight <= 0) {
+      errors.weight = 'Le poids doit être supérieur à 0.';
+    }
+    if (!formData.senderLastName.trim()) errors.senderLastName = 'Le nom de l\'expéditeur est obligatoire.';
+    if (!formData.senderFirstName.trim()) errors.senderFirstName = 'Le prénom de l\'expéditeur est obligatoire.';
+    if (!formData.senderPhone.trim()) errors.senderPhone = 'Le téléphone de l\'expéditeur est obligatoire.';
+    if (!formData.recipientLastName.trim()) errors.recipientLastName = 'Le nom du destinataire est obligatoire.';
+    if (!formData.recipientFirstName.trim()) errors.recipientFirstName = 'Le prénom du destinataire est obligatoire.';
+    if (!formData.recipientPhone.trim()) errors.recipientPhone = 'Le téléphone du destinataire est obligatoire.';
+
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
   };
 
   const printParcelLabel = () => {
@@ -427,6 +463,14 @@ export function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart 
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
+
+    if (!validateRequiredFields()) {
+      const message = 'Veuillez corriger les champs obligatoires.';
+      setSubmitError(message);
+      toast({ title: 'Erreur', description: message, variant: 'destructive' });
+      return;
+    }
+
     setIsLoading(true);
     setSubmitError(null);
 
@@ -489,7 +533,8 @@ export function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart 
         return;
       }
 
-      let description = 'Impossible de créer le colis';
+      let description = `Impossible de créer le colis (HTTP ${response.status})`;
+      const responseClone = response.clone();
       try {
         const payload = await response.json();
         if (payload?.error) {
@@ -502,7 +547,14 @@ export function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart 
           description = `${description} (${payload.step || 'REQUEST'}${payload.code ? ` / ${payload.code}` : ''})`;
         }
       } catch {
-        // keep default message
+        try {
+          const rawText = (await responseClone.text())?.trim();
+          if (rawText) {
+            description = `${description} - ${rawText.slice(0, 220)}`;
+          }
+        } catch {
+          // keep default message
+        }
       }
 
       setSubmitError(description);
@@ -725,9 +777,19 @@ export function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart 
                   <Label className="text-sm">Départ</Label>
                   <Select
                     value={formData.villeDepart}
-                    onValueChange={(value) => setFormData((prev) => ({ ...prev, villeDepart: value, villeArrivee: '', relaisDepartId: '', relaisArriveeId: '' }))}
+                    onValueChange={(value) => {
+                      setFormData((prev) => ({ ...prev, villeDepart: value, villeArrivee: '', relaisDepartId: '', relaisArriveeId: '' }));
+                      setFieldErrors((prev) => {
+                        const next = { ...prev };
+                        delete next.villeDepart;
+                        delete next.villeArrivee;
+                        delete next.relaisDepartId;
+                        delete next.relaisArriveeId;
+                        return next;
+                      });
+                    }}
                   >
-                    <SelectTrigger className="h-10"><SelectValue placeholder="Sélectionner" /></SelectTrigger>
+                    <SelectTrigger className={`h-10 ${fieldErrors.villeDepart ? 'border-red-500 focus:ring-red-500' : ''}`}><SelectValue placeholder="Sélectionner" /></SelectTrigger>
                     <SelectContent>
                       {departWilayas.length === 0 ? (
                         <div className="px-3 py-4 text-center text-sm text-slate-400">Aucune ligne configurée</div>
@@ -736,15 +798,24 @@ export function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart 
                       )}
                     </SelectContent>
                   </Select>
+                  {fieldErrors.villeDepart && <p className="text-xs text-red-600">{fieldErrors.villeDepart}</p>}
                 </div>
                 <div className="space-y-2">
                   <Label className="text-sm">Arrivée</Label>
                   <Select
                     value={formData.villeArrivee}
-                    onValueChange={(value) => setFormData((prev) => ({ ...prev, villeArrivee: value, relaisArriveeId: '' }))}
+                    onValueChange={(value) => {
+                      setFormData((prev) => ({ ...prev, villeArrivee: value, relaisArriveeId: '' }));
+                      setFieldErrors((prev) => {
+                        const next = { ...prev };
+                        delete next.villeArrivee;
+                        delete next.relaisArriveeId;
+                        return next;
+                      });
+                    }}
                     disabled={!formData.villeDepart}
                   >
-                    <SelectTrigger className="h-10"><SelectValue placeholder={formData.villeDepart ? 'Sélectionner' : 'Choisir le départ d\'abord'} /></SelectTrigger>
+                    <SelectTrigger className={`h-10 ${fieldErrors.villeArrivee ? 'border-red-500 focus:ring-red-500' : ''}`}><SelectValue placeholder={formData.villeDepart ? 'Sélectionner' : 'Choisir le départ d\'abord'} /></SelectTrigger>
                     <SelectContent>
                       {arriveeWilayas.length === 0 ? (
                         <div className="px-3 py-4 text-center text-sm text-slate-400">Aucune ligne depuis cette ville</div>
@@ -753,6 +824,7 @@ export function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart 
                       )}
                     </SelectContent>
                   </Select>
+                  {fieldErrors.villeArrivee && <p className="text-xs text-red-600">{fieldErrors.villeArrivee}</p>}
                 </div>
               </div>
             </div>
@@ -811,8 +883,8 @@ export function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart 
                 <div className="grid gap-3 lg:grid-cols-2">
                   <div className="min-w-0 space-y-2">
                     <Label className="text-sm">Relais départ</Label>
-                    <Select value={formData.relaisDepartId} onValueChange={(value) => setFormData((prev) => ({ ...prev, relaisDepartId: value }))}>
-                      <SelectTrigger className="h-10 w-full min-w-0"><SelectValue placeholder="Sélectionner" /></SelectTrigger>
+                    <Select value={formData.relaisDepartId} onValueChange={(value) => updateField('relaisDepartId', value)}>
+                      <SelectTrigger className={`h-10 w-full min-w-0 ${fieldErrors.relaisDepartId ? 'border-red-500 focus:ring-red-500' : ''}`}><SelectValue placeholder="Sélectionner" /></SelectTrigger>
                       <SelectContent>
                         {relaisDepart.map((relay) => (
                           <SelectItem key={relay.id} value={relay.id}>
@@ -822,6 +894,7 @@ export function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart 
                         ))}
                       </SelectContent>
                     </Select>
+                    {fieldErrors.relaisDepartId && <p className="text-xs text-red-600">{fieldErrors.relaisDepartId}</p>}
                     {selectedRelayDepart && (
                       <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
                         <p className="truncate font-medium text-slate-800">{selectedRelayDepart.commerceName}</p>
@@ -849,14 +922,15 @@ export function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart 
 
                   <div className="min-w-0 space-y-2">
                     <Label className="text-sm">Relais arrivée</Label>
-                    <Select value={formData.relaisArriveeId} onValueChange={(value) => setFormData((prev) => ({ ...prev, relaisArriveeId: value }))}>
-                      <SelectTrigger className="h-10 w-full min-w-0"><SelectValue placeholder="Sélectionner" /></SelectTrigger>
+                    <Select value={formData.relaisArriveeId} onValueChange={(value) => updateField('relaisArriveeId', value)}>
+                      <SelectTrigger className={`h-10 w-full min-w-0 ${fieldErrors.relaisArriveeId ? 'border-red-500 focus:ring-red-500' : ''}`}><SelectValue placeholder="Sélectionner" /></SelectTrigger>
                       <SelectContent>
                         {relaisArrivee.map((relay) => (
                           <SelectItem key={relay.id} value={relay.id}>{relay.commerceName}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
+                    {fieldErrors.relaisArriveeId && <p className="text-xs text-red-600">{fieldErrors.relaisArriveeId}</p>}
                     {selectedRelayArrivee && (
                       <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
                         <p className="truncate font-medium text-slate-800">{selectedRelayArrivee.commerceName}</p>
@@ -879,7 +953,8 @@ export function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart 
                 <div className="grid gap-3 md:grid-cols-[180px_1fr] md:items-end">
                   <div className="space-y-2">
                     <Label className="text-sm">Poids (kg)</Label>
-                    <Input className="h-10" type="number" min="0.1" step="0.1" value={formData.weight} onChange={(event) => setFormData((prev) => ({ ...prev, weight: event.target.value }))} placeholder="2.5" required />
+                    <Input className={`h-10 ${fieldErrors.weight ? 'border-red-500 focus-visible:ring-red-500' : ''}`} type="number" min="0.1" step="0.1" value={formData.weight} onChange={(event) => updateField('weight', event.target.value)} placeholder="2.5" />
+                    {fieldErrors.weight && <p className="text-xs text-red-600">{fieldErrors.weight}</p>}
                   </div>
                   {calculatedPrice && (
                     <div className="rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
@@ -914,27 +989,33 @@ export function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart 
                   <div className="grid gap-3 md:grid-cols-2">
                     <div className="space-y-2">
                       <Label className="text-sm">Nom expéditeur</Label>
-                      <Input className="h-10" value={formData.senderLastName} onChange={(event) => setFormData((prev) => ({ ...prev, senderLastName: event.target.value }))} />
+                      <Input className={`h-10 ${fieldErrors.senderLastName ? 'border-red-500 focus-visible:ring-red-500' : ''}`} value={formData.senderLastName} onChange={(event) => updateField('senderLastName', event.target.value)} />
+                      {fieldErrors.senderLastName && <p className="text-xs text-red-600">{fieldErrors.senderLastName}</p>}
                     </div>
                     <div className="space-y-2">
                       <Label className="text-sm">Prénom expéditeur</Label>
-                      <Input className="h-10" value={formData.senderFirstName} onChange={(event) => setFormData((prev) => ({ ...prev, senderFirstName: event.target.value }))} />
+                      <Input className={`h-10 ${fieldErrors.senderFirstName ? 'border-red-500 focus-visible:ring-red-500' : ''}`} value={formData.senderFirstName} onChange={(event) => updateField('senderFirstName', event.target.value)} />
+                      {fieldErrors.senderFirstName && <p className="text-xs text-red-600">{fieldErrors.senderFirstName}</p>}
                     </div>
                     <div className="space-y-2">
                       <Label className="text-sm">Tél. expéditeur</Label>
-                      <Input className="h-10" value={formData.senderPhone} onChange={(event) => setFormData((prev) => ({ ...prev, senderPhone: event.target.value }))} placeholder="0550123456" />
+                      <Input className={`h-10 ${fieldErrors.senderPhone ? 'border-red-500 focus-visible:ring-red-500' : ''}`} value={formData.senderPhone} onChange={(event) => updateField('senderPhone', event.target.value)} placeholder="0550123456" />
+                      {fieldErrors.senderPhone && <p className="text-xs text-red-600">{fieldErrors.senderPhone}</p>}
                     </div>
                     <div className="space-y-2">
                       <Label className="text-sm">Nom destinataire</Label>
-                      <Input className="h-10" value={formData.recipientLastName} onChange={(event) => setFormData((prev) => ({ ...prev, recipientLastName: event.target.value }))} />
+                      <Input className={`h-10 ${fieldErrors.recipientLastName ? 'border-red-500 focus-visible:ring-red-500' : ''}`} value={formData.recipientLastName} onChange={(event) => updateField('recipientLastName', event.target.value)} />
+                      {fieldErrors.recipientLastName && <p className="text-xs text-red-600">{fieldErrors.recipientLastName}</p>}
                     </div>
                     <div className="space-y-2">
                       <Label className="text-sm">Prénom destinataire</Label>
-                      <Input className="h-10" value={formData.recipientFirstName} onChange={(event) => setFormData((prev) => ({ ...prev, recipientFirstName: event.target.value }))} />
+                      <Input className={`h-10 ${fieldErrors.recipientFirstName ? 'border-red-500 focus-visible:ring-red-500' : ''}`} value={formData.recipientFirstName} onChange={(event) => updateField('recipientFirstName', event.target.value)} />
+                      {fieldErrors.recipientFirstName && <p className="text-xs text-red-600">{fieldErrors.recipientFirstName}</p>}
                     </div>
                     <div className="space-y-2">
                       <Label className="text-sm">Tél. destinataire</Label>
-                      <Input className="h-10" value={formData.recipientPhone} onChange={(event) => setFormData((prev) => ({ ...prev, recipientPhone: event.target.value }))} placeholder="0660123456" />
+                      <Input className={`h-10 ${fieldErrors.recipientPhone ? 'border-red-500 focus-visible:ring-red-500' : ''}`} value={formData.recipientPhone} onChange={(event) => updateField('recipientPhone', event.target.value)} placeholder="0660123456" />
+                      {fieldErrors.recipientPhone && <p className="text-xs text-red-600">{fieldErrors.recipientPhone}</p>}
                     </div>
                     <div className="space-y-2 md:col-span-2">
                       <Label className="text-sm">Email destinataire (optionnel)</Label>
@@ -978,18 +1059,7 @@ export function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart 
             <div className="mx-auto flex max-w-md gap-3">
               <Button
                 type="submit"
-                disabled={
-                  isLoading ||
-                  !formData.relaisDepartId ||
-                  !formData.relaisArriveeId ||
-                  !formData.weight ||
-                  !formData.senderFirstName ||
-                  !formData.senderLastName ||
-                  !formData.senderPhone ||
-                  !formData.recipientFirstName ||
-                  !formData.recipientLastName ||
-                  !formData.recipientPhone
-                }
+                disabled={isLoading}
                 className="h-11 flex-1 bg-emerald-600 hover:bg-emerald-700"
               >
                 {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Package className="h-4 w-4 mr-2" />}
