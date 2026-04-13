@@ -28,8 +28,17 @@ export async function GET(request: NextRequest) {
 
     if (config === '1') {
       const provider = process.env.PAYMENT_PROVIDER || 'SIM';
+      const onlinePaymentAvailable = isRealPspConfigured() || provider === 'SIM';
+      const availableMethods = isRealPspConfigured()
+        ? provider === 'SATIM'
+          ? ['CIB', 'EDAHABIA', 'BARIDI_MOB']
+          : ['STRIPE_TEST']
+        : ['STRIPE_TEST'];
+
       return NextResponse.json({
-        onlinePaymentAvailable: isRealPspConfigured(),
+        onlinePaymentAvailable,
+        availableMethods,
+        simulationMode: !isRealPspConfigured(),
         provider,
         environment: process.env.NODE_ENV || 'development',
       });
@@ -182,6 +191,8 @@ export async function PUT(request: NextRequest) {
       const VALID_METHODS = ['CIB', 'EDAHABIA', 'BARIDI_MOB', 'STRIPE_TEST', 'SIM_STANDARD'];
       const paymentMethod = method && VALID_METHODS.includes(method) ? method : undefined;
 
+      const isSimulatedStripe = paymentMethod === 'STRIPE_TEST' && !isRealPspConfigured();
+
       if (paymentMethod && isOnlineMethod(paymentMethod)) {
         if (isRealPspConfigured()) {
           const hosted = await createHostedCheckout({
@@ -212,7 +223,7 @@ export async function PUT(request: NextRequest) {
           });
         }
 
-        if (process.env.NODE_ENV === 'production') {
+        if (!isSimulatedStripe && process.env.NODE_ENV === 'production') {
           return NextResponse.json(
             {
               error: 'Le paiement en ligne est actuellement indisponible. Vous pouvez regler ce colis au relais de depart.',
@@ -223,7 +234,7 @@ export async function PUT(request: NextRequest) {
         }
       }
 
-      const result = await processPayment(paymentId, 0.95, paymentMethod);
+      const result = await processPayment(paymentId, isSimulatedStripe ? 0.98 : 0.95, paymentMethod);
       if (!result.success) {
         return NextResponse.json(
           { error: result.error, payment: result.payment },
@@ -231,7 +242,8 @@ export async function PUT(request: NextRequest) {
         );
       }
       return NextResponse.json({
-        message: 'Payment processed successfully',
+        message: isSimulatedStripe ? 'Paiement Stripe simulé traité avec succès' : 'Payment processed successfully',
+        mode: isSimulatedStripe ? 'SIMULATED_STRIPE' : 'DIRECT_PROCESSING',
         payment: result.payment,
       });
     }

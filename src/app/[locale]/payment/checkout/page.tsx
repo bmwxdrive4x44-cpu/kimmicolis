@@ -29,6 +29,8 @@ interface PaymentData {
 
 interface PaymentConfig {
   onlinePaymentAvailable: boolean;
+  availableMethods: PaymentMethod[];
+  simulationMode: boolean;
   provider: string;
   environment: string;
 }
@@ -81,6 +83,8 @@ function CheckoutContent() {
   const [queueRemaining, setQueueRemaining] = useState(0);
   const [queueReturnUrl, setQueueReturnUrl] = useState<string | null>(null);
   const [paymentConfig, setPaymentConfig] = useState<PaymentConfig | null>(null);
+
+  const availableMethods = paymentConfig?.availableMethods || [];
 
   const waitForBackendConfirmation = async (id: string, maxAttempts = 12) => {
     for (let i = 0; i < maxAttempts; i++) {
@@ -154,7 +158,7 @@ function CheckoutContent() {
   }, [paymentId, authStatus]);
 
   const handleMethodSelect = (method: PaymentMethod) => {
-    if (paymentConfig && !paymentConfig.onlinePaymentAvailable) {
+    if (paymentConfig && (!paymentConfig.onlinePaymentAvailable || !availableMethods.includes(method))) {
       setErrorMsg('Le paiement en ligne est actuellement indisponible. Vous pouvez regler ce colis au relais de depart.');
       setStep('failure');
       return;
@@ -264,13 +268,17 @@ function CheckoutContent() {
           <Card>
             <CardHeader>
               <CardTitle>Choisir un mode de paiement</CardTitle>
-              <CardDescription>Sélectionnez votre méthode de paiement préférée</CardDescription>
+              <CardDescription>
+                {paymentConfig?.simulationMode
+                  ? 'Aucun PSP réel configuré: Stripe est proposé en mode simulation pour tester le parcours.'
+                  : 'Sélectionnez votre méthode de paiement préférée'}
+              </CardDescription>
             </CardHeader>
             <CardContent className="grid gap-3">
-              <MethodCard method="CIB" title="Carte CIB" subtitle="Visa / Mastercard algérienne (SATIM)" icon={<CreditCard className="h-6 w-6 text-blue-600" />} onClick={() => handleMethodSelect('CIB')} />
-              <MethodCard method="EDAHABIA" title="Carte Edahabia" subtitle="Carte Algérie Poste (CCP)" icon={<CreditCard className="h-6 w-6 text-yellow-600" />} onClick={() => handleMethodSelect('EDAHABIA')} />
-              <MethodCard method="BARIDI_MOB" title="Baridi Mob" subtitle="Paiement mobile Algérie Poste" icon={<Smartphone className="h-6 w-6 text-green-600" />} onClick={() => handleMethodSelect('BARIDI_MOB')} />
-              <MethodCard method="STRIPE_TEST" title="Stripe (mode test)" subtitle="Cartes de test Stripe" icon={<CreditCard className="h-6 w-6 text-purple-600" />} onClick={() => handleMethodSelect('STRIPE_TEST')} />
+              {availableMethods.includes('CIB') && <MethodCard method="CIB" title="Carte CIB" subtitle="Visa / Mastercard algérienne (SATIM)" icon={<CreditCard className="h-6 w-6 text-blue-600" />} onClick={() => handleMethodSelect('CIB')} />}
+              {availableMethods.includes('EDAHABIA') && <MethodCard method="EDAHABIA" title="Carte Edahabia" subtitle="Carte Algérie Poste (CCP)" icon={<CreditCard className="h-6 w-6 text-yellow-600" />} onClick={() => handleMethodSelect('EDAHABIA')} />}
+              {availableMethods.includes('BARIDI_MOB') && <MethodCard method="BARIDI_MOB" title="Baridi Mob" subtitle="Paiement mobile Algérie Poste" icon={<Smartphone className="h-6 w-6 text-green-600" />} onClick={() => handleMethodSelect('BARIDI_MOB')} />}
+              {availableMethods.includes('STRIPE_TEST') && <MethodCard method="STRIPE_TEST" title="Stripe (mode test)" subtitle={paymentConfig?.simulationMode ? 'Simulation de paiement Stripe sans PSP réel' : 'Cartes de test Stripe'} icon={<CreditCard className="h-6 w-6 text-purple-600" />} onClick={() => handleMethodSelect('STRIPE_TEST')} />}
             </CardContent>
           </Card>
         )}
@@ -297,15 +305,18 @@ function CheckoutContent() {
               )}
 
               <div className="rounded-lg border border-slate-200 bg-slate-50 dark:bg-slate-900 p-4 text-sm text-slate-700 dark:text-slate-300">
-                Vous allez etre redirige vers la page securisee du PSP pour finaliser le paiement.
-                Le statut de votre colis sera mis a jour apres confirmation du webhook.
+                {paymentConfig?.simulationMode && selectedMethod === 'STRIPE_TEST'
+                  ? 'Mode simulation Stripe: aucun PSP externe ne sera appele. Le paiement sera traite directement par le backend pour tester le parcours utilisateur.'
+                  : 'Vous allez etre redirige vers la page securisee du PSP pour finaliser le paiement. Le statut de votre colis sera mis a jour apres confirmation du webhook.'}
               </div>
 
               <Button onClick={handlePay} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white" size="lg">
-                <Lock className="h-4 w-4 mr-2" />Continuer vers PSP ({payment?.amount.toFixed(2)} DA)
+                <Lock className="h-4 w-4 mr-2" />{paymentConfig?.simulationMode && selectedMethod === 'STRIPE_TEST' ? 'Simuler le paiement Stripe' : `Continuer vers PSP (${payment?.amount.toFixed(2)} DA)`}
               </Button>
               <p className="text-xs text-center text-slate-500">
-                Paiement sécurisé via {selectedMethod === 'BARIDI_MOB' ? 'Baridi (Algérie Poste)' : selectedMethod === 'STRIPE_TEST' ? 'Stripe test' : 'réseau SATIM'}.
+                {paymentConfig?.simulationMode && selectedMethod === 'STRIPE_TEST'
+                  ? 'Simulation de paiement Stripe pour valider le parcours sans configuration PSP externe.'
+                  : `Paiement sécurisé via ${selectedMethod === 'BARIDI_MOB' ? 'Baridi (Algérie Poste)' : selectedMethod === 'STRIPE_TEST' ? 'Stripe test' : 'réseau SATIM'}.`}
               </p>
             </CardContent>
           </Card>
