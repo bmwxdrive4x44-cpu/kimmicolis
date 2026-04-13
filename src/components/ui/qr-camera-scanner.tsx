@@ -71,11 +71,19 @@ export function QrCameraScanner({ onScan, disabled = false, onError }: QrCameraS
     const startCamera = async () => {
       try {
         // ── Pré-vérification getUserMedia ──────────────────────────────────────
-        // Tester l'accès caméra AVANT html5-qrcode pour obtenir un vrai DOMException
-        // avec .name/.message, plutôt que les objets custom de la lib.
+        // Tester l'accès caméra AVANT html5-qrcode pour obtenir un vrai DOMException.
+        // Important: NotFoundError n'est pas bloquant ici; on laisse html5-qrcode tenter
+        // ses propres stratégies (deviceId/facingMode), parfois plus tolérantes.
+        let preflightError: unknown = null;
         let testStream: MediaStream | null = null;
         try {
           testStream = await navigator.mediaDevices.getUserMedia({ video: true });
+        } catch (preErr) {
+          preflightError = preErr;
+          const preErrString = extractErrString(preErr);
+          if (/NotAllowedError|permission denied/i.test(preErrString)) {
+            throw preErr;
+          }
         } finally {
           // Libère la stream de test (sinon elle bloquerait l'init html5-qrcode)
           testStream?.getTracks().forEach((t) => t.stop());
@@ -146,6 +154,10 @@ export function QrCameraScanner({ onScan, disabled = false, onError }: QrCameraS
 
         if (!started) {
           throw new Error(`camera_start_failed::${attemptErrors.join(' || ') || 'no strategy succeeded'}`);
+        }
+
+        if (preflightError) {
+          console.warn('[QrCameraScanner] preflight getUserMedia a échoué mais un fallback a réussi:', preflightError);
         }
       } catch (err: unknown) {
         if (cancelled) return;
