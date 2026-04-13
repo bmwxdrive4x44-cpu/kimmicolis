@@ -674,12 +674,14 @@ function PaymentTab({ userId }: { userId: string }) {
                     </div>
                     <div className="grid grid-cols-2 gap-2">
                       <Button
+                        type="button"
                         disabled={payingId === parcel.id}
                         onClick={async () => {
                           setPayingId(parcel.id);
                           try {
                             const res = await fetch('/api/payments', {
                               method: 'POST',
+                              credentials: 'include',
                               headers: { 'Content-Type': 'application/json' },
                               body: JSON.stringify({ colisId: parcel.id, amount: parcel.prixClient }),
                             });
@@ -694,7 +696,7 @@ function PaymentTab({ userId }: { userId: string }) {
                         {payingId === parcel.id ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <CreditCard className="h-4 w-4 mr-1" />}
                         Payer en ligne
                       </Button>
-                      <Button variant="outline" onClick={() => push(`/${locale}/dashboard/client?tab=track&track=${parcel.trackingNumber}`)}>
+                      <Button type="button" variant="outline" onClick={() => push(`/${locale}/dashboard/client?tab=track&track=${parcel.trackingNumber}`)}>
                         <Banknote className="h-4 w-4 mr-1" />Voir (espèces)
                       </Button>
                       <ParcelEditDialog parcel={parcel} buttonLabel="Modifier" onSaved={fetchData} />
@@ -963,12 +965,12 @@ function ParcelHistory({ userId, onTrack }: { userId: string; onTrack: (tn: stri
                   <TableCell className="text-sm text-slate-500">{new Date(c.createdAt).toLocaleDateString('fr-FR')}</TableCell>
                   <TableCell>
                     <div className="flex gap-2">
-                      <Button size="sm" variant="outline" onClick={() => onTrack(c.trackingNumber)}>
+                      <Button type="button" size="sm" variant="outline" onClick={() => onTrack(c.trackingNumber)}>
                         <MapPin className="h-3 w-3 mr-1" />Suivre
                       </Button>
                       <ParcelEditDialog parcel={c} buttonLabel="Modifier" onSaved={fetchColis} />
                       <ParcelDeleteButton parcel={c} onSaved={fetchColis} />
-                      <Button size="sm" variant="outline" onClick={() => printStoredOrLiveLabel(c)}>
+                      <Button type="button" size="sm" variant="outline" onClick={() => printStoredOrLiveLabel(c)}>
                         <Printer className="h-3 w-3 mr-1" />Étiquette
                       </Button>
                     </div>

@@ -15,6 +15,11 @@ function isSchemaDriftError(error: unknown): boolean {
   return code === 'P2010' || code === 'P2021' || code === 'P2022' || code === 'P2025';
 }
 
+function isForeignKeyConstraintError(error: unknown): boolean {
+  const code = typeof error === 'object' && error && 'code' in error ? String((error as { code?: unknown }).code || '') : '';
+  return code === 'P2003';
+}
+
 async function getTableColumns(tableName: string): Promise<Set<string>> {
   const cached = tableColumnCache.get(tableName);
   if (cached) return cached;
@@ -335,7 +340,8 @@ export async function DELETE(
       );
     }
 
-    await db.$transaction(async (tx) => {
+    try {
+      await db.$transaction(async (tx) => {
       const safeDelete = async (run: () => Promise<unknown>) => {
         try {
           await run();
@@ -375,10 +381,37 @@ export async function DELETE(
         await safeDelete(() => txExtended.actionLog!.deleteMany({ where: { entityType: 'COLIS', entityId: id } }));
       }
 
-      await tx.colis.delete({ where: { id } });
-    });
+        await tx.colis.delete({ where: { id } });
+      });
 
-    return NextResponse.json({ success: true, deletedId: id });
+      return NextResponse.json({ success: true, deletedId: id });
+    } catch (deleteError) {
+      if (!isForeignKeyConstraintError(deleteError)) {
+        throw deleteError;
+      }
+
+      // Fallback UX: if hard delete is blocked by FK constraints unknown to this deployment,
+      // convert the operation into a cancellation so the user is no longer blocked.
+      const cancelled = await db.colis.update({
+        where: { id },
+        data: { status: 'ANNULE' },
+      });
+
+      await db.trackingHistory.create({
+        data: {
+          colisId: id,
+          status: 'ANNULE',
+          userId: auth.payload.id,
+          notes: 'Suppression demandée: colis annulé (suppression physique bloquée par contraintes de données).',
+        },
+      }).catch(() => null);
+
+      return NextResponse.json({
+        success: true,
+        cancelledId: cancelled.id,
+        message: 'Le colis a été annulé (suppression physique indisponible sur ce schéma).',
+      });
+    }
   } catch (error) {
     console.error('Error deleting parcel:', error);
     return NextResponse.json({ error: 'Failed to delete parcel' }, { status: 500 });

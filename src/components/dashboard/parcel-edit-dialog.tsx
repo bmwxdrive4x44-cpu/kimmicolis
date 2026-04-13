@@ -87,6 +87,7 @@ export function ParcelEditDialog({
     try {
       const res = await fetch(`/api/parcels/${parcel.id}`, {
         method: 'PATCH',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           recipientFirstName: form.recipientFirstName.trim(),
@@ -125,7 +126,7 @@ export function ParcelEditDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="sm" variant="outline" disabled={!canEdit} title={!canEdit ? 'Modification possible uniquement avant paiement' : undefined}>
+        <Button type="button" size="sm" variant="outline" disabled={!canEdit} title={!canEdit ? 'Modification possible uniquement avant paiement' : undefined}>
           <Pencil className="h-3 w-3 mr-1" />{buttonLabel}
         </Button>
       </DialogTrigger>
@@ -172,8 +173,8 @@ export function ParcelEditDialog({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)}>Annuler</Button>
-          <Button onClick={handleSave} disabled={saving} className="bg-emerald-600 hover:bg-emerald-700">
+          <Button type="button" variant="outline" onClick={() => setOpen(false)}>Annuler</Button>
+          <Button type="button" onClick={handleSave} disabled={saving} className="bg-emerald-600 hover:bg-emerald-700">
             {saving ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
             Enregistrer
           </Button>
@@ -202,7 +203,7 @@ export function ParcelDeleteButton({
 
     setDeleting(true);
     try {
-      const res = await fetch(`/api/parcels/${parcel.id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/parcels/${parcel.id}`, { method: 'DELETE', credentials: 'include' });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.error || 'Impossible de supprimer ce colis');
 
@@ -220,6 +221,7 @@ export function ParcelDeleteButton({
     <AlertDialog>
       <AlertDialogTrigger asChild>
         <Button
+          type="button"
           size="sm"
           variant="destructive"
           disabled={!canEdit || deleting}
@@ -241,6 +243,7 @@ export function ParcelDeleteButton({
         <AlertDialogFooter>
           <AlertDialogCancel disabled={deleting}>Annuler</AlertDialogCancel>
           <AlertDialogAction
+            type="button"
             onClick={handleDelete}
             disabled={deleting}
             className="bg-red-600 hover:bg-red-700 focus-visible:ring-red-600"
