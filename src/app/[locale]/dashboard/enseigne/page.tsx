@@ -182,6 +182,7 @@ export default async function EnseigneDashboardPage({
         await db.colis.update({
           where: { id: parcel.id },
           data: { qrCodeImage: fallbackImage },
+          select: { id: true },
         }).catch(() => undefined);
 
         return { ...parcel, qrCodeImage: fallbackImage };

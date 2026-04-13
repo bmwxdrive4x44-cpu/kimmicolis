@@ -108,7 +108,11 @@ export async function POST(request: NextRequest) {
     const notes = `Colis arrivé au relais de destination ${relais.commerceName}`;
 
     try {
-      await db.colis.update({ where: { id: parcel.id }, data: { status: newStatus, custody: 'RELAIS_DEST' } });
+      await db.colis.update({
+        where: { id: parcel.id },
+        data: { status: newStatus, custody: 'RELAIS_DEST' },
+        select: { id: true, status: true },
+      });
     } catch (custodyErr) {
       if (isPrismaSchemaError(custodyErr)) {
         await db.$executeRaw`UPDATE "Colis" SET status = ${newStatus}, "updatedAt" = NOW() WHERE id = ${parcel.id}`;

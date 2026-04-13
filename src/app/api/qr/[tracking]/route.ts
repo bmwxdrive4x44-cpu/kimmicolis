@@ -457,6 +457,7 @@ export async function POST(
             status: newStatus,
             deliveredAt: newStatus === 'LIVRE' ? new Date() : undefined,
           },
+          select: { id: true, status: true, deliveredAt: true },
         })
       : parcel;
 

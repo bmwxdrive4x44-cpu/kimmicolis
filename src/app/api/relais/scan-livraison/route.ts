@@ -200,6 +200,7 @@ export async function POST(request: NextRequest) {
         db.colis.update({
           where: { id: parcel.id },
           data: { status: newStatus, deliveredAt: new Date(), custody: 'RELAIS_DEST' },
+          select: { id: true, status: true },
         }),
         db.trackingHistory.create({
           data: { colisId: parcel.id, status: newStatus, notes, userId: auth.payload.id, relaisId: actingRelaisId },

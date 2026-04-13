@@ -80,6 +80,7 @@ export async function PUT(
       await db.colis.update({
         where: { id: mission.colisId },
         data: { status: 'EN_TRANSPORT' },
+        select: { id: true, status: true },
       });
 
       await db.trackingHistory.create({
@@ -104,6 +105,7 @@ export async function PUT(
       await db.colis.update({
         where: { id: mission.colisId },
         data: { status: 'ARRIVE_RELAIS_DESTINATION' },
+        select: { id: true, status: true },
       });
 
       await db.trackingHistory.create({

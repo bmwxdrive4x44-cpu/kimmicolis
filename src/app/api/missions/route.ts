@@ -170,6 +170,7 @@ export async function POST(request: NextRequest) {
     await db.colis.update({
       where: { id: colisId },
       data: { status: 'WAITING_PICKUP' },
+      select: { id: true, status: true },
     });
 
     // Add tracking history

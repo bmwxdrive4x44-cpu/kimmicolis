@@ -63,7 +63,18 @@ export async function POST(request: NextRequest) {
       await db.$transaction(async (tx) => {
         const lockedPayment = await tx.payment.findUnique({
           where: { id: payment.id },
-          include: { colis: true },
+          select: {
+            id: true,
+            colis: {
+              select: {
+                id: true,
+                status: true,
+                villeDepart: true,
+                villeArrivee: true,
+                clientId: true,
+              },
+            },
+          },
         });
 
         if (!lockedPayment) return;
@@ -83,6 +94,7 @@ export async function POST(request: NextRequest) {
           await tx.colis.update({
             where: { id: payment.colis.id },
             data: { status: applyTransition(lockedPayment.colis.status, 'READY_FOR_DEPOSIT') },
+            select: { id: true, status: true },
           });
         }
       });
@@ -91,7 +103,6 @@ export async function POST(request: NextRequest) {
       try {
         const matchResult = await matchColisToTrajets({
           id: payment.colis.id,
-          lineId: payment.colis.lineId,
           villeDepart: payment.colis.villeDepart,
           villeArrivee: payment.colis.villeArrivee,
           clientId: payment.colis.clientId,

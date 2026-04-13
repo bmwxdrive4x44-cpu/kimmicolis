@@ -174,11 +174,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Update parcel
-    let updatedParcel: Awaited<ReturnType<typeof db.colis.update>>;
+    let updatedParcel: { id: string; status: string; deliveredAt: Date | null };
     try {
       updatedParcel = await db.colis.update({
         where: { id: parcel.id },
         data: { status: newParcelStatus, ...parcelUpdateData },
+        select: { id: true, status: true, deliveredAt: true },
       });
     } catch (custodyErr) {
       if (isPrismaSchemaError(custodyErr)) {
@@ -188,6 +189,7 @@ export async function POST(request: NextRequest) {
         updatedParcel = await db.colis.update({
           where: { id: parcel.id },
           data: { status: newParcelStatus, ...safeUpdateData },
+          select: { id: true, status: true, deliveredAt: true },
         });
       } else {
         throw custodyErr;

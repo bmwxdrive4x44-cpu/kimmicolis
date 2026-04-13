@@ -140,6 +140,7 @@ export async function POST(request: NextRequest) {
     await db.colis.update({
       where: { id: colisId },
       data: { status: 'EN_DISPUTE', updatedAt: new Date() },
+      select: { id: true, status: true },
     });
 
     await Promise.all([
@@ -224,6 +225,7 @@ export async function PUT(request: NextRequest) {
       await db.colis.update({
         where: { id: existing.colisId },
         data: { status: restoreStatus, updatedAt: new Date() },
+        select: { id: true, status: true },
       });
 
       await db.notification.create({

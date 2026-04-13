@@ -152,6 +152,7 @@ export async function POST(request: NextRequest) {
         await tx.colis.update({
           where: { id: lockedPayment.colisId },
           data: { status: nextStatus },
+          select: { id: true, status: true },
         });
         await tx.trackingHistory.create({
           data: {
@@ -183,7 +184,6 @@ export async function POST(request: NextRequest) {
       where: { id: payment.colisId },
       select: {
         id: true,
-        lineId: true,
         villeDepart: true,
         villeArrivee: true,
         clientId: true,
@@ -224,6 +224,7 @@ export async function POST(request: NextRequest) {
       await tx.colis.update({
         where: { id: lockedPayment.colisId },
         data: { status: nextStatus },
+        select: { id: true, status: true },
       });
       await tx.trackingHistory.create({
         data: {

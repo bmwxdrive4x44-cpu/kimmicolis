@@ -142,7 +142,11 @@ export async function POST(request: NextRequest) {
       ]);
 
       try {
-        await db.colis.update({ where: { id: parcel.id }, data: { status: newStatus, custody: 'RELAIS_DEPART' } });
+        await db.colis.update({
+          where: { id: parcel.id },
+          data: { status: newStatus, custody: 'RELAIS_DEPART' },
+          select: { id: true, status: true },
+        });
       } catch (custodyErr) {
         if (isPrismaSchemaError(custodyErr)) {
           await db.$executeRaw`UPDATE "Colis" SET status = ${newStatus}, "updatedAt" = NOW() WHERE id = ${parcel.id}`;
@@ -166,7 +170,11 @@ export async function POST(request: NextRequest) {
     } else {
       // Cash déjà enregistré lors d'une étape précédente
       try {
-        await db.colis.update({ where: { id: parcel.id }, data: { status: newStatus, custody: 'RELAIS_DEPART' } });
+        await db.colis.update({
+          where: { id: parcel.id },
+          data: { status: newStatus, custody: 'RELAIS_DEPART' },
+          select: { id: true, status: true },
+        });
       } catch (custodyErr) {
         if (isPrismaSchemaError(custodyErr)) {
           await db.$executeRaw`UPDATE "Colis" SET status = ${newStatus}, "updatedAt" = NOW() WHERE id = ${parcel.id}`;

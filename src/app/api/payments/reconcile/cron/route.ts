@@ -71,6 +71,7 @@ export async function POST(request: NextRequest) {
           await tx.colis.update({
             where: { id: payment.colisId },
             data: { status: 'CREATED', updatedAt: new Date() },
+            select: { id: true, status: true },
           });
           colisReset += 1;
         }

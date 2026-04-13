@@ -329,6 +329,7 @@ export async function POST(request: NextRequest) {
     const updatedParcel = await db.colis.update({
       where: { id: parcel.id },
       data: { status: newStatus, ...updateData },
+      select: { id: true, status: true, deliveredAt: true },
     });
 
     // Add tracking history

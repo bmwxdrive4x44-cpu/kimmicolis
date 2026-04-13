@@ -71,6 +71,7 @@ export async function POST(request: NextRequest) {
     await db.colis.update({
       where: { id: parcel.id },
       data: { status: 'RETOUR', updatedAt: new Date() },
+      select: { id: true, status: true },
     });
 
     await Promise.all([
