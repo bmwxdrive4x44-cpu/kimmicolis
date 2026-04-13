@@ -20,6 +20,9 @@ export function QrCameraScanner({ onScan, disabled = false, onError }: QrCameraS
   const [manualInput, setManualInput] = useState('');
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const isMountedRef = useRef(true);
+  // onScan ref pour éviter de le capturer dans useEffect
+  const onScanRef = useRef(onScan);
+  useEffect(() => { onScanRef.current = onScan; }, [onScan]);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -32,7 +35,6 @@ export function QrCameraScanner({ onScan, disabled = false, onError }: QrCameraS
   const stopScanner = async () => {
     const scanner = scannerRef.current;
     if (!scanner) return;
-
     try {
       const state = scanner.getState();
       if (
@@ -48,10 +50,83 @@ export function QrCameraScanner({ onScan, disabled = false, onError }: QrCameraS
     scannerRef.current = null;
   };
 
+  // Démarre la caméra APRÈS le re-render React (isOpen=true rend le container visible avec des dimensions réelles)
+  useEffect(() => {
+    if (!isOpen || !isStarting) return;
+
+    const startCamera = async () => {
+      try {
+        const qrScanner = new Html5Qrcode(SCANNER_ELEMENT_ID);
+        scannerRef.current = qrScanner;
+
+        const onDecoded = (decodedText: string) => {
+          onScanRef.current(decodedText);
+          stopScanner().then(() => {
+            if (isMountedRef.current) setIsOpen(false);
+          });
+        };
+
+        const config = {
+          fps: 15,
+          qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
+            const edge = Math.floor(Math.min(viewfinderWidth, viewfinderHeight) * 0.8);
+            return { width: edge, height: edge };
+          },
+        };
+
+        // Préférer caméra arrière, fallback sur caméra avant
+        try {
+          await qrScanner.start({ facingMode: 'environment' }, config, onDecoded, undefined);
+        } catch (firstErr: unknown) {
+          const firstErrorName = (firstErr as { name?: string })?.name;
+          if (firstErrorName === 'NotAllowedError') throw firstErr;
+          await qrScanner.start({ facingMode: 'user' }, config, onDecoded, undefined);
+        }
+      } catch (err: unknown) {
+        const errorName = (err as { name?: string })?.name;
+        const errorMsg = (err as { message?: string })?.message;
+        let message = 'Impossible de démarrer la caméra QR. Vous pouvez saisir le code manuellement.';
+
+        if (errorName === 'NotFoundError') {
+          message = 'Aucune caméra compatible détectée. Vérifiez qu\'une webcam est branchée/active.';
+        } else if (errorName === 'NotAllowedError') {
+          message = 'Accès caméra refusé. Autorisez la caméra dans les paramètres du navigateur (cadenas dans la barre d\'adresse).';
+        } else if (errorName === 'NotReadableError') {
+          message = 'La caméra est déjà utilisée par une autre application. Fermez-la puis réessayez.';
+        } else if (errorName === 'OverconstrainedError') {
+          message = 'Aucune caméra ne correspond aux contraintes. Essayez un autre navigateur.';
+        } else if (errorMsg?.includes('https') || errorMsg?.includes('secure')) {
+          message = 'La caméra nécessite une connexion HTTPS. Saisissez le code manuellement.';
+        } else if (errorName) {
+          message = `Caméra indisponible (${errorName}). Saisissez le code manuellement.`;
+        }
+
+        setErrorMessage(message);
+        onError?.(message);
+        console.error('[QrCameraScanner] Erreur caméra:', {
+          name: errorName,
+          message: errorMsg,
+          isSecureContext: window.isSecureContext,
+        });
+
+        await stopScanner();
+        if (isMountedRef.current) setIsOpen(false);
+      } finally {
+        if (isMountedRef.current) setIsStarting(false);
+      }
+    };
+
+    startCamera();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, isStarting]);
+
   const handleToggle = async () => {
     if (isOpen) {
       await stopScanner();
-      if (isMountedRef.current) setIsOpen(false);
+      if (isMountedRef.current) {
+        setIsOpen(false);
+        setIsStarting(false);
+      }
       return;
     }
 
@@ -66,83 +141,16 @@ export function QrCameraScanner({ onScan, disabled = false, onError }: QrCameraS
     }
 
     if (!window.isSecureContext) {
-      const message = 'La caméra nécessite HTTPS ou localhost (évitez 127.0.0.1 si permission refusée).';
+      const message = 'La caméra nécessite HTTPS ou localhost.';
       setErrorMessage(message);
       onError?.(message);
       return;
     }
 
+    // 1. isOpen=true → React re-render → container devient visible avec vraies dimensions
+    // 2. isStarting=true → useEffect détecte les deux à true → démarre la caméra
     setIsOpen(true);
     setIsStarting(true);
-
-    if (!isMountedRef.current) return;
-
-    try {
-      const qrScanner = new Html5Qrcode(SCANNER_ELEMENT_ID);
-      scannerRef.current = qrScanner;
-
-      const onDecoded = (decodedText: string) => {
-        onScan(decodedText);
-        stopScanner().then(() => {
-          if (isMountedRef.current) setIsOpen(false);
-        });
-      };
-
-      const config = {
-        fps: 15,
-        qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
-          const edge = Math.floor(Math.min(viewfinderWidth, viewfinderHeight) * 0.8);
-          return { width: edge, height: edge };
-        },
-      };
-
-      // Prefer rear camera; if unavailable, fallback to front camera.
-      try {
-        await qrScanner.start({ facingMode: 'environment' }, config, onDecoded, undefined);
-      } catch (firstErr: unknown) {
-        const firstErrorName = (firstErr as { name?: string })?.name;
-
-        if (firstErrorName === 'NotAllowedError') {
-          throw firstErr;
-        }
-
-        await qrScanner.start({ facingMode: 'user' }, config, onDecoded, undefined);
-      }
-    } catch (err: unknown) {
-      const errorName = (err as { name?: string })?.name;
-      const errorMsg = (err as { message?: string })?.message;
-      let message = 'Impossible de démarrer la caméra QR. Vous pouvez saisir le code manuellement.';
-
-      if (errorName === 'NotFoundError') {
-        message = 'Aucune caméra compatible détectée. Vérifiez qu\'une webcam est branchée/active.';
-      } else if (errorName === 'NotAllowedError') {
-        message = 'Accès caméra refusé. Autorisez la caméra dans les paramètres du navigateur (cadenas dans la barre d\'adresse).';
-      } else if (errorName === 'NotReadableError') {
-        message = 'La caméra est déjà utilisée par une autre application. Fermez-la puis réessayez.';
-      } else if (errorName === 'OverconstrainedError') {
-        message = 'Aucune caméra ne correspond aux contraintes demandées. Essayez un autre navigateur.';
-      } else if (errorMsg?.includes('https') || errorMsg?.includes('secure')) {
-        message = 'La caméra nécessite une connexion HTTPS. Saisissez le code manuellement.';
-      } else if (errorName) {
-        message = `Caméra indisponible (${errorName}). Saisissez le code manuellement.`;
-      }
-
-      setErrorMessage(message);
-      onError?.(message);
-
-      // Log detailed error info for debugging
-      console.error('[QrCameraScanner] Erreur caméra:', {
-        name: errorName,
-        message: errorMsg,
-        isSecureContext: window.isSecureContext,
-        fullError: err,
-      });
-
-      await stopScanner();
-      if (isMountedRef.current) setIsOpen(false);
-    } finally {
-      if (isMountedRef.current) setIsStarting(false);
-    }
   };
 
   const handleManualSubmit = (e: React.FormEvent) => {
