@@ -54,9 +54,19 @@ export function QrCameraScanner({ onScan, disabled = false, onError }: QrCameraS
   useEffect(() => {
     if (!isOpen || !isStarting) return;
 
+    // `cancelled` protège contre le double-run React StrictMode (dev)
+    let cancelled = false;
+
     const startCamera = async () => {
       try {
         const qrScanner = new Html5Qrcode(SCANNER_ELEMENT_ID);
+
+        // Si StrictMode a déjà nettoyé entre-temps, libérer immédiatement
+        if (cancelled) {
+          try { qrScanner.clear(); } catch { /* ignore */ }
+          return;
+        }
+
         scannerRef.current = qrScanner;
 
         const onDecoded = (decodedText: string) => {
@@ -78,16 +88,36 @@ export function QrCameraScanner({ onScan, disabled = false, onError }: QrCameraS
         try {
           await qrScanner.start({ facingMode: 'environment' }, config, onDecoded, undefined);
         } catch (firstErr: unknown) {
-          const firstErrorName = (firstErr as { name?: string })?.name;
-          if (firstErrorName === 'NotAllowedError') throw firstErr;
+          if (cancelled) return;
+          const firstErrName = firstErr instanceof Error
+            ? firstErr.name
+            : (firstErr as { name?: string })?.name ?? String(firstErr);
+          if (firstErrName === 'NotAllowedError') throw firstErr;
           await qrScanner.start({ facingMode: 'user' }, config, onDecoded, undefined);
         }
       } catch (err: unknown) {
-        const errorName = (err as { name?: string })?.name;
-        const errorMsg = (err as { message?: string })?.message;
+        if (cancelled) return;
+
+        // html5-qrcode peut lancer des strings, des DOMException ou des objets custom
+        let errorName: string | undefined;
+        let errorMsg: string | undefined;
+
+        if (err instanceof Error) {
+          errorName = err.name;
+          errorMsg = err.message;
+        } else if (typeof err === 'string') {
+          errorMsg = err;
+          // Messages strings courants de html5-qrcode
+          if (/no cameras/i.test(err)) errorName = 'NotFoundError';
+          else if (/permission/i.test(err) || /not allowed/i.test(err)) errorName = 'NotAllowedError';
+        } else if (err && typeof err === 'object') {
+          errorName = (err as { name?: string }).name;
+          errorMsg = (err as { message?: string }).message ?? JSON.stringify(err);
+        }
+
         let message = 'Impossible de démarrer la caméra QR. Vous pouvez saisir le code manuellement.';
 
-        if (errorName === 'NotFoundError') {
+        if (errorName === 'NotFoundError' || /no cameras/i.test(errorMsg ?? '')) {
           message = 'Aucune caméra compatible détectée. Vérifiez qu\'une webcam est branchée/active.';
         } else if (errorName === 'NotAllowedError') {
           message = 'Accès caméra refusé. Autorisez la caméra dans les paramètres du navigateur (cadenas dans la barre d\'adresse).';
@@ -103,20 +133,23 @@ export function QrCameraScanner({ onScan, disabled = false, onError }: QrCameraS
 
         setErrorMessage(message);
         onError?.(message);
-        console.error('[QrCameraScanner] Erreur caméra:', {
-          name: errorName,
-          message: errorMsg,
-          isSecureContext: window.isSecureContext,
-        });
+        // Log brut pour faciliter le debug (pas de wrapping dans un objet)
+        console.error('[QrCameraScanner] Erreur caméra (raw):', err, '| isSecureContext:', window.isSecureContext);
 
         await stopScanner();
         if (isMountedRef.current) setIsOpen(false);
       } finally {
-        if (isMountedRef.current) setIsStarting(false);
+        if (!cancelled && isMountedRef.current) setIsStarting(false);
       }
     };
 
     startCamera();
+
+    // Cleanup: annule l'init si React démonte entre-temps (StrictMode, navigation rapide)
+    return () => {
+      cancelled = true;
+      stopScanner();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, isStarting]);
 
@@ -195,7 +228,7 @@ export function QrCameraScanner({ onScan, disabled = false, onError }: QrCameraS
               <Loader2 className="h-8 w-8 animate-spin text-white" />
             </div>
           )}
-          <div id={SCANNER_ELEMENT_ID} className="w-full" />
+          <div id={SCANNER_ELEMENT_ID} className="w-full min-h-[300px]" />
       </div>
 
       {errorMessage && (
