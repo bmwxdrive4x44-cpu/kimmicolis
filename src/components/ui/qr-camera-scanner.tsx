@@ -70,24 +70,6 @@ export function QrCameraScanner({ onScan, disabled = false, onError }: QrCameraS
 
     const startCamera = async () => {
       try {
-        // ── Pré-vérification getUserMedia ──────────────────────────────────────
-        // Tester l'accès caméra AVANT html5-qrcode pour obtenir un vrai DOMException.
-        // Important: NotFoundError n'est pas bloquant ici; on laisse html5-qrcode tenter
-        // ses propres stratégies (deviceId/facingMode), parfois plus tolérantes.
-        let preflightError: unknown = null;
-        let testStream: MediaStream | null = null;
-        try {
-          testStream = await navigator.mediaDevices.getUserMedia({ video: true });
-        } catch (preErr) {
-          preflightError = preErr;
-          const preErrString = extractErrString(preErr);
-          if (/NotAllowedError|permission denied/i.test(preErrString)) {
-            throw preErr;
-          }
-        } finally {
-          // Libère la stream de test (sinon elle bloquerait l'init html5-qrcode)
-          testStream?.getTracks().forEach((t) => t.stop());
-        }
 
         const onDecoded = (decodedText: string) => {
           onScanRef.current(decodedText);
@@ -106,24 +88,25 @@ export function QrCameraScanner({ onScan, disabled = false, onError }: QrCameraS
 
         // Essayer plusieurs stratégies avant de conclure "pas de caméra"
         const attemptErrors: string[] = [];
-        const cameras = await Html5Qrcode.getCameras().catch((e) => {
+        let cameras: Array<{ id: string; label: string }> = [];
+        // Sur certains navigateurs prod, getCameras peut échouer alors que facingMode fonctionne.
+        // On privilégie donc d'abord facingMode.
+        try {
+          cameras = await Html5Qrcode.getCameras();
+        } catch (e) {
           attemptErrors.push(`getCameras:${extractErrString(e)}`);
-          return [] as Array<{ id: string; label: string }>;
-        });
+        }
 
         const preferred = cameras.find((camera) =>
           /back|rear|environment|arriere|traseira|trasera/i.test(camera.label)
         );
-
-        const orderedIds = [
-          preferred?.id,
-          ...cameras.map((camera) => camera.id),
-        ].filter((id, idx, arr): id is string => Boolean(id) && arr.indexOf(id) === idx);
+        const orderedIds = [preferred?.id, ...cameras.map((camera) => camera.id)]
+          .filter((id, idx, arr): id is string => Boolean(id) && arr.indexOf(id) === idx);
 
         const strategies: Array<{ key: string; camera: string | { facingMode: 'environment' | 'user' } }> = [
-          ...orderedIds.map((deviceId) => ({ key: `device:${deviceId}`, camera: deviceId })),
           { key: 'facing:environment', camera: { facingMode: 'environment' as const } },
           { key: 'facing:user', camera: { facingMode: 'user' as const } },
+          ...orderedIds.map((deviceId) => ({ key: `device:${deviceId}`, camera: deviceId })),
         ];
 
         let started = false;
@@ -156,9 +139,6 @@ export function QrCameraScanner({ onScan, disabled = false, onError }: QrCameraS
           throw new Error(`camera_start_failed::${attemptErrors.join(' || ') || 'no strategy succeeded'}`);
         }
 
-        if (preflightError) {
-          console.warn('[QrCameraScanner] preflight getUserMedia a échoué mais un fallback a réussi:', preflightError);
-        }
       } catch (err: unknown) {
         if (cancelled) return;
 
