@@ -696,8 +696,18 @@ function PaymentTab({ userId }: { userId: string }) {
                         {payingId === parcel.id ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <CreditCard className="h-4 w-4 mr-1" />}
                         Payer en ligne
                       </Button>
-                      <Button type="button" variant="outline" onClick={() => push(`/${locale}/dashboard/client?tab=track&track=${parcel.trackingNumber}`)}>
-                        <Banknote className="h-4 w-4 mr-1" />Voir (espèces)
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          toast({
+                            title: 'Paiement en espèces au relais',
+                            description: 'Le règlement en espèces se fait au relais de départ. Ouverture du suivi du colis.',
+                          });
+                          push(`/${locale}/dashboard/client?tab=track&track=${parcel.trackingNumber}`);
+                        }}
+                      >
+                        <Banknote className="h-4 w-4 mr-1" />Suivi / espèces
                       </Button>
                       <ParcelEditDialog parcel={parcel} buttonLabel="Modifier" onSaved={fetchData} />
                       <ParcelDeleteButton parcel={parcel} onSaved={fetchData} />
