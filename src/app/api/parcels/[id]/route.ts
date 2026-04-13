@@ -47,6 +47,47 @@ async function filterExistingColisFields<T extends Record<string, unknown>>(data
   ) as Partial<T>;
 }
 
+async function getSafeColisReadSelect() {
+  const columns = await getTableColumns('Colis');
+  const scalarFields = [
+    'id',
+    'trackingNumber',
+    'clientId',
+    'relaisDepartId',
+    'relaisArriveeId',
+    'villeDepart',
+    'villeArrivee',
+    'weight',
+    'description',
+    'prixClient',
+    'status',
+    'dateLimit',
+    'deliveredAt',
+    'createdAt',
+    'updatedAt',
+    'recipientFirstName',
+    'recipientLastName',
+    'recipientPhone',
+    'recipientEmail',
+    'qrCodeImage',
+  ];
+
+  const select: Record<string, unknown> = {};
+  for (const field of scalarFields) {
+    if (columns.has(field)) {
+      select[field] = true;
+    }
+  }
+
+  select.client = { select: { id: true, name: true, email: true, phone: true } };
+  select.relaisDepart = { include: { user: { select: { name: true, phone: true } } } };
+  select.relaisArrivee = { include: { user: { select: { name: true, phone: true } } } };
+  select.missions = { include: { transporteur: { select: { id: true, name: true, phone: true } } } };
+  select.trackingHistory = { orderBy: { createdAt: 'desc' } };
+
+  return select;
+}
+
 async function getPricingConfig() {
   const keys = [
     'pricingAdminFee',
@@ -89,20 +130,14 @@ export async function GET(
     
     const parcel = await db.colis.findUnique({
       where: { id },
-      include: {
-        client: { select: { id: true, name: true, email: true, phone: true } },
-        relaisDepart: { include: { user: { select: { name: true, phone: true } } } },
-        relaisArrivee: { include: { user: { select: { name: true, phone: true } } } },
-        missions: { include: { transporteur: { select: { id: true, name: true, phone: true } } } },
-        trackingHistory: { orderBy: { createdAt: 'desc' } },
-      },
+      select: await getSafeColisReadSelect(),
     });
 
     if (!parcel) {
       return NextResponse.json({ error: 'Parcel not found' }, { status: 404 });
     }
 
-    if (auth.payload.role === 'CLIENT' && parcel.clientId !== auth.payload.id) {
+    if (auth.payload.role === 'CLIENT' && (parcel as any).clientId !== auth.payload.id) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
@@ -141,6 +176,7 @@ export async function PUT(
         status,
         deliveredAt: status === 'LIVRE' ? new Date() : null,
       },
+      select: { id: true, status: true, deliveredAt: true },
     });
 
     // Add tracking history
@@ -289,6 +325,16 @@ export async function PATCH(
     const parcel = await db.colis.update({
       where: { id },
       data: effectiveUpdates,
+      select: {
+        id: true,
+        status: true,
+        recipientFirstName: true,
+        recipientLastName: true,
+        recipientPhone: true,
+        recipientEmail: true,
+        weight: true,
+        description: true,
+      },
     });
 
     await db.trackingHistory.create({
