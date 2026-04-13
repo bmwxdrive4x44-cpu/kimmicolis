@@ -991,6 +991,37 @@ function ProfilClientTab({ userId }: { userId: string }) {
   const [userData, setUserData] = useState<any>(null);
   const [form, setForm] = useState({ firstName: '', lastName: '', email: '', phone: '', address: '' });
   const [passwordForm, setPasswordForm] = useState({ password: '', confirm: '' });
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+
+  const validateForm = () => {
+    const errors: Record<string, string> = {};
+
+    if (!form.firstName.trim()) errors.firstName = 'Le prénom est obligatoire';
+    if (!form.lastName.trim()) errors.lastName = 'Le nom est obligatoire';
+    if (!form.email.trim()) {
+      errors.email = 'L\'email est obligatoire';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+      errors.email = 'Format d\'email invalide';
+    }
+    if (!form.phone.trim()) errors.phone = 'Le téléphone est obligatoire';
+    if (!form.address.trim()) errors.address = 'L\'adresse est obligatoire';
+
+    if (passwordForm.password) {
+      if (passwordForm.password.length < 8) {
+        errors.password = 'Le mot de passe doit contenir au moins 8 caractères';
+      }
+      if (!passwordForm.confirm) {
+        errors.confirm = 'Veuillez confirmer le mot de passe';
+      } else if (passwordForm.password !== passwordForm.confirm) {
+        errors.confirm = 'Les mots de passe ne correspondent pas';
+      }
+    } else if (passwordForm.confirm) {
+      errors.password = 'Saisissez un mot de passe avant la confirmation';
+    }
+
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
 
   const fetchData = async () => {
     try {
@@ -1015,8 +1046,8 @@ function ProfilClientTab({ userId }: { userId: string }) {
   useEffect(() => { fetchData(); }, [userId]);
 
   const handleSave = async () => {
-    if (passwordForm.password && passwordForm.password !== passwordForm.confirm) {
-      toast({ title: 'Erreur', description: 'Les mots de passe ne correspondent pas', variant: 'destructive' });
+    if (!validateForm()) {
+      toast({ title: 'Erreur', description: 'Veuillez corriger les champs obligatoires', variant: 'destructive' });
       return;
     }
     setIsSaving(true);
@@ -1039,6 +1070,7 @@ function ProfilClientTab({ userId }: { userId: string }) {
       if (res.ok) {
         toast({ title: 'Profil mis à jour' });
         setIsEditing(false);
+        setFormErrors({});
         setPasswordForm({ password: '', confirm: '' });
         await fetchData();
       } else {
@@ -1079,24 +1111,72 @@ function ProfilClientTab({ userId }: { userId: string }) {
             <div className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label>Prénom</Label>
-                  <Input value={form.firstName} onChange={e => setForm({ ...form, firstName: e.target.value })} />
+                  <Label>Prénom *</Label>
+                  <Input
+                    value={form.firstName}
+                    onChange={e => {
+                      setForm({ ...form, firstName: e.target.value });
+                      if (formErrors.firstName) setFormErrors((prev) => ({ ...prev, firstName: '' }));
+                    }}
+                    aria-invalid={Boolean(formErrors.firstName)}
+                    className={formErrors.firstName ? 'border-red-500 focus-visible:ring-red-500' : ''}
+                  />
+                  {formErrors.firstName && <p className="text-xs text-red-600">{formErrors.firstName}</p>}
                 </div>
                 <div className="space-y-2">
-                  <Label>Nom</Label>
-                  <Input value={form.lastName} onChange={e => setForm({ ...form, lastName: e.target.value })} />
+                  <Label>Nom *</Label>
+                  <Input
+                    value={form.lastName}
+                    onChange={e => {
+                      setForm({ ...form, lastName: e.target.value });
+                      if (formErrors.lastName) setFormErrors((prev) => ({ ...prev, lastName: '' }));
+                    }}
+                    aria-invalid={Boolean(formErrors.lastName)}
+                    className={formErrors.lastName ? 'border-red-500 focus-visible:ring-red-500' : ''}
+                  />
+                  {formErrors.lastName && <p className="text-xs text-red-600">{formErrors.lastName}</p>}
                 </div>
                 <div className="space-y-2">
-                  <Label>Téléphone</Label>
-                  <Input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="Ex: 0555123456" />
+                  <Label>Téléphone *</Label>
+                  <Input
+                    value={form.phone}
+                    onChange={e => {
+                      setForm({ ...form, phone: e.target.value });
+                      if (formErrors.phone) setFormErrors((prev) => ({ ...prev, phone: '' }));
+                    }}
+                    placeholder="Ex: 0555123456"
+                    aria-invalid={Boolean(formErrors.phone)}
+                    className={formErrors.phone ? 'border-red-500 focus-visible:ring-red-500' : ''}
+                  />
+                  {formErrors.phone && <p className="text-xs text-red-600">{formErrors.phone}</p>}
                 </div>
                 <div className="space-y-2 sm:col-span-2">
-                  <Label>Email</Label>
-                  <Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
+                  <Label>Email *</Label>
+                  <Input
+                    type="email"
+                    value={form.email}
+                    onChange={e => {
+                      setForm({ ...form, email: e.target.value });
+                      if (formErrors.email) setFormErrors((prev) => ({ ...prev, email: '' }));
+                    }}
+                    aria-invalid={Boolean(formErrors.email)}
+                    className={formErrors.email ? 'border-red-500 focus-visible:ring-red-500' : ''}
+                  />
+                  {formErrors.email && <p className="text-xs text-red-600">{formErrors.email}</p>}
                 </div>
                 <div className="space-y-2 sm:col-span-2">
-                  <Label>Adresse</Label>
-                  <Input value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} placeholder="Ex: 12 Rue Didouche Mourad" />
+                  <Label>Adresse *</Label>
+                  <Input
+                    value={form.address}
+                    onChange={e => {
+                      setForm({ ...form, address: e.target.value });
+                      if (formErrors.address) setFormErrors((prev) => ({ ...prev, address: '' }));
+                    }}
+                    placeholder="Ex: 12 Rue Didouche Mourad"
+                    aria-invalid={Boolean(formErrors.address)}
+                    className={formErrors.address ? 'border-red-500 focus-visible:ring-red-500' : ''}
+                  />
+                  {formErrors.address && <p className="text-xs text-red-600">{formErrors.address}</p>}
                 </div>
               </div>
               <hr />
@@ -1104,15 +1184,36 @@ function ProfilClientTab({ userId }: { userId: string }) {
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label>Nouveau mot de passe</Label>
-                  <Input type="password" value={passwordForm.password} onChange={e => setPasswordForm({ ...passwordForm, password: e.target.value })} />
+                  <Input
+                    type="password"
+                    value={passwordForm.password}
+                    onChange={e => {
+                      setPasswordForm({ ...passwordForm, password: e.target.value });
+                      if (formErrors.password) setFormErrors((prev) => ({ ...prev, password: '' }));
+                    }}
+                    aria-invalid={Boolean(formErrors.password)}
+                    className={formErrors.password ? 'border-red-500 focus-visible:ring-red-500' : ''}
+                  />
+                  {formErrors.password && <p className="text-xs text-red-600">{formErrors.password}</p>}
                 </div>
                 <div className="space-y-2">
                   <Label>Confirmer le mot de passe</Label>
-                  <Input type="password" value={passwordForm.confirm} onChange={e => setPasswordForm({ ...passwordForm, confirm: e.target.value })} />
+                  <Input
+                    type="password"
+                    value={passwordForm.confirm}
+                    onChange={e => {
+                      setPasswordForm({ ...passwordForm, confirm: e.target.value });
+                      if (formErrors.confirm) setFormErrors((prev) => ({ ...prev, confirm: '' }));
+                    }}
+                    aria-invalid={Boolean(formErrors.confirm)}
+                    className={formErrors.confirm ? 'border-red-500 focus-visible:ring-red-500' : ''}
+                  />
+                  {formErrors.confirm && <p className="text-xs text-red-600">{formErrors.confirm}</p>}
                 </div>
               </div>
               <div className="flex gap-3 pt-2">
                 <button
+                  type="button"
                   onClick={handleSave}
                   disabled={isSaving}
                   className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded text-sm font-medium disabled:opacity-60 transition-colors"
@@ -1121,8 +1222,10 @@ function ProfilClientTab({ userId }: { userId: string }) {
                   Enregistrer
                 </button>
                 <button
+                  type="button"
                   onClick={() => {
                     setIsEditing(false);
+                    setFormErrors({});
                     setForm({
                       firstName: userData?.firstName || '',
                       lastName: userData?.lastName || '',
