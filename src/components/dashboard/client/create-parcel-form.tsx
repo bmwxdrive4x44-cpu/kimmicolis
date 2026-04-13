@@ -126,6 +126,7 @@ export function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart 
     void fetchRelayPrinterStatuses();
     void fetchPricingSettings();
     void fetchLignesActives();
+    void fetchUserProfile();
   }, []);
 
   useEffect(() => {
@@ -194,6 +195,29 @@ export function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart 
       });
     } catch {
       // keep defaults
+    }
+  };
+
+  const fetchUserProfile = async () => {
+    try {
+      const response = await fetch(`/api/users/${userId}`, { credentials: 'include' });
+      if (!response.ok) return;
+
+      const user = await response.json();
+      const fallbackNames = String(user?.name || '').trim().split(/\s+/).filter(Boolean);
+      const fallbackFirstName = fallbackNames.length > 1 ? fallbackNames.slice(0, -1).join(' ') : fallbackNames[0] || '';
+      const fallbackLastName = fallbackNames.length > 1 ? fallbackNames[fallbackNames.length - 1] : '';
+
+      setFormData((prev) => ({
+        ...prev,
+        senderFirstName: prev.senderFirstName || user?.firstName || fallbackFirstName,
+        senderLastName: prev.senderLastName || user?.lastName || fallbackLastName,
+        senderPhone: prev.senderPhone || user?.phone || '',
+      }));
+
+      setHomeAddress((prev) => prev || user?.address || '');
+    } catch (error) {
+      console.error('Error fetching user profile for parcel form:', error);
     }
   };
 
@@ -720,15 +744,17 @@ export function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart 
             </div>
           )}
 
-          <div className="flex flex-col sm:flex-row gap-3">
-            <Button variant="outline" className="flex-1" onClick={resetForm}>
-              <Plus className="h-4 w-4 mr-2" />Créer un autre colis
-            </Button>
-            <Button variant="outline" className="flex-1" onClick={onGoToCart}>
-              <CreditCard className="h-4 w-4 mr-2" />Aller au panier
-            </Button>
-            <Button className="flex-1 bg-emerald-600 hover:bg-emerald-700" onClick={onGoToHistory}>
-              <History className="h-4 w-4 mr-2" />Voir mon historique
+          <div className="flex flex-col gap-3">
+            <div className="grid grid-cols-2 gap-3">
+              <Button variant="outline" className="w-full text-sm" onClick={resetForm}>
+                <Plus className="h-4 w-4 mr-1.5 shrink-0" />Créer un autre colis
+              </Button>
+              <Button variant="outline" className="w-full text-sm" onClick={onGoToCart}>
+                <CreditCard className="h-4 w-4 mr-1.5 shrink-0" />Aller au panier
+              </Button>
+            </div>
+            <Button className="w-full bg-emerald-600 hover:bg-emerald-700" onClick={onGoToHistory}>
+              <History className="h-4 w-4 mr-2 shrink-0" />Voir mon historique
             </Button>
           </div>
         </CardContent>
