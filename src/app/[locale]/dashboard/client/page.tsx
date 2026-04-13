@@ -1051,7 +1051,10 @@ function ProfilClientTab({ userId }: { userId: string }) {
   useEffect(() => { fetchData(); }, [userId]);
 
   const handleSave = async () => {
-    if (passwordForm.password && passwordForm.password !== passwordForm.confirm) {
+    const nextPassword = passwordForm.password.trim();
+    const nextPasswordConfirm = passwordForm.confirm.trim();
+
+    if (nextPassword && nextPassword !== nextPasswordConfirm) {
       toast({ title: 'Erreur', description: 'Les mots de passe ne correspondent pas', variant: 'destructive' });
       return;
     }
@@ -1065,7 +1068,7 @@ function ProfilClientTab({ userId }: { userId: string }) {
         phone: form.phone,
         address: form.address,
       };
-      if (passwordForm.password) payload.password = passwordForm.password;
+      if (nextPassword) payload.password = nextPassword;
       const res = await fetch(`/api/users/${userId}`, {
         method: 'PUT',
         credentials: 'include',
@@ -1140,11 +1143,11 @@ function ProfilClientTab({ userId }: { userId: string }) {
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label>Nouveau mot de passe</Label>
-                  <Input type="password" value={passwordForm.password} onChange={e => setPasswordForm({ ...passwordForm, password: e.target.value })} />
+                  <Input autoComplete="new-password" type="password" value={passwordForm.password} onChange={e => setPasswordForm({ ...passwordForm, password: e.target.value })} />
                 </div>
                 <div className="space-y-2">
                   <Label>Confirmer le mot de passe</Label>
-                  <Input type="password" value={passwordForm.confirm} onChange={e => setPasswordForm({ ...passwordForm, confirm: e.target.value })} />
+                  <Input autoComplete="new-password" type="password" value={passwordForm.confirm} onChange={e => setPasswordForm({ ...passwordForm, confirm: e.target.value })} />
                 </div>
               </div>
               <div className="flex gap-3 pt-2">
