@@ -30,7 +30,7 @@ export type EditableParcel = {
   description?: string | null;
 };
 
-const EDITABLE_STATUSES = new Set(['CREATED', 'PENDING_PAYMENT', 'ANNULE']);
+const EDITABLE_STATUSES = new Set(['CREATED', 'PENDING_PAYMENT']);
 
 export function ParcelEditDialog({
   parcel,
