@@ -75,6 +75,7 @@ function ClientDashboardContent() {
   const [stats, setStats] = useState({ created: 0, inTransit: 0, delivered: 0, totalSpent: 0 });
   const [cartCount, setCartCount] = useState(0);
   const [implicitPro, setImplicitPro] = useState({ eligible: false, validParcelsCount: 0, remaining: 5, threshold: 5, windowDays: 90 });
+  const [sessionLoadingTimedOut, setSessionLoadingTimedOut] = useState(false);
 
   async function fetchStats() {
     try {
@@ -176,12 +177,36 @@ function ClientDashboardContent() {
     return () => clearTimeout(timeoutRef);
   }, [activeTab, session?.user?.id]);
 
+  useEffect(() => {
+    setSessionLoadingTimedOut(false);
+    if (status !== 'loading') return;
+
+    const timeoutRef = setTimeout(() => {
+      setSessionLoadingTimedOut(true);
+    }, 12000);
+
+    return () => clearTimeout(timeoutRef);
+  }, [status]);
+
   if (status === 'loading') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
         <div className="text-center">
           <Loader2 className="h-8 w-8 animate-spin text-emerald-600 mx-auto mb-4" />
           <p className="text-slate-600">Connexion en cours...</p>
+          {sessionLoadingTimedOut && (
+            <div className="mt-4 space-y-3">
+              <p className="text-sm text-amber-700">La session met trop de temps à se charger.</p>
+              <div className="flex items-center justify-center gap-2">
+                <Button type="button" variant="outline" onClick={() => window.location.reload()}>
+                  Rafraîchir
+                </Button>
+                <Button type="button" onClick={() => router.push(`/${locale}/auth/login`)}>
+                  Se reconnecter
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -991,46 +1016,15 @@ function ProfilClientTab({ userId }: { userId: string }) {
   const [userData, setUserData] = useState<any>(null);
   const [form, setForm] = useState({ firstName: '', lastName: '', email: '', phone: '', address: '' });
   const [passwordForm, setPasswordForm] = useState({ password: '', confirm: '' });
-  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
-
-  const validateForm = () => {
-    const errors: Record<string, string> = {};
-
-    if (!form.firstName.trim()) errors.firstName = 'Le prénom est obligatoire';
-    if (!form.lastName.trim()) errors.lastName = 'Le nom est obligatoire';
-    if (!form.email.trim()) {
-      errors.email = 'L\'email est obligatoire';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
-      errors.email = 'Format d\'email invalide';
-    }
-    if (!form.phone.trim()) errors.phone = 'Le téléphone est obligatoire';
-    if (!form.address.trim()) errors.address = 'L\'adresse est obligatoire';
-
-    const shouldValidatePassword = Boolean(passwordForm.password.trim()) || Boolean(passwordForm.confirm.trim());
-
-    if (shouldValidatePassword) {
-      if (!passwordForm.password && passwordForm.confirm) {
-        errors.password = 'Saisissez un mot de passe avant la confirmation';
-      }
-      if (passwordForm.password) {
-        if (passwordForm.password.length < 8) {
-          errors.password = 'Le mot de passe doit contenir au moins 8 caractères';
-        }
-        if (!passwordForm.confirm) {
-          errors.confirm = 'Veuillez confirmer le mot de passe';
-        } else if (passwordForm.password !== passwordForm.confirm) {
-          errors.confirm = 'Les mots de passe ne correspondent pas';
-        }
-      }
-    }
-
-    setFormErrors(errors);
-    return Object.keys(errors).length === 0;
-  };
 
   const fetchData = async () => {
+    const controller = new AbortController();
+    const timeoutRef = setTimeout(() => controller.abort(), 12000);
     try {
-      const res = await fetch(`/api/users/${userId}`, { credentials: 'include' });
+      const res = await fetch(`/api/users/${userId}`, {
+        credentials: 'include',
+        signal: controller.signal,
+      });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setUserData(data);
@@ -1041,18 +1035,24 @@ function ProfilClientTab({ userId }: { userId: string }) {
         phone: data.phone || '',
         address: data.address || '',
       });
-      setPasswordForm({ password: '', confirm: '' });
-      setFormErrors({});
     } catch (error) {
       console.error('Error fetching user:', error);
+      toast({
+        title: 'Chargement profil interrompu',
+        description: 'La récupération du profil a pris trop de temps. Réessayez.',
+        variant: 'destructive',
+      });
     } finally {
+      clearTimeout(timeoutRef);
       setIsLoading(false);
     }
   };
 
+  useEffect(() => { fetchData(); }, [userId]);
+
   const handleSave = async () => {
-    if (!validateForm()) {
-      toast({ title: 'Erreur', description: 'Veuillez corriger les champs obligatoires', variant: 'destructive' });
+    if (passwordForm.password && passwordForm.password !== passwordForm.confirm) {
+      toast({ title: 'Erreur', description: 'Les mots de passe ne correspondent pas', variant: 'destructive' });
       return;
     }
     setIsSaving(true);
@@ -1075,7 +1075,6 @@ function ProfilClientTab({ userId }: { userId: string }) {
       if (res.ok) {
         toast({ title: 'Profil mis à jour' });
         setIsEditing(false);
-        setFormErrors({});
         setPasswordForm({ password: '', confirm: '' });
         await fetchData();
       } else {
@@ -1116,72 +1115,24 @@ function ProfilClientTab({ userId }: { userId: string }) {
             <div className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label>Prénom *</Label>
-                  <Input
-                    value={form.firstName}
-                    onChange={e => {
-                      setForm({ ...form, firstName: e.target.value });
-                      if (formErrors.firstName) setFormErrors((prev) => ({ ...prev, firstName: '' }));
-                    }}
-                    aria-invalid={Boolean(formErrors.firstName)}
-                    className={formErrors.firstName ? 'border-red-500 focus-visible:ring-red-500' : ''}
-                  />
-                  {formErrors.firstName && <p className="text-xs text-red-600">{formErrors.firstName}</p>}
+                  <Label>Prénom</Label>
+                  <Input value={form.firstName} onChange={e => setForm({ ...form, firstName: e.target.value })} />
                 </div>
                 <div className="space-y-2">
-                  <Label>Nom *</Label>
-                  <Input
-                    value={form.lastName}
-                    onChange={e => {
-                      setForm({ ...form, lastName: e.target.value });
-                      if (formErrors.lastName) setFormErrors((prev) => ({ ...prev, lastName: '' }));
-                    }}
-                    aria-invalid={Boolean(formErrors.lastName)}
-                    className={formErrors.lastName ? 'border-red-500 focus-visible:ring-red-500' : ''}
-                  />
-                  {formErrors.lastName && <p className="text-xs text-red-600">{formErrors.lastName}</p>}
+                  <Label>Nom</Label>
+                  <Input value={form.lastName} onChange={e => setForm({ ...form, lastName: e.target.value })} />
                 </div>
                 <div className="space-y-2">
-                  <Label>Téléphone *</Label>
-                  <Input
-                    value={form.phone}
-                    onChange={e => {
-                      setForm({ ...form, phone: e.target.value });
-                      if (formErrors.phone) setFormErrors((prev) => ({ ...prev, phone: '' }));
-                    }}
-                    placeholder="Ex: 0555123456"
-                    aria-invalid={Boolean(formErrors.phone)}
-                    className={formErrors.phone ? 'border-red-500 focus-visible:ring-red-500' : ''}
-                  />
-                  {formErrors.phone && <p className="text-xs text-red-600">{formErrors.phone}</p>}
+                  <Label>Téléphone</Label>
+                  <Input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="Ex: 0555123456" />
                 </div>
                 <div className="space-y-2 sm:col-span-2">
-                  <Label>Email *</Label>
-                  <Input
-                    type="email"
-                    value={form.email}
-                    onChange={e => {
-                      setForm({ ...form, email: e.target.value });
-                      if (formErrors.email) setFormErrors((prev) => ({ ...prev, email: '' }));
-                    }}
-                    aria-invalid={Boolean(formErrors.email)}
-                    className={formErrors.email ? 'border-red-500 focus-visible:ring-red-500' : ''}
-                  />
-                  {formErrors.email && <p className="text-xs text-red-600">{formErrors.email}</p>}
+                  <Label>Email</Label>
+                  <Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
                 </div>
                 <div className="space-y-2 sm:col-span-2">
-                  <Label>Adresse *</Label>
-                  <Input
-                    value={form.address}
-                    onChange={e => {
-                      setForm({ ...form, address: e.target.value });
-                      if (formErrors.address) setFormErrors((prev) => ({ ...prev, address: '' }));
-                    }}
-                    placeholder="Ex: 12 Rue Didouche Mourad"
-                    aria-invalid={Boolean(formErrors.address)}
-                    className={formErrors.address ? 'border-red-500 focus-visible:ring-red-500' : ''}
-                  />
-                  {formErrors.address && <p className="text-xs text-red-600">{formErrors.address}</p>}
+                  <Label>Adresse</Label>
+                  <Input value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} placeholder="Ex: 12 Rue Didouche Mourad" />
                 </div>
               </div>
               <hr />
@@ -1189,38 +1140,15 @@ function ProfilClientTab({ userId }: { userId: string }) {
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label>Nouveau mot de passe</Label>
-                  <Input
-                    type="password"
-                    autoComplete="new-password"
-                    value={passwordForm.password}
-                    onChange={e => {
-                      setPasswordForm({ ...passwordForm, password: e.target.value });
-                      if (formErrors.password) setFormErrors((prev) => ({ ...prev, password: '' }));
-                    }}
-                    aria-invalid={Boolean(formErrors.password)}
-                    className={formErrors.password ? 'border-red-500 focus-visible:ring-red-500' : ''}
-                  />
-                  {formErrors.password && <p className="text-xs text-red-600">{formErrors.password}</p>}
+                  <Input type="password" value={passwordForm.password} onChange={e => setPasswordForm({ ...passwordForm, password: e.target.value })} />
                 </div>
                 <div className="space-y-2">
                   <Label>Confirmer le mot de passe</Label>
-                  <Input
-                    type="password"
-                    autoComplete="new-password"
-                    value={passwordForm.confirm}
-                    onChange={e => {
-                      setPasswordForm({ ...passwordForm, confirm: e.target.value });
-                      if (formErrors.confirm) setFormErrors((prev) => ({ ...prev, confirm: '' }));
-                    }}
-                    aria-invalid={Boolean(formErrors.confirm)}
-                    className={formErrors.confirm ? 'border-red-500 focus-visible:ring-red-500' : ''}
-                  />
-                  {formErrors.confirm && <p className="text-xs text-red-600">{formErrors.confirm}</p>}
+                  <Input type="password" value={passwordForm.confirm} onChange={e => setPasswordForm({ ...passwordForm, confirm: e.target.value })} />
                 </div>
               </div>
               <div className="flex gap-3 pt-2">
                 <button
-                  type="button"
                   onClick={handleSave}
                   disabled={isSaving}
                   className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded text-sm font-medium disabled:opacity-60 transition-colors"
@@ -1229,10 +1157,8 @@ function ProfilClientTab({ userId }: { userId: string }) {
                   Enregistrer
                 </button>
                 <button
-                  type="button"
                   onClick={() => {
                     setIsEditing(false);
-                    setFormErrors({});
                     setForm({
                       firstName: userData?.firstName || '',
                       lastName: userData?.lastName || '',
@@ -1241,7 +1167,6 @@ function ProfilClientTab({ userId }: { userId: string }) {
                       address: userData?.address || '',
                     });
                     setPasswordForm({ password: '', confirm: '' });
-                    setFormErrors({});
                   }}
                   className="px-4 py-2 text-sm border rounded hover:bg-slate-50 transition-colors"
                 >

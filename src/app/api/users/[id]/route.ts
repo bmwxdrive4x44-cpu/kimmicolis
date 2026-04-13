@@ -233,22 +233,27 @@ export async function PUT(
       if (recomposed) updateData.name = recomposed;
     }
 
-    let user: any;
-    const buildUserSelect = (cols: Set<string>): Record<string, boolean> => {
-      const s: Record<string, boolean> = {
-        id: true, email: true, name: true, role: true, phone: true, isActive: true,
+    const buildUpdateSelect = (cols: Set<string>): Record<string, boolean> => {
+      const select: Record<string, boolean> = {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        phone: true,
+        isActive: true,
       };
-      if (cols.has('firstName')) s.firstName = true;
-      if (cols.has('lastName')) s.lastName = true;
-      if (cols.has('address')) s.address = true;
-      return s;
+      if (cols.has('firstName')) select.firstName = true;
+      if (cols.has('lastName')) select.lastName = true;
+      if (cols.has('address')) select.address = true;
+      return select;
     };
 
+    let user: any;
     try {
       user = await db.user.update({
         where: { id },
         data: updateData,
-        select: buildUserSelect(userColumns) as any,
+        select: buildUpdateSelect(userColumns) as any,
       });
     } catch (error) {
       if (isRecordNotFoundError(error)) {
@@ -259,18 +264,27 @@ export async function PUT(
         throw error;
       }
 
-      if ('clientType' in updateData) delete updateData.clientType;
+      if ('clientType' in updateData) {
+        delete updateData.clientType;
+      }
+
       if ('firstName' in updateData) delete updateData.firstName;
       if ('lastName' in updateData) delete updateData.lastName;
       if ('address' in updateData) delete updateData.address;
 
-      // Force-reset column cache so next request re-probes schema
       userColumnsCache = null;
 
       user = await db.user.update({
         where: { id },
         data: updateData,
-        select: { id: true, email: true, name: true, role: true, phone: true, isActive: true } as any,
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          role: true,
+          phone: true,
+          isActive: true,
+        },
       });
     }
 
