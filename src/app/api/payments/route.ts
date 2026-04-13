@@ -24,6 +24,16 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const paymentId = searchParams.get('paymentId');
     const clientId = searchParams.get('clientId');
+    const config = searchParams.get('config');
+
+    if (config === '1') {
+      const provider = process.env.PAYMENT_PROVIDER || 'SIM';
+      return NextResponse.json({
+        onlinePaymentAvailable: isRealPspConfigured(),
+        provider,
+        environment: process.env.NODE_ENV || 'development',
+      });
+    }
 
     if (paymentId) {
       // Get specific payment
@@ -204,8 +214,11 @@ export async function PUT(request: NextRequest) {
 
         if (process.env.NODE_ENV === 'production') {
           return NextResponse.json(
-            { error: 'PSP reel non configure en production (PAYMENT_PROVIDER + variables SATIM_* ou STRIPE_*)' },
-            { status: 500 }
+            {
+              error: 'Le paiement en ligne est actuellement indisponible. Vous pouvez regler ce colis au relais de depart.',
+              code: 'PSP_NOT_CONFIGURED',
+            },
+            { status: 400 }
           );
         }
       }

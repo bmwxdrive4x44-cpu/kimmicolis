@@ -27,6 +27,12 @@ interface PaymentData {
   colis?: { trackingNumber: string; villeDepart: string; villeArrivee: string; weight?: number | null };
 }
 
+interface PaymentConfig {
+  onlinePaymentAvailable: boolean;
+  provider: string;
+  environment: string;
+}
+
 function MethodCard({ method, title, subtitle, icon, onClick }: {
   method: PaymentMethod; title: string; subtitle: string; icon: React.ReactNode; onClick: () => void;
 }) {
@@ -74,6 +80,7 @@ function CheckoutContent() {
   const [txRef, setTxRef] = useState<string | null>(null);
   const [queueRemaining, setQueueRemaining] = useState(0);
   const [queueReturnUrl, setQueueReturnUrl] = useState<string | null>(null);
+  const [paymentConfig, setPaymentConfig] = useState<PaymentConfig | null>(null);
 
   const waitForBackendConfirmation = async (id: string, maxAttempts = 12) => {
     for (let i = 0; i < maxAttempts; i++) {
@@ -127,9 +134,18 @@ function CheckoutContent() {
 
     (async () => {
       try {
-        const res = await fetch(`/api/payments?paymentId=${paymentId}`);
-        if (!res.ok) { const e = await res.json(); setLoadError(e.error || 'Paiement introuvable'); return; }
-        const data = await res.json();
+        const [paymentRes, configRes] = await Promise.all([
+          fetch(`/api/payments?paymentId=${paymentId}`),
+          fetch('/api/payments?config=1'),
+        ]);
+
+        if (configRes.ok) {
+          const configData = await configRes.json();
+          setPaymentConfig(configData);
+        }
+
+        if (!paymentRes.ok) { const e = await paymentRes.json(); setLoadError(e.error || 'Paiement introuvable'); return; }
+        const data = await paymentRes.json();
         if (data.status === 'COMPLETED') { setStep('success'); setTxRef(data.transactionRef); }
         setPayment(data);
       } catch { setLoadError('Erreur de connexion'); }
@@ -138,6 +154,11 @@ function CheckoutContent() {
   }, [paymentId, authStatus]);
 
   const handleMethodSelect = (method: PaymentMethod) => {
+    if (paymentConfig && !paymentConfig.onlinePaymentAvailable) {
+      setErrorMsg('Le paiement en ligne est actuellement indisponible. Vous pouvez regler ce colis au relais de depart.');
+      setStep('failure');
+      return;
+    }
     setSelectedMethod(method);
     setStep('form');
   };
@@ -223,7 +244,23 @@ function CheckoutContent() {
           </Card>
         )}
 
-        {step === 'method' && (
+        {paymentConfig && !paymentConfig.onlinePaymentAvailable && step === 'method' && (
+          <Card className="border-amber-200 bg-amber-50">
+            <CardHeader>
+              <CardTitle>Paiement en ligne indisponible</CardTitle>
+              <CardDescription>Le fournisseur de paiement n'est pas encore configure pour cette instance.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4 text-sm text-amber-900">
+              <p>Vous pouvez conserver ce colis dans le panier et le regler directement au relais de depart.</p>
+              <div className="flex gap-3">
+                <Button variant="outline" onClick={() => router.push(getPaymentTabUrl())}>Retour au panier</Button>
+                <Button onClick={() => router.push(getHistoryTabUrl())} className="bg-emerald-600 hover:bg-emerald-700 text-white">Voir mes colis</Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {step === 'method' && paymentConfig?.onlinePaymentAvailable !== false && (
           <Card>
             <CardHeader>
               <CardTitle>Choisir un mode de paiement</CardTitle>
