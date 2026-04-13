@@ -230,10 +230,11 @@ export function QrCameraScanner({ onScan, disabled = false, onError }: QrCameraS
 
     startCamera();
 
-    // Cleanup: annule l'init si React démonte entre-temps (StrictMode, navigation rapide)
+    // Cleanup: annule uniquement l'init en cours.
+    // Ne pas stopper le scanner ici, sinon un changement d'état (isStarting -> false)
+    // coupe la vidéo juste après démarrage et provoque un écran noir / AbortError.
     return () => {
       cancelled = true;
-      stopScanner();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, isStarting]);
