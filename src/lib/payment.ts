@@ -86,8 +86,13 @@ export async function createPayment(
       return { success: false, error: `Parcel cannot be paid with status ${colis.status}` };
     }
 
-    if (amount !== colis.prixClient) {
-      return { success: false, error: 'Amount mismatch' };
+    const normalizedAmount = Number(amount);
+    const expectedAmount = Number(colis.prixClient);
+    if (!Number.isFinite(normalizedAmount) || Math.abs(normalizedAmount - expectedAmount) > 0.01) {
+      return {
+        success: false,
+        error: `Amount mismatch: expected ${expectedAmount.toFixed(2)}, received ${Number.isFinite(normalizedAmount) ? normalizedAmount.toFixed(2) : 'NaN'}`,
+      };
     }
 
     const existingActivePayment = await paymentDb.payment.findFirst({

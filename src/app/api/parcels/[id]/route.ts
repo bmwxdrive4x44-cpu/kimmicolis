@@ -12,7 +12,7 @@ const tableColumnCache = new Map<string, Set<string>>();
 
 function isSchemaDriftError(error: unknown): boolean {
   const code = typeof error === 'object' && error && 'code' in error ? String((error as { code?: unknown }).code || '') : '';
-  return code === 'P2010' || code === 'P2021' || code === 'P2022';
+  return code === 'P2010' || code === 'P2021' || code === 'P2022' || code === 'P2025';
 }
 
 async function getTableColumns(tableName: string): Promise<Set<string>> {
@@ -336,42 +336,46 @@ export async function DELETE(
     }
 
     await db.$transaction(async (tx) => {
-      const txWithRaw = tx as typeof tx & {
-        $executeRawUnsafe: (query: string, ...values: unknown[]) => Promise<number>;
+      const safeDelete = async (run: () => Promise<unknown>) => {
+        try {
+          await run();
+        } catch (error) {
+          if (!isSchemaDriftError(error)) {
+            throw error;
+          }
+        }
       };
 
-      const dependentTables = [
-        'TrackingHistory',
-        'RelaisCash',
-        'Dispute',
-        'Payment',
-        'Mission',
-        'DeliveryProof',
-        'QrSecurityLog',
-      ];
+      await safeDelete(() => tx.trackingHistory.deleteMany({ where: { colisId: id } }));
+      await safeDelete(() => tx.relaisCash.deleteMany({ where: { colisId: id } }));
+      await safeDelete(() => tx.dispute.deleteMany({ where: { colisId: id } }));
+      await safeDelete(() => tx.payment.deleteMany({ where: { colisId: id } }));
+      await safeDelete(() => tx.mission.deleteMany({ where: { colisId: id } }));
 
-      for (const tableName of dependentTables) {
-        const columns = await getTableColumns(tableName);
-        if (columns.has('colisId')) {
-          await txWithRaw.$executeRawUnsafe(`DELETE FROM "${tableName}" WHERE "colisId" = $1`, id);
-        }
+      const txExtended = tx as typeof tx & {
+        deliveryProof?: { deleteMany(args: Record<string, unknown>): Promise<unknown> };
+        qrSecurityLog?: { deleteMany(args: Record<string, unknown>): Promise<unknown> };
+        transporterPenalty?: { deleteMany(args: Record<string, unknown>): Promise<unknown> };
+        actionLog?: { deleteMany(args: Record<string, unknown>): Promise<unknown> };
+      };
+
+      if (txExtended.deliveryProof) {
+        await safeDelete(() => txExtended.deliveryProof!.deleteMany({ where: { colisId: id } }));
       }
 
-      const actionLogColumns = await getTableColumns('ActionLog');
-      if (actionLogColumns.has('entityType') && actionLogColumns.has('entityId')) {
-        await txWithRaw.$executeRawUnsafe(
-          'DELETE FROM "ActionLog" WHERE "entityType" = $1 AND "entityId" = $2',
-          'COLIS',
-          id
-        );
+      if (txExtended.qrSecurityLog) {
+        await safeDelete(() => txExtended.qrSecurityLog!.deleteMany({ where: { colisId: id } }));
       }
 
-      const transporterPenaltyColumns = await getTableColumns('TransporterPenalty');
-      if (transporterPenaltyColumns.has('colisId')) {
-        await txWithRaw.$executeRawUnsafe('DELETE FROM "TransporterPenalty" WHERE "colisId" = $1', id);
+      if (txExtended.transporterPenalty) {
+        await safeDelete(() => txExtended.transporterPenalty!.deleteMany({ where: { colisId: id } }));
       }
 
-      await txWithRaw.$executeRawUnsafe('DELETE FROM "Colis" WHERE "id" = $1', id);
+      if (txExtended.actionLog) {
+        await safeDelete(() => txExtended.actionLog!.deleteMany({ where: { entityType: 'COLIS', entityId: id } }));
+      }
+
+      await tx.colis.delete({ where: { id } });
     });
 
     return NextResponse.json({ success: true, deletedId: id });
