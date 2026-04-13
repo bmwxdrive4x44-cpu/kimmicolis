@@ -72,7 +72,15 @@ export async function createPayment(
 }> {
   try {
     // Verify colis exists
-    const colis = await db.colis.findUnique({ where: { id: colisId } });
+    const colis = await db.colis.findUnique({
+      where: { id: colisId },
+      select: {
+        id: true,
+        clientId: true,
+        status: true,
+        prixClient: true,
+      },
+    });
     if (!colis) {
       return { success: false, error: 'Colis not found' };
     }
