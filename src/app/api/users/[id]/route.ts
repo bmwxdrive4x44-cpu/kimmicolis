@@ -5,9 +5,28 @@ import { isAlgerianCommerceRegisterNumber, normalizeCommerceRegisterNumber } fro
 import { describeBlockedIdentity, findBlockedRelayIdentity } from '@/lib/banned-identities';
 import { getClientIpFromHeaders } from '@/lib/request-ip';
 
+type UserColumnRow = {
+  column_name: string;
+};
+
+let userColumnsCache: Set<string> | null = null;
+
+async function getUserColumns(): Promise<Set<string>> {
+  if (userColumnsCache) return userColumnsCache;
+
+  const rows = await db.$queryRaw<UserColumnRow[]>`
+    SELECT column_name
+    FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'User'
+  `;
+
+  userColumnsCache = new Set(rows.map((row) => row.column_name));
+  return userColumnsCache;
+}
+
 function isMissingClientTypeColumnError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error || '');
-  return message.toLowerCase().includes('clienttype');
+  return ['clienttype', 'firstname', 'lastname', 'address'].some((field) => message.toLowerCase().includes(field));
 }
 
 function isRecordNotFoundError(error: unknown): boolean {
@@ -25,86 +44,70 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    
-    let user: any = null;
-    try {
-      user = await db.user.findUnique({
-        where: { id },
+    const userColumns = await getUserColumns();
+    const userSelect: Record<string, boolean | object> = {
+      id: true,
+      email: true,
+      name: true,
+      role: true,
+      phone: true,
+      isActive: true,
+      createdAt: true,
+      siret: true,
+      relais: {
         select: {
           id: true,
-          email: true,
-          name: true,
-          firstName: true,
-          lastName: true,
+          commerceName: true,
+          status: true,
           address: true,
-          role: true,
-          phone: true,
-          isActive: true,
-          clientType: true,
-          createdAt: true,
-          siret: true,
-          relais: {
-            select: {
-              id: true,
-              commerceName: true,
-              status: true,
-              address: true,
-              ville: true,
-            },
-          },
+          ville: true,
         },
-      });
-    } catch (dbError) {
-      // If clientType doesn't exist, retry without it
-      if (isMissingClientTypeColumnError(dbError)) {
-        try {
-          user = await db.user.findUnique({
-            where: { id },
-            select: {
-              id: true,
-              email: true,
-              name: true,
-              firstName: true,
-              lastName: true,
-              address: true,
-              role: true,
-              phone: true,
-              isActive: true,
-              createdAt: true,
-              siret: true,
-              relais: {
-                select: {
-                  id: true,
-                  commerceName: true,
-                  status: true,
-                  address: true,
-                  ville: true,
-                },
-              },
-            },
-          });
+      },
+    };
 
-          if (user) {
-            user = { ...user, clientType: 'STANDARD' };
-          }
-        } catch (fallbackError) {
-          console.error('Fallback query failed:', fallbackError);
-          throw fallbackError;
-        }
-      } else {
-        // For any other error, try a simple query without relais
-        console.warn('Query with relais failed, retrying without relations:', dbError);
-        user = await db.user.findUnique({
-          where: { id },
-        });
-        
-        if (user) {
-          user = {
-            ...user,
-            relais: null,
-          };
-        }
+    if (userColumns.has('firstName')) userSelect.firstName = true;
+    if (userColumns.has('lastName')) userSelect.lastName = true;
+    if (userColumns.has('address')) userSelect.address = true;
+    if (userColumns.has('clientType')) userSelect.clientType = true;
+
+    let user: any = null;
+    try {
+      user = await db.user.findUnique({ where: { id }, select: userSelect as any });
+    } catch (dbError) {
+      if (!isMissingClientTypeColumnError(dbError)) {
+        console.warn('Query with relations failed, retrying without relations:', dbError);
       }
+
+      const fallbackSelect: Record<string, boolean> = {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        phone: true,
+        isActive: true,
+        createdAt: true,
+        siret: true,
+      };
+
+      if (userColumns.has('firstName')) fallbackSelect.firstName = true;
+      if (userColumns.has('lastName')) fallbackSelect.lastName = true;
+      if (userColumns.has('address')) fallbackSelect.address = true;
+      if (userColumns.has('clientType')) fallbackSelect.clientType = true;
+
+      user = await db.user.findUnique({ where: { id }, select: fallbackSelect as any });
+      if (user) {
+        user = { ...user, relais: null };
+      }
+    }
+
+    if (user) {
+      user = {
+        ...user,
+        firstName: user.firstName ?? null,
+        lastName: user.lastName ?? null,
+        address: user.address ?? null,
+        clientType: user.clientType ?? 'STANDARD',
+      };
     }
 
     if (!user) {
@@ -159,12 +162,14 @@ export async function PUT(
       }, { status: 403 });
     }
 
+    const userColumns = await getUserColumns();
+
     // Build update data
     const updateData: any = {};
     if (name !== undefined) updateData.name = name;
-    if (normalizedFirstName !== undefined) updateData.firstName = normalizedFirstName || null;
-    if (normalizedLastName !== undefined) updateData.lastName = normalizedLastName || null;
-    if (normalizedAddress !== undefined) updateData.address = normalizedAddress || null;
+    if (normalizedFirstName !== undefined && userColumns.has('firstName')) updateData.firstName = normalizedFirstName || null;
+    if (normalizedLastName !== undefined && userColumns.has('lastName')) updateData.lastName = normalizedLastName || null;
+    if (normalizedAddress !== undefined && userColumns.has('address')) updateData.address = normalizedAddress || null;
     if (phone !== undefined) updateData.phone = phone;
     if (normalizedEmail !== undefined) updateData.email = normalizedEmail;
     if (isActive !== undefined) updateData.isActive = isActive;
@@ -215,7 +220,7 @@ export async function PUT(
     if (password) {
       updateData.password = await hashPassword(password);
     }
-    if (clientType !== undefined) {
+    if (clientType !== undefined && userColumns.has('clientType')) {
       const normalized = String(clientType || '').toUpperCase();
       if (!['STANDARD', 'PRO'].includes(normalized)) {
         return NextResponse.json({ error: 'clientType invalide (STANDARD ou PRO)' }, { status: 400 });

@@ -4,6 +4,39 @@ import { requireRole } from '@/lib/rbac';
 import { evaluateImplicitProEligibility } from '@/lib/pro-eligibility';
 import { calculateDynamicParcelPricing, estimateSafeDistanceKmByWilayas } from '@/lib/pricing';
 
+type TableColumnRow = {
+  column_name: string;
+};
+
+const tableColumnCache = new Map<string, Set<string>>();
+
+function isSchemaDriftError(error: unknown): boolean {
+  const code = typeof error === 'object' && error && 'code' in error ? String((error as { code?: unknown }).code || '') : '';
+  return code === 'P2010' || code === 'P2021' || code === 'P2022';
+}
+
+async function getTableColumns(tableName: string): Promise<Set<string>> {
+  const cached = tableColumnCache.get(tableName);
+  if (cached) return cached;
+
+  const rows = await db.$queryRaw<TableColumnRow[]>`
+    SELECT column_name
+    FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = ${tableName}
+  `;
+
+  const columns = new Set(rows.map((row) => row.column_name));
+  tableColumnCache.set(tableName, columns);
+  return columns;
+}
+
+async function filterExistingColisFields<T extends Record<string, unknown>>(data: T): Promise<Partial<T>> {
+  const columns = await getTableColumns('Colis');
+  return Object.fromEntries(
+    Object.entries(data).filter(([key, value]) => value !== undefined && columns.has(key))
+  ) as Partial<T>;
+}
+
 async function getPricingConfig() {
   const keys = [
     'pricingAdminFee',
@@ -158,7 +191,7 @@ export async function PATCH(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const editableStatuses = new Set(['CREATED', 'PENDING_PAYMENT']);
+    const editableStatuses = new Set(['CREATED', 'PENDING_PAYMENT', 'ANNULE']);
     if (!editableStatuses.has(existingParcel.status)) {
       return NextResponse.json(
         { error: 'Ce colis ne peut plus être modifié après paiement.' },
@@ -235,9 +268,17 @@ export async function PATCH(
       return NextResponse.json({ error: 'Aucune donnée à modifier' }, { status: 400 });
     }
 
+    const effectiveUpdates = await filterExistingColisFields(updates);
+    if (Object.keys(effectiveUpdates).length === 0) {
+      return NextResponse.json(
+        { error: 'Aucun champ modifiable disponible sur ce schéma de base de données.' },
+        { status: 400 }
+      );
+    }
+
     const parcel = await db.colis.update({
       where: { id },
-      data: updates,
+      data: effectiveUpdates,
     });
 
     await db.trackingHistory.create({
@@ -286,7 +327,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const deletableStatuses = new Set(['CREATED', 'PENDING_PAYMENT']);
+    const deletableStatuses = new Set(['CREATED', 'PENDING_PAYMENT', 'ANNULE']);
     if (!deletableStatuses.has(existingParcel.status)) {
       return NextResponse.json(
         { error: 'Ce colis est déjà payé ou en cours de traitement: suppression impossible.' },
@@ -295,12 +336,42 @@ export async function DELETE(
     }
 
     await db.$transaction(async (tx) => {
-      await tx.trackingHistory.deleteMany({ where: { colisId: id } });
-      await tx.relaisCash.deleteMany({ where: { colisId: id } });
-      await tx.dispute.deleteMany({ where: { colisId: id } });
-      await tx.payment.deleteMany({ where: { colisId: id } });
-      await tx.mission.deleteMany({ where: { colisId: id } });
-      await tx.colis.delete({ where: { id } });
+      const txWithRaw = tx as typeof tx & {
+        $executeRawUnsafe: (query: string, ...values: unknown[]) => Promise<number>;
+      };
+
+      const dependentTables = [
+        'TrackingHistory',
+        'RelaisCash',
+        'Dispute',
+        'Payment',
+        'Mission',
+        'DeliveryProof',
+        'QrSecurityLog',
+      ];
+
+      for (const tableName of dependentTables) {
+        const columns = await getTableColumns(tableName);
+        if (columns.has('colisId')) {
+          await txWithRaw.$executeRawUnsafe(`DELETE FROM "${tableName}" WHERE "colisId" = $1`, id);
+        }
+      }
+
+      const actionLogColumns = await getTableColumns('ActionLog');
+      if (actionLogColumns.has('entityType') && actionLogColumns.has('entityId')) {
+        await txWithRaw.$executeRawUnsafe(
+          'DELETE FROM "ActionLog" WHERE "entityType" = $1 AND "entityId" = $2',
+          'COLIS',
+          id
+        );
+      }
+
+      const transporterPenaltyColumns = await getTableColumns('TransporterPenalty');
+      if (transporterPenaltyColumns.has('colisId')) {
+        await txWithRaw.$executeRawUnsafe('DELETE FROM "TransporterPenalty" WHERE "colisId" = $1', id);
+      }
+
+      await txWithRaw.$executeRawUnsafe('DELETE FROM "Colis" WHERE "id" = $1', id);
     });
 
     return NextResponse.json({ success: true, deletedId: id });
