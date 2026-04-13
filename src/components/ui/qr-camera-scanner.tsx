@@ -105,12 +105,21 @@ export function QrCameraScanner({ onScan, disabled = false, onError }: QrCameraS
           },
         };
 
-        // Préférer caméra arrière, fallback sur caméra avant
+        // Préférer une caméra explicite (deviceId), plus fiable que facingMode sur certains navigateurs.
         try {
-          await qrScanner.start({ facingMode: 'environment' }, config, onDecoded, undefined);
+          const cameras = await Html5Qrcode.getCameras();
+          if (!cameras?.length) {
+            throw new Error('No cameras found');
+          }
+
+          const preferred =
+            cameras.find((camera) => /back|rear|environment|arriere|traseira|trasera/i.test(camera.label)) || cameras[0];
+
+          await qrScanner.start(preferred.id, config, onDecoded, undefined);
         } catch (firstErr: unknown) {
           if (cancelled) return;
           if (/NotAllowedError|permission denied/i.test(extractErrString(firstErr))) throw firstErr;
+          // Fallback final via contrainte navigateur
           await qrScanner.start({ facingMode: 'user' }, config, onDecoded, undefined);
         }
       } catch (err: unknown) {
@@ -137,6 +146,9 @@ export function QrCameraScanner({ onScan, disabled = false, onError }: QrCameraS
             : typeof o.errorMessage === 'string'
               ? o.errorMessage
               : JSON.stringify(err);
+          if (!errorName && typeof o.type === 'string') {
+            errorName = o.type;
+          }
           // Dérive le nom si absent
           if (!errorName && errorMsg) {
             if (/NotFoundError|no cameras/i.test(errorMsg)) errorName = 'NotFoundError';
