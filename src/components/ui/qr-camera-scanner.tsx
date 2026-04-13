@@ -265,16 +265,13 @@ export function QrCameraScanner({ onScan, disabled = false, onError }: QrCameraS
       return;
     }
 
-    // Détection explicite des entrées vidéo exposées par le navigateur.
-    // Évite un cycle d'erreurs html5-qrcode quand aucune caméra n'est disponible côté OS/browser.
+    // Vérification informative des entrées vidéo exposées par le navigateur.
+    // Ne pas bloquer ici: certains navigateurs renvoient 0 caméra avant consentement utilisateur.
     try {
       const devices = await navigator.mediaDevices.enumerateDevices();
       const hasVideoInput = devices.some((d) => d.kind === 'videoinput');
       if (!hasVideoInput) {
-        const message = 'Aucune caméra détectée par le navigateur sur cet appareil.';
-        setErrorMessage(message);
-        onError?.(message);
-        return;
+        console.warn('[QrCameraScanner] enumerateDevices: aucun videoinput avant permission, poursuite du démarrage');
       }
     } catch {
       // Si enumerateDevices échoue, on continue vers le flux normal.
