@@ -991,8 +991,6 @@ function ProfilClientTab({ userId }: { userId: string }) {
   const [userData, setUserData] = useState<any>(null);
   const [form, setForm] = useState({ firstName: '', lastName: '', email: '', phone: '', address: '' });
   const [passwordForm, setPasswordForm] = useState({ password: '', confirm: '' });
-  const [passwordTouched, setPasswordTouched] = useState(false);
-  const [confirmTouched, setConfirmTouched] = useState(false);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
   const validateForm = () => {
@@ -1008,7 +1006,7 @@ function ProfilClientTab({ userId }: { userId: string }) {
     if (!form.phone.trim()) errors.phone = 'Le téléphone est obligatoire';
     if (!form.address.trim()) errors.address = 'L\'adresse est obligatoire';
 
-    const shouldValidatePassword = passwordTouched || confirmTouched;
+    const shouldValidatePassword = Boolean(passwordForm.password.trim()) || Boolean(passwordForm.confirm.trim());
 
     if (shouldValidatePassword) {
       if (!passwordForm.password && passwordForm.confirm) {
@@ -1044,8 +1042,6 @@ function ProfilClientTab({ userId }: { userId: string }) {
         address: data.address || '',
       });
       setPasswordForm({ password: '', confirm: '' });
-      setPasswordTouched(false);
-      setConfirmTouched(false);
       setFormErrors({});
     } catch (error) {
       console.error('Error fetching user:', error);
@@ -1069,7 +1065,7 @@ function ProfilClientTab({ userId }: { userId: string }) {
         phone: form.phone,
         address: form.address,
       };
-      if (passwordTouched && passwordForm.password) payload.password = passwordForm.password;
+      if (passwordForm.password) payload.password = passwordForm.password;
       const res = await fetch(`/api/users/${userId}`, {
         method: 'PUT',
         credentials: 'include',
@@ -1081,8 +1077,6 @@ function ProfilClientTab({ userId }: { userId: string }) {
         setIsEditing(false);
         setFormErrors({});
         setPasswordForm({ password: '', confirm: '' });
-        setPasswordTouched(false);
-        setConfirmTouched(false);
         await fetchData();
       } else {
         const err = await res.json().catch(() => ({}));
@@ -1197,10 +1191,10 @@ function ProfilClientTab({ userId }: { userId: string }) {
                   <Label>Nouveau mot de passe</Label>
                   <Input
                     type="password"
+                    autoComplete="new-password"
                     value={passwordForm.password}
                     onChange={e => {
                       setPasswordForm({ ...passwordForm, password: e.target.value });
-                      setPasswordTouched(true);
                       if (formErrors.password) setFormErrors((prev) => ({ ...prev, password: '' }));
                     }}
                     aria-invalid={Boolean(formErrors.password)}
@@ -1212,10 +1206,10 @@ function ProfilClientTab({ userId }: { userId: string }) {
                   <Label>Confirmer le mot de passe</Label>
                   <Input
                     type="password"
+                    autoComplete="new-password"
                     value={passwordForm.confirm}
                     onChange={e => {
                       setPasswordForm({ ...passwordForm, confirm: e.target.value });
-                      setConfirmTouched(true);
                       if (formErrors.confirm) setFormErrors((prev) => ({ ...prev, confirm: '' }));
                     }}
                     aria-invalid={Boolean(formErrors.confirm)}
@@ -1247,8 +1241,6 @@ function ProfilClientTab({ userId }: { userId: string }) {
                       address: userData?.address || '',
                     });
                     setPasswordForm({ password: '', confirm: '' });
-                    setPasswordTouched(false);
-                    setConfirmTouched(false);
                     setFormErrors({});
                   }}
                   className="px-4 py-2 text-sm border rounded hover:bg-slate-50 transition-colors"
