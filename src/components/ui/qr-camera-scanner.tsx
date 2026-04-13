@@ -265,6 +265,21 @@ export function QrCameraScanner({ onScan, disabled = false, onError }: QrCameraS
       return;
     }
 
+    // Détection explicite des entrées vidéo exposées par le navigateur.
+    // Évite un cycle d'erreurs html5-qrcode quand aucune caméra n'est disponible côté OS/browser.
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const hasVideoInput = devices.some((d) => d.kind === 'videoinput');
+      if (!hasVideoInput) {
+        const message = 'Aucune caméra détectée par le navigateur sur cet appareil.';
+        setErrorMessage(message);
+        onError?.(message);
+        return;
+      }
+    } catch {
+      // Si enumerateDevices échoue, on continue vers le flux normal.
+    }
+
     // 1. isOpen=true → React re-render → container devient visible avec vraies dimensions
     // 2. isStarting=true → useEffect détecte les deux à true → démarre la caméra
     setIsOpen(true);
@@ -323,6 +338,8 @@ export function QrCameraScanner({ onScan, disabled = false, onError }: QrCameraS
           </p>
           <form onSubmit={handleManualSubmit} className="flex gap-2">
             <input
+              id="qr-manual-code"
+              name="qrManualCode"
               type="text"
               placeholder="Saisissez le code QR (ex: SC123456)"
               value={manualInput}
