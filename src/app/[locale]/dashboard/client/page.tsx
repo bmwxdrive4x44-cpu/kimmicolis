@@ -325,6 +325,7 @@ function ClientDashboardContent() {
                 <ParcelHistory
                   userId={session.user.id}
                   onTrack={(tn: string) => { setTrackingNumber(tn); setActiveTab('track'); }}
+                  senderName={session.user.name || ''}
                 />
               </TabsContent>
               <TabsContent value="profil">
@@ -752,7 +753,7 @@ function PaymentTab({ userId }: { userId: string }) {
 }
 
 // Parcel History
-function ParcelHistory({ userId, onTrack }: { userId: string; onTrack: (tn: string) => void }) {
+function ParcelHistory({ userId, onTrack, senderName = '' }: { userId: string; onTrack: (tn: string) => void; senderName?: string }) {
   const { toast } = useToast();
   const [colis, setColis] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -775,6 +776,7 @@ function ParcelHistory({ userId, onTrack }: { userId: string; onTrack: (tn: stri
   const filtered = filter === 'all' ? colis : colis.filter(c => c.status === filter);
 
   const printStoredOrLiveLabel = (parcel: any) => {
+    const senderNameProp = senderName;
     try {
       const allStored = JSON.parse(localStorage.getItem(LABEL_STORAGE_KEY) || '{}');
       const saved = allStored[parcel.trackingNumber] || {};
@@ -785,8 +787,12 @@ function ParcelHistory({ userId, onTrack }: { userId: string; onTrack: (tn: stri
       const villeArrivee = WILAYAS.find(w => w.id === villeArriveeId)?.name || villeArriveeId || '—';
       const dateCreation = new Date(saved.createdAt || parcel.createdAt || new Date().toISOString()).toLocaleDateString('fr-DZ', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
-      const senderFirstName = saved.senderFirstName || '';
-      const senderLastName = saved.senderLastName || '';
+      // Fallback sur le nom de session si le localStorage ne contient pas info expéditeur
+      const nameParts = (typeof senderNameProp === 'string' ? senderNameProp : '').trim().split(/\s+/);
+      const fallbackFirst = nameParts.slice(1).join(' ');
+      const fallbackLast = nameParts[0] || '';
+      const senderFirstName = saved.senderFirstName || fallbackFirst;
+      const senderLastName = saved.senderLastName || fallbackLast;
       const senderPhone = saved.senderPhone || '';
       const recipientFirstName = saved.recipientFirstName || parcel.recipientFirstName || '';
       const recipientLastName = saved.recipientLastName || parcel.recipientLastName || '';
@@ -898,7 +904,10 @@ function ParcelHistory({ userId, onTrack }: { userId: string; onTrack: (tn: stri
     </div>
   </div>
   <div class="instructions">
-    &#9888;&#65039; À déposer exclusivement au relais indiqué &bull; Règlement en espèces au dépôt &bull; Conserver ce numéro de suivi
+    ${['CREATED', 'PENDING_PAYMENT'].includes(saved.status || parcel.status || 'CREATED')
+      ? '&#9888;&#65039; À déposer exclusivement au relais indiqué &bull; Règlement en espèces au dépôt &bull; Conserver ce numéro de suivi'
+      : '&#9888;&#65039; À déposer exclusivement au relais indiqué &bull; Paiement confirmé ✓ &bull; Conserver ce numéro de suivi'
+    }
   </div>
 </div>
 </body></html>`;

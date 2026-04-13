@@ -116,9 +116,15 @@ export function QrCameraScanner({ onScan, disabled = false, onError }: QrCameraS
       if (errorName === 'NotFoundError') {
         message = 'Aucune caméra compatible détectée. Vérifiez qu\'une webcam est branchée/active.';
       } else if (errorName === 'NotAllowedError') {
-        message = 'Accès caméra refusé. Cliquez le cadenas de la page puis autorisez la caméra pour localhost:3000.';
+        message = 'Accès caméra refusé. Autorisez la caméra dans les paramètres du navigateur (cadenas dans la barre d\'adresse).';
       } else if (errorName === 'NotReadableError') {
         message = 'La caméra est déjà utilisée par une autre application. Fermez-la puis réessayez.';
+      } else if (errorName === 'OverconstrainedError') {
+        message = 'Aucune caméra ne correspond aux contraintes demandées. Essayez un autre navigateur.';
+      } else if (errorMsg?.includes('https') || errorMsg?.includes('secure')) {
+        message = 'La caméra nécessite une connexion HTTPS. Saisissez le code manuellement.';
+      } else if (errorName) {
+        message = `Caméra indisponible (${errorName}). Saisissez le code manuellement.`;
       }
 
       setErrorMessage(message);
