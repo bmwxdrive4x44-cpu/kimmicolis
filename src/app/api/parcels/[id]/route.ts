@@ -237,10 +237,10 @@ export async function PATCH(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const editableStatuses = new Set(['CREATED', 'PENDING_PAYMENT', 'ANNULE']);
+    const editableStatuses = new Set(['CREATED', 'PENDING_PAYMENT']);
     if (!editableStatuses.has(existingParcel.status)) {
       return NextResponse.json(
-        { error: 'Ce colis ne peut plus être modifié après paiement.' },
+        { error: 'Ce colis ne peut être modifié que tant que le paiement n\'est pas effectué.' },
         { status: 400 }
       );
     }
@@ -391,6 +391,14 @@ export async function DELETE(
       );
     }
 
+    if (existingParcel.status === 'ANNULE') {
+      return NextResponse.json({
+        success: true,
+        cancelledId: id,
+        message: 'Le colis est déjà annulé.',
+      });
+    }
+
     try {
       await db.$transaction(async (tx) => {
       const safeDelete = async (run: () => Promise<unknown>) => {
@@ -450,16 +458,26 @@ export async function DELETE(
         select: { id: true },
       });
 
-      await db.trackingHistory.create({
-        data: {
-          colisId: id,
-          status: 'ANNULE',
-          userId: auth.payload.id,
-          notes: isKnownRelationalFailure
-            ? 'Suppression demandée: colis annulé (suppression physique bloquée par contraintes de données).'
-            : 'Suppression demandée: colis annulé (fallback après erreur de suppression).',
-        },
+      const cancelNote = isKnownRelationalFailure
+        ? 'Suppression demandée: colis annulé (suppression physique bloquée par contraintes de données).'
+        : 'Suppression demandée: colis annulé.';
+
+      const latestCancelEvent = await db.trackingHistory.findFirst({
+        where: { colisId: id, status: 'ANNULE' },
+        orderBy: { createdAt: 'desc' },
+        select: { notes: true },
       }).catch(() => null);
+
+      if (latestCancelEvent?.notes !== cancelNote) {
+        await db.trackingHistory.create({
+          data: {
+            colisId: id,
+            status: 'ANNULE',
+            userId: auth.payload.id,
+            notes: cancelNote,
+          },
+        }).catch(() => null);
+      }
 
       return NextResponse.json({
         success: true,
