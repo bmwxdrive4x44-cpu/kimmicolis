@@ -105,22 +105,54 @@ export function QrCameraScanner({ onScan, disabled = false, onError }: QrCameraS
           },
         };
 
-        // Préférer une caméra explicite (deviceId), plus fiable que facingMode sur certains navigateurs.
-        try {
-          const cameras = await Html5Qrcode.getCameras();
-          if (!cameras?.length) {
-            throw new Error('No cameras found');
+        // Essayer plusieurs stratégies avant de conclure "pas de caméra"
+        const attemptErrors: string[] = [];
+        const cameras = await Html5Qrcode.getCameras().catch((e) => {
+          attemptErrors.push(`getCameras:${extractErrString(e)}`);
+          return [] as Array<{ id: string; label: string }>;
+        });
+
+        const preferred = cameras.find((camera) =>
+          /back|rear|environment|arriere|traseira|trasera/i.test(camera.label)
+        );
+
+        const orderedIds = [
+          preferred?.id,
+          ...cameras.map((camera) => camera.id),
+        ].filter((id, idx, arr): id is string => Boolean(id) && arr.indexOf(id) === idx);
+
+        let started = false;
+
+        for (const deviceId of orderedIds) {
+          try {
+            await qrScanner.start(deviceId, config, onDecoded, undefined);
+            started = true;
+            break;
+          } catch (e) {
+            attemptErrors.push(`device:${deviceId}:${extractErrString(e)}`);
           }
+        }
 
-          const preferred =
-            cameras.find((camera) => /back|rear|environment|arriere|traseira|trasera/i.test(camera.label)) || cameras[0];
+        if (!started) {
+          try {
+            await qrScanner.start({ facingMode: 'environment' }, config, onDecoded, undefined);
+            started = true;
+          } catch (e) {
+            attemptErrors.push(`facing:environment:${extractErrString(e)}`);
+          }
+        }
 
-          await qrScanner.start(preferred.id, config, onDecoded, undefined);
-        } catch (firstErr: unknown) {
-          if (cancelled) return;
-          if (/NotAllowedError|permission denied/i.test(extractErrString(firstErr))) throw firstErr;
-          // Fallback final via contrainte navigateur
-          await qrScanner.start({ facingMode: 'user' }, config, onDecoded, undefined);
+        if (!started) {
+          try {
+            await qrScanner.start({ facingMode: 'user' }, config, onDecoded, undefined);
+            started = true;
+          } catch (e) {
+            attemptErrors.push(`facing:user:${extractErrString(e)}`);
+          }
+        }
+
+        if (!started) {
+          throw new Error(`camera_start_failed::${attemptErrors.join(' || ') || 'no strategy succeeded'}`);
         }
       } catch (err: unknown) {
         if (cancelled) return;
