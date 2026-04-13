@@ -1016,6 +1016,7 @@ function ProfilClientTab({ userId }: { userId: string }) {
   const [userData, setUserData] = useState<any>(null);
   const [form, setForm] = useState({ firstName: '', lastName: '', email: '', phone: '', address: '' });
   const [passwordForm, setPasswordForm] = useState({ password: '', confirm: '' });
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const fetchData = async () => {
     const controller = new AbortController();
@@ -1050,12 +1051,62 @@ function ProfilClientTab({ userId }: { userId: string }) {
 
   useEffect(() => { fetchData(); }, [userId]);
 
-  const handleSave = async () => {
+  const updateField = (field: keyof typeof form, value: string) => {
+    setForm((prev) => ({ ...prev, [field]: value }));
+    setFieldErrors((prev) => {
+      if (!prev[field]) return prev;
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+  };
+
+  const updatePasswordField = (field: keyof typeof passwordForm, value: string) => {
+    setPasswordForm((prev) => ({ ...prev, [field]: value }));
+    setFieldErrors((prev) => {
+      if (!prev[field]) return prev;
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+  };
+
+  const validateProfileForm = () => {
+    const errors: Record<string, string> = {};
     const nextPassword = passwordForm.password.trim();
     const nextPasswordConfirm = passwordForm.confirm.trim();
 
-    if (nextPassword && nextPassword !== nextPasswordConfirm) {
-      toast({ title: 'Erreur', description: 'Les mots de passe ne correspondent pas', variant: 'destructive' });
+    if (!form.firstName.trim()) errors.firstName = 'Le prénom est obligatoire.';
+    if (!form.lastName.trim()) errors.lastName = 'Le nom est obligatoire.';
+    if (!form.phone.trim()) {
+      errors.phone = 'Le téléphone est obligatoire.';
+    } else if (!/^\+?[0-9]{8,15}$/.test(form.phone.replace(/\s+/g, '').trim())) {
+      errors.phone = 'Téléphone invalide.';
+    }
+    if (!form.email.trim()) {
+      errors.email = 'L\'email est obligatoire.';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+      errors.email = 'Email invalide.';
+    }
+    if (!form.address.trim()) errors.address = 'L\'adresse est obligatoire.';
+
+    if (nextPassword) {
+      if (nextPassword.length < 8) errors.password = 'Le mot de passe doit contenir au moins 8 caractères.';
+      if (!nextPasswordConfirm) {
+        errors.confirm = 'Veuillez confirmer le mot de passe.';
+      } else if (nextPassword !== nextPasswordConfirm) {
+        errors.confirm = 'Les mots de passe ne correspondent pas.';
+      }
+    }
+
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const handleSave = async () => {
+    const nextPassword = passwordForm.password.trim();
+    if (!validateProfileForm()) {
+      toast({ title: 'Erreur', description: 'Veuillez corriger les champs obligatoires.', variant: 'destructive' });
       return;
     }
     setIsSaving(true);
@@ -1079,6 +1130,7 @@ function ProfilClientTab({ userId }: { userId: string }) {
         toast({ title: 'Profil mis à jour' });
         setIsEditing(false);
         setPasswordForm({ password: '', confirm: '' });
+        setFieldErrors({});
         await fetchData();
       } else {
         const err = await res.json().catch(() => ({}));
@@ -1119,23 +1171,28 @@ function ProfilClientTab({ userId }: { userId: string }) {
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label>Prénom</Label>
-                  <Input value={form.firstName} onChange={e => setForm({ ...form, firstName: e.target.value })} />
+                  <Input className={fieldErrors.firstName ? 'border-red-500 focus-visible:ring-red-500' : ''} value={form.firstName} onChange={e => updateField('firstName', e.target.value)} />
+                  {fieldErrors.firstName && <p className="text-xs text-red-600">{fieldErrors.firstName}</p>}
                 </div>
                 <div className="space-y-2">
                   <Label>Nom</Label>
-                  <Input value={form.lastName} onChange={e => setForm({ ...form, lastName: e.target.value })} />
+                  <Input className={fieldErrors.lastName ? 'border-red-500 focus-visible:ring-red-500' : ''} value={form.lastName} onChange={e => updateField('lastName', e.target.value)} />
+                  {fieldErrors.lastName && <p className="text-xs text-red-600">{fieldErrors.lastName}</p>}
                 </div>
                 <div className="space-y-2">
                   <Label>Téléphone</Label>
-                  <Input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="Ex: 0555123456" />
+                  <Input className={fieldErrors.phone ? 'border-red-500 focus-visible:ring-red-500' : ''} value={form.phone} onChange={e => updateField('phone', e.target.value)} placeholder="Ex: 0555123456" />
+                  {fieldErrors.phone && <p className="text-xs text-red-600">{fieldErrors.phone}</p>}
                 </div>
                 <div className="space-y-2 sm:col-span-2">
                   <Label>Email</Label>
-                  <Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
+                  <Input className={fieldErrors.email ? 'border-red-500 focus-visible:ring-red-500' : ''} type="email" value={form.email} onChange={e => updateField('email', e.target.value)} />
+                  {fieldErrors.email && <p className="text-xs text-red-600">{fieldErrors.email}</p>}
                 </div>
                 <div className="space-y-2 sm:col-span-2">
                   <Label>Adresse</Label>
-                  <Input value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} placeholder="Ex: 12 Rue Didouche Mourad" />
+                  <Input className={fieldErrors.address ? 'border-red-500 focus-visible:ring-red-500' : ''} value={form.address} onChange={e => updateField('address', e.target.value)} placeholder="Ex: 12 Rue Didouche Mourad" />
+                  {fieldErrors.address && <p className="text-xs text-red-600">{fieldErrors.address}</p>}
                 </div>
               </div>
               <hr />
@@ -1143,15 +1200,18 @@ function ProfilClientTab({ userId }: { userId: string }) {
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label>Nouveau mot de passe</Label>
-                  <Input autoComplete="new-password" type="password" value={passwordForm.password} onChange={e => setPasswordForm({ ...passwordForm, password: e.target.value })} />
+                  <Input className={fieldErrors.password ? 'border-red-500 focus-visible:ring-red-500' : ''} autoComplete="new-password" type="password" value={passwordForm.password} onChange={e => updatePasswordField('password', e.target.value)} />
+                  {fieldErrors.password && <p className="text-xs text-red-600">{fieldErrors.password}</p>}
                 </div>
                 <div className="space-y-2">
                   <Label>Confirmer le mot de passe</Label>
-                  <Input autoComplete="new-password" type="password" value={passwordForm.confirm} onChange={e => setPasswordForm({ ...passwordForm, confirm: e.target.value })} />
+                  <Input className={fieldErrors.confirm ? 'border-red-500 focus-visible:ring-red-500' : ''} autoComplete="new-password" type="password" value={passwordForm.confirm} onChange={e => updatePasswordField('confirm', e.target.value)} />
+                  {fieldErrors.confirm && <p className="text-xs text-red-600">{fieldErrors.confirm}</p>}
                 </div>
               </div>
               <div className="flex gap-3 pt-2">
                 <button
+                  type="button"
                   onClick={handleSave}
                   disabled={isSaving}
                   className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded text-sm font-medium disabled:opacity-60 transition-colors"
@@ -1160,8 +1220,10 @@ function ProfilClientTab({ userId }: { userId: string }) {
                   Enregistrer
                 </button>
                 <button
+                  type="button"
                   onClick={() => {
                     setIsEditing(false);
+                    setFieldErrors({});
                     setForm({
                       firstName: userData?.firstName || '',
                       lastName: userData?.lastName || '',

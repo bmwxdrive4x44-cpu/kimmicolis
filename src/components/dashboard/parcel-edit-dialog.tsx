@@ -44,6 +44,7 @@ export function ParcelEditDialog({
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [form, setForm] = useState({
     recipientFirstName: parcel.recipientFirstName || '',
     recipientLastName: parcel.recipientLastName || '',
@@ -55,33 +56,53 @@ export function ParcelEditDialog({
 
   const canEdit = useMemo(() => EDITABLE_STATUSES.has(parcel.status), [parcel.status]);
 
+  const updateField = (field: keyof typeof form, value: string) => {
+    setForm((prev) => ({ ...prev, [field]: value }));
+    setFieldErrors((prev) => {
+      if (!prev[field]) return prev;
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+  };
+
+  const validateForm = () => {
+    const errors: Record<string, string> = {};
+    const normalizedPhone = form.recipientPhone.replace(/\s+/g, '').trim();
+    const trimmedRecipientEmail = form.recipientEmail.trim().toLowerCase();
+    const weight = Number(form.weight);
+
+    if (!form.recipientFirstName.trim()) errors.recipientFirstName = 'Le prénom destinataire est obligatoire.';
+    if (!form.recipientLastName.trim()) errors.recipientLastName = 'Le nom destinataire est obligatoire.';
+    if (!normalizedPhone) {
+      errors.recipientPhone = 'Le téléphone destinataire est obligatoire.';
+    } else if (!/^\+?[0-9]{8,15}$/.test(normalizedPhone)) {
+      errors.recipientPhone = 'Téléphone destinataire invalide.';
+    }
+    if (trimmedRecipientEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedRecipientEmail)) {
+      errors.recipientEmail = 'Email destinataire invalide.';
+    }
+    if (!Number.isFinite(weight) || weight <= 0) {
+      errors.weight = 'Le poids doit être supérieur à 0.';
+    }
+
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
   const handleSave = async () => {
     if (!canEdit) {
       toast({ title: 'Modification impossible', description: 'Ce colis est déjà payé ou en cours de traitement.', variant: 'destructive' });
       return;
     }
 
-    if (!form.recipientFirstName.trim() || !form.recipientLastName.trim()) {
-      toast({ title: 'Erreur', description: 'Nom et prénom destinataire sont obligatoires.', variant: 'destructive' });
-      return;
-    }
-
-    if (!/^\+?[0-9]{8,15}$/.test(form.recipientPhone.replace(/\s+/g, '').trim())) {
-      toast({ title: 'Erreur', description: 'Téléphone destinataire invalide.', variant: 'destructive' });
+    if (!validateForm()) {
+      toast({ title: 'Erreur', description: 'Veuillez corriger les champs obligatoires.', variant: 'destructive' });
       return;
     }
 
     const trimmedRecipientEmail = form.recipientEmail.trim().toLowerCase();
-    if (trimmedRecipientEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedRecipientEmail)) {
-      toast({ title: 'Erreur', description: 'Email destinataire invalide.', variant: 'destructive' });
-      return;
-    }
-
     const weight = Number(form.weight);
-    if (!Number.isFinite(weight) || weight <= 0) {
-      toast({ title: 'Erreur', description: 'Poids invalide.', variant: 'destructive' });
-      return;
-    }
 
     setSaving(true);
     try {
@@ -106,6 +127,7 @@ export function ParcelEditDialog({
 
       toast({ title: 'Colis modifié', description: 'Les changements ont été enregistrés.' });
       setOpen(false);
+      setFieldErrors({});
       onSaved?.({
         ...parcel,
         recipientFirstName: form.recipientFirstName.trim(),
@@ -142,28 +164,33 @@ export function ParcelEditDialog({
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label>Prénom destinataire</Label>
-              <Input value={form.recipientFirstName} onChange={(e) => setForm((p) => ({ ...p, recipientFirstName: e.target.value }))} />
+              <Input className={fieldErrors.recipientFirstName ? 'border-red-500 focus-visible:ring-red-500' : ''} value={form.recipientFirstName} onChange={(e) => updateField('recipientFirstName', e.target.value)} />
+              {fieldErrors.recipientFirstName && <p className="text-xs text-red-600">{fieldErrors.recipientFirstName}</p>}
             </div>
             <div className="space-y-1.5">
               <Label>Nom destinataire</Label>
-              <Input value={form.recipientLastName} onChange={(e) => setForm((p) => ({ ...p, recipientLastName: e.target.value }))} />
+              <Input className={fieldErrors.recipientLastName ? 'border-red-500 focus-visible:ring-red-500' : ''} value={form.recipientLastName} onChange={(e) => updateField('recipientLastName', e.target.value)} />
+              {fieldErrors.recipientLastName && <p className="text-xs text-red-600">{fieldErrors.recipientLastName}</p>}
             </div>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label>Téléphone destinataire</Label>
-              <Input value={form.recipientPhone} onChange={(e) => setForm((p) => ({ ...p, recipientPhone: e.target.value }))} placeholder="0555123456" />
+              <Input className={fieldErrors.recipientPhone ? 'border-red-500 focus-visible:ring-red-500' : ''} value={form.recipientPhone} onChange={(e) => updateField('recipientPhone', e.target.value)} placeholder="0555123456" />
+              {fieldErrors.recipientPhone && <p className="text-xs text-red-600">{fieldErrors.recipientPhone}</p>}
             </div>
             <div className="space-y-1.5">
               <Label>Email destinataire (optionnel)</Label>
-              <Input type="email" value={form.recipientEmail} onChange={(e) => setForm((p) => ({ ...p, recipientEmail: e.target.value }))} placeholder="destinataire@email.com" />
+              <Input className={fieldErrors.recipientEmail ? 'border-red-500 focus-visible:ring-red-500' : ''} type="email" value={form.recipientEmail} onChange={(e) => updateField('recipientEmail', e.target.value)} placeholder="destinataire@email.com" />
+              {fieldErrors.recipientEmail && <p className="text-xs text-red-600">{fieldErrors.recipientEmail}</p>}
             </div>
           </div>
 
           <div className="space-y-1.5">
             <Label>Poids (kg)</Label>
-            <Input type="number" step="0.1" min="0.1" value={form.weight} onChange={(e) => setForm((p) => ({ ...p, weight: e.target.value }))} />
+            <Input className={fieldErrors.weight ? 'border-red-500 focus-visible:ring-red-500' : ''} type="number" step="0.1" min="0.1" value={form.weight} onChange={(e) => updateField('weight', e.target.value)} />
+            {fieldErrors.weight && <p className="text-xs text-red-600">{fieldErrors.weight}</p>}
           </div>
 
           <div className="space-y-1.5">
@@ -173,7 +200,10 @@ export function ParcelEditDialog({
         </div>
 
         <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => setOpen(false)}>Annuler</Button>
+          <Button type="button" variant="outline" onClick={() => {
+            setOpen(false);
+            setFieldErrors({});
+          }}>Annuler</Button>
           <Button type="button" onClick={handleSave} disabled={saving} className="bg-emerald-600 hover:bg-emerald-700">
             {saving ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
             Enregistrer
