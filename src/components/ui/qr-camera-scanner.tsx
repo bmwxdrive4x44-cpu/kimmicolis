@@ -1,6 +1,17 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+
+// Extrait une représentation string de n'importe quelle erreur (pour comparaison regex)
+function extractErrString(err: unknown): string {
+  if (typeof err === 'string') return err;
+  if (err instanceof Error) return `${err.name} ${err.message}`;
+  if (err && typeof err === 'object') {
+    const o = err as Record<string, unknown>;
+    return [o.name, o.message, o.errorMessage].filter(Boolean).join(' ');
+  }
+  return String(err);
+}
 import { Html5Qrcode, Html5QrcodeScannerState } from 'html5-qrcode';
 import { Camera, CameraOff, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -59,14 +70,24 @@ export function QrCameraScanner({ onScan, disabled = false, onError }: QrCameraS
 
     const startCamera = async () => {
       try {
-        const qrScanner = new Html5Qrcode(SCANNER_ELEMENT_ID);
+        // ── Pré-vérification getUserMedia ──────────────────────────────────────
+        // Tester l'accès caméra AVANT html5-qrcode pour obtenir un vrai DOMException
+        // avec .name/.message, plutôt que les objets custom de la lib.
+        let testStream: MediaStream | null = null;
+        try {
+          testStream = await navigator.mediaDevices.getUserMedia({ video: true });
+        } finally {
+          // Libère la stream de test (sinon elle bloquerait l'init html5-qrcode)
+          testStream?.getTracks().forEach((t) => t.stop());
+        }
 
-        // Si StrictMode a déjà nettoyé entre-temps, libérer immédiatement
+        if (cancelled) return;
+
+        const qrScanner = new Html5Qrcode(SCANNER_ELEMENT_ID);
         if (cancelled) {
           try { qrScanner.clear(); } catch { /* ignore */ }
           return;
         }
-
         scannerRef.current = qrScanner;
 
         const onDecoded = (decodedText: string) => {
@@ -89,16 +110,13 @@ export function QrCameraScanner({ onScan, disabled = false, onError }: QrCameraS
           await qrScanner.start({ facingMode: 'environment' }, config, onDecoded, undefined);
         } catch (firstErr: unknown) {
           if (cancelled) return;
-          const firstErrName = firstErr instanceof Error
-            ? firstErr.name
-            : (firstErr as { name?: string })?.name ?? String(firstErr);
-          if (firstErrName === 'NotAllowedError') throw firstErr;
+          if (/NotAllowedError|permission denied/i.test(extractErrString(firstErr))) throw firstErr;
           await qrScanner.start({ facingMode: 'user' }, config, onDecoded, undefined);
         }
       } catch (err: unknown) {
         if (cancelled) return;
 
-        // html5-qrcode peut lancer des strings, des DOMException ou des objets custom
+        // Normalise n'importe quel type d'erreur en {name, message}
         let errorName: string | undefined;
         let errorMsg: string | undefined;
 
@@ -107,34 +125,51 @@ export function QrCameraScanner({ onScan, disabled = false, onError }: QrCameraS
           errorMsg = err.message;
         } else if (typeof err === 'string') {
           errorMsg = err;
-          // Messages strings courants de html5-qrcode
-          if (/no cameras/i.test(err)) errorName = 'NotFoundError';
-          else if (/permission/i.test(err) || /not allowed/i.test(err)) errorName = 'NotAllowedError';
+          if (/NotFoundError|no cameras/i.test(err)) errorName = 'NotFoundError';
+          else if (/NotAllowedError|permission denied/i.test(err)) errorName = 'NotAllowedError';
+          else if (/NotReadableError/i.test(err)) errorName = 'NotReadableError';
         } else if (err && typeof err === 'object') {
-          errorName = (err as { name?: string }).name;
-          errorMsg = (err as { message?: string }).message ?? JSON.stringify(err);
+          // html5-qrcode v2 peut utiliser `errorMessage` au lieu de `message`
+          const o = err as Record<string, unknown>;
+          errorName = typeof o.name === 'string' ? o.name : undefined;
+          errorMsg = typeof o.message === 'string'
+            ? o.message
+            : typeof o.errorMessage === 'string'
+              ? o.errorMessage
+              : JSON.stringify(err);
+          // Dérive le nom si absent
+          if (!errorName && errorMsg) {
+            if (/NotFoundError|no cameras/i.test(errorMsg)) errorName = 'NotFoundError';
+            else if (/NotAllowedError|permission/i.test(errorMsg)) errorName = 'NotAllowedError';
+            else if (/NotReadableError/i.test(errorMsg)) errorName = 'NotReadableError';
+          }
         }
 
-        let message = 'Impossible de démarrer la caméra QR. Vous pouvez saisir le code manuellement.';
+        let message = 'Impossible de démarrer la caméra. Saisissez le code manuellement.';
 
         if (errorName === 'NotFoundError' || /no cameras/i.test(errorMsg ?? '')) {
-          message = 'Aucune caméra compatible détectée. Vérifiez qu\'une webcam est branchée/active.';
+          message = 'Aucune caméra compatible détectée sur cet appareil.';
         } else if (errorName === 'NotAllowedError') {
-          message = 'Accès caméra refusé. Autorisez la caméra dans les paramètres du navigateur (cadenas dans la barre d\'adresse).';
+          message = 'Accès caméra refusé. Autorisez la caméra dans les réglages du navigateur (icône cadenas dans la barre d\'adresse).';
         } else if (errorName === 'NotReadableError') {
           message = 'La caméra est déjà utilisée par une autre application. Fermez-la puis réessayez.';
         } else if (errorName === 'OverconstrainedError') {
           message = 'Aucune caméra ne correspond aux contraintes. Essayez un autre navigateur.';
         } else if (errorMsg?.includes('https') || errorMsg?.includes('secure')) {
-          message = 'La caméra nécessite une connexion HTTPS. Saisissez le code manuellement.';
-        } else if (errorName) {
-          message = `Caméra indisponible (${errorName}). Saisissez le code manuellement.`;
+          message = 'La caméra nécessite une connexion HTTPS.';
+        } else if (errorMsg) {
+          message = `Caméra indisponible: ${errorMsg.substring(0, 100)}. Saisissez le code manuellement.`;
         }
 
         setErrorMessage(message);
         onError?.(message);
-        // Log brut pour faciliter le debug (pas de wrapping dans un objet)
-        console.error('[QrCameraScanner] Erreur caméra (raw):', err, '| isSecureContext:', window.isSecureContext);
+        // Log brut intégral pour debug
+        console.error('[QrCameraScanner] Erreur caméra ▶', {
+          rawErr: err,
+          errorName,
+          errorMsg,
+          isSecureContext: window.isSecureContext,
+        });
 
         await stopScanner();
         if (isMountedRef.current) setIsOpen(false);
