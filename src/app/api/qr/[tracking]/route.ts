@@ -134,9 +134,21 @@ export async function POST(
 
     const parcel = await db.colis.findUnique({
       where: { trackingNumber: tracking },
-      include: {
-        relaisDepart: true,
-        relaisArrivee: true,
+      select: {
+        id: true,
+        status: true,
+        relaisDepartId: true,
+        relaisArriveeId: true,
+        clientId: true,
+        prixClient: true,
+        villeDepart: true,
+        villeArrivee: true,
+        netTransporteur: true,
+        recipientFirstName: true,
+        recipientLastName: true,
+        recipientPhone: true,
+        withdrawalCodeHash: true,
+        relaisDepart: { select: { id: true, commerceName: true } },
       },
     });
 
@@ -512,7 +524,6 @@ export async function POST(
       try {
         const matchingResult = await matchColisToTrajets({
           id: parcel.id,
-          lineId: parcel.lineId,
           villeDepart: parcel.villeDepart,
           villeArrivee: parcel.villeArrivee,
           clientId: parcel.clientId,
