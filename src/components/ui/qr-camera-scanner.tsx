@@ -338,13 +338,14 @@ startingRef.current = false;
         )}
       </Button>
 
-      <div className={`relative rounded-lg overflow-hidden border bg-black ${isOpen ? 'block' : 'hidden'}`}>
+      <div className={`relative rounded-lg overflow-hidden border bg-black ${isOpen ? 'block' : 'hidden'} min-h-[300px] md:min-h-[400px]`}>
           {isStarting && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/60 z-10">
-              <Loader2 className="h-8 w-8 animate-spin text-white" />
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 z-10">
+              <Loader2 className="h-8 w-8 animate-spin text-white mb-2" />
+              <span className="text-xs text-gray-300">Initialisation caméra...</span>
             </div>
           )}
-          <div id={SCANNER_ELEMENT_ID} className="w-full min-h-[300px]" />
+          <div id={SCANNER_ELEMENT_ID} className="w-full h-full" />
       </div>
 
       {errorMessage && (
