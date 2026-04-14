@@ -1319,11 +1319,20 @@ function ScanTab({ relaisId, userId, onRefresh, prefilledTracking }: { relaisId:
       });
       const data = await res.json();
       if (!res.ok) {
-        toast({ title: 'Erreur', description: data.error, variant: 'destructive' });
+        toast({ title: 'Erreur action', description: data.error, variant: 'destructive' });
       } else {
-        toast({ title: 'Succès', description: data.message });
+        console.log('[ScanTab] Action réussie, mise à jour des stats...', { action, newStatus: data.parcel?.status });
+        toast({ 
+          title: '✓ Colis validé',
+          description: `${data.message}. Les statistiques vont être mises à jour...`,
+          variant: 'default',
+          duration: 5000,
+        });
         setParcel((prev: any) => ({ ...prev, status: data.parcel?.status ?? prev.status }));
-        onRefresh();
+        setTimeout(() => {
+          console.log('[ScanTab] Appel onRefresh() pour mettre à jour les stats');
+          onRefresh();
+        }, 500);
       }
     } catch {
       toast({ title: 'Erreur réseau', variant: 'destructive' });
@@ -1637,18 +1646,37 @@ function ScanTab({ relaisId, userId, onRefresh, prefilledTracking }: { relaisId:
             }}
           />
 
+          {isSearching && (
+            <div className="flex items-center gap-2 p-4 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg">
+              <Loader2 className="h-5 w-5 text-blue-600 animate-spin" />
+              <div>
+                <p className="font-semibold text-blue-900 dark:text-blue-100">Récupération des données du colis...</p>
+                <p className="text-xs text-blue-700 dark:text-blue-300">Scan en cours de traitement</p>
+              </div>
+            </div>
+          )}
+
           {parcel && (
-            <Card className="bg-slate-50 dark:bg-slate-800 border-2">
+            <Card className="bg-emerald-50 dark:bg-emerald-950/20 border-2 border-emerald-200 dark:border-emerald-800">
               <CardContent className="pt-6">
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <p className="font-mono font-bold text-xl">{parcel.trackingNumber}</p>
-                    <p className="text-slate-500 text-sm">{parcel.villeDepart} → {parcel.villeArrivee}</p>
+                <div className="flex items-start gap-3 mb-4">
+                  <CheckCircle className="h-5 w-5 text-emerald-600 mt-1 flex-shrink-0" />
+                  <div className="flex-1">
+                    <p className="font-semibold text-emerald-900 dark:text-emerald-100">✓ Colis scanné et détecté</p>
+                    <p className="text-xs text-emerald-700 dark:text-emerald-300">Choisissez une action ci-dessous pour confirmer</p>
                   </div>
-                  <Badge className={`${statusInfo?.color ?? 'bg-slate-500'} text-white px-3 py-1`}>
-                    {statusInfo?.label ?? currentStatus}
-                  </Badge>
                 </div>
+
+                <div className="border-t border-emerald-200 dark:border-emerald-800 pt-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <p className="font-mono font-bold text-xl">{parcel.trackingNumber}</p>
+                      <p className="text-slate-500 text-sm">{parcel.villeDepart} → {parcel.villeArrivee}</p>
+                    </div>
+                    <Badge className={`${statusInfo?.color ?? 'bg-slate-500'} text-white px-3 py-1`}>
+                      {statusInfo?.label ?? currentStatus}
+                    </Badge>
+                  </div>
 
                 <div className="grid gap-4 md:grid-cols-3 mb-6 text-sm">
                   <div><p className="text-slate-500 mb-1">Client</p><p className="font-semibold">{parcel.client?.name}</p><p>{parcel.client?.phone}</p></div>
@@ -1725,6 +1753,7 @@ function ScanTab({ relaisId, userId, onRefresh, prefilledTracking }: { relaisId:
                     );
                   })}
                 </div>
+              </div>
 
                 {availableActions.length > 0 ? (
                   <div className="space-y-3">
