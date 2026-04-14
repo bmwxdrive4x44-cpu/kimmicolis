@@ -2108,7 +2108,10 @@ function CashTab({ relaisId, cashInfo: initialCashInfo, userId, onRefresh }: { r
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2"><History className="h-5 w-5" />Historique des transactions</CardTitle>
+          <CardTitle className="flex items-center gap-2"><History className="h-5 w-5" />Historique des scans client et reversements</CardTitle>
+          <CardDescription>
+            Date/heure du dépôt client, montant payé, commission relais et reversements plateforme.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -2117,26 +2120,54 @@ function CashTab({ relaisId, cashInfo: initialCashInfo, userId, onRefresh }: { r
             <p className="text-center text-slate-500 py-8">Aucune transaction</p>
           ) : (
             <div className="space-y-3">
-              {transactions.map((tx: any) => (
-                <div key={tx.id} className="flex items-center justify-between p-3 border rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${tx.type === 'COLLECTED' ? 'bg-emerald-100' : 'bg-blue-100'}`}>
-                      {tx.type === 'COLLECTED' ? <ArrowDownToLine className="h-4 w-4 text-emerald-600" /> : <ArrowUpFromLine className="h-4 w-4 text-blue-600" />}
-                    </div>
-                    <div>
-                      <p className="font-semibold text-sm">
-                        {tx.type === 'COLLECTED' ? 'Encaissement' : 'Versement'}
-                        {tx.colis && <span className="font-mono text-slate-500 ml-2 text-xs">#{tx.colis.trackingNumber}</span>}
-                      </p>
+              <div className="hidden md:grid md:grid-cols-6 text-xs font-semibold uppercase tracking-wide text-slate-500 border rounded-lg px-3 py-2 bg-slate-50">
+                <span>Date / Heure</span>
+                <span>Colis</span>
+                <span>Type</span>
+                <span className="text-right">Payé client</span>
+                <span className="text-right">Commission</span>
+                <span className="text-right">Reversement</span>
+              </div>
+
+              {transactions.map((tx: any) => {
+                const isCollected = tx.type === 'COLLECTED';
+                const paidByClient = isCollected ? Number(tx.amount || tx.colis?.prixClient || 0) : Number(tx.colis?.prixClient || 0);
+                const commission = Number(tx.colis?.commissionRelais || 0);
+                const reversal = isCollected ? 0 : Number(tx.amount || 0);
+
+                return (
+                  <div key={tx.id} className="border rounded-lg px-3 py-3">
+                    <div className="md:hidden space-y-1 mb-2">
                       <p className="text-xs text-slate-500">{new Date(tx.createdAt).toLocaleString('fr-FR')}</p>
-                      {tx.notes && <p className="text-xs text-slate-400">{tx.notes}</p>}
+                      <p className="font-semibold text-sm">
+                        {isCollected ? 'Dépôt client scanné' : 'Reversement plateforme'}
+                        {tx.colis?.trackingNumber ? <span className="font-mono text-slate-500 ml-2 text-xs">#{tx.colis.trackingNumber}</span> : null}
+                      </p>
                     </div>
+
+                    <div className="hidden md:grid md:grid-cols-6 md:items-center text-sm">
+                      <span className="text-slate-600">{new Date(tx.createdAt).toLocaleString('fr-FR')}</span>
+                      <span className="font-mono text-xs text-slate-600">{tx.colis?.trackingNumber || '—'}</span>
+                      <span>
+                        <Badge className={isCollected ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-100' : 'bg-blue-100 text-blue-700 hover:bg-blue-100'}>
+                          {isCollected ? 'Dépôt client' : 'Reversement'}
+                        </Badge>
+                      </span>
+                      <span className="text-right font-semibold text-slate-700">{paidByClient.toFixed(0)} DA</span>
+                      <span className="text-right font-semibold text-emerald-600">{commission.toFixed(0)} DA</span>
+                      <span className="text-right font-semibold text-blue-600">{reversal > 0 ? `${reversal.toFixed(0)} DA` : '—'}</span>
+                    </div>
+
+                    <div className="md:hidden grid grid-cols-2 gap-x-4 gap-y-1 text-xs mt-2">
+                      <span className="text-slate-500">Payé client</span><span className="text-right font-semibold">{paidByClient.toFixed(0)} DA</span>
+                      <span className="text-slate-500">Commission</span><span className="text-right font-semibold text-emerald-600">{commission.toFixed(0)} DA</span>
+                      <span className="text-slate-500">Reversement</span><span className="text-right font-semibold text-blue-600">{reversal > 0 ? `${reversal.toFixed(0)} DA` : '—'}</span>
+                    </div>
+
+                    {tx.notes ? <p className="text-xs text-slate-400 mt-2">{tx.notes}</p> : null}
                   </div>
-                  <p className={`font-bold ${tx.type === 'COLLECTED' ? 'text-emerald-600' : 'text-blue-600'}`}>
-                    {tx.type === 'COLLECTED' ? '+' : '-'}{tx.amount.toFixed(0)} DA
-                  </p>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </CardContent>
