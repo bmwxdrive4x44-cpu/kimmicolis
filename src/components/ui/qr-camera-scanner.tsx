@@ -110,13 +110,12 @@ export function QrCameraScanner({ onScan, disabled = false, onError }: QrCameraS
         const orderedIds = [preflightDeviceIdRef.current, preferred?.id, ...cameras.map((camera) => camera.id)]
           .filter((id, idx, arr): id is string => Boolean(id) && arr.indexOf(id) === idx);
 
-        const strategies: Array<{ key: string; camera: string | MediaTrackConstraints }> = [
+        // html5-qrcode n'accepte que: string deviceId, { facingMode: 'environment'|'user' }
+        // Les objets imbriqués ({ ideal: ... }) ou vides ({}) ne sont pas supportés.
+        const strategies: Array<{ key: string; camera: string | { facingMode: 'environment' | 'user' } }> = [
           ...orderedIds.map((deviceId) => ({ key: `device:${deviceId}`, camera: deviceId })),
-          { key: 'constraints:ideal-environment', camera: { facingMode: { ideal: 'environment' } } },
-          { key: 'constraints:ideal-user', camera: { facingMode: { ideal: 'user' } } },
           { key: 'facing:environment', camera: { facingMode: 'environment' as const } },
           { key: 'facing:user', camera: { facingMode: 'user' as const } },
-          { key: 'constraints:any-video', camera: {} },
         ];
 
         let started = false;
@@ -187,7 +186,7 @@ export function QrCameraScanner({ onScan, disabled = false, onError }: QrCameraS
         let message = 'Impossible de démarrer la caméra. Saisissez le code manuellement.';
 
         if (errorName === 'NotFoundError' || /no cameras|requested device not found/i.test(errorMsg ?? '')) {
-          message = 'Caméra introuvable ou occupée. Vérifiez les permissions OS/navigateur puis fermez les apps qui utilisent déjà la caméra.';
+          message = 'Aucune caméra accessible. Causes possibles: (1) caméra non autorisée — cliquez sur le cadenas dans la barre d\'adresse et autorisez la caméra; (2) caméra utilisée par une autre app — fermez-la; (3) matériel indisponible — utilisez "Scanner depuis photo" ci-dessous.';
         } else if (errorName === 'NotAllowedError') {
           message = 'Accès caméra refusé. Autorisez la caméra dans les réglages du navigateur (icône cadenas dans la barre d\'adresse).';
         } else if (errorName === 'NotReadableError') {
