@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
       }),
       db.relaisCash.findMany({
         where: { relaisId },
-        include: { colis: { select: { trackingNumber: true, weight: true, prixClient: true, commissionRelais: true, status: true } } },
+        include: { colis: { select: { id: true, trackingNumber: true, weight: true, prixClient: true, commissionRelais: true, status: true } } },
         orderBy: { createdAt: 'desc' },
         take: 100,
       }),
@@ -100,10 +100,22 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Relais introuvable' }, { status: 404 });
     }
 
-    // Compute from actual transactions (source of truth) to avoid stale denormalized fields
-    const cashCollected = transactions
-      .filter(t => t.type === 'COLLECTED')
-      .reduce((sum, t) => sum + t.amount, 0);
+    // Compute from ledger transactions, with fallback from PAID_RELAY history when
+    // COLLECTED rows are missing for legacy/partial flows.
+    const collectedTransactions = transactions.filter(t => t.type === 'COLLECTED');
+    const collectedColisIds = new Set(
+      collectedTransactions
+        .map((t) => t.colis?.id)
+        .filter((id): id is string => Boolean(id))
+    );
+
+    const inferredCollectedFromHistory = scanHistory
+      .filter((h) => h.status === 'PAID_RELAY' && !collectedColisIds.has(h.colis.id))
+      .reduce((sum, h) => sum + Number(h.colis.prixClient || 0), 0);
+
+    const cashCollected = collectedTransactions
+      .reduce((sum, t) => sum + t.amount, 0) + inferredCollectedFromHistory;
+
     const cashReversed = transactions
       .filter(t => t.type === 'REVERSED')
       .reduce((sum, t) => sum + t.amount, 0);
