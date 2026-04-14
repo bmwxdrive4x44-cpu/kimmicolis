@@ -2,6 +2,20 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { requireRole } from '@/lib/rbac';
 
+const COMMISSION_EARNED_STATUSES = [
+  'PAID_RELAY',
+  'DEPOSITED_RELAY',
+  'RECU_RELAIS',
+  'WAITING_PICKUP',
+  'ASSIGNED',
+  'PICKED_UP',
+  'EN_TRANSPORT',
+  'IN_TRANSIT',
+  'ARRIVED_RELAY',
+  'ARRIVE_RELAIS_DESTINATION',
+  'LIVRE',
+];
+
 /**
  * GET /api/relais-cash?relaisId=...
  * Returns cash ledger for a relay point.
@@ -33,7 +47,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const [relais, transactions] = await Promise.all([
+    const [relais, transactions, commissionParcels] = await Promise.all([
       db.relais.findUnique({
         where: { id: relaisId },
         select: { cashCollected: true, cashReversed: true, commissionPetit: true, commissionMoyen: true, commissionGros: true },
@@ -43,6 +57,16 @@ export async function GET(request: NextRequest) {
         include: { colis: { select: { trackingNumber: true, weight: true, prixClient: true, commissionRelais: true, status: true } } },
         orderBy: { createdAt: 'desc' },
         take: 100,
+      }),
+      db.colis.findMany({
+        where: {
+          relaisDepartId: relaisId,
+          status: { in: COMMISSION_EARNED_STATUSES },
+        },
+        select: {
+          id: true,
+          commissionRelais: true,
+        },
       }),
     ]);
 
@@ -59,10 +83,10 @@ export async function GET(request: NextRequest) {
       .reduce((sum, t) => sum + t.amount, 0);
     const balance = cashCollected - cashReversed;
 
-    // Commission only on customer drop-off cash (departure relay)
-    const totalCommissions = transactions
-      .filter(t => t.type === 'COLLECTED')
-      .reduce((sum, t) => sum + (t.colis?.commissionRelais || 0), 0);
+    // Relay commission is earned on eligible parcels handled by the departure relay,
+    // including online-paid parcels that do not create a cash collection transaction.
+    const totalCommissions = commissionParcels
+      .reduce((sum, parcel) => sum + Number(parcel.commissionRelais || 0), 0);
 
     // Sync denormalized fields if out of date
     if (relais.cashCollected !== cashCollected || relais.cashReversed !== cashReversed) {

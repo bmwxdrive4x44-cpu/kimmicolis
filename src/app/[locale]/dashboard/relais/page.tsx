@@ -2533,7 +2533,7 @@ function GainsTab({ relaisId }: { relaisId: string | undefined }) {
     if (!relaisId) return;
     setIsLoading(true);
     try {
-      const res = await fetch(`/api/relais/financials?relaisId=${relaisId}`);
+      const res = await fetch(`/api/relais/financials?relaisId=${relaisId}&_=${Date.now()}`, { cache: 'no-store' });
       if (res.ok) setData(await res.json());
     } finally {
       setIsLoading(false);
@@ -2543,26 +2543,26 @@ function GainsTab({ relaisId }: { relaisId: string | undefined }) {
   useEffect(() => { fetchData(); }, [fetchData]);
 
   const monthlyData = useMemo(() => {
-    if (!data?.transactions) return [];
+    if (!data?.commissionEntries) return [];
     const months: Record<string, number> = {};
-    const sorted = [...data.transactions]
-      .filter((t: any) => t.type === 'COLLECTED')
-      .sort((a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-    sorted.forEach((t: any) => {
-      const d = new Date(t.createdAt);
+    const sorted = [...data.commissionEntries]
+      .filter((entry: any) => (entry.commissionRelais || 0) > 0)
+      .sort((a: any, b: any) => new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime());
+    sorted.forEach((entry: any) => {
+      const d = new Date(entry.updatedAt);
       const key = d.toLocaleDateString('fr-FR', { month: 'short', year: '2-digit' });
-      months[key] = (months[key] || 0) + (t.colis?.commissionRelais || 0);
+      months[key] = (months[key] || 0) + Number(entry.commissionRelais || 0);
     });
     return Object.entries(months).map(([month, amount]) => ({ month, amount: Math.round(amount as number) })).slice(-6);
   }, [data]);
 
   const commissionTransactions = useMemo(() =>
-    (data?.transactions || []).filter((t: any) => t.type === 'COLLECTED' && (t.colis?.commissionRelais || 0) > 0),
+    (data?.commissionEntries || []).filter((entry: any) => (entry.commissionRelais || 0) > 0),
     [data]
   );
 
   const totalCommissions = useMemo(() =>
-    commissionTransactions.reduce((sum: number, t: any) => sum + (t.colis?.commissionRelais || 0), 0),
+    commissionTransactions.reduce((sum: number, entry: any) => sum + Number(entry.commissionRelais || 0), 0),
     [commissionTransactions]
   );
 
@@ -2659,18 +2659,18 @@ function GainsTab({ relaisId }: { relaisId: string | undefined }) {
                     <div>
                       <p className="font-semibold text-sm">
                         Colis commissionné
-                        {tx.colis && <span className="font-mono text-slate-400 ml-2 text-xs">#{tx.colis.trackingNumber}</span>}
+                        <span className="font-mono text-slate-400 ml-2 text-xs">#{tx.trackingNumber}</span>
                       </p>
                       <p className="text-xs text-slate-400">
-                        {new Date(tx.createdAt).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })}
-                        {tx.colis && <span className="ml-2">{tx.colis.villeDepart} → {tx.colis.villeArrivee}</span>}
+                        {new Date(tx.updatedAt).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })}
+                        <span className="ml-2">{tx.villeDepart} → {tx.villeArrivee}</span>
                       </p>
-                      {tx.notes && <p className="text-xs text-slate-400 italic">{tx.notes}</p>}
+                      <p className="text-xs text-slate-400 italic">Statut: {tx.status}</p>
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="font-bold text-slate-700">{tx.amount.toFixed(0)} DA payés par le client</p>
-                    <p className="text-xs text-emerald-500">+{(tx.colis?.commissionRelais || 0).toFixed(0)} DA gagnés par le relais</p>
+                    <p className="font-bold text-slate-700">{Number(tx.prixClient || 0).toFixed(0)} DA payés par le client</p>
+                    <p className="text-xs text-emerald-500">+{Number(tx.commissionRelais || 0).toFixed(0)} DA gagnés par le relais</p>
                   </div>
                 </div>
               ))}

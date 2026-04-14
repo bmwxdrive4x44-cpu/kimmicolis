@@ -3,6 +3,20 @@ import { db } from '@/lib/db';
 import { requireRole } from '@/lib/rbac';
 import { RELAY_BLOCK_THRESHOLD_DA } from '@/lib/constants';
 
+const COMMISSION_EARNED_STATUSES = [
+  'PAID_RELAY',
+  'DEPOSITED_RELAY',
+  'RECU_RELAIS',
+  'WAITING_PICKUP',
+  'ASSIGNED',
+  'PICKED_UP',
+  'EN_TRANSPORT',
+  'IN_TRANSIT',
+  'ARRIVED_RELAY',
+  'ARRIVE_RELAIS_DESTINATION',
+  'LIVRE',
+];
+
 /**
  * GET /api/relais/financials
  * Get financial summary for a relay point.
@@ -41,18 +55,38 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Point relais non trouvé' }, { status: 404 });
     }
 
-    // Get transaction history
-    const transactions = await db.relaisCash.findMany({
-      where: { relaisId },
-      include: {
-        colis: { select: { trackingNumber: true, villeDepart: true, villeArrivee: true } },
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 100,
-    });
+    const [transactions, commissionEntries] = await Promise.all([
+      db.relaisCash.findMany({
+        where: { relaisId },
+        include: {
+          colis: { select: { trackingNumber: true, villeDepart: true, villeArrivee: true, commissionRelais: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 100,
+      }),
+      db.colis.findMany({
+        where: {
+          relaisDepartId: relaisId,
+          status: { in: COMMISSION_EARNED_STATUSES },
+        },
+        select: {
+          id: true,
+          trackingNumber: true,
+          villeDepart: true,
+          villeArrivee: true,
+          prixClient: true,
+          commissionRelais: true,
+          status: true,
+          updatedAt: true,
+        },
+        orderBy: { updatedAt: 'desc' },
+        take: 100,
+      }),
+    ]);
 
     const balance = relais.cashCollected - relais.cashReversed;
     const blockRisk = (balance / RELAY_BLOCK_THRESHOLD_DA) * 100;
+    const totalCommissions = commissionEntries.reduce((sum, entry) => sum + Number(entry.commissionRelais || 0), 0);
 
     return NextResponse.json({
       relaisId,
@@ -60,10 +94,12 @@ export async function GET(request: NextRequest) {
       totalEncaisse: relais.cashCollected,
       totalReverse: relais.cashReversed,
       balance,
+      totalCommissions,
       isBlocked: balance >= RELAY_BLOCK_THRESHOLD_DA,
       blockThreshold: RELAY_BLOCK_THRESHOLD_DA,
       blockRiskPercent: Math.min(blockRisk, 100),
       transactions,
+      commissionEntries,
     });
   } catch (error) {
     console.error('Error fetching relay financials:', error);
