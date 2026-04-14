@@ -275,16 +275,22 @@ export function QrCameraScanner({ onScan, disabled = false, onError }: QrCameraS
       preflightDeviceIdRef.current = typeof settings?.deviceId === 'string' ? settings.deviceId : null;
       stream.getTracks().forEach((track) => track.stop());
     } catch (err) {
+      preflightDeviceIdRef.current = null;
       const errText = extractErrString(err).toLowerCase();
       let message = 'Caméra indisponible. Vérifiez les permissions puis réessayez.';
       if (errText.includes('notallowederror') || errText.includes('permission')) {
         message = 'Accès caméra refusé. Autorisez la caméra dans les réglages du navigateur.';
-      } else if (errText.includes('notfounderror') || errText.includes('requested device not found')) {
-        message = 'Aucune caméra détectée sur cet appareil ou caméra non accessible.';
+        setErrorMessage(message);
+        onError?.(message);
+        return;
       }
-      setErrorMessage(message);
-      onError?.(message);
-      return;
+
+      // Certains navigateurs échouent en préflight mais réussissent via html5-qrcode ensuite.
+      // On log puis on continue le flux de démarrage normal.
+      console.warn('[QrCameraScanner] preflight getUserMedia failed, fallback to scanner strategies', {
+        err,
+        isSecureContext: window.isSecureContext,
+      });
     }
 
     // Vérification informative des entrées vidéo exposées par le navigateur.
