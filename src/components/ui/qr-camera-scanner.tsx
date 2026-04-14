@@ -110,9 +110,9 @@ export function QrCameraScanner({ onScan, disabled = false, onError }: QrCameraS
           .filter((id, idx, arr): id is string => Boolean(id) && arr.indexOf(id) === idx);
 
         const strategies: Array<{ key: string; camera: string | { facingMode: 'environment' | 'user' } }> = [
+          ...orderedIds.map((deviceId) => ({ key: `device:${deviceId}`, camera: deviceId })),
           { key: 'facing:environment', camera: { facingMode: 'environment' as const } },
           { key: 'facing:user', camera: { facingMode: 'user' as const } },
-          ...orderedIds.map((deviceId) => ({ key: `device:${deviceId}`, camera: deviceId })),
         ];
 
         let started = false;
@@ -217,7 +217,6 @@ export function QrCameraScanner({ onScan, disabled = false, onError }: QrCameraS
 
     startCamera();
 
-      startingRef.current = false;
     // Cleanup: annule uniquement l'init en cours.
     // Ne pas stopper le scanner ici, sinon un changement d'état (isStarting -> false)
     // coupe la vidéo juste après démarrage et provoque un écran noir / AbortError.
@@ -250,6 +249,32 @@ export function QrCameraScanner({ onScan, disabled = false, onError }: QrCameraS
 
     if (!window.isSecureContext) {
       const message = 'La caméra nécessite HTTPS ou localhost.';
+      setErrorMessage(message);
+      onError?.(message);
+      return;
+    }
+
+    // Préflight: certains navigateurs renvoient des deviceId invalides avant un vrai getUserMedia.
+    // On ouvre/ferme un stream court pour stabiliser la liste des caméras avant le start html5-qrcode.
+    try {
+      let stream: MediaStream | null = null;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: 'environment' } },
+          audio: false,
+        });
+      } catch {
+        stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      }
+      stream.getTracks().forEach((track) => track.stop());
+    } catch (err) {
+      const errText = extractErrString(err).toLowerCase();
+      let message = 'Caméra indisponible. Vérifiez les permissions puis réessayez.';
+      if (errText.includes('notallowederror') || errText.includes('permission')) {
+        message = 'Accès caméra refusé. Autorisez la caméra dans les réglages du navigateur.';
+      } else if (errText.includes('notfounderror') || errText.includes('requested device not found')) {
+        message = 'Aucune caméra détectée sur cet appareil ou caméra non accessible.';
+      }
       setErrorMessage(message);
       onError?.(message);
       return;
