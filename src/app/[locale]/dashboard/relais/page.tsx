@@ -1902,6 +1902,7 @@ function ScanTab({ relaisId, userId, onRefresh, onDashboardUpdate, prefilledTrac
 function CashTab({ relaisId, cashInfo: initialCashInfo, userId, onRefresh }: { relaisId: string | undefined; cashInfo: any; userId: string; onRefresh: () => void }) {
   const { toast } = useToast();
   const [transactions, setTransactions] = useState<any[]>([]);
+  const [scanHistory, setScanHistory] = useState<any[]>([]);
   const [cashPickups, setCashPickups] = useState<any[]>([]);
   const [cashInfo, setCashInfo] = useState(initialCashInfo);
   const [reverseAmount, setReverseAmount] = useState('');
@@ -1931,6 +1932,7 @@ function CashTab({ relaisId, cashInfo: initialCashInfo, userId, onRefresh }: { r
       const cashData = await cashRes.json();
       const pickupData = await pickupRes.json().catch(() => ({ pickups: [] }));
       setTransactions(cashData.transactions || []);
+      setScanHistory(cashData.scanHistory || []);
       setCashPickups(pickupData.pickups || []);
       // Update local cash summary from fresh API data (source of truth)
       if (cashRes.ok) {
@@ -1947,6 +1949,38 @@ function CashTab({ relaisId, cashInfo: initialCashInfo, userId, onRefresh }: { r
   }, [relaisId]);
 
   useEffect(() => { fetchTransactions(); }, [fetchTransactions]);
+
+  const ledgerRows = useMemo(() => {
+    const scanRows = (scanHistory || []).map((scan: any) => ({
+      id: `scan-${scan.id}`,
+      date: scan.createdAt,
+      trackingNumber: scan.colis?.trackingNumber || null,
+      typeLabel: 'Dépôt client scanné',
+      paidByClient: Number(scan.colis?.prixClient || 0),
+      commission: Number(scan.colis?.commissionRelais || 0),
+      reversal: 0,
+      notes: scan.notes || null,
+      badgeClass: 'bg-emerald-100 text-emerald-700 hover:bg-emerald-100',
+    }));
+
+    const reversalRows = (transactions || [])
+      .filter((tx: any) => tx.type === 'REVERSED')
+      .map((tx: any) => ({
+        id: `reversal-${tx.id}`,
+        date: tx.createdAt,
+        trackingNumber: tx.colis?.trackingNumber || null,
+        typeLabel: 'Reversement plateforme',
+        paidByClient: Number(tx.colis?.prixClient || 0),
+        commission: Number(tx.colis?.commissionRelais || 0),
+        reversal: Number(tx.amount || 0),
+        notes: tx.notes || null,
+        badgeClass: 'bg-blue-100 text-blue-700 hover:bg-blue-100',
+      }));
+
+    return [...scanRows, ...reversalRows].sort(
+      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+    );
+  }, [scanHistory, transactions]);
 
   const handleReverse = async () => {
     const amount = parseLocaleFloat(reverseAmount);
@@ -2116,7 +2150,7 @@ function CashTab({ relaisId, cashInfo: initialCashInfo, userId, onRefresh }: { r
         <CardContent>
           {isLoading ? (
             <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-emerald-600" /></div>
-          ) : transactions.length === 0 ? (
+          ) : ledgerRows.length === 0 ? (
             <p className="text-center text-slate-500 py-8">Aucune transaction</p>
           ) : (
             <div className="space-y-3">
@@ -2129,28 +2163,27 @@ function CashTab({ relaisId, cashInfo: initialCashInfo, userId, onRefresh }: { r
                 <span className="text-right">Reversement</span>
               </div>
 
-              {transactions.map((tx: any) => {
-                const isCollected = tx.type === 'COLLECTED';
-                const paidByClient = isCollected ? Number(tx.amount || tx.colis?.prixClient || 0) : Number(tx.colis?.prixClient || 0);
-                const commission = Number(tx.colis?.commissionRelais || 0);
-                const reversal = isCollected ? 0 : Number(tx.amount || 0);
+              {ledgerRows.map((row: any) => {
+                const paidByClient = Number(row.paidByClient || 0);
+                const commission = Number(row.commission || 0);
+                const reversal = Number(row.reversal || 0);
 
                 return (
-                  <div key={tx.id} className="border rounded-lg px-3 py-3">
+                  <div key={row.id} className="border rounded-lg px-3 py-3">
                     <div className="md:hidden space-y-1 mb-2">
-                      <p className="text-xs text-slate-500">{new Date(tx.createdAt).toLocaleString('fr-FR')}</p>
+                      <p className="text-xs text-slate-500">{new Date(row.date).toLocaleString('fr-FR')}</p>
                       <p className="font-semibold text-sm">
-                        {isCollected ? 'Dépôt client scanné' : 'Reversement plateforme'}
-                        {tx.colis?.trackingNumber ? <span className="font-mono text-slate-500 ml-2 text-xs">#{tx.colis.trackingNumber}</span> : null}
+                        {row.typeLabel}
+                        {row.trackingNumber ? <span className="font-mono text-slate-500 ml-2 text-xs">#{row.trackingNumber}</span> : null}
                       </p>
                     </div>
 
                     <div className="hidden md:grid md:grid-cols-6 md:items-center text-sm">
-                      <span className="text-slate-600">{new Date(tx.createdAt).toLocaleString('fr-FR')}</span>
-                      <span className="font-mono text-xs text-slate-600">{tx.colis?.trackingNumber || '—'}</span>
+                      <span className="text-slate-600">{new Date(row.date).toLocaleString('fr-FR')}</span>
+                      <span className="font-mono text-xs text-slate-600">{row.trackingNumber || '—'}</span>
                       <span>
-                        <Badge className={isCollected ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-100' : 'bg-blue-100 text-blue-700 hover:bg-blue-100'}>
-                          {isCollected ? 'Dépôt client' : 'Reversement'}
+                        <Badge className={row.badgeClass}>
+                          {row.typeLabel}
                         </Badge>
                       </span>
                       <span className="text-right font-semibold text-slate-700">{paidByClient.toFixed(0)} DA</span>
@@ -2164,7 +2197,7 @@ function CashTab({ relaisId, cashInfo: initialCashInfo, userId, onRefresh }: { r
                       <span className="text-slate-500">Reversement</span><span className="text-right font-semibold text-blue-600">{reversal > 0 ? `${reversal.toFixed(0)} DA` : '—'}</span>
                     </div>
 
-                    {tx.notes ? <p className="text-xs text-slate-400 mt-2">{tx.notes}</p> : null}
+                    {row.notes ? <p className="text-xs text-slate-400 mt-2">{row.notes}</p> : null}
                   </div>
                 );
               })}

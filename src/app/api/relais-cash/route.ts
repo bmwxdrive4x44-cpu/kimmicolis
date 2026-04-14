@@ -16,6 +16,8 @@ const COMMISSION_EARNED_STATUSES = [
   'LIVRE',
 ];
 
+const RELAY_SCAN_STATUSES = ['PAID_RELAY', 'DEPOSITED_RELAY', 'RECU_RELAIS'];
+
 /**
  * GET /api/relais-cash?relaisId=...
  * Returns cash ledger for a relay point.
@@ -47,7 +49,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const [relais, transactions, commissionParcels] = await Promise.all([
+    const [relais, transactions, commissionParcels, scanHistory] = await Promise.all([
       db.relais.findUnique({
         where: { id: relaisId },
         select: { cashCollected: true, cashReversed: true, commissionPetit: true, commissionMoyen: true, commissionGros: true },
@@ -67,6 +69,30 @@ export async function GET(request: NextRequest) {
           id: true,
           commissionRelais: true,
         },
+      }),
+      db.trackingHistory.findMany({
+        where: {
+          status: { in: RELAY_SCAN_STATUSES },
+          colis: { relaisDepartId: relaisId },
+        },
+        select: {
+          id: true,
+          status: true,
+          createdAt: true,
+          notes: true,
+          colis: {
+            select: {
+              id: true,
+              trackingNumber: true,
+              prixClient: true,
+              commissionRelais: true,
+              villeDepart: true,
+              villeArrivee: true,
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 200,
       }),
     ]);
 
@@ -102,6 +128,7 @@ export async function GET(request: NextRequest) {
       balance,
       totalCommissions,
       transactions,
+      scanHistory,
     });
   } catch (error) {
     console.error('Error fetching relais cash:', error);
