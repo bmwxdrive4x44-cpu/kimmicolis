@@ -65,10 +65,8 @@ export function QrCameraScanner({ onScan, disabled = false, onError }: QrCameraS
 
   // Démarre la caméra APRÈS le re-render React (isOpen=true rend le container visible avec des dimensions réelles)
   useEffect(() => {
-    // Guard: empêche deux startCamera simultanés si l'effet se réexécute
-    if (startingRef.current) return;
-    startingRef.current = true;
     if (!isOpen || !isStarting) return;
+    
     // Guard: empêche deux startCamera simultanés si l'effet se réexécute
     if (startingRef.current) return;
     startingRef.current = true;
@@ -208,8 +206,7 @@ export function QrCameraScanner({ onScan, disabled = false, onError }: QrCameraS
           isSecureContext: window.isSecureContext,
           attemptHint: 'Si Requested device not found persiste, le navigateur expose un deviceId invalide ou la caméra est indisponible',
         });
-startingRef.current = false;
-        
+
         await stopScanner();
         if (isMountedRef.current) setIsOpen(false);
       } finally {
