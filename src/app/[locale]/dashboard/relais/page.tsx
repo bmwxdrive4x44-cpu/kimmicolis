@@ -92,7 +92,8 @@ export default function RelaisDashboard() {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await fetch(`/api/relais?userId=${session?.user?.id}&_=${Date.now()}`, {
+      const nonce = Date.now();
+      const response = await fetch(`/api/relais?userId=${session?.user?.id}&_=${nonce}`, {
         cache: 'no-store',
       });
       const data = await response.json();
@@ -120,9 +121,9 @@ export default function RelaisDashboard() {
         
         // Fetch stats, cash and admin-controlled commission barème in parallel
         const [statsRes, cashRes, settingsRes] = await Promise.all([
-          fetch(`/api/relais/${relais.id}/stats`).catch(() => null),
-          fetch(`/api/relais-cash?relaisId=${relais.id}`).catch(() => null),
-          fetch('/api/settings').catch(() => null),
+          fetch(`/api/relais/${relais.id}/stats?_=${nonce}`, { cache: 'no-store' }).catch(() => null),
+          fetch(`/api/relais-cash?relaisId=${relais.id}&_=${nonce}`, { cache: 'no-store' }).catch(() => null),
+          fetch(`/api/settings?_=${nonce}`, { cache: 'no-store' }).catch(() => null),
         ]);
         if (statsRes?.ok) setStats(await statsRes.json());
         if (cashRes?.ok) setCashInfo(await cashRes.json());
@@ -138,7 +139,7 @@ export default function RelaisDashboard() {
           });
         }
 
-        const printerRes = await fetch('/api/relais/printers').catch(() => null);
+        const printerRes = await fetch(`/api/relais/printers?_=${nonce}`, { cache: 'no-store' }).catch(() => null);
         if (printerRes?.ok) {
           const printerData = await printerRes.json();
           const current = Array.isArray(printerData?.printers) ? printerData.printers[0] : null;
@@ -157,6 +158,51 @@ export default function RelaisDashboard() {
       setIsLoading(false);
     }
   }, [session?.user?.id, locale, router]);
+
+  const handleScanDashboardUpdate = useCallback((payload: {
+    action: string;
+    amountCollected?: number;
+    commissionRelais?: number;
+  }) => {
+    if (payload.action === 'validate_payment') {
+      const amountCollected = Number(payload.amountCollected || 0);
+      const commissionRelais = Number(payload.commissionRelais || 0);
+
+      if (amountCollected > 0) {
+        setCashInfo((prev) => ({
+          ...prev,
+          cashCollected: prev.cashCollected + amountCollected,
+          balance: prev.balance + amountCollected,
+          totalCommissions: prev.totalCommissions + commissionRelais,
+        }));
+      }
+      return;
+    }
+
+    if (payload.action === 'deposit') {
+      setStats((prev) => ({
+        ...prev,
+        pending: Math.max(prev.pending - 1, 0),
+        received: prev.received + 1,
+      }));
+      return;
+    }
+
+    if (payload.action === 'arrive_dest') {
+      setStats((prev) => ({
+        ...prev,
+        received: prev.received + 1,
+      }));
+      return;
+    }
+
+    if (payload.action === 'deliver') {
+      setStats((prev) => ({
+        ...prev,
+        handedOver: prev.handedOver + 1,
+      }));
+    }
+  }, []);
 
   // Fetch relais info when session is ready
   useEffect(() => {
@@ -391,7 +437,7 @@ export default function RelaisDashboard() {
                 />
               </TabsContent>
               <TabsContent value="scan">
-                <ScanTab relaisId={relaisInfo?.id} userId={session.user.id} onRefresh={fetchRelaisInfo} prefilledTracking={scanTrackingPrefill} />
+                <ScanTab relaisId={relaisInfo?.id} userId={session.user.id} onRefresh={fetchRelaisInfo} onDashboardUpdate={handleScanDashboardUpdate} prefilledTracking={scanTrackingPrefill} />
               </TabsContent>
               <TabsContent value="cash">
                 <CashTab relaisId={relaisInfo?.id} cashInfo={cashInfo} userId={session.user.id} onRefresh={fetchRelaisInfo} />
@@ -1208,7 +1254,7 @@ function OverviewTab({
 }
 
 // Scan Tab — MVP workflow
-function ScanTab({ relaisId, userId, onRefresh, prefilledTracking }: { relaisId: string | undefined; userId: string; onRefresh: () => void; prefilledTracking?: string }) {
+function ScanTab({ relaisId, userId, onRefresh, onDashboardUpdate, prefilledTracking }: { relaisId: string | undefined; userId: string; onRefresh: () => void; onDashboardUpdate?: (payload: { action: string; amountCollected?: number; commissionRelais?: number }) => void; prefilledTracking?: string }) {
   const { toast } = useToast();
   const searchParams = useSearchParams();
   const [tracking, setTracking] = useState(() => searchParams.get('scan') ?? '');
@@ -1321,6 +1367,20 @@ function ScanTab({ relaisId, userId, onRefresh, prefilledTracking }: { relaisId:
       if (!res.ok) {
         toast({ title: 'Erreur action', description: data.error, variant: 'destructive' });
       } else {
+        onDashboardUpdate?.({
+          action,
+          amountCollected: typeof data.amountCollected === 'number' ? data.amountCollected : undefined,
+          commissionRelais: typeof data.commissionRelais === 'number' ? data.commissionRelais : Number(parcel.commissionRelais || 0),
+        });
+
+        if (action === 'validate_payment' && typeof data.amountCollected === 'number') {
+          setPaymentReceipt({
+            amount: data.amountCollected,
+            collectedAtIso: typeof data.collectedAtIso === 'string' ? data.collectedAtIso : new Date().toISOString(),
+            trackingNumber: parcel.trackingNumber,
+          });
+        }
+
         console.log('[ScanTab] Action réussie, mise à jour des stats...', { action, newStatus: data.parcel?.status });
         toast({ 
           title: '✓ Colis validé',
@@ -1839,6 +1899,10 @@ function CashTab({ relaisId, cashInfo: initialCashInfo, userId, onRefresh }: { r
   const [reverseNotes, setReverseNotes] = useState('');
   const [pickupAmount, setPickupAmount] = useState('');
   const [pickupNotes, setPickupNotes] = useState('');
+
+  useEffect(() => {
+    setCashInfo(initialCashInfo);
+  }, [initialCashInfo]);
   const [pickupScheduledAt, setPickupScheduledAt] = useState('');
   const [isReversing, setIsReversing] = useState(false);
   const [isRequestingPickup, setIsRequestingPickup] = useState(false);

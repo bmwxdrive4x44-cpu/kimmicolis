@@ -141,6 +141,7 @@ export async function POST(
         relaisArriveeId: true,
         clientId: true,
         prixClient: true,
+        commissionRelais: true,
         villeDepart: true,
         villeArrivee: true,
         netTransporteur: true,
@@ -206,6 +207,8 @@ export async function POST(
       notes = `Paiement cash validé: ${amount.toFixed(0)} DA`;
       extraData.cashCollected = amount;
       responseData.amountCollected = amount;
+      responseData.commissionRelais = Number(parcel.commissionRelais || 0);
+      responseData.collectedAtIso = new Date().toISOString();
       responseData.amountCurrency = 'DZD';
 
       await db.relaisCash.create({
