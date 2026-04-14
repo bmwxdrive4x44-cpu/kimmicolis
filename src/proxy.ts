@@ -12,8 +12,8 @@ const securityHeaders = {
   'X-Frame-Options': 'SAMEORIGIN',
   'X-Content-Type-Options': 'nosniff',
   'Referrer-Policy': 'strict-origin-when-cross-origin',
-  // Autorise la caméra sur l'origine courante (utile pour le scanner QR en production).
-  'Permissions-Policy': 'camera=(self), microphone=(), geolocation=()'
+  // Autorise la caméra pour tous les contextes same-origin (camera=* est plus compatible que camera=(self)).
+  'Permissions-Policy': 'camera=*, microphone=(), geolocation=()'
 };
 
 function applyApiCorsHeaders(request: NextRequest, response: NextResponse) {

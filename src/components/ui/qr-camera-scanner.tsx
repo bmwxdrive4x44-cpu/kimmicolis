@@ -31,6 +31,7 @@ export function QrCameraScanner({ onScan, disabled = false, onError }: QrCameraS
   const [manualInput, setManualInput] = useState('');
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const isMountedRef = useRef(true);
+  const startingRef = useRef(false); // guard contre le double-firing de l'effect
   // onScan ref pour éviter de le capturer dans useEffect
   const onScanRef = useRef(onScan);
   useEffect(() => { onScanRef.current = onScan; }, [onScan]);
@@ -64,6 +65,9 @@ export function QrCameraScanner({ onScan, disabled = false, onError }: QrCameraS
   // Démarre la caméra APRÈS le re-render React (isOpen=true rend le container visible avec des dimensions réelles)
   useEffect(() => {
     if (!isOpen || !isStarting) return;
+    // Guard: empêche deux startCamera simultanés si l'effet se réexécute
+    if (startingRef.current) return;
+    startingRef.current = true;
 
     // `cancelled` protège contre le double-run React StrictMode (dev)
     let cancelled = false;
@@ -204,6 +208,7 @@ export function QrCameraScanner({ onScan, disabled = false, onError }: QrCameraS
         await stopScanner();
         if (isMountedRef.current) setIsOpen(false);
       } finally {
+        startingRef.current = false;
         if (!cancelled && isMountedRef.current) setIsStarting(false);
       }
     };
@@ -215,6 +220,7 @@ export function QrCameraScanner({ onScan, disabled = false, onError }: QrCameraS
     // coupe la vidéo juste après démarrage et provoque un écran noir / AbortError.
     return () => {
       cancelled = true;
+      startingRef.current = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, isStarting]);
