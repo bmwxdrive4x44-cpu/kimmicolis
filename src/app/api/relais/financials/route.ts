@@ -50,6 +50,16 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'relaisId is required' }, { status: 400 });
     }
 
+    if (auth.payload.role === 'RELAIS') {
+      const ownedRelais = await db.relais.findFirst({
+        where: { id: relaisId, userId: auth.payload.id },
+        select: { id: true },
+      });
+      if (!ownedRelais) {
+        return NextResponse.json({ error: 'Accès interdit à ce relais' }, { status: 403 });
+      }
+    }
+
     const relais = await db.relais.findUnique({ where: { id: relaisId } });
     if (!relais) {
       return NextResponse.json({ error: 'Point relais non trouvé' }, { status: 404 });

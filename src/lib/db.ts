@@ -123,6 +123,7 @@ const shouldDisableTlsValidation =
   process.env.NODE_ENV === 'production' &&
   typeof runtimeDatabaseUrl === 'string' &&
   runtimeDatabaseUrl.includes('pooler.supabase.com')
+const allowInsecureTls = process.env.ALLOW_INSECURE_DB_TLS === 'true'
 
 if (shouldDisableTlsValidation) {
   // Prevent ambient PG* vars from overriding credentials encoded in DATABASE_URL.
@@ -134,7 +135,7 @@ if (shouldDisableTlsValidation) {
   delete process.env.PGSSLMODE
 }
 
-if (shouldDisableTlsValidation && process.env.NODE_TLS_REJECT_UNAUTHORIZED !== '0') {
+if (shouldDisableTlsValidation && allowInsecureTls && process.env.NODE_TLS_REJECT_UNAUTHORIZED !== '0') {
   process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'
 }
 
