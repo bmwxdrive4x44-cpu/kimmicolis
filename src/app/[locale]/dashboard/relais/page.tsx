@@ -1925,9 +1925,10 @@ function CashTab({ relaisId, cashInfo: initialCashInfo, userId, onRefresh }: { r
     if (!relaisId) return;
     setIsLoading(true);
     try {
+      const nonce = Date.now();
       const [cashRes, pickupRes] = await Promise.all([
-        fetch(`/api/relais-cash?relaisId=${relaisId}`),
-        fetch(`/api/relais/cash-pickups?relaisId=${relaisId}`),
+        fetch(`/api/relais-cash?relaisId=${relaisId}&_=${nonce}`, { cache: 'no-store' }),
+        fetch(`/api/relais/cash-pickups?relaisId=${relaisId}&_=${nonce}`, { cache: 'no-store' }),
       ]);
       const cashData = await cashRes.json();
       const pickupData = await pickupRes.json().catch(() => ({ pickups: [] }));

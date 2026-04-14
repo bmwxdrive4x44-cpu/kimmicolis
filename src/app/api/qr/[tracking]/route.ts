@@ -464,6 +464,10 @@ export async function POST(
       return NextResponse.json({ error: `Action inconnue: ${action}` }, { status: 400 });
     }
 
+    if (shouldUpdateParcelStatus) {
+      trackingStatus = newStatus;
+    }
+
     // ── Persist status change ────────────────────────────────────────────────────
     const updatedParcel = shouldUpdateParcelStatus
       ? await db.colis.update({
