@@ -1606,9 +1606,17 @@ function ScanTab({ relaisId, userId, onRefresh, onDashboardUpdate, prefilledTrac
         }
 
         const collected = Number(paymentData?.amountCollected ?? expectedAmount ?? 0);
+        onDashboardUpdate?.({
+          action: 'validate_payment',
+          amountCollected: collected,
+          commissionRelais: typeof paymentData?.commissionRelais === 'number'
+            ? paymentData.commissionRelais
+            : Number(parcel.commissionRelais || 0),
+        });
+
         setPaymentReceipt({
           amount: collected,
-          collectedAtIso: new Date().toISOString(),
+          collectedAtIso: typeof paymentData?.collectedAtIso === 'string' ? paymentData.collectedAtIso : new Date().toISOString(),
           trackingNumber: parcel.trackingNumber,
         });
         toast({
@@ -1660,6 +1668,7 @@ function ScanTab({ relaisId, userId, onRefresh, onDashboardUpdate, prefilledTrac
         });
       }
 
+      onDashboardUpdate?.({ action: 'deposit' });
       setParcel((prev: any) => ({ ...prev, status: depositData.parcel?.status ?? 'DEPOSITED_RELAY' }));
       onRefresh();
     } catch (err) {
