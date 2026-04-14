@@ -1259,6 +1259,7 @@ function ScanTab({ relaisId, userId, onRefresh, onDashboardUpdate, prefilledTrac
   const searchParams = useSearchParams();
   const [tracking, setTracking] = useState(() => searchParams.get('scan') ?? '');
   const [parcel, setParcel] = useState<any>(null);
+  const [hasUserTriggeredSearch, setHasUserTriggeredSearch] = useState(false);
   const [paymentReceipt, setPaymentReceipt] = useState<{ amount: number; collectedAtIso: string; trackingNumber: string } | null>(null);
   const [matchingFeedback, setMatchingFeedback] = useState<{ matched: boolean; error: string | null } | null>(null);
   const [isSearching, setIsSearching] = useState(false);
@@ -1272,22 +1273,16 @@ function ScanTab({ relaisId, userId, onRefresh, onDashboardUpdate, prefilledTrac
     recipientIdentityNumber: '',
   });
 
-  // Auto-trigger search if ?scan= param is present on mount
-  useEffect(() => {
-    const scanParam = searchParams.get('scan');
-    if (scanParam && !parcel) {
-      handleSearch();
-    }
-  }, []);
-
   useEffect(() => {
     if (prefilledTracking && prefilledTracking !== tracking) {
+      setHasUserTriggeredSearch(true);
       setTracking(prefilledTracking);
       void handleSearch(prefilledTracking);
     }
   }, [prefilledTracking]);
 
   const handleSearch = async (rawInput?: string) => {
+    setHasUserTriggeredSearch(true);
     const resolvedTracking = extractTrackingFromQrPayload(rawInput ?? tracking);
     if (!resolvedTracking) {
       toast({ title: 'QR invalide', description: 'Le QR scanné ne contient pas de numéro de suivi exploitable', variant: 'destructive' });
@@ -1725,7 +1720,7 @@ function ScanTab({ relaisId, userId, onRefresh, onDashboardUpdate, prefilledTrac
             </div>
           )}
 
-          {parcel && (
+          {parcel && hasUserTriggeredSearch && (
             <Card className="bg-emerald-50 dark:bg-emerald-950/20 border-2 border-emerald-200 dark:border-emerald-800">
               <CardContent className="pt-6">
                 <div className="flex items-start gap-3 mb-4">
