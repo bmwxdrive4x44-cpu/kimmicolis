@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const [relais, transactions, commissionParcels, scanHistory] = await Promise.all([
+    const [relais, transactions, commissionParcels] = await Promise.all([
       db.relais.findUnique({
         where: { id: relaisId },
         select: { cashCollected: true, cashReversed: true, commissionPetit: true, commissionMoyen: true, commissionGros: true },
@@ -67,38 +67,116 @@ export async function GET(request: NextRequest) {
         },
         select: {
           id: true,
+          trackingNumber: true,
+          prixClient: true,
           commissionRelais: true,
-        },
-      }),
-      db.trackingHistory.findMany({
-        where: {
-          status: { in: RELAY_SCAN_STATUSES },
-          colis: { relaisDepartId: relaisId },
-        },
-        select: {
-          id: true,
+          villeDepart: true,
+          villeArrivee: true,
           status: true,
-          createdAt: true,
-          notes: true,
-          colis: {
-            select: {
-              id: true,
-              trackingNumber: true,
-              prixClient: true,
-              commissionRelais: true,
-              villeDepart: true,
-              villeArrivee: true,
-            },
-          },
+          updatedAt: true,
         },
-        orderBy: { createdAt: 'desc' },
-        take: 200,
       }),
     ]);
 
     if (!relais) {
       return NextResponse.json({ error: 'Relais introuvable' }, { status: 404 });
     }
+
+    const parcelIds = commissionParcels.map((p) => p.id);
+    const parcelById = new Map(commissionParcels.map((p) => [p.id, p]));
+
+    const [scanHistoryRaw, validatePaymentLogs] = await Promise.all([
+      parcelIds.length > 0
+        ? db.trackingHistory.findMany({
+            where: {
+              status: { in: RELAY_SCAN_STATUSES },
+              colisId: { in: parcelIds },
+            },
+            select: {
+              id: true,
+              status: true,
+              createdAt: true,
+              notes: true,
+              colisId: true,
+              colis: {
+                select: {
+                  id: true,
+                  trackingNumber: true,
+                  prixClient: true,
+                  commissionRelais: true,
+                  villeDepart: true,
+                  villeArrivee: true,
+                },
+              },
+            },
+            orderBy: { createdAt: 'desc' },
+            take: 300,
+          })
+        : Promise.resolve([]),
+      parcelIds.length > 0
+        ? db.actionLog.findMany({
+            where: {
+              entityType: 'COLIS',
+              action: 'QR_SCAN:VALIDATE_PAYMENT',
+              entityId: { in: parcelIds },
+            },
+            select: {
+              id: true,
+              entityId: true,
+              details: true,
+              createdAt: true,
+            },
+            orderBy: { createdAt: 'desc' },
+            take: 300,
+          })
+        : Promise.resolve([]),
+    ]);
+
+    const paidRelayHistoryColisIds = new Set(
+      scanHistoryRaw.filter((h) => h.status === 'PAID_RELAY').map((h) => h.colisId)
+    );
+
+    const scanHistoryFromLogs = validatePaymentLogs
+      .filter((log) => !paidRelayHistoryColisIds.has(log.entityId))
+      .map((log) => {
+        const parcel = parcelById.get(log.entityId);
+        let amountFromLog = Number(parcel?.prixClient || 0);
+        let notes = 'Paiement cash validé (action log)';
+
+        if (log.details) {
+          try {
+            const parsed = JSON.parse(log.details) as { cashCollected?: number; tracking?: string };
+            if (typeof parsed.cashCollected === 'number') {
+              amountFromLog = parsed.cashCollected;
+            }
+            if (typeof parsed.tracking === 'string') {
+              notes = `Paiement cash validé pour ${parsed.tracking}`;
+            }
+          } catch {
+            // ignore malformed details
+          }
+        }
+
+        return {
+          id: `log-${log.id}`,
+          status: 'PAID_RELAY',
+          createdAt: log.createdAt,
+          notes,
+          colisId: log.entityId,
+          colis: {
+            id: log.entityId,
+            trackingNumber: parcel?.trackingNumber || 'UNKNOWN',
+            prixClient: amountFromLog,
+            commissionRelais: Number(parcel?.commissionRelais || 0),
+            villeDepart: parcel?.villeDepart || '',
+            villeArrivee: parcel?.villeArrivee || '',
+          },
+        };
+      });
+
+    const scanHistory = [...scanHistoryRaw, ...scanHistoryFromLogs].sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
 
     // Compute from ledger transactions, with fallback from PAID_RELAY history when
     // COLLECTED rows are missing for legacy/partial flows.
