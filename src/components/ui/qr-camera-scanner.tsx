@@ -32,6 +32,7 @@ export function QrCameraScanner({ onScan, disabled = false, onError }: QrCameraS
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const isMountedRef = useRef(true);
   const startingRef = useRef(false); // guard contre le double-firing de l'effect
+  const fileInputRef = useRef<HTMLInputElement>(null);
   // onScan ref pour éviter de le capturer dans useEffect
   const onScanRef = useRef(onScan);
   useEffect(() => { onScanRef.current = onScan; }, [onScan]);
@@ -64,6 +65,9 @@ export function QrCameraScanner({ onScan, disabled = false, onError }: QrCameraS
 
   // Démarre la caméra APRÈS le re-render React (isOpen=true rend le container visible avec des dimensions réelles)
   useEffect(() => {
+    // Guard: empêche deux startCamera simultanés si l'effet se réexécute
+    if (startingRef.current) return;
+    startingRef.current = true;
     if (!isOpen || !isStarting) return;
     // Guard: empêche deux startCamera simultanés si l'effet se réexécute
     if (startingRef.current) return;
@@ -204,7 +208,8 @@ export function QrCameraScanner({ onScan, disabled = false, onError }: QrCameraS
           isSecureContext: window.isSecureContext,
           attemptHint: 'Si Requested device not found persiste, le navigateur expose un deviceId invalide ou la caméra est indisponible',
         });
-
+startingRef.current = false;
+        
         await stopScanner();
         if (isMountedRef.current) setIsOpen(false);
       } finally {
@@ -215,6 +220,7 @@ export function QrCameraScanner({ onScan, disabled = false, onError }: QrCameraS
 
     startCamera();
 
+      startingRef.current = false;
     // Cleanup: annule uniquement l'init en cours.
     // Ne pas stopper le scanner ici, sinon un changement d'état (isStarting -> false)
     // coupe la vidéo juste après démarrage et provoque un écran noir / AbortError.
@@ -283,6 +289,32 @@ export function QrCameraScanner({ onScan, disabled = false, onError }: QrCameraS
     });
   };
 
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsStarting(true);
+    try {
+      // Utilise une instance temporaire pour scanner le fichier
+      const tempScanner = new Html5Qrcode('file-scan-temp');
+      const result = await tempScanner.scanFile(file, true);
+      if (result) {
+        onScanRef.current(result);
+        setErrorMessage(null);
+        setManualInput('');
+        await stopScanner();
+        if (isMountedRef.current) setIsOpen(false);
+      }
+      await tempScanner.stop();
+    } catch (err: unknown) {
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      setErrorMessage(`Impossible de décoder le QR: ${errorMsg.substring(0, 60)}`);
+    } finally {
+      if (isMountedRef.current) setIsStarting(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
   return (
     <div className="flex flex-col gap-2">
       <Button
@@ -320,6 +352,30 @@ export function QrCameraScanner({ onScan, disabled = false, onError }: QrCameraS
           <p className="text-xs text-amber-700">
             {errorMessage}
           </p>
+          {/* Fallback: charger une photo de la caméra/galerie pour scanner via fichier */}
+          <div className="flex gap-2">
+            <label className="flex-1">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={handleFileUpload}
+                disabled={isStarting}
+                className="hidden"
+              />
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                disabled={isStarting}
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full"
+              >
+                {isStarting ? 'Décodage...' : 'Scanner depuis photo'}
+              </Button>
+            </label>
+          </div>
           <form onSubmit={handleManualSubmit} className="flex gap-2">
             <input
               id="qr-manual-code"
