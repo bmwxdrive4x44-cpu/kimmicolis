@@ -2063,6 +2063,15 @@ function CashTab({ relaisId, cashInfo: initialCashInfo, userId, onRefresh }: { r
 
   return (
     <div className="space-y-6">
+      <Card className="border-sky-200 bg-sky-50/70">
+        <CardContent className="py-3">
+          <p className="text-xs text-sky-800">
+            Règle métier: le cash encaissé et la commission s'alimentent au scan du dépôt client sur le relais de départ.
+            Un relais d'arrivée voit le suivi colis, mais pas le cash du dépôt initial.
+          </p>
+        </CardContent>
+      </Card>
+
       <div className="grid gap-4 md:grid-cols-3">
         <Card className="bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 border-emerald-200">
           <CardContent className="pt-6 text-center">
