@@ -32,6 +32,7 @@ export function QrCameraScanner({ onScan, disabled = false, onError }: QrCameraS
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const isMountedRef = useRef(true);
   const startingRef = useRef(false); // guard contre le double-firing de l'effect
+  const preflightDeviceIdRef = useRef<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   // onScan ref pour éviter de le capturer dans useEffect
   const onScanRef = useRef(onScan);
@@ -106,13 +107,16 @@ export function QrCameraScanner({ onScan, disabled = false, onError }: QrCameraS
         const preferred = cameras.find((camera) =>
           /back|rear|environment|arriere|traseira|trasera/i.test(camera.label)
         );
-        const orderedIds = [preferred?.id, ...cameras.map((camera) => camera.id)]
+        const orderedIds = [preflightDeviceIdRef.current, preferred?.id, ...cameras.map((camera) => camera.id)]
           .filter((id, idx, arr): id is string => Boolean(id) && arr.indexOf(id) === idx);
 
-        const strategies: Array<{ key: string; camera: string | { facingMode: 'environment' | 'user' } }> = [
+        const strategies: Array<{ key: string; camera: string | MediaTrackConstraints }> = [
           ...orderedIds.map((deviceId) => ({ key: `device:${deviceId}`, camera: deviceId })),
+          { key: 'constraints:ideal-environment', camera: { facingMode: { ideal: 'environment' } } },
+          { key: 'constraints:ideal-user', camera: { facingMode: { ideal: 'user' } } },
           { key: 'facing:environment', camera: { facingMode: 'environment' as const } },
           { key: 'facing:user', camera: { facingMode: 'user' as const } },
+          { key: 'constraints:any-video', camera: {} },
         ];
 
         let started = false;
@@ -266,6 +270,9 @@ export function QrCameraScanner({ onScan, disabled = false, onError }: QrCameraS
       } catch {
         stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
       }
+      const firstVideoTrack = stream.getVideoTracks()[0];
+      const settings = firstVideoTrack?.getSettings?.();
+      preflightDeviceIdRef.current = typeof settings?.deviceId === 'string' ? settings.deviceId : null;
       stream.getTracks().forEach((track) => track.stop());
     } catch (err) {
       const errText = extractErrString(err).toLowerCase();
