@@ -6,13 +6,22 @@ const isWindows = process.platform === 'win32';
 const MAX_WINDOWS_RETRIES = 3;
 const WINDOWS_RETRY_DELAY_MS = 1500;
 const WINDOWS_ENGINE_PATH = join(process.cwd(), 'src', 'generated', 'prisma', 'query-engine-windows.exe');
+const PRISMA_CLI_PATH = join(process.cwd(), 'node_modules', 'prisma', 'build', 'index.js');
 
 const runGenerate = (args) => {
-  const result = spawnSync('npx', args, {
-    shell: true,
+  if (!existsSync(PRISMA_CLI_PATH)) {
+    console.error(`[prisma-generate] Prisma CLI entrypoint not found at ${PRISMA_CLI_PATH}`);
+    return { status: 1, stdout: '', stderr: '' };
+  }
+
+  const result = spawnSync(process.execPath, [PRISMA_CLI_PATH, ...args], {
     env: process.env,
     encoding: 'utf8',
   });
+
+  if (result.error) {
+    console.error(`[prisma-generate] Failed to spawn Prisma CLI: ${result.error.message}`);
+  }
 
   if (result.stdout) {
     process.stdout.write(result.stdout);
@@ -49,8 +58,15 @@ const isWindowsLockError = (result) => {
   );
 };
 
+const isWindowsSpawnPermissionError = (result) => {
+  return isWindows && result.error?.code === 'EPERM';
+};
+
 const canReuseExistingWindowsEngine = (result) => {
-  return isWindowsLockError(result) && existsSync(WINDOWS_ENGINE_PATH);
+  return existsSync(WINDOWS_ENGINE_PATH) && (
+    isWindowsLockError(result) ||
+    isWindowsSpawnPermissionError(result)
+  );
 };
 
 const runWithWindowsRetry = (args) => {
@@ -71,7 +87,13 @@ let result = runWithWindowsRetry(['prisma', 'generate']);
 
 if (result.status !== 0 && isWindows) {
   if (canReuseExistingWindowsEngine(result)) {
-    console.warn('[prisma-generate] Windows engine rename is locked, reusing existing query-engine-windows.exe.');
+    if (isWindowsLockError(result)) {
+      console.warn('[prisma-generate] Windows engine rename is locked, reusing existing query-engine-windows.exe.');
+    } else if (isWindowsSpawnPermissionError(result)) {
+      console.warn('[prisma-generate] Windows process spawn is blocked (EPERM), reusing existing query-engine-windows.exe.');
+    } else {
+      console.warn('[prisma-generate] Reusing existing query-engine-windows.exe.');
+    }
     process.exit(0);
   }
 

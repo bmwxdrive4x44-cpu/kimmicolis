@@ -89,6 +89,62 @@ async function main() {
     siret: '12345678901234',
   });
 
+  await prisma.transporterApplication.upsert({
+    where: { userId: transporter.id },
+    update: {
+      fullName: 'Karim Transport',
+      phone: '+213555222222',
+      vehicle: 'Kangoo',
+      license: 'TR-001-2026',
+      experience: 4,
+      regions: JSON.stringify(['alger', 'oran']),
+      description: 'Transporteur seed E2E',
+      documents: JSON.stringify([
+        {
+          url: '/upload/demo-license.pdf',
+          filename: 'license.pdf',
+          size: 1024,
+        },
+      ]),
+      status: 'APPROVED',
+    },
+    create: {
+      userId: transporter.id,
+      fullName: 'Karim Transport',
+      phone: '+213555222222',
+      vehicle: 'Kangoo',
+      license: 'TR-001-2026',
+      experience: 4,
+      regions: JSON.stringify(['alger', 'oran']),
+      description: 'Transporteur seed E2E',
+      documents: JSON.stringify([
+        {
+          url: '/upload/demo-license.pdf',
+          filename: 'license.pdf',
+          size: 1024,
+        },
+      ]),
+      status: 'APPROVED',
+    },
+  });
+
+  const transporterAlias = await upsertUser({
+    email: 'transporter@swiftcolis.dz',
+    password: 'transport123',
+    name: 'Karim Transport Alias',
+    role: 'TRANSPORTER',
+    phone: '+213555222223',
+    siret: '12345678901235',
+  });
+
+  const enseigne = await upsertUser({
+    email: 'enseigne@demo.dz',
+    password: 'enseigne123',
+    name: 'Enseigne Demo',
+    role: 'ENSEIGNE',
+    phone: '+213555777777',
+  });
+
   const relayUser = await upsertUser({
     email: 'relais@demo.dz',
     password: 'relais123',
@@ -122,9 +178,28 @@ async function main() {
     },
   });
 
+  await prisma.enseigne.upsert({
+    where: { userId: enseigne.id },
+    update: {
+      businessName: 'Enseigne Demo Shop',
+      legalName: 'Enseigne Demo SARL',
+      billingEmail: 'billing-enseigne@demo.dz',
+      operationalCity: 'alger',
+      monthlyVolume: 50,
+    },
+    create: {
+      userId: enseigne.id,
+      businessName: 'Enseigne Demo Shop',
+      legalName: 'Enseigne Demo SARL',
+      billingEmail: 'billing-enseigne@demo.dz',
+      operationalCity: 'alger',
+      monthlyVolume: 50,
+    },
+  });
+
   console.log('Seed complete.');
   console.log('Users ready:');
-  for (const user of [admin, client, transporter, relayUser]) {
+  for (const user of [admin, client, transporter, transporterAlias, relayUser, enseigne]) {
     console.log(`- ${user.email} (${user.role})`);
   }
 }
