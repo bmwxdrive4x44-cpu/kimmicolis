@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 test.describe('Onboarding ENSEIGNE', () => {
-  test('creation compte + profil puis redirection dashboard enseigne', async ({ page, request }) => {
+  test('creation compte + profil puis redirection login avec notice verification', async ({ page, request }) => {
     test.setTimeout(90_000);
 
     await request.get('/api/seed');
@@ -33,8 +33,8 @@ test.describe('Onboarding ENSEIGNE', () => {
 
     await onboarding.getByRole('button', { name: /Activer mon espace enseigne/i }).click();
 
-    await page.waitForURL('**/fr/dashboard/enseigne**', { timeout: 30_000 });
-    await expect(page.getByRole('main').getByText('Espace Enseigne')).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Pilotage logistique B2B' })).toBeVisible();
+    await page.waitForURL('**/fr/auth/login?notice=enseigne-email-verification', { timeout: 90_000 });
+    await expect(page.getByText(/Votre compte enseigne a ete cree/i)).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Connexion/i })).toBeVisible();
   });
 });

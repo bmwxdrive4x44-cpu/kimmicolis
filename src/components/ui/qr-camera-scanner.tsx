@@ -227,7 +227,6 @@ export function QrCameraScanner({ onScan, disabled = false, onError }: QrCameraS
       cancelled = true;
       startingRef.current = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, isStarting]);
 
   const handleToggle = async () => {

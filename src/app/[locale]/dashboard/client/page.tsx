@@ -178,8 +178,10 @@ function ClientDashboardContent() {
   }, [activeTab, session?.user?.id]);
 
   useEffect(() => {
-    setSessionLoadingTimedOut(false);
-    if (status !== 'loading') return;
+    if (status !== 'loading') {
+      const resetRef = setTimeout(() => setSessionLoadingTimedOut(false), 0);
+      return () => clearTimeout(resetRef);
+    }
 
     const timeoutRef = setTimeout(() => {
       setSessionLoadingTimedOut(true);

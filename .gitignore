@@ -63,3 +63,10 @@ public/uploads/
 
 # Prisma temporary local binaries
 src/generated/prisma/query-engine-windows.exe.tmp*
+
+# Playwright E2E - auth state files and log artifacts
+tests/e2e/.auth/
+test-results*.log
+e2e-run-output.txt
+playwright-report/
+test-results/

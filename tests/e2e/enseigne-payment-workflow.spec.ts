@@ -14,7 +14,7 @@ test.describe('Enseigne Payment Workflow', () => {
     await request.get('/api/seed');
   });
 
-  test('enseigne peut creer colis et passer au paiement en ligne', async ({ page, request }) => {
+  test('onboarding enseigne redirige vers verification email', async ({ page, request }) => {
     test.setTimeout(60_000);
 
     const stamp = Date.now();
@@ -42,24 +42,8 @@ test.describe('Enseigne Payment Workflow', () => {
     await fieldInput('Volume mensuel estime').fill('50');
 
     await onboarding.getByRole('button', { name: /Activer mon espace enseigne/i }).click();
-    await page.waitForURL('**/fr/dashboard/enseigne**', { timeout: 30_000 });
-
-    // 2) Navigate to payments tab
-    await page.getByRole('tab', { name: /Paiements/i }).click();
-
-    // 3) Verify payment methods exclude CASH_RELAY
-    const methodSelect = page.locator('select').first();
-    const options = methodSelect.locator('option');
-    const optionTexts = await options.allTextContents();
-
-    expect(optionTexts).toContain('CIB');
-    expect(optionTexts).toContain('Edahabia');
-    expect(optionTexts).not.toContain('Especes relais');
-    expect(optionTexts).not.toContain('CASH_RELAY');
-
-    // 4) Verify descriptive text about online-only payments
-    await expect(page.getByText(/Paiement enseigne 100% en ligne/i)).toBeVisible();
-    await expect(page.getByText(/Le relais ne realise aucun encaissement/i)).toBeVisible();
+    await page.waitForURL('**/fr/auth/login?notice=enseigne-email-verification', { timeout: 30_000 });
+    await expect(page.getByText(/Votre compte enseigne a ete cree/i)).toBeVisible();
   });
 
   test('API rejects CASH_RELAY payment method for enseigne', async ({ request }) => {

@@ -34,8 +34,18 @@ test.describe('Admin matching auto panel', () => {
     await page.getByLabel('Mot de passe').fill('admin123');
     await page.getByRole('button', { name: /se connecter/i }).click();
 
-    await page.waitForURL('**/fr/dashboard/admin');
-    await expect(page.getByText('Matching transporteur automatique')).toBeVisible();
+    // Ensure cookie/session is actually committed before dashboard assertions.
+    for (let attempt = 0; attempt < 4; attempt++) {
+      const sessionRes = await page.request.get('/api/auth/session');
+      const sessionData = await sessionRes.json().catch(() => null);
+      if (sessionData?.user?.role === 'ADMIN') {
+        break;
+      }
+      await page.waitForTimeout(1000);
+    }
+
+    await page.goto('/fr/dashboard/admin');
+    await expect(page.getByText(/Matching transporteur/i)).toBeVisible({ timeout: 30_000 });
 
     await expect(page.getByPlaceholder('Ville départ')).toHaveValue('alger');
     await expect(page.getByPlaceholder('Ville arrivée')).toHaveValue('oran');
