@@ -110,7 +110,30 @@ export async function proxy(request: NextRequest) {
     }
   }
 
-  return finalizeResponse(request, intlMiddleware(request));
+    // Redirect authenticated users away from login/register pages
+    const isAuthPage = /\/(?:fr|ar|en|es)\/auth\/(login|register|forgot-password|reset-password)/.test(pathname);
+    if (isAuthPage) {
+      const token = await getToken({
+        req: request,
+        secret: env.NEXTAUTH_SECRET,
+      });
+
+      if (token) {
+        const localeMatch = pathname.match(/^\/(fr|ar|en|es)\//);
+        const locale = localeMatch ? localeMatch[1] : routing.defaultLocale;
+        const userRole = token.role as string;
+
+        let targetPath = `/${locale}/dashboard/client`;
+        if (userRole === 'ADMIN') targetPath = `/${locale}/dashboard/admin`;
+        else if (userRole === 'TRANSPORTER') targetPath = `/${locale}/dashboard/transporter`;
+        else if (userRole === 'RELAIS') targetPath = `/${locale}/dashboard/relais`;
+        else if (userRole === 'ENSEIGNE') targetPath = `/${locale}/dashboard/enseigne`;
+
+        return finalizeResponse(request, NextResponse.redirect(new URL(targetPath, request.url)));
+      }
+    }
+
+    return finalizeResponse(request, intlMiddleware(request));
 }
 
 export const config = {

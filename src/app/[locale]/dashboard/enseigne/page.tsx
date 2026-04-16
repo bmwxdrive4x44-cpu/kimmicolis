@@ -112,7 +112,7 @@ export default async function EnseigneDashboardPage({
     db.mission.count({
       where: {
         colis: { clientId: session.user.id },
-        status: { in: ['ASSIGNE', 'EN_COURS', 'PICKED_UP'] },
+        status: { in: ['ASSIGNE', 'EN_COURS'] },
       },
     }),
     db.colis.count({
@@ -121,7 +121,7 @@ export default async function EnseigneDashboardPage({
         status: { in: ['DEPOSITED_RELAY', 'RECU_RELAIS', 'PAID_RELAY'] },
         missions: {
           none: {
-            status: { in: ['ASSIGNE', 'EN_COURS', 'PICKED_UP'] },
+            status: { in: ['ASSIGNE', 'EN_COURS'] },
           },
         },
       },

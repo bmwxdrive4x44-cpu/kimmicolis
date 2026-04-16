@@ -71,7 +71,8 @@ export default function TransporterDashboard() {
   const [activeTab, setActiveTab] = useState('overview');
   const [stats, setStats] = useState({ trajets: 0, missions: 0, completed: 0, earnings: 0 });
   const [isInitialLoading, setIsInitialLoading] = useState(true);
-  const [hasProfile, setHasProfile] = useState(false);
+  const [hasProfile, setHasProfile] = useState(true);
+  const [isProfileChecking, setIsProfileChecking] = useState(true);
   const [applicationStatus, setApplicationStatus] = useState<'APPROVED' | 'PENDING' | 'REJECTED' | 'MISSING'>('MISSING');
 
   useEffect(() => {
@@ -89,6 +90,7 @@ export default function TransporterDashboard() {
   useEffect(() => {
     const checkProfile = async () => {
       if (!session?.user?.id) return;
+      setIsProfileChecking(true);
       try {
         const response = await fetch(`/api/transporters?userId=${session.user.id}`);
         const data = await response.json();
@@ -97,15 +99,21 @@ export default function TransporterDashboard() {
           setApplicationStatus(data[0]?.status === 'APPROVED' ? 'APPROVED' : data[0]?.status === 'REJECTED' ? 'REJECTED' : 'PENDING');
         } else {
           setApplicationStatus('MISSING');
+          setHasProfile(false);
           // Redirect to profile completion page
           router.push(`/${locale}/complete-profile/transporter`);
         }
       } catch (error) {
         console.error('Error checking profile:', error);
+        // Avoid rendering a blank page during transient network issues.
+        setHasProfile(true);
+        setApplicationStatus('APPROVED');
+      } finally {
+        setIsProfileChecking(false);
       }
     };
 
-    if (status === 'authenticated' && session?.user?.role === 'TRANSPORTER') {
+    if (status === 'authenticated' && session?.user?.id) {
       checkProfile();
     }
   }, [status, session, router, locale]);
@@ -163,7 +171,7 @@ export default function TransporterDashboard() {
     }
   };
 
-  if (status === 'loading' || (isInitialLoading && hasProfile && applicationStatus === 'APPROVED')) {
+  if (status === 'loading' || isProfileChecking || (isInitialLoading && hasProfile && applicationStatus === 'APPROVED')) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
         <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
@@ -1760,7 +1768,7 @@ function AutoAssignTab({ userId }: { userId: string }) {
       </div>
 
       {/* Activation */}
-      <Card>
+      <Card data-testid="auto-assign-activation-card">
         <CardHeader>
           <CardTitle className="flex items-center gap-2"><Zap className="h-5 w-5 text-emerald-600" />Activation & Programme</CardTitle>
         </CardHeader>
@@ -1782,7 +1790,7 @@ function AutoAssignTab({ userId }: { userId: string }) {
             <div className="space-y-2">
               <Label>Fréquence d'attribution automatique</Label>
               <Select value={form.autoAssignSchedule} onValueChange={(v) => setForm(f => ({ ...f, autoAssignSchedule: v }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger data-testid="auto-assign-schedule-select"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="DAILY_8AM">Tous les jours à 8h du matin</SelectItem>
                   <SelectItem value="DAILY_6PM">Tous les jours à 18h</SelectItem>
@@ -1842,7 +1850,7 @@ function AutoAssignTab({ userId }: { userId: string }) {
       </Card>
 
       {/* Géographie */}
-      <Card>
+      <Card data-testid="auto-assign-zones-card">
         <CardHeader>
           <CardTitle className="flex items-center gap-2"><MapPin className="h-5 w-5 text-blue-600" />Zones préférées</CardTitle>
           <CardDescription>Optimisez votre attribution en définissant vos zones</CardDescription>
@@ -1895,7 +1903,7 @@ function AutoAssignTab({ userId }: { userId: string }) {
       </Card>
 
       {/* Scoring weights */}
-      <Card>
+      <Card data-testid="auto-assign-criteria-card">
         <CardHeader>
           <CardTitle className="flex items-center gap-2"><Settings className="h-5 w-5 text-slate-600" />Critères de priorité</CardTitle>
           <CardDescription>
@@ -1904,7 +1912,7 @@ function AutoAssignTab({ userId }: { userId: string }) {
         </CardHeader>
         <CardContent className="space-y-4">
           {totalScoreWeight === 0 && (
-            <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">
+            <div data-testid="scoring-zero-warning" className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">
               <AlertCircle className="h-4 w-4 shrink-0" />
               La somme des critères doit être supérieure à 0
             </div>
