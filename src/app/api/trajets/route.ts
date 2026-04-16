@@ -12,6 +12,11 @@ type TrajetMeta = {
   recurrenceBatchId?: string | null;
 };
 
+function isPrismaSchemaError(error: unknown): boolean {
+  const code = String((error as { code?: string })?.code || '');
+  return code === 'P2022' || code === 'P2010';
+}
+
 function isAlgeriaWeekend(date: Date): boolean {
   const day = date.getDay();
   // Jeudi(4), Vendredi(5)
@@ -335,23 +340,37 @@ export async function POST(request: NextRequest) {
 
       const nextDate = new Date(cursor);
 
-      const trajet = await db.trajet.create({
-        data: {
+      const createData = {
+        transporteurId,
+        lineId: activeLine?.id ?? null,
+        villeDepart: dep,
+        villeArrivee: arr,
+        villesEtapes: serializeVillesEtapes(villesEtapes, {
+          capacitePoidsKg: poidsMax,
+          capaciteSurfaceM2: surfaceM2,
+          recurrenceMode: recurrence,
+          recurrenceWeekdays: customDays,
+          recurrenceBatchId: batchId,
+        }),
+        dateDepart: nextDate,
+        placesColis: places,
+        status: 'PROGRAMME',
+      };
+
+      const trajet = await db.trajet.create({ data: createData }).catch(async (error) => {
+        if (!isPrismaSchemaError(error)) throw error;
+
+        const fallbackData = {
           transporteurId,
-          lineId: activeLine?.id ?? null,
           villeDepart: dep,
           villeArrivee: arr,
-          villesEtapes: serializeVillesEtapes(villesEtapes, {
-            capacitePoidsKg: poidsMax,
-            capaciteSurfaceM2: surfaceM2,
-            recurrenceMode: recurrence,
-            recurrenceWeekdays: customDays,
-            recurrenceBatchId: batchId,
-          }),
+          villesEtapes: createData.villesEtapes,
           dateDepart: nextDate,
           placesColis: places,
           status: 'PROGRAMME',
-        },
+        };
+
+        return db.trajet.create({ data: fallbackData });
       });
       created.push(trajet);
       cursor.setDate(cursor.getDate() + 1);
@@ -368,6 +387,13 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error('Error creating trajet:', error);
-    return NextResponse.json({ error: 'Failed to create trajet' }, { status: 500 });
+    return NextResponse.json(
+      {
+        error: 'Failed to create trajet',
+        details: error instanceof Error ? error.message : 'Unknown error',
+        code: String((error as { code?: string })?.code || ''),
+      },
+      { status: 500 }
+    );
   }
 }

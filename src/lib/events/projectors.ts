@@ -32,6 +32,18 @@ async function bumpUpdatedAt(table: 'KpiTransporter' | 'KpiEnseigne' | 'KpiRelai
 export async function projectDomainEvent(event: DomainEventRecord): Promise<void> {
   const p = event.payload ?? {};
 
+  if (event.type === 'PARCEL_CREATED') {
+    const enseigneId = String(p.clientId || '').trim();
+    if (!enseigneId) return;
+
+    await ensureEnseigneKpiRow(enseigneId);
+    await db.$executeRawUnsafe(
+      'UPDATE "KpiEnseigne" SET "parcelsTotal" = "parcelsTotal" + 1, "pendingPayment" = "pendingPayment" + 1, "updatedAt" = NOW() WHERE "enseigneId" = $1',
+      enseigneId,
+    );
+    return;
+  }
+
   if (event.type === 'MISSION_ASSIGNED') {
     const transporteurId = String(p.transporteurId || '').trim();
     if (!transporteurId) return;
@@ -98,9 +110,8 @@ export async function projectDomainEvent(event: DomainEventRecord): Promise<void
     if (enseigneId) {
       await ensureEnseigneKpiRow(enseigneId);
       await db.$executeRawUnsafe(
-        'UPDATE "KpiEnseigne" SET "parcelsTotal" = "parcelsTotal" + 1, "readyForDeposit" = GREATEST("readyForDeposit" - 1, 0), "inTransit" = "inTransit" + 1, "revenueCommitted" = "revenueCommitted" + $2, "updatedAt" = NOW() WHERE "enseigneId" = $1',
+        'UPDATE "KpiEnseigne" SET "readyForDeposit" = GREATEST("readyForDeposit" - 1, 0), "inTransit" = "inTransit" + 1, "updatedAt" = NOW() WHERE "enseigneId" = $1',
         enseigneId,
-        Number(p.clientAmount || 0),
       );
     }
 
@@ -172,20 +183,22 @@ export async function projectDomainEvent(event: DomainEventRecord): Promise<void
 
   if (event.type === 'CASH_COLLECTED') {
     const relaisId = String(p.relaisId || '').trim();
-    if (!relaisId) return;
-    await ensureRelaisKpiRow(relaisId);
-    await db.$executeRawUnsafe(
-      'UPDATE "KpiRelais" SET "cashOnHand" = "cashOnHand" + $2, "updatedAt" = NOW() WHERE "relaisId" = $1',
-      relaisId,
-      Number(p.amount || 0),
-    );
+    if (relaisId) {
+      await ensureRelaisKpiRow(relaisId);
+      await db.$executeRawUnsafe(
+        'UPDATE "KpiRelais" SET "cashOnHand" = "cashOnHand" + $2, "updatedAt" = NOW() WHERE "relaisId" = $1',
+        relaisId,
+        Number(p.amount || 0),
+      );
+    }
 
     const enseigneId = String(p.clientId || '').trim();
     if (enseigneId) {
       await ensureEnseigneKpiRow(enseigneId);
       await db.$executeRawUnsafe(
-        'UPDATE "KpiEnseigne" SET "pendingPayment" = GREATEST("pendingPayment" - 1, 0), "readyForDeposit" = "readyForDeposit" + 1, "updatedAt" = NOW() WHERE "enseigneId" = $1',
+        'UPDATE "KpiEnseigne" SET "pendingPayment" = GREATEST("pendingPayment" - 1, 0), "readyForDeposit" = "readyForDeposit" + 1, "revenueCommitted" = "revenueCommitted" + $2, "updatedAt" = NOW() WHERE "enseigneId" = $1',
         enseigneId,
+        Number(p.amount || 0),
       );
     }
 

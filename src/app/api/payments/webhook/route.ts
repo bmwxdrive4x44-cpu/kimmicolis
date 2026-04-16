@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { emitEvent } from '@/lib/events/store';
 import { matchColisToTrajets } from '@/services/matchingService';
 import { applyTransition, canTransition } from '@/lib/parcelStateMachine';
 
@@ -192,6 +193,19 @@ export async function POST(request: NextRequest) {
     });
 
     if (refreshedColis) {
+      await emitEvent({
+        type: 'CASH_COLLECTED',
+        aggregateType: 'financial',
+        aggregateId: payment.colisId,
+        payload: {
+          parcelId: payment.colisId,
+          clientId: payment.clientId,
+          amount: Number(payment.amount || 0),
+          method: payload.method || payment.method || 'ONLINE',
+          provider: payload.provider || null,
+        },
+      });
+
       await matchColisToTrajets(refreshedColis);
     }
 

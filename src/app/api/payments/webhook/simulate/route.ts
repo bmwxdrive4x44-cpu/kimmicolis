@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { emitEvent } from '@/lib/events/store';
 import { matchColisToTrajets } from '@/services/matchingService';
 import { applyTransition, canTransition } from '@/lib/parcelStateMachine';
 
@@ -101,6 +102,19 @@ export async function POST(request: NextRequest) {
 
       let matched = false;
       try {
+        await emitEvent({
+          type: 'CASH_COLLECTED',
+          aggregateType: 'financial',
+          aggregateId: payment.colis.id,
+          payload: {
+            parcelId: payment.colis.id,
+            clientId: payment.colis.clientId,
+            amount: Number(payment.amount || 0),
+            method,
+            provider: 'SIMULATE_WEBHOOK',
+          },
+        });
+
         const matchResult = await matchColisToTrajets({
           id: payment.colis.id,
           villeDepart: payment.colis.villeDepart,

@@ -1,6 +1,7 @@
 export type EventAggregateType = 'parcel' | 'mission' | 'relais' | 'financial';
 
 export type DomainEventType =
+  | 'PARCEL_CREATED'
   | 'PARCEL_DEPOSITED'
   | 'PARCEL_PICKED_UP'
   | 'PARCEL_IN_TRANSIT'

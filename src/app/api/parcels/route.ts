@@ -6,6 +6,7 @@ import { requireRole, verifyJWT } from '@/lib/rbac';
 import { generateQRCodeImage } from '@/lib/qrcode';
 import { calculateDynamicParcelPricing, estimateSafeDistanceKmByWilayas } from '@/lib/pricing';
 import { evaluateImplicitProEligibility } from '@/lib/pro-eligibility';
+import { emitEvent } from '@/lib/events/store';
 import { getImplicitLoyaltyConfig } from '@/lib/loyalty-config';
 import { createHash, randomBytes, randomUUID } from 'crypto';
 import { findActiveLineByCities } from '@/lib/logistics';
@@ -1442,6 +1443,25 @@ export async function POST(request: NextRequest) {
       });
     } catch (trackingError) {
       console.warn('[api/parcels] tracking history create failed (non-blocking):', trackingError);
+    }
+
+    try {
+      await emitEvent({
+        type: 'PARCEL_CREATED',
+        aggregateType: 'parcel',
+        aggregateId: colis.id,
+        payload: {
+          parcelId: colis.id,
+          clientId,
+          relaisDepartId,
+          relaisArriveeId,
+          villeDepart,
+          villeArrivee,
+          amount: Number(prixClient || 0),
+        },
+      });
+    } catch (eventError) {
+      console.warn('[api/parcels] event emission failed (non-blocking):', eventError);
     }
 
     errorStep = 'POST_ELIGIBILITY_REFRESH';
