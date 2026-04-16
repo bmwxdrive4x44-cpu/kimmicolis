@@ -60,7 +60,14 @@ export default function RelaisDashboard() {
   const [activeTab, setActiveTab] = useState('overview');
   const [scanTrackingPrefill, setScanTrackingPrefill] = useState('');
   const [relaisInfo, setRelaisInfo] = useState<any>(null);
-  const [stats, setStats] = useState({ pending: 0, received: 0, handedOver: 0, earnings: 0 });
+  const [stats, setStats] = useState({
+    pending: 0,
+    inStockDeparture: 0,
+    inStockArrival: 0,
+    received: 0,
+    handedOver: 0,
+    earnings: 0,
+  });
   const [cashInfo, setCashInfo] = useState({ cashCollected: 0, cashReversed: 0, balance: 0, totalCommissions: 0 });
   const [adminCommissions, setAdminCommissions] = useState({
     petit: DEFAULT_RELAY_COMMISSION.PETIT,
@@ -182,7 +189,7 @@ export default function RelaisDashboard() {
     if (payload.action === 'deposit') {
       setStats((prev) => ({
         ...prev,
-        pending: Math.max(prev.pending - 1, 0),
+        inStockDeparture: prev.inStockDeparture + 1,
         received: prev.received + 1,
       }));
       return;
@@ -191,6 +198,8 @@ export default function RelaisDashboard() {
     if (payload.action === 'arrive_dest') {
       setStats((prev) => ({
         ...prev,
+        pending: prev.pending + 1,
+        inStockArrival: prev.inStockArrival + 1,
         received: prev.received + 1,
       }));
       return;
@@ -199,10 +208,15 @@ export default function RelaisDashboard() {
     if (payload.action === 'deliver') {
       setStats((prev) => ({
         ...prev,
+        pending: Math.max(prev.pending - 1, 0),
+        inStockArrival: Math.max(prev.inStockArrival - 1, 0),
         handedOver: prev.handedOver + 1,
       }));
     }
   }, []);
+
+  const handoverBase = stats.inStockArrival + stats.handedOver;
+  const handoverRate = handoverBase > 0 ? Math.round((stats.handedOver / handoverBase) * 100) : 100;
 
   // Fetch relais info when session is ready
   useEffect(() => {
@@ -367,44 +381,24 @@ export default function RelaisDashboard() {
           </Card>
         )}
 
-          <DashboardStatsGrid>
-            <DashboardMetricCard tone="relais" label="En attente" value={stats.pending} icon={<Clock className="h-5 w-5" />} detail="colis à traiter" />
-            <DashboardMetricCard tone="relais" label="Reçus / Déposés" value={stats.received} icon={<ArrowDownToLine className="h-5 w-5" />} detail="total reçus" />
-            <DashboardMetricCard tone="relais" label="Cash en main" value={`${cashInfo.balance.toFixed(0)} DA`} icon={<BanknoteIcon className="h-5 w-5" />} detail="à reverser" className={cashInfo.balance >= RELAY_CASH_ALERT_THRESHOLD ? 'ring-1 ring-red-300' : ''} />
-            <DashboardMetricCard tone="relais" label="Commissions" value={`${cashInfo.totalCommissions.toFixed(0)} DA`} icon={<DollarSign className="h-5 w-5" />} detail="total gagné" />
-          </DashboardStatsGrid>
+          <section className="space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-600">KPI business</p>
+            <DashboardStatsGrid>
+              <DashboardMetricCard tone="relais" label="Cash en main" value={`${cashInfo.balance.toFixed(0)} DA`} icon={<BanknoteIcon className="h-5 w-5" />} detail="a reverser" className={cashInfo.balance >= RELAY_CASH_ALERT_THRESHOLD ? 'ring-1 ring-red-300' : ''} />
+              <DashboardMetricCard tone="relais" label="Commissions" value={`${cashInfo.totalCommissions.toFixed(0)} DA`} icon={<DollarSign className="h-5 w-5" />} detail="total gagne" />
+              <DashboardMetricCard tone="relais" label="Remises finalisees" value={stats.handedOver} icon={<CheckCircle className="h-5 w-5" />} detail="colis remis au destinataire" />
+              <DashboardMetricCard tone="relais" label="Taux de remise" value={`${handoverRate}%`} icon={<TrendingUp className="h-5 w-5" />} detail="sur colis arrives au relais destination" />
+            </DashboardStatsGrid>
+          </section>
 
-          <Card>
-          <CardHeader>
-            <CardTitle>Synthèse colis</CardTitle>
-            <CardDescription>Vue agrégée cohérente avec les autres dashboards</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-4 md:grid-cols-3">
-              <div className="rounded-lg border p-4 bg-slate-50 dark:bg-slate-800/60">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm text-slate-600 dark:text-slate-400">Créés</p>
-                  <Package className="h-4 w-4 text-slate-400" />
-                </div>
-                <p className="text-2xl font-bold mt-1">{stats.pending}</p>
-              </div>
-              <div className="rounded-lg border p-4 bg-slate-50 dark:bg-slate-800/60">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm text-slate-600 dark:text-slate-400">En transit</p>
-                  <ArrowDownToLine className="h-4 w-4 text-orange-500" />
-                </div>
-                <p className="text-2xl font-bold mt-1">{stats.received}</p>
-              </div>
-              <div className="rounded-lg border p-4 bg-slate-50 dark:bg-slate-800/60">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm text-slate-600 dark:text-slate-400">Livrés</p>
-                  <CheckCircle className="h-4 w-4 text-emerald-600" />
-                </div>
-                <p className="text-2xl font-bold mt-1">{stats.handedOver}</p>
-              </div>
-            </div>
-          </CardContent>
-          </Card>
+          <section className="space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-600">Etats logistiques</p>
+            <DashboardStatsGrid className="md:grid-cols-3 xl:grid-cols-3">
+              <DashboardMetricCard tone="relais" label="A traiter" value={stats.pending} icon={<Clock className="h-5 w-5" />} detail="actions en file relais" />
+              <DashboardMetricCard tone="relais" label="Stock depart" value={stats.inStockDeparture} icon={<ArrowDownToLine className="h-5 w-5" />} detail="deposes, attente transporteur" />
+              <DashboardMetricCard tone="relais" label="Stock arrivee" value={stats.inStockArrival} icon={<Package className="h-5 w-5" />} detail="a remettre au destinataire" />
+            </DashboardStatsGrid>
+          </section>
 
           <DashboardPanel tone="relais">
             <Tabs value={activeTab} onValueChange={setActiveTab}>

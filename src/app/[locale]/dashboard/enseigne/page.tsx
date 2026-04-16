@@ -56,7 +56,12 @@ export default async function EnseigneDashboardPage({
     }
   }
 
-  const [enseigneRows, totalParcels, deliveredParcels, revenueAgg] = await Promise.all([
+  const deliveredStatuses = ['LIVRE', 'DELIVERED'];
+  const readyForDepositStatuses = ['READY_FOR_DEPOSIT', 'PAID_RELAY', 'PAID'];
+  const atRelayDepartureStatuses = ['DEPOSITED_RELAY', 'RECU_RELAIS', 'WAITING_PICKUP', 'ASSIGNED'];
+  const inTransportStatuses = ['PICKED_UP', 'EN_TRANSPORT'];
+
+  const [enseigneRows, totalParcels, deliveredParcels, deliveredRevenueAgg, committedRevenueAgg] = await Promise.all([
     db.$queryRaw<Array<{
       id: string;
       userId: string;
@@ -78,11 +83,26 @@ export default async function EnseigneDashboardPage({
       LIMIT 1
     `,
     db.colis.count({ where: { clientId: session.user.id } }),
-    db.colis.count({ where: { clientId: session.user.id, status: 'LIVRE' } }),
+    db.colis.count({ where: { clientId: session.user.id, status: { in: deliveredStatuses } } }),
     db.colis.aggregate({
       where: {
         clientId: session.user.id,
-        status: { in: ['READY_FOR_DEPOSIT', 'PAID', 'DEPOSITED_RELAY', 'EN_TRANSPORT', 'ARRIVE_RELAIS_DESTINATION', 'LIVRE'] },
+        status: { in: deliveredStatuses },
+      },
+      _sum: { prixClient: true },
+    }),
+    db.colis.aggregate({
+      where: {
+        clientId: session.user.id,
+        status: {
+          in: [
+            ...readyForDepositStatuses,
+            ...atRelayDepartureStatuses,
+            ...inTransportStatuses,
+            'ARRIVE_RELAIS_DESTINATION',
+            ...deliveredStatuses,
+          ],
+        },
       },
       _sum: { prixClient: true },
     }),
@@ -103,10 +123,10 @@ export default async function EnseigneDashboardPage({
   ] = await Promise.all([
     db.colis.count({ where: { clientId: session.user.id, status: 'CREATED' } }),
     db.colis.count({ where: { clientId: session.user.id, status: 'PENDING_PAYMENT' } }),
-    db.colis.count({ where: { clientId: session.user.id, status: 'READY_FOR_DEPOSIT' } }),
-    db.colis.count({ where: { clientId: session.user.id, status: 'DEPOSITED_RELAY' } }),
+    db.colis.count({ where: { clientId: session.user.id, status: { in: readyForDepositStatuses } } }),
+    db.colis.count({ where: { clientId: session.user.id, status: { in: atRelayDepartureStatuses } } }),
     db.colis.count({
-      where: { clientId: session.user.id, status: { in: ['WAITING_PICKUP', 'EN_TRANSPORT'] } },
+      where: { clientId: session.user.id, status: { in: inTransportStatuses } },
     }),
     db.colis.count({ where: { clientId: session.user.id, status: 'ARRIVE_RELAIS_DESTINATION' } }),
     db.mission.count({
@@ -118,7 +138,7 @@ export default async function EnseigneDashboardPage({
     db.colis.count({
       where: {
         clientId: session.user.id,
-        status: { in: ['DEPOSITED_RELAY', 'RECU_RELAIS', 'PAID_RELAY'] },
+        status: { in: atRelayDepartureStatuses },
         missions: {
           none: {
             status: { in: ['ASSIGNE', 'EN_COURS'] },
@@ -193,7 +213,8 @@ export default async function EnseigneDashboardPage({
   );
 
   const deliveryRate = totalParcels > 0 ? Math.round((deliveredParcels / totalParcels) * 100) : 0;
-  const totalRevenue = revenueAgg._sum.prixClient ?? 0;
+  const deliveredRevenue = deliveredRevenueAgg._sum.prixClient ?? 0;
+  const committedRevenue = committedRevenueAgg._sum.prixClient ?? 0;
 
   // PRO score: 0-100 based on delivery success rate with penalty for returns
   const proScore = totalParcels > 0
@@ -224,6 +245,9 @@ export default async function EnseigneDashboardPage({
                 ) : null}
                 <Badge variant="outline" className="border-white/70 bg-white/70 text-slate-700">
                   Taux de livraison: {deliveryRate}%
+                </Badge>
+                <Badge variant="outline" className="border-white/70 bg-white/70 text-slate-700">
+                  CA livre: {Math.round(deliveredRevenue).toLocaleString('fr-DZ')} DA
                 </Badge>
                 <Badge variant="outline" className="border-white/70 bg-white/70 text-slate-700">
                   <Star className="h-3 w-3 mr-1 text-amber-500" />
@@ -310,43 +334,73 @@ export default async function EnseigneDashboardPage({
             </div>
           )}
 
-          <DashboardStatsGrid>
-            <DashboardMetricCard
-              tone="client"
-              label="Colis total"
-              value={totalParcels}
-              icon={<Package className="h-5 w-5" />}
-              detail="Volume global traite"
-            />
-            <DashboardMetricCard
-              tone="client"
-              label="Non payes"
-              value={createdOnlyParcels + pendingPaymentParcels}
-              icon={<CreditCard className="h-5 w-5" />}
-              detail={`${createdOnlyParcels} crees · ${pendingPaymentParcels} session en cours`}
-            />
-            <DashboardMetricCard
-              tone="client"
-              label="A deposer au relais"
-              value={readyForDepositParcels}
-              icon={<Package className="h-5 w-5" />}
-              detail="Payes, attente depot physique"
-            />
-            <DashboardMetricCard
-              tone="client"
-              label="En transit"
-              value={inTransportParcels}
-              icon={<Truck className="h-5 w-5" />}
-              detail={`${activeMissions} missions actives`}
-            />
-            <DashboardMetricCard
-              tone="client"
-              label="Livres"
-              value={deliveredParcels}
-              icon={<CheckCircle className="h-5 w-5" />}
-              detail={`${Math.round(totalRevenue).toLocaleString('fr-DZ')} DA CA · score ${proScore}/100`}
-            />
-          </DashboardStatsGrid>
+          <section className="space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-600">KPI business</p>
+            <DashboardStatsGrid>
+              <DashboardMetricCard
+                tone="client"
+                label="Colis total"
+                value={totalParcels}
+                icon={<Package className="h-5 w-5" />}
+                detail="volume global"
+              />
+              <DashboardMetricCard
+                tone="client"
+                label="Taux livraison"
+                value={`${deliveryRate}%`}
+                icon={<CheckCircle className="h-5 w-5" />}
+                detail={`${deliveredParcels} colis livres`}
+              />
+              <DashboardMetricCard
+                tone="client"
+                label="CA livre"
+                value={`${Math.round(deliveredRevenue).toLocaleString('fr-DZ')} DA`}
+                icon={<CreditCard className="h-5 w-5" />}
+                detail="encaisse sur colis livres"
+              />
+              <DashboardMetricCard
+                tone="client"
+                label="CA engage"
+                value={`${Math.round(committedRevenue).toLocaleString('fr-DZ')} DA`}
+                icon={<Star className="h-5 w-5" />}
+                detail={`score PRO ${proScore}/100`}
+              />
+            </DashboardStatsGrid>
+          </section>
+
+          <section className="space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-600">Etats logistiques</p>
+            <DashboardStatsGrid>
+              <DashboardMetricCard
+                tone="client"
+                label="Non payes"
+                value={createdOnlyParcels + pendingPaymentParcels}
+                icon={<CreditCard className="h-5 w-5" />}
+                detail={`${createdOnlyParcels} crees · ${pendingPaymentParcels} en attente`}
+              />
+              <DashboardMetricCard
+                tone="client"
+                label="A deposer au relais"
+                value={readyForDepositParcels}
+                icon={<Package className="h-5 w-5" />}
+                detail="payes, attente depot physique"
+              />
+              <DashboardMetricCard
+                tone="client"
+                label="Collecte / transport"
+                value={depositedRelayParcels + inTransportParcels}
+                icon={<Truck className="h-5 w-5" />}
+                detail={`${activeMissions} missions actives`}
+              />
+              <DashboardMetricCard
+                tone="client"
+                label="Arrives relais dest"
+                value={arrivedRelayParcels}
+                icon={<CheckCircle className="h-5 w-5" />}
+                detail={`${pendingAssignmentParcels} en attente assignation`}
+              />
+            </DashboardStatsGrid>
+          </section>
 
           <DashboardPanel tone="client">
             <Tabs key={initialTab} defaultValue={initialTab}>

@@ -69,7 +69,15 @@ export default function TransporterDashboard() {
   const locale = useLocale();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState('overview');
-  const [stats, setStats] = useState({ trajets: 0, missions: 0, completed: 0, earnings: 0 });
+  const [stats, setStats] = useState({
+    trajets: 0,
+    totalMissions: 0,
+    activeMissions: 0,
+    assignedMissions: 0,
+    inProgressMissions: 0,
+    completedMissions: 0,
+    earnings: 0,
+  });
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [hasProfile, setHasProfile] = useState(true);
   const [isProfileChecking, setIsProfileChecking] = useState(true);
@@ -156,11 +164,21 @@ export default function TransporterDashboard() {
       const trajets = asArray<any>(trajetsData);
       const missions = asArray<any>(missionsData);
       
+      const assignedMissions = missions.filter((m: any) => m.status === 'ASSIGNE').length;
+      const inProgressMissions = missions.filter((m: any) => m.status === 'EN_COURS' || m.status === 'PICKED_UP').length;
+      const completedMissions = missions.filter((m: any) => m.status === 'LIVRE' || m.status === 'COMPLETED').length;
+      const totalMissions = missions.length;
+
       setStats({
         trajets: trajets.length,
-        missions: missions.filter((m: any) => m.status === 'ASSIGNE' || m.status === 'EN_COURS').length,
-        completed: missions.filter((m: any) => m.status === 'LIVRE').length,
-        earnings: missions.filter((m: any) => m.status === 'LIVRE').reduce((sum: number, m: any) => sum + (m.colis?.netTransporteur || 0), 0),
+        totalMissions,
+        activeMissions: assignedMissions + inProgressMissions,
+        assignedMissions,
+        inProgressMissions,
+        completedMissions,
+        earnings: missions
+          .filter((m: any) => m.status === 'LIVRE' || m.status === 'COMPLETED')
+          .reduce((sum: number, m: any) => sum + (m.colis?.netTransporteur || 0), 0),
       });
     } catch (error) {
       console.error('Error fetching stats:', error);
@@ -217,6 +235,10 @@ export default function TransporterDashboard() {
     );
   }
 
+  const completionRate = stats.totalMissions > 0
+    ? Math.round((stats.completedMissions / stats.totalMissions) * 100)
+    : 0;
+
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-900">
       <Header />
@@ -235,12 +257,24 @@ export default function TransporterDashboard() {
             }
           />
 
-          <DashboardStatsGrid>
-            <DashboardMetricCard tone="transporteur" label="Mes trajets" value={stats.trajets} icon={<Route className="h-5 w-5" />} />
-            <DashboardMetricCard tone="transporteur" label="Missions actives" value={stats.missions} icon={<Truck className="h-5 w-5" />} />
-            <DashboardMetricCard tone="transporteur" label="Missions terminées" value={stats.completed} icon={<CheckCircle className="h-5 w-5" />} />
-            <DashboardMetricCard tone="transporteur" label="Gains" value={`${stats.earnings} DA`} icon={<DollarSign className="h-5 w-5" />} />
-          </DashboardStatsGrid>
+          <section className="space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-600">KPI business</p>
+            <DashboardStatsGrid>
+              <DashboardMetricCard tone="transporteur" label="Mes trajets" value={stats.trajets} icon={<Route className="h-5 w-5" />} detail="trajets publies" />
+              <DashboardMetricCard tone="transporteur" label="Missions totales" value={stats.totalMissions} icon={<Package className="h-5 w-5" />} detail={`${stats.activeMissions} actives`} />
+              <DashboardMetricCard tone="transporteur" label="Taux de completion" value={`${completionRate}%`} icon={<CheckCircle className="h-5 w-5" />} detail={`${stats.completedMissions} livrees`} />
+              <DashboardMetricCard tone="transporteur" label="Gains" value={`${stats.earnings} DA`} icon={<DollarSign className="h-5 w-5" />} detail="missions livrees" />
+            </DashboardStatsGrid>
+          </section>
+
+          <section className="space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-600">Etats missions</p>
+            <DashboardStatsGrid className="md:grid-cols-3 xl:grid-cols-3">
+              <DashboardMetricCard tone="transporteur" label="Assignees" value={stats.assignedMissions} icon={<Clock className="h-5 w-5" />} detail="en attente de prise en charge" />
+              <DashboardMetricCard tone="transporteur" label="En cours" value={stats.inProgressMissions} icon={<Truck className="h-5 w-5" />} detail="collecte ou transport" />
+              <DashboardMetricCard tone="transporteur" label="Livrees" value={stats.completedMissions} icon={<CheckCircle className="h-5 w-5" />} detail="missions finalisees" />
+            </DashboardStatsGrid>
+          </section>
 
           <DashboardPanel tone="transporteur">
             <Tabs value={activeTab} onValueChange={setActiveTab}>

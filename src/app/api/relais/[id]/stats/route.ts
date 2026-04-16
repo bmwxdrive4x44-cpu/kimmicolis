@@ -40,14 +40,34 @@ export async function GET(
       WHERE "relaisDepartId" = ${id} OR "relaisArriveeId" = ${id}
     `;
 
-    const pending = parcels.filter(p =>
-      ['CREATED', 'PAID', 'PAID_RELAY'].includes(p.status) && p.relaisDepartId === id
+    const actionableDepartureStatuses = [
+      'CREATED',
+      'PENDING_PAYMENT',
+      'READY_FOR_DEPOSIT',
+      'PAID',
+      'PAID_RELAY',
+      'DEPOSITED_RELAY',
+      'RECU_RELAIS',
+      'WAITING_PICKUP',
+      'ASSIGNED',
+    ];
+    const inStockDepartureStatuses = ['DEPOSITED_RELAY', 'RECU_RELAIS', 'WAITING_PICKUP', 'ASSIGNED'];
+    const inStockArrivalStatuses = ['ARRIVE_RELAIS_DESTINATION'];
+
+    const pendingDeparture = parcels.filter(
+      (p) => p.relaisDepartId === id && actionableDepartureStatuses.includes(p.status)
     ).length;
 
-    const received = parcels.filter(p =>
-      (p.relaisDepartId === id && ['DEPOSITED_RELAY', 'RECU_RELAIS'].includes(p.status)) ||
-      (p.relaisArriveeId === id && p.status === 'ARRIVE_RELAIS_DESTINATION')
+    const inStockDeparture = parcels.filter(
+      (p) => p.relaisDepartId === id && inStockDepartureStatuses.includes(p.status)
     ).length;
+
+    const inStockArrival = parcels.filter(
+      (p) => p.relaisArriveeId === id && inStockArrivalStatuses.includes(p.status)
+    ).length;
+
+    const pending = pendingDeparture + inStockArrival;
+    const received = inStockDeparture + inStockArrival;
     
     const handedOver = parcels.filter(p => 
       p.status === 'LIVRE' && p.relaisArriveeId === id
@@ -59,6 +79,8 @@ export async function GET(
 
     return NextResponse.json({
       pending,
+      inStockDeparture,
+      inStockArrival,
       received,
       handedOver,
       earnings,
@@ -67,6 +89,8 @@ export async function GET(
     console.error('Error fetching relais stats:', error);
     return NextResponse.json({
       pending: 0,
+      inStockDeparture: 0,
+      inStockArrival: 0,
       received: 0,
       handedOver: 0,
       earnings: 0,
