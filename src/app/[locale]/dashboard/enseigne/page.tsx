@@ -61,7 +61,7 @@ export default async function EnseigneDashboardPage({
   const atRelayDepartureStatuses = ['DEPOSITED_RELAY', 'RECU_RELAIS', 'WAITING_PICKUP', 'ASSIGNED'];
   const inTransportStatuses = ['PICKED_UP', 'EN_TRANSPORT'];
 
-  const [enseigneRows, totalParcels, deliveredParcels, deliveredRevenueAgg, committedRevenueAgg] = await Promise.all([
+  const [enseigneRows, kpiRows, totalParcels, deliveredParcels, deliveredRevenueAgg, committedRevenueAgg] = await Promise.all([
     db.$queryRaw<Array<{
       id: string;
       userId: string;
@@ -80,6 +80,24 @@ export default async function EnseigneDashboardPage({
         "monthlyVolume", "billingEmail", "operationalCity", "createdAt", "updatedAt"
       FROM "Enseigne"
       WHERE "userId" = ${session.user.id}
+      LIMIT 1
+    `,
+    db.$queryRaw<Array<{
+      enseigneId: string;
+      parcelsTotal: number;
+      parcelsDelivered: number;
+      pendingPayment: number;
+      readyForDeposit: number;
+      inTransit: number;
+      arrivedRelay: number;
+      revenueDelivered: number;
+      revenueCommitted: number;
+    }>>`
+      SELECT
+        "enseigneId", "parcelsTotal", "parcelsDelivered", "pendingPayment", "readyForDeposit",
+        "inTransit", "arrivedRelay", "revenueDelivered", "revenueCommitted"
+      FROM "KpiEnseigne"
+      WHERE "enseigneId" = ${session.user.id}
       LIMIT 1
     `,
     db.colis.count({ where: { clientId: session.user.id } }),
@@ -187,6 +205,7 @@ export default async function EnseigneDashboardPage({
   ]);
 
   const enseigne = enseigneRows[0] ?? null;
+  const kpi = kpiRows[0] ?? null;
 
   const parcelsWithQr = await Promise.all(
     recentParcels.map(async (parcel) => {
@@ -212,14 +231,21 @@ export default async function EnseigneDashboardPage({
     })
   );
 
-  const deliveryRate = totalParcels > 0 ? Math.round((deliveredParcels / totalParcels) * 100) : 0;
-  const deliveredRevenue = deliveredRevenueAgg._sum.prixClient ?? 0;
-  const committedRevenue = committedRevenueAgg._sum.prixClient ?? 0;
+  const totalParcelsKpi = kpi?.parcelsTotal ?? totalParcels;
+  const deliveredParcelsKpi = kpi?.parcelsDelivered ?? deliveredParcels;
+  const pendingPaymentKpi = kpi?.pendingPayment ?? (createdOnlyParcels + pendingPaymentParcels);
+  const readyForDepositKpi = kpi?.readyForDeposit ?? readyForDepositParcels;
+  const inTransitKpi = kpi?.inTransit ?? (depositedRelayParcels + inTransportParcels);
+  const arrivedRelayKpi = kpi?.arrivedRelay ?? arrivedRelayParcels;
+  const deliveredRevenue = kpi?.revenueDelivered ?? (deliveredRevenueAgg._sum.prixClient ?? 0);
+  const committedRevenue = kpi?.revenueCommitted ?? (committedRevenueAgg._sum.prixClient ?? 0);
+
+  const deliveryRate = totalParcelsKpi > 0 ? Math.round((deliveredParcelsKpi / totalParcelsKpi) * 100) : 0;
 
   // PRO score: 0-100 based on delivery success rate with penalty for returns
-  const proScore = totalParcels > 0
+  const proScore = totalParcelsKpi > 0
     ? Math.max(0, Math.min(100, Math.round(
-        (deliveredParcels / totalParcels) * 100 - (returnedParcels / Math.max(totalParcels, 1)) * 20
+        (deliveredParcelsKpi / Math.max(totalParcelsKpi, 1)) * 100 - (returnedParcels / Math.max(totalParcelsKpi, 1)) * 20
       )))
     : 100;
 
@@ -340,7 +366,7 @@ export default async function EnseigneDashboardPage({
               <DashboardMetricCard
                 tone="client"
                 label="Colis total"
-                value={totalParcels}
+                value={totalParcelsKpi}
                 icon={<Package className="h-5 w-5" />}
                 detail="volume global"
               />
@@ -349,7 +375,7 @@ export default async function EnseigneDashboardPage({
                 label="Taux livraison"
                 value={`${deliveryRate}%`}
                 icon={<CheckCircle className="h-5 w-5" />}
-                detail={`${deliveredParcels} colis livres`}
+                detail={`${deliveredParcelsKpi} colis livres`}
               />
               <DashboardMetricCard
                 tone="client"
@@ -374,28 +400,28 @@ export default async function EnseigneDashboardPage({
               <DashboardMetricCard
                 tone="client"
                 label="Non payes"
-                value={createdOnlyParcels + pendingPaymentParcels}
+                value={pendingPaymentKpi}
                 icon={<CreditCard className="h-5 w-5" />}
                 detail={`${createdOnlyParcels} crees · ${pendingPaymentParcels} en attente`}
               />
               <DashboardMetricCard
                 tone="client"
                 label="A deposer au relais"
-                value={readyForDepositParcels}
+                value={readyForDepositKpi}
                 icon={<Package className="h-5 w-5" />}
                 detail="payes, attente depot physique"
               />
               <DashboardMetricCard
                 tone="client"
                 label="Collecte / transport"
-                value={depositedRelayParcels + inTransportParcels}
+                value={inTransitKpi}
                 icon={<Truck className="h-5 w-5" />}
                 detail={`${activeMissions} missions actives`}
               />
               <DashboardMetricCard
                 tone="client"
                 label="Arrives relais dest"
-                value={arrivedRelayParcels}
+                value={arrivedRelayKpi}
                 icon={<CheckCircle className="h-5 w-5" />}
                 detail={`${pendingAssignmentParcels} en attente assignation`}
               />

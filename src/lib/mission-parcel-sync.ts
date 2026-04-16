@@ -10,6 +10,7 @@
  */
 
 import { db } from '@/lib/db';
+import { emitEvent } from '@/lib/events/store';
 import { assertMissionTransition, normalizeMissionStatus } from '@/lib/missionStateMachine';
 
 /**
@@ -53,7 +54,7 @@ export async function transitionMission(params: {
 
   assertMissionTransition(normalizedCurrent, normalizedNext);
 
-  return db.$transaction(async (tx) => {
+  const transitionResult = await db.$transaction(async (tx) => {
     // Optimistic concurrency : updateMany avec guard sur le statut actuel.
     // Si la mission a déjà été transitionée (race condition), count === 0.
     const result = await tx.mission.updateMany({
@@ -75,7 +76,7 @@ export async function transitionMission(params: {
     // Récupère colisId — nécessaire pour la synchro colis
     const mission = await tx.mission.findUnique({
       where: { id: missionId },
-      select: { colisId: true },
+      select: { colisId: true, transporteurId: true },
     });
 
     if (!mission) {
@@ -101,8 +102,81 @@ export async function transitionMission(params: {
       });
     }
 
-    return { updated: true, colisId: mission.colisId } satisfies TransitionSuccess;
+    return {
+      updated: true,
+      colisId: mission.colisId,
+      transporteurId: mission.transporteurId,
+      parcelStatus: syncParcel ? targetParcelStatus : undefined,
+    } as TransitionSuccess & { transporteurId: string; parcelStatus?: string };
   });
+
+  if (!transitionResult.updated) {
+    return transitionResult;
+  }
+
+  const missionEventType =
+    normalizedNext === 'ASSIGNE'
+      ? 'MISSION_ASSIGNED'
+      : normalizedNext === 'EN_COURS'
+        ? 'MISSION_ACCEPTED'
+        : normalizedNext === 'LIVRE'
+          ? 'MISSION_COMPLETED'
+          : null;
+
+  if (missionEventType) {
+    await emitEvent({
+      type: missionEventType,
+      aggregateType: 'mission',
+      aggregateId: missionId,
+      payload: {
+        missionId,
+        transporteurId: transitionResult.transporteurId,
+        colisId: transitionResult.colisId,
+        fromStatus: normalizedCurrent,
+        toStatus: normalizedNext,
+      },
+    });
+  }
+
+  if (transitionResult.parcelStatus) {
+    const parcelRow = await db.colis.findUnique({
+      where: { id: transitionResult.colisId },
+      select: {
+        id: true,
+        clientId: true,
+        relaisDepartId: true,
+        relaisArriveeId: true,
+        status: true,
+      },
+    });
+
+    if (parcelRow) {
+      const parcelEventType =
+        transitionResult.parcelStatus === 'EN_TRANSPORT'
+          ? 'PARCEL_IN_TRANSIT'
+          : transitionResult.parcelStatus === 'ARRIVE_RELAIS_DESTINATION'
+            ? 'PARCEL_ARRIVED_RELAY'
+            : null;
+
+      if (parcelEventType) {
+        await emitEvent({
+          type: parcelEventType,
+          aggregateType: 'parcel',
+          aggregateId: parcelRow.id,
+          payload: {
+            parcelId: parcelRow.id,
+            clientId: parcelRow.clientId,
+            relaisDepartId: parcelRow.relaisDepartId,
+            relaisArriveeId: parcelRow.relaisArriveeId,
+            status: parcelRow.status,
+            missionId,
+          },
+        });
+      }
+    }
+  }
+
+  return transitionResult;
 }
 
 function defaultTrackingNote(missionStatus: string): string {

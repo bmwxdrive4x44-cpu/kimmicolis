@@ -7,6 +7,7 @@
  */
 
 import { db } from '@/lib/db';
+import { emitEvent } from '@/lib/events/store';
 import { createNotificationDedup } from '@/lib/notifications';
 
 // ---------------------------------------------------------------------------
@@ -410,6 +411,21 @@ export async function matchColisToTrajets(colis: {
       error: error instanceof Error ? error.message : 'Erreur lors de l’assignation du colis',
     };
   }
+
+  // Notifier le client
+  await emitEvent({
+    type: 'MISSION_ASSIGNED',
+    aggregateType: 'mission',
+    aggregateId: mission.id,
+    payload: {
+      missionId: mission.id,
+      colisId: colis.id,
+      transporteurId: trajet.transporteurId,
+      trajetId: trajet.id,
+      villeDepart: colis.villeDepart,
+      villeArrivee: colis.villeArrivee,
+    },
+  });
 
   // Notifier le client
   try {

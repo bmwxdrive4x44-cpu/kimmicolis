@@ -78,6 +78,7 @@ export default function TransporterDashboard() {
     completedMissions: 0,
     earnings: 0,
   });
+  const [kpiLoading, setKpiLoading] = useState(true);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [hasProfile, setHasProfile] = useState(true);
   const [isProfileChecking, setIsProfileChecking] = useState(true);
@@ -155,33 +156,27 @@ export default function TransporterDashboard() {
       setIsInitialLoading(true);
     }
     try {
-      const [trajetsRes, missionsRes] = await Promise.all([
+      const [trajetsRes, kpiRes] = await Promise.all([
         fetch(`/api/trajets?transporteurId=${session?.user?.id}`),
-        fetch(`/api/missions?transporteurId=${session?.user?.id}`),
+        fetch(`/api/kpi/transporter/${session?.user?.id}`),
       ]);
       const trajetsData = await trajetsRes.json().catch(() => null);
-      const missionsData = await missionsRes.json().catch(() => null);
       const trajets = asArray<any>(trajetsData);
-      const missions = asArray<any>(missionsData);
-      
-      const assignedMissions = missions.filter((m: any) => m.status === 'ASSIGNE').length;
-      const inProgressMissions = missions.filter((m: any) => m.status === 'EN_COURS' || m.status === 'PICKED_UP').length;
-      const completedMissions = missions.filter((m: any) => m.status === 'LIVRE' || m.status === 'COMPLETED').length;
-      const totalMissions = missions.length;
+      const kpiData = (await kpiRes.json().catch(() => null)) as Record<string, unknown> | null;
 
       setStats({
         trajets: trajets.length,
-        totalMissions,
-        activeMissions: assignedMissions + inProgressMissions,
-        assignedMissions,
-        inProgressMissions,
-        completedMissions,
-        earnings: missions
-          .filter((m: any) => m.status === 'LIVRE' || m.status === 'COMPLETED')
-          .reduce((sum: number, m: any) => sum + (m.colis?.netTransporteur || 0), 0),
+        totalMissions: Number(kpiData?.missionsTotal || 0),
+        activeMissions: Number(kpiData?.missionsActive || 0),
+        assignedMissions: Number(kpiData?.missionsAssigned || 0),
+        inProgressMissions: Number(kpiData?.missionsInProgress || 0),
+        completedMissions: Number(kpiData?.missionsCompleted || 0),
+        earnings: Number(kpiData?.earningsTotal || 0),
       });
+      setKpiLoading(false);
     } catch (error) {
       console.error('Error fetching stats:', error);
+      setKpiLoading(false);
     } finally {
       if (!background) {
         setIsInitialLoading(false);
@@ -261,7 +256,7 @@ export default function TransporterDashboard() {
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-600">KPI business</p>
             <DashboardStatsGrid>
               <DashboardMetricCard tone="transporteur" label="Mes trajets" value={stats.trajets} icon={<Route className="h-5 w-5" />} detail="trajets publies" />
-              <DashboardMetricCard tone="transporteur" label="Missions totales" value={stats.totalMissions} icon={<Package className="h-5 w-5" />} detail={`${stats.activeMissions} actives`} />
+              <DashboardMetricCard tone="transporteur" label="Missions totales" value={stats.totalMissions} icon={<Package className="h-5 w-5" />} detail={kpiLoading ? 'chargement KPI...' : `${stats.activeMissions} actives`} />
               <DashboardMetricCard tone="transporteur" label="Taux de completion" value={`${completionRate}%`} icon={<CheckCircle className="h-5 w-5" />} detail={`${stats.completedMissions} livrees`} />
               <DashboardMetricCard tone="transporteur" label="Gains" value={`${stats.earnings} DA`} icon={<DollarSign className="h-5 w-5" />} detail="missions livrees" />
             </DashboardStatsGrid>

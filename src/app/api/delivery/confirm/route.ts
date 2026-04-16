@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { emitEvent } from '@/lib/events/store';
 import { createNotificationDedup } from '@/lib/notifications';
 import { requireRole } from '@/lib/rbac';
 import { applyTransition, canTransition } from '@/lib/parcelStateMachine';
@@ -256,6 +257,48 @@ export async function POST(request: NextRequest) {
         }),
       },
     });
+
+    if (effectiveAction === 'pickup') {
+      await emitEvent({
+        type: 'PARCEL_PICKED_UP',
+        aggregateType: 'parcel',
+        aggregateId: parcel.id,
+        payload: {
+          parcelId: parcel.id,
+          clientId: parcel.clientId,
+          relaisDepartId: parcel.relaisDepartId,
+          transporteurId: mission?.transporteurId || auth.payload.id,
+          status: newParcelStatus,
+        },
+      });
+
+      await emitEvent({
+        type: 'PARCEL_IN_TRANSIT',
+        aggregateType: 'parcel',
+        aggregateId: parcel.id,
+        payload: {
+          parcelId: parcel.id,
+          clientId: parcel.clientId,
+          status: newParcelStatus,
+          transporteurId: mission?.transporteurId || auth.payload.id,
+        },
+      });
+    }
+
+    if (effectiveAction === 'arrive_relay') {
+      await emitEvent({
+        type: 'PARCEL_ARRIVED_RELAY',
+        aggregateType: 'parcel',
+        aggregateId: parcel.id,
+        payload: {
+          parcelId: parcel.id,
+          clientId: parcel.clientId,
+          relaisArriveeId: parcel.relaisArriveeId,
+          status: newParcelStatus,
+          transporteurId: mission?.transporteurId || auth.payload.id,
+        },
+      });
+    }
 
     return NextResponse.json({
       success: true,

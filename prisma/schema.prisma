@@ -585,3 +585,54 @@ model QrSecurityLog {
   @@index([fraudFlagRaised])
   @@index([scanTimestamp])
 }
+
+// Append-only domain event store (source de verite analytics/audit)
+model Event {
+  id            String   @id @default(cuid())
+  type          String
+  aggregateType String   // parcel | mission | relais | financial
+  aggregateId   String
+  payload       String   // JSON string
+  createdAt     DateTime @default(now())
+
+  @@index([aggregateType, aggregateId, createdAt])
+  @@index([type, createdAt])
+}
+
+model KpiTransporter {
+  transporteurId      String   @id
+  missionsTotal       Int      @default(0)
+  missionsActive      Int      @default(0)
+  missionsAssigned    Int      @default(0)
+  missionsInProgress  Int      @default(0)
+  missionsCompleted   Int      @default(0)
+  earningsTotal       Float    @default(0)
+  updatedAt           DateTime @updatedAt
+  createdAt           DateTime @default(now())
+}
+
+model KpiEnseigne {
+  enseigneId          String   @id
+  parcelsTotal        Int      @default(0)
+  parcelsDelivered    Int      @default(0)
+  pendingPayment      Int      @default(0)
+  readyForDeposit     Int      @default(0)
+  inTransit           Int      @default(0)
+  arrivedRelay        Int      @default(0)
+  revenueDelivered    Float    @default(0)
+  revenueCommitted    Float    @default(0)
+  updatedAt           DateTime @updatedAt
+  createdAt           DateTime @default(now())
+}
+
+model KpiRelais {
+  relaisId            String   @id
+  pendingActions      Int      @default(0)
+  stockDeparture      Int      @default(0)
+  stockArrival        Int      @default(0)
+  handoversCompleted  Int      @default(0)
+  cashOnHand          Float    @default(0)
+  commissionsTotal    Float    @default(0)
+  updatedAt           DateTime @updatedAt
+  createdAt           DateTime @default(now())
+}

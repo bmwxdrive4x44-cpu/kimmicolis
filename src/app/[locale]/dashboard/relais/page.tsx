@@ -68,6 +68,11 @@ export default function RelaisDashboard() {
     handedOver: 0,
     earnings: 0,
   });
+  const [kpi, setKpi] = useState({
+    handoversCompleted: 0,
+    cashOnHand: 0,
+    commissionsTotal: 0,
+  });
   const [cashInfo, setCashInfo] = useState({ cashCollected: 0, cashReversed: 0, balance: 0, totalCommissions: 0 });
   const [adminCommissions, setAdminCommissions] = useState({
     petit: DEFAULT_RELAY_COMMISSION.PETIT,
@@ -126,13 +131,22 @@ export default function RelaisDashboard() {
         setRelaisInfo(relais);
         console.log('[Relais Dashboard] State relaisInfo mise à jour');
         
-        // Fetch stats, cash and admin-controlled commission barème in parallel
-        const [statsRes, cashRes, settingsRes] = await Promise.all([
+        // Fetch states + KPI + cash and admin-controlled commission barème in parallel
+        const [statsRes, kpiRes, cashRes, settingsRes] = await Promise.all([
           fetch(`/api/relais/${relais.id}/stats?_=${nonce}`, { cache: 'no-store' }).catch(() => null),
+          fetch(`/api/kpi/relais/${relais.id}?_=${nonce}`, { cache: 'no-store' }).catch(() => null),
           fetch(`/api/relais-cash?relaisId=${relais.id}&_=${nonce}`, { cache: 'no-store' }).catch(() => null),
           fetch(`/api/settings?_=${nonce}`, { cache: 'no-store' }).catch(() => null),
         ]);
         if (statsRes?.ok) setStats(await statsRes.json());
+        if (kpiRes?.ok) {
+          const kpiData = await kpiRes.json();
+          setKpi({
+            handoversCompleted: Number(kpiData?.handoversCompleted || 0),
+            cashOnHand: Number(kpiData?.cashOnHand || 0),
+            commissionsTotal: Number(kpiData?.commissionsTotal || 0),
+          });
+        }
         if (cashRes?.ok) setCashInfo(await cashRes.json());
         if (settingsRes?.ok) {
           const settingsData = await settingsRes.json();
@@ -215,8 +229,8 @@ export default function RelaisDashboard() {
     }
   }, []);
 
-  const handoverBase = stats.inStockArrival + stats.handedOver;
-  const handoverRate = handoverBase > 0 ? Math.round((stats.handedOver / handoverBase) * 100) : 100;
+  const handoverBase = stats.inStockArrival + kpi.handoversCompleted;
+  const handoverRate = handoverBase > 0 ? Math.round((kpi.handoversCompleted / handoverBase) * 100) : 100;
 
   // Fetch relais info when session is ready
   useEffect(() => {
@@ -384,9 +398,9 @@ export default function RelaisDashboard() {
           <section className="space-y-3">
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-600">KPI business</p>
             <DashboardStatsGrid>
-              <DashboardMetricCard tone="relais" label="Cash en main" value={`${cashInfo.balance.toFixed(0)} DA`} icon={<BanknoteIcon className="h-5 w-5" />} detail="a reverser" className={cashInfo.balance >= RELAY_CASH_ALERT_THRESHOLD ? 'ring-1 ring-red-300' : ''} />
-              <DashboardMetricCard tone="relais" label="Commissions" value={`${cashInfo.totalCommissions.toFixed(0)} DA`} icon={<DollarSign className="h-5 w-5" />} detail="total gagne" />
-              <DashboardMetricCard tone="relais" label="Remises finalisees" value={stats.handedOver} icon={<CheckCircle className="h-5 w-5" />} detail="colis remis au destinataire" />
+              <DashboardMetricCard tone="relais" label="Cash en main" value={`${kpi.cashOnHand.toFixed(0)} DA`} icon={<BanknoteIcon className="h-5 w-5" />} detail="a reverser" className={kpi.cashOnHand >= RELAY_CASH_ALERT_THRESHOLD ? 'ring-1 ring-red-300' : ''} />
+              <DashboardMetricCard tone="relais" label="Commissions" value={`${kpi.commissionsTotal.toFixed(0)} DA`} icon={<DollarSign className="h-5 w-5" />} detail="total gagne" />
+              <DashboardMetricCard tone="relais" label="Remises finalisees" value={kpi.handoversCompleted} icon={<CheckCircle className="h-5 w-5" />} detail="colis remis au destinataire" />
               <DashboardMetricCard tone="relais" label="Taux de remise" value={`${handoverRate}%`} icon={<TrendingUp className="h-5 w-5" />} detail="sur colis arrives au relais destination" />
             </DashboardStatsGrid>
           </section>

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { createHash } from 'crypto';
+import { emitEvent } from '@/lib/events/store';
 import { createNotificationDedup } from '@/lib/notifications';
 import { evaluateImplicitProEligibility } from '@/lib/pro-eligibility';
 import { requireRole } from '@/lib/rbac';
@@ -677,6 +678,173 @@ export async function POST(
       } catch (eligibilityError) {
         console.error('[implicit-pro] qr status evaluation failed:', eligibilityError);
       }
+    }
+
+    // Domain events (append-only Event Store + KPI projectors)
+    if (action === 'validate_payment' && actingRelaisId) {
+      await emitEvent({
+        type: 'CASH_COLLECTED',
+        aggregateType: 'financial',
+        aggregateId: parcel.id,
+        payload: {
+          parcelId: parcel.id,
+          relaisId: actingRelaisId,
+          clientId: parcel.clientId,
+          amount: Number(parcel.prixClient || 0),
+          action,
+        },
+      });
+
+      await emitEvent({
+        type: 'COMMISSION_ALLOCATED',
+        aggregateType: 'financial',
+        aggregateId: parcel.id,
+        payload: {
+          parcelId: parcel.id,
+          relaisId: actingRelaisId,
+          amount: Number(parcel.commissionRelais || 0),
+          action,
+        },
+      });
+    }
+
+    if (action === 'deposit' && shouldUpdateParcelStatus && actingRelaisId) {
+      await emitEvent({
+        type: 'PARCEL_DEPOSITED',
+        aggregateType: 'parcel',
+        aggregateId: parcel.id,
+        payload: {
+          parcelId: parcel.id,
+          clientId: parcel.clientId,
+          relaisDepartId: parcel.relaisDepartId,
+          relaisArriveeId: parcel.relaisArriveeId,
+          status: newStatus,
+          clientAmount: Number(parcel.prixClient || 0),
+        },
+      });
+
+      await emitEvent({
+        type: 'RELAY_STOCK_INCREASED',
+        aggregateType: 'relais',
+        aggregateId: actingRelaisId,
+        payload: {
+          relaisId: actingRelaisId,
+          parcelId: parcel.id,
+          stockSide: 'departure',
+        },
+      });
+    }
+
+    if (action === 'pickup' && shouldUpdateParcelStatus) {
+      await emitEvent({
+        type: 'PARCEL_PICKED_UP',
+        aggregateType: 'parcel',
+        aggregateId: parcel.id,
+        payload: {
+          parcelId: parcel.id,
+          clientId: parcel.clientId,
+          relaisDepartId: parcel.relaisDepartId,
+          transporteurId: extraData.transporteurId,
+        },
+      });
+
+      await emitEvent({
+        type: 'PARCEL_IN_TRANSIT',
+        aggregateType: 'parcel',
+        aggregateId: parcel.id,
+        payload: {
+          parcelId: parcel.id,
+          clientId: parcel.clientId,
+          status: newStatus,
+          transporteurId: extraData.transporteurId,
+        },
+      });
+
+      if (parcel.relaisDepartId) {
+        await emitEvent({
+          type: 'RELAY_STOCK_DECREASED',
+          aggregateType: 'relais',
+          aggregateId: parcel.relaisDepartId,
+          payload: {
+            relaisId: parcel.relaisDepartId,
+            parcelId: parcel.id,
+            stockSide: 'departure',
+          },
+        });
+      }
+    }
+
+    if (action === 'arrive_dest' && shouldUpdateParcelStatus) {
+      await emitEvent({
+        type: 'PARCEL_ARRIVED_RELAY',
+        aggregateType: 'parcel',
+        aggregateId: parcel.id,
+        payload: {
+          parcelId: parcel.id,
+          clientId: parcel.clientId,
+          relaisArriveeId: parcel.relaisArriveeId,
+          status: newStatus,
+        },
+      });
+
+      if (parcel.relaisArriveeId) {
+        await emitEvent({
+          type: 'RELAY_STOCK_INCREASED',
+          aggregateType: 'relais',
+          aggregateId: parcel.relaisArriveeId,
+          payload: {
+            relaisId: parcel.relaisArriveeId,
+            parcelId: parcel.id,
+            stockSide: 'arrival',
+          },
+        });
+      }
+    }
+
+    if (action === 'deliver' && shouldUpdateParcelStatus) {
+      await emitEvent({
+        type: 'PARCEL_DELIVERED',
+        aggregateType: 'parcel',
+        aggregateId: parcel.id,
+        payload: {
+          parcelId: parcel.id,
+          clientId: parcel.clientId,
+          relaisArriveeId: parcel.relaisArriveeId,
+          status: newStatus,
+        },
+      });
+
+      if (parcel.relaisArriveeId) {
+        await emitEvent({
+          type: 'RELAY_STOCK_DECREASED',
+          aggregateType: 'relais',
+          aggregateId: parcel.relaisArriveeId,
+          payload: {
+            relaisId: parcel.relaisArriveeId,
+            parcelId: parcel.id,
+            stockSide: 'arrival',
+          },
+        });
+      }
+
+      const missionForRevenue = await db.mission.findFirst({
+        where: { colisId: parcel.id },
+        orderBy: { createdAt: 'desc' },
+        select: { transporteurId: true },
+      });
+
+      await emitEvent({
+        type: 'REVENUE_EARNED',
+        aggregateType: 'financial',
+        aggregateId: parcel.id,
+        payload: {
+          parcelId: parcel.id,
+          enseigneId: parcel.clientId,
+          transporteurId: missionForRevenue?.transporteurId,
+          amount: Number(parcel.netTransporteur || 0),
+          clientAmount: Number(parcel.prixClient || 0),
+        },
+      });
     }
 
     return NextResponse.json({ success: true, parcel: updatedParcel, message: notes, ...responseData });
