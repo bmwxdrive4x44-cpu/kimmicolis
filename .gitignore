@@ -48,6 +48,7 @@ prompt
 
 server.log
 smoke-test-report.json
+kpi-coherence-report.json
 # SQLite local database files
 dev.db
 dev.db-shm
