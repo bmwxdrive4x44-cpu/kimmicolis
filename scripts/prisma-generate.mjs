@@ -8,6 +8,22 @@ const WINDOWS_RETRY_DELAY_MS = 1500;
 const WINDOWS_ENGINE_PATH = join(process.cwd(), 'src', 'generated', 'prisma', 'query-engine-windows.exe');
 const PRISMA_CLI_PATH = join(process.cwd(), 'node_modules', 'prisma', 'build', 'index.js');
 
+const buildPrismaEnv = () => {
+  const env = { ...process.env };
+
+  // Vercel Postgres exposes POSTGRES_* variables by default.
+  // Prisma schema expects DATABASE_URL / DIRECT_DATABASE_URL.
+  if (!env.DATABASE_URL) {
+    env.DATABASE_URL = env.POSTGRES_PRISMA_URL || env.POSTGRES_URL || env.POSTGRES_URL_NON_POOLING;
+  }
+
+  if (!env.DIRECT_DATABASE_URL) {
+    env.DIRECT_DATABASE_URL = env.POSTGRES_URL_NON_POOLING || env.DATABASE_URL;
+  }
+
+  return env;
+};
+
 const runGenerate = (args) => {
   if (!existsSync(PRISMA_CLI_PATH)) {
     console.error(`[prisma-generate] Prisma CLI entrypoint not found at ${PRISMA_CLI_PATH}`);
@@ -15,7 +31,7 @@ const runGenerate = (args) => {
   }
 
   const result = spawnSync(process.execPath, [PRISMA_CLI_PATH, ...args], {
-    env: process.env,
+    env: buildPrismaEnv(),
     encoding: 'utf8',
   });
 
@@ -83,7 +99,7 @@ const runWithWindowsRetry = (args) => {
   return result;
 };
 
-let result = runWithWindowsRetry(['prisma', 'generate']);
+let result = runWithWindowsRetry(['generate']);
 
 if (result.status !== 0 && isWindows) {
   if (canReuseExistingWindowsEngine(result)) {
@@ -99,7 +115,7 @@ if (result.status !== 0 && isWindows) {
 
   if (process.env.PRISMA_ALLOW_NO_ENGINE === 'true') {
     console.warn('[prisma-generate] Native generate failed on Windows, fallback to --no-engine (PRISMA_ALLOW_NO_ENGINE=true).');
-    result = runWithWindowsRetry(['prisma', 'generate', '--no-engine']);
+    result = runWithWindowsRetry(['generate', '--no-engine']);
   } else {
     console.error('[prisma-generate] Native generate failed on Windows.');
     console.error('[prisma-generate] Aborting to avoid generating a no-engine client that can break local DB runtime.');
