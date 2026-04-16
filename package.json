@@ -20,6 +20,7 @@
     "db:migrate:status": "prisma migrate status",
     "db:migrate:deploy": "prisma migrate deploy",
     "db:kpi:backfill": "node scripts/run-kpi-backfill.cjs",
+    "db:kpi:verify": "node scripts/verify-kpi-coherence.cjs",
     "db:prod:fix-actionlog": "prisma db execute --schema prisma/schema.prisma --file ./scripts/prod-fix-actionlog-eventid.sql",
     "db:prod:fix-user-clienttype": "prisma db execute --schema prisma/schema.prisma --file ./scripts/prod-fix-user-clienttype.sql",
     "db:seed:demo": "node scripts/seed-demo-users.cjs --yes",
