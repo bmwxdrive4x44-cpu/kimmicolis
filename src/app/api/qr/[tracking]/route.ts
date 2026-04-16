@@ -5,6 +5,8 @@ import { createNotificationDedup } from '@/lib/notifications';
 import { evaluateImplicitProEligibility } from '@/lib/pro-eligibility';
 import { requireRole } from '@/lib/rbac';
 import { applyTransition, canTransition } from '@/lib/parcelStateMachine';
+import { transitionMission } from '@/lib/mission-parcel-sync';
+import { normalizeMissionStatus } from '@/lib/missionStateMachine';
 import { matchColisToTrajets } from '@/services/matchingService';
 
 function normalizeName(value: string): string {
@@ -162,12 +164,8 @@ export async function POST(
       request.headers.get('x-event-id') ||
       `${action || 'unknown'}:${parcel.id}:${normalizedRole}`;
 
-    const existingEvent = await db.actionLog.findFirst({
-      where: {
-        entityType: 'COLIS',
-        entityId: parcel.id,
-        action: `QR_EVENT:${effectiveEventId}`,
-      },
+    const existingEvent = await db.actionLog.findUnique({
+      where: { eventId: effectiveEventId },
       select: { id: true },
     });
 
@@ -269,19 +267,9 @@ export async function POST(
       newStatus = applyTransition(parcel.status === 'WAITING_PICKUP' || parcel.status === 'ASSIGNED' ? 'DEPOSITED_RELAY' : parcel.status, 'PICKED_UP');
       notes = 'Colis pris en charge par le transporteur';
 
-      // Update active mission if exists
+      // Mission/wallet updates are performed only after parcel status commit succeeds.
       const transporterId = actingTransporterId || (typeof transporteurId === 'string' ? transporteurId : undefined);
       if (transporterId) {
-        await db.mission.updateMany({
-          where: { colisId: parcel.id, transporteurId: transporterId, status: 'ASSIGNE' },
-          data: { status: 'PICKED_UP' },
-        });
-        // Update wallet: move to pending
-        await db.transporterWallet.upsert({
-          where: { transporteurId: transporterId },
-          update: { pendingEarnings: { increment: parcel.netTransporteur }, totalEarned: { increment: parcel.netTransporteur } },
-          create: { transporteurId: transporterId, pendingEarnings: parcel.netTransporteur, totalEarned: parcel.netTransporteur },
-        });
         extraData.transporteurId = transporterId;
       }
     }
@@ -364,29 +352,6 @@ export async function POST(
       newStatus = applyTransition(parcel.status, 'DELIVERED');
       const sanitizedId = String(recipientIdentityNumber).trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
       notes = `Colis remis au destinataire après triple vérification: identité + téléphone + code de retrait. Pièce d'identité n°: ${sanitizedId}`;
-
-      // Close mission
-      await db.mission.updateMany({
-        where: { colisId: parcel.id, status: 'EN_COURS' },
-        data: { status: 'LIVRE', completedAt: new Date() },
-      });
-
-      // Move transporter earnings from pending → available
-      const mission = await db.mission.findFirst({ where: { colisId: parcel.id } });
-      if (mission) {
-        await db.transporterWallet.upsert({
-          where: { transporteurId: mission.transporteurId },
-          update: {
-            pendingEarnings: { decrement: parcel.netTransporteur },
-            availableEarnings: { increment: parcel.netTransporteur },
-          },
-          create: {
-            transporteurId: mission.transporteurId,
-            availableEarnings: parcel.netTransporteur,
-            totalEarned: parcel.netTransporteur,
-          },
-        });
-      }
     }
 
     // ── Legacy compatibility actions ───────────────────────────────────────────
@@ -470,15 +435,133 @@ export async function POST(
 
     // ── Persist status change ────────────────────────────────────────────────────
     const updatedParcel = shouldUpdateParcelStatus
-      ? await db.colis.update({
-          where: { trackingNumber: tracking },
-          data: {
-            status: newStatus,
-            deliveredAt: newStatus === 'LIVRE' ? new Date() : undefined,
-          },
-          select: { id: true, status: true, deliveredAt: true },
-        })
+      ? await (async () => {
+          const guarded = await db.colis.updateMany({
+            where: {
+              trackingNumber: tracking,
+              status: parcel.status,
+            },
+            data: {
+              status: newStatus,
+              deliveredAt: newStatus === 'LIVRE' ? new Date() : undefined,
+            },
+          });
+
+          if (guarded.count === 0) {
+            const latest = await db.colis.findUnique({
+              where: { trackingNumber: tracking },
+              select: { id: true, status: true, deliveredAt: true },
+            });
+
+            return NextResponse.json(
+              {
+                success: true,
+                idempotent: true,
+                message: 'Transition déjà appliquée ou requête concurrente détectée',
+                parcel: latest,
+              },
+              { status: 200 }
+            );
+          }
+
+          return db.colis.findUnique({
+            where: { trackingNumber: tracking },
+            select: { id: true, status: true, deliveredAt: true },
+          });
+        })()
       : parcel;
+
+    if (updatedParcel instanceof NextResponse) {
+      return updatedParcel;
+    }
+
+    // Side effects after successful parcel status commit only.
+    if (action === 'pickup' && typeof extraData.transporteurId === 'string') {
+      const transporterId = extraData.transporteurId;
+
+      const missions = await db.mission.findMany({
+        where: { colisId: parcel.id, transporteurId: transporterId, status: { in: ['ASSIGNE', 'EN_COURS', 'PICKED_UP'] } },
+        select: { id: true, status: true },
+      });
+
+      for (const mission of missions) {
+        const missionCurrent = normalizeMissionStatus(String(mission.status));
+        if (missionCurrent === 'EN_COURS') continue;
+
+        await transitionMission({
+          missionId: mission.id,
+          expectedCurrentStatus: mission.status,
+          newStatus: 'EN_COURS',
+          notes: 'Mission activée après prise en charge transporteur (scan QR)',
+          syncParcel: false,
+        }).catch(() => null);
+      }
+
+      await db.transporterWallet.upsert({
+        where: { transporteurId: transporterId },
+        update: { pendingEarnings: { increment: parcel.netTransporteur }, totalEarned: { increment: parcel.netTransporteur } },
+        create: { transporteurId: transporterId, pendingEarnings: parcel.netTransporteur, totalEarned: parcel.netTransporteur },
+      });
+    }
+
+    if (action === 'deliver') {
+      const missions = await db.mission.findMany({
+        where: { colisId: parcel.id, status: { in: ['ASSIGNE', 'EN_COURS', 'PICKED_UP', 'COMPLETED'] } },
+        select: { id: true, status: true },
+      });
+
+      for (const mission of missions) {
+        let expectedStatus = mission.status;
+        let missionCurrent = normalizeMissionStatus(String(mission.status));
+
+        if (missionCurrent === 'ASSIGNE') {
+          const toInProgress = await transitionMission({
+            missionId: mission.id,
+            expectedCurrentStatus: expectedStatus,
+            newStatus: 'EN_COURS',
+            notes: 'Transition intermédiaire avant livraison finale (scan QR)',
+            syncParcel: false,
+          }).catch(() => null);
+
+          if (!toInProgress?.updated) {
+            continue;
+          }
+
+          const latest = await db.mission.findUnique({ where: { id: mission.id }, select: { status: true } });
+          if (!latest) continue;
+          expectedStatus = latest.status;
+          missionCurrent = normalizeMissionStatus(String(latest.status));
+        }
+
+        if (missionCurrent === 'LIVRE') {
+          continue;
+        }
+
+        await transitionMission({
+          missionId: mission.id,
+          expectedCurrentStatus: expectedStatus,
+          newStatus: 'LIVRE',
+          notes: 'Mission clôturée lors de la remise au destinataire (scan QR)',
+          syncParcel: false,
+        }).catch(() => null);
+      }
+
+      const mission = await db.mission.findFirst({ where: { colisId: parcel.id } });
+      if (mission) {
+        await db.transporterWallet.upsert({
+          where: { transporteurId: mission.transporteurId },
+          update: {
+            pendingEarnings: { decrement: parcel.netTransporteur },
+            availableEarnings: { increment: parcel.netTransporteur },
+          },
+          create: {
+            transporteurId: mission.transporteurId,
+            availableEarnings: parcel.netTransporteur,
+            totalEarned: parcel.netTransporteur,
+          },
+        });
+      }
+    }
 
     await db.trackingHistory.create({
       data: { colisId: parcel.id, status: trackingStatus, notes: `[${action}] ${notes} :: relais=${actingRelaisId || 'n/a'}` },
@@ -506,6 +589,8 @@ export async function POST(
 
     await db.actionLog.create({
       data: {
+        eventId: effectiveEventId,
+        scope: 'QR',
         userId: auth.payload.id,
         entityType: 'COLIS',
         entityId: parcel.id,

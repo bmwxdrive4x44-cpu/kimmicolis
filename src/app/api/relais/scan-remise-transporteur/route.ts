@@ -108,7 +108,7 @@ export async function POST(request: NextRequest) {
 
     const actionLogDb = db as typeof db & {
       actionLog: {
-        findFirst(args: Record<string, unknown>): Promise<{ id: string } | null>;
+        findUnique(args: Record<string, unknown>): Promise<{ id: string } | null>;
         create(args: Record<string, unknown>): Promise<unknown>;
       };
       qrSecurityLog: {
@@ -116,12 +116,12 @@ export async function POST(request: NextRequest) {
       };
       mission: {
         findFirst(args: Record<string, unknown>): Promise<any | null>;
-        update(args: Record<string, unknown>): Promise<any>;
+        updateMany(args: Record<string, unknown>): Promise<{ count: number }>;
       };
     };
 
-    const existingEvent = await actionLogDb.actionLog.findFirst({
-      where: { eventId, scope: 'QR', entityId: parcel.id },
+    const existingEvent = await actionLogDb.actionLog.findUnique({
+      where: { eventId },
       select: { id: true },
     });
     if (existingEvent) {
@@ -170,8 +170,8 @@ export async function POST(request: NextRequest) {
 
     if (missions) {
       // Mark that relais has confirmed handoff
-      await actionLogDb.mission.update({
-        where: { id: missions.id },
+      await actionLogDb.mission.updateMany({
+        where: { id: missions.id, relaisConfirmed: false },
         data: { relaisConfirmed: true },
       });
     }

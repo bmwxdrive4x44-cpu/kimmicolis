@@ -5,12 +5,8 @@ import { verifyPassword } from '@/lib/auth';
 // Endpoint de vérification des identifiants pour les smoke tests CI.
 // Ne doit JAMAIS retourner d'informations sensibles (hash, format, etc.).
 export async function POST(request: Request) {
-  // Accessible uniquement depuis localhost en production
-  const host = (request as any).headers?.get
-    ? (request as any).headers.get('host') ?? ''
-    : '';
-  const isLocal = host.startsWith('localhost') || host.startsWith('127.0.0.1');
-  if (process.env.NODE_ENV === 'production' && !isLocal) {
+  // Hard-disabled in production: never expose credential diagnostics.
+  if (process.env.NODE_ENV === 'production') {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
   try {

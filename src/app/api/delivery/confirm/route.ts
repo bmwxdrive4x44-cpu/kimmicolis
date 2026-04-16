@@ -3,6 +3,8 @@ import { db } from '@/lib/db';
 import { createNotificationDedup } from '@/lib/notifications';
 import { requireRole } from '@/lib/rbac';
 import { applyTransition, canTransition } from '@/lib/parcelStateMachine';
+import { transitionMission } from '@/lib/mission-parcel-sync';
+import { normalizeMissionStatus } from '@/lib/missionStateMachine';
 
 function isPrismaSchemaError(err: unknown): boolean {
   const code = String((err as { code?: string }).code ?? '');
@@ -75,7 +77,7 @@ export async function POST(request: NextRequest) {
         where: {
           colisId: parcel.id,
           transporteurId: auth.payload.id,
-          status: { in: ['ASSIGNE', 'PICKED_UP'] },
+          status: { in: ['ASSIGNE', 'EN_COURS'] },
         },
       });
     }
@@ -124,7 +126,6 @@ export async function POST(request: NextRequest) {
     let newMissionStatus: string;
     let notes: string;
     const parcelUpdateData: Record<string, unknown> = {};
-    const missionUpdateData: Record<string, unknown> = {};
 
     // ──────────────────────────────────────────────
     // ACTION: pickup
@@ -140,7 +141,7 @@ export async function POST(request: NextRequest) {
         );
       }
       newParcelStatus = applyTransition(parcel.status === 'ASSIGNED' || parcel.status === 'RECU_RELAIS' ? 'DEPOSITED_RELAY' : parcel.status, 'PICKED_UP');
-      newMissionStatus = 'PICKED_UP';
+      newMissionStatus = 'EN_COURS';
       notes = 'Colis pris en charge par le transporteur';
       parcelUpdateData.custody = 'TRANSPORTEUR';
     }
@@ -165,9 +166,8 @@ export async function POST(request: NextRequest) {
         newParcelStatus = applyTransition(inTransit, 'ARRIVED_RELAY');
       }
 
-      newMissionStatus = 'COMPLETED';
+      newMissionStatus = 'LIVRE';
       notes = 'Colis livré au relais de destination par le transporteur';
-      missionUpdateData.completedAt = new Date();
       parcelUpdateData.custody = 'RELAIS_DEST';
     } else {
       return NextResponse.json({ error: `Action inconnue: ${effectiveAction}` }, { status: 400 });
@@ -198,10 +198,25 @@ export async function POST(request: NextRequest) {
 
     // Update mission
     if (mission) {
-      await db.mission.update({
-        where: { id: mission.id },
-        data: { status: newMissionStatus, ...missionUpdateData },
-      });
+      const normalizedCurrent = normalizeMissionStatus(String(mission.status));
+      const normalizedNext = normalizeMissionStatus(newMissionStatus);
+
+      if (normalizedCurrent !== normalizedNext) {
+        const transitionResult = await transitionMission({
+          missionId: mission.id,
+          expectedCurrentStatus: mission.status,
+          newStatus: newMissionStatus,
+          notes,
+          syncParcel: false,
+        });
+
+        if (!transitionResult.updated) {
+          return NextResponse.json(
+            { error: transitionResult.reason, code: 'CONCURRENT_MODIFICATION' },
+            { status: 409 }
+          );
+        }
+      }
     }
 
     // Add tracking history

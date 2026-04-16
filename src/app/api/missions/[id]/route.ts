@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { requireRole } from '@/lib/rbac';
 import { evaluateImplicitProEligibility } from '@/lib/pro-eligibility';
+import { assertMissionTransition, ALL_MISSION_STATUSES } from '@/lib/missionStateMachine';
+import { transitionMission } from '@/lib/mission-parcel-sync';
 
 // GET single mission
 export async function GET(
@@ -66,66 +68,52 @@ export async function PUT(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    // Update mission
-    const mission = await db.mission.update({
-      where: { id },
-      data: {
-        status,
-        completedAt: status === 'LIVRE' ? new Date() : null,
-      },
+    // Validate status value (whitelist)
+    if (!ALL_MISSION_STATUSES.includes(status)) {
+      return NextResponse.json({ error: `Statut invalide: ${status}` }, { status: 400 });
+    }
+
+    // Enforce state machine transition
+    try {
+      assertMissionTransition(currentMission.status, status);
+    } catch {
+      return NextResponse.json(
+        { error: `Transition interdite : ${currentMission.status} → ${status}` },
+        { status: 409 }
+      );
+    }
+
+    // Update mission + colis atomiquement avec guard de concurrence.
+    // transitionMission() utilise updateMany(where: { id, status: currentStatus })
+    // → si 0 rows affected = modification concurrente détectée → 409.
+    const syncResult = await transitionMission({
+      missionId: id,
+      expectedCurrentStatus: currentMission.status,
+      newStatus: status,
+      notes: notes ?? undefined,
     });
 
-    // Update parcel status based on mission status
-    if (status === 'EN_COURS') {
-      await db.colis.update({
-        where: { id: mission.colisId },
-        data: { status: 'EN_TRANSPORT' },
-        select: { id: true, status: true },
-      });
+    if (!syncResult.updated) {
+      return NextResponse.json(
+        { error: syncResult.reason, code: 'CONCURRENT_MODIFICATION' },
+        { status: 409 }
+      );
+    }
 
-      await db.trackingHistory.create({
-        data: {
-          colisId: mission.colisId,
-          status: 'EN_TRANSPORT',
-          notes: notes || 'Transport en cours',
-        },
+    // Side-effect hors transaction (non-critique, échec silencieux)
+    if (syncResult.colisId) {
+      const parcel = await db.colis.findUnique({
+        where: { id: syncResult.colisId },
+        select: { clientId: true },
       });
-
-      const parcel = await db.colis.findUnique({ where: { id: mission.colisId }, select: { clientId: true } });
       if (parcel?.clientId) {
-        try {
-          await evaluateImplicitProEligibility(parcel.clientId);
-        } catch (eligibilityError) {
-          console.error('[implicit-pro] mission EN_COURS evaluation failed:', eligibilityError);
-        }
+        evaluateImplicitProEligibility(parcel.clientId).catch((e) =>
+          console.error('[implicit-pro] mission transition evaluation failed:', e)
+        );
       }
     }
 
-    if (status === 'LIVRE') {
-      await db.colis.update({
-        where: { id: mission.colisId },
-        data: { status: 'ARRIVE_RELAIS_DESTINATION' },
-        select: { id: true, status: true },
-      });
-
-      await db.trackingHistory.create({
-        data: {
-          colisId: mission.colisId,
-          status: 'ARRIVE_RELAIS_DESTINATION',
-          notes: notes || 'Colis arrivé au relais de destination',
-        },
-      });
-
-      const parcel = await db.colis.findUnique({ where: { id: mission.colisId }, select: { clientId: true } });
-      if (parcel?.clientId) {
-        try {
-          await evaluateImplicitProEligibility(parcel.clientId);
-        } catch (eligibilityError) {
-          console.error('[implicit-pro] mission LIVRE evaluation failed:', eligibilityError);
-        }
-      }
-    }
-
+    const mission = await db.mission.findUnique({ where: { id } });
     return NextResponse.json(mission);
   } catch (error) {
     console.error('Error updating mission:', error);

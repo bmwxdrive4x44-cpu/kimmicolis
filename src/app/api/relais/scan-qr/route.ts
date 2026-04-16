@@ -4,6 +4,9 @@ import { RELAY_BLOCK_THRESHOLD_DA } from '@/lib/constants';
 import { createHash } from 'crypto';
 import { createNotificationDedup } from '@/lib/notifications';
 import { extractTrackingFromQrPayload } from '@/lib/qr-payload';
+import { requireRole } from '@/lib/rbac';
+import { transitionMission } from '@/lib/mission-parcel-sync';
+import { normalizeMissionStatus } from '@/lib/missionStateMachine';
 
 function normalizeName(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, ' ');
@@ -36,17 +39,19 @@ function hashWithdrawalCode(code: string): string {
  *   - "deliver": maps to deliver_client
  */
 export async function POST(request: NextRequest) {
+  const auth = await requireRole(request, ['RELAIS', 'ADMIN']);
+  if (!auth.success) return auth.response;
+
   try {
     const body = await request.json();
     const {
       trackingNumber,
       qrData,
       relaisId,
-      userId,
       action,
+      eventId: bodyEventId,
       cashAmount,
       photoUrl,
-      actionBy,
       recipientFirstName,
       recipientLastName,
       recipientPhone,
@@ -55,27 +60,26 @@ export async function POST(request: NextRequest) {
 
     const relayActions = new Set(['validate_payment', 'deposit_scan', 'receive_transporter', 'deliver_client', 'receive', 'deliver']);
     let actingRelaisId = typeof relaisId === 'string' && relaisId.trim().length > 0 ? relaisId.trim() : undefined;
-    const actorUserId = typeof actionBy === 'string' && actionBy.trim().length > 0
-      ? actionBy.trim()
-      : typeof userId === 'string' && userId.trim().length > 0
-        ? userId.trim()
-        : undefined;
 
-    if (actorUserId) {
-      const relayFromUser = await db.relais.findUnique({
-        where: { userId: actorUserId },
+    // Never trust actor identity from request body.
+    if (auth.payload.role === 'RELAIS') {
+      const relayFromSession = await db.relais.findUnique({
+        where: { userId: auth.payload.id },
         select: { id: true, commerceName: true },
       });
 
-      if (relayFromUser) {
-        if (actingRelaisId && actingRelaisId !== relayFromUser.id) {
-          return NextResponse.json(
-            { error: `Relais invalide pour cet utilisateur. Relais attendu: ${relayFromUser.commerceName}` },
-            { status: 403 }
-          );
-        }
-        actingRelaisId = relayFromUser.id;
+      if (!relayFromSession) {
+        return NextResponse.json({ error: 'Compte relais introuvable' }, { status: 403 });
       }
+
+      if (actingRelaisId && actingRelaisId !== relayFromSession.id) {
+        return NextResponse.json(
+          { error: `Relais invalide pour cet utilisateur. Relais attendu: ${relayFromSession.commerceName}` },
+          { status: 403 }
+        );
+      }
+
+      actingRelaisId = relayFromSession.id;
     }
 
     if (relayActions.has(action) && !actingRelaisId) {
@@ -87,6 +91,24 @@ export async function POST(request: NextRequest) {
 
     if (!tracking) {
       return NextResponse.json({ error: 'trackingNumber ou qrData est requis' }, { status: 400 });
+    }
+
+    const effectiveEventId =
+      (typeof bodyEventId === 'string' && bodyEventId.trim().length > 0 ? bodyEventId.trim() : null) ||
+      request.headers.get('x-event-id') ||
+      `SCAN_QR:${action || 'unknown'}:${tracking}:${auth.payload.id}`;
+
+    const existingEvent = await db.actionLog.findUnique({
+      where: { eventId: effectiveEventId },
+      select: { id: true },
+    });
+
+    if (existingEvent) {
+      return NextResponse.json({
+        success: true,
+        idempotent: true,
+        message: 'Événement déjà traité',
+      });
     }
 
     // Find parcel
@@ -311,15 +333,42 @@ export async function POST(request: NextRequest) {
       updateData.deliveredAt = new Date();
       if (photoUrl) updateData.photoLivraison = photoUrl;
 
-      // Release transporter gains on delivery
+      // Close active mission(s) on final client delivery
       const missions = await db.mission.findMany({
-        where: { colisId: parcel.id, status: { in: ['ASSIGNE', 'PICKED_UP', 'COMPLETED'] } },
+        where: { colisId: parcel.id, status: { in: ['ASSIGNE', 'EN_COURS', 'PICKED_UP', 'COMPLETED'] } },
       });
       for (const m of missions) {
-        await db.mission.update({
-          where: { id: m.id },
-          data: { completedAt: m.completedAt ?? new Date() },
+        const missionCurrent = normalizeMissionStatus(String(m.status));
+        if (missionCurrent === 'LIVRE') continue;
+
+        if (missionCurrent === 'ASSIGNE') {
+          const toInProgress = await transitionMission({
+            missionId: m.id,
+            expectedCurrentStatus: m.status,
+            newStatus: 'EN_COURS',
+            notes: 'Transition intermédiaire avant clôture de mission',
+            syncParcel: false,
+          });
+
+          if (!toInProgress.updated) {
+            continue;
+          }
+        }
+
+        const latestMission = await db.mission.findUnique({ where: { id: m.id }, select: { status: true } });
+        if (!latestMission) continue;
+
+        const toDelivered = await transitionMission({
+          missionId: m.id,
+          expectedCurrentStatus: latestMission.status,
+          newStatus: 'LIVRE',
+          notes: 'Mission clôturée lors de la remise finale au client',
+          syncParcel: false,
         });
+
+        if (!toDelivered.updated) {
+          continue;
+        }
       }
     } else {
       return NextResponse.json({ error: `Action inconnue: ${effectiveAction}` }, { status: 400 });
@@ -338,6 +387,23 @@ export async function POST(request: NextRequest) {
         colisId: parcel.id,
         status: newStatus,
         notes,
+      },
+    });
+
+    await db.actionLog.create({
+      data: {
+        eventId: effectiveEventId,
+        scope: 'QR',
+        userId: auth.payload.id,
+        entityType: 'COLIS',
+        entityId: parcel.id,
+        action: `QR_SCAN:${String(effectiveAction || action || 'UNKNOWN').toUpperCase()}`,
+        details: JSON.stringify({
+          tracking,
+          fromStatus: parcel.status,
+          toStatus: newStatus,
+          relaisId: actingRelaisId,
+        }),
       },
     });
 

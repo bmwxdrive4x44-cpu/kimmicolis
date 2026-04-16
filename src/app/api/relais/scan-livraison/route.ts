@@ -129,13 +129,13 @@ export async function POST(request: NextRequest) {
 
     const actionLogDb = db as typeof db & {
       actionLog: {
-        findFirst(args: Record<string, unknown>): Promise<{ id: string } | null>;
+        findUnique(args: Record<string, unknown>): Promise<{ id: string } | null>;
         create(args: Record<string, unknown>): Promise<unknown>;
       };
     };
 
-    const existingEvent = await actionLogDb.actionLog.findFirst({
-      where: { eventId, scope: 'DELIVERY', entityId: parcel.id },
+    const existingEvent = await actionLogDb.actionLog.findUnique({
+      where: { eventId },
       select: { id: true },
     });
     if (existingEvent) {

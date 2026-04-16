@@ -847,7 +847,7 @@ export async function GET(request: NextRequest) {
       // Show parcels available for transport: deposited at relay (new + legacy statuses)
       where.status = { in: ['DEPOSITED_RELAY', 'WAITING_PICKUP', 'READY_FOR_DEPOSIT', 'RECU_RELAIS', 'PAID_RELAY'] };
       // Only parcels without an active mission
-      where.missions = { none: { status: { in: ['ASSIGNE', 'PICKED_UP'] } } };
+      where.missions = { none: { status: { in: ['ASSIGNE', 'EN_COURS'] } } };
       where.lineId = { not: null };
       where.relaisDepart = { is: { status: 'APPROVED', operationalStatus: 'ACTIF' } };
       where.relaisArrivee = { is: { status: 'APPROVED', operationalStatus: 'ACTIF' } };

@@ -3,6 +3,8 @@ import { db } from '@/lib/db';
 import { requireRole } from '@/lib/rbac';
 import { createNotificationDedup } from '@/lib/notifications';
 import { resolveQrSecurityPayload } from '@/lib/relais-scan';
+import { transitionMission } from '@/lib/mission-parcel-sync';
+import { normalizeMissionStatus } from '@/lib/missionStateMachine';
 import { 
   validateQRAgainstParcel,
   createQRScanLogEntry 
@@ -102,14 +104,38 @@ export async function POST(
       });
     }
 
-    // 🔄 Mark transporteur confirmation and update mission status
-    const updatedMission = await (db as any).mission.update({
-      where: { id: missionId },
-      data: {
-        transporteurConfirmed: true,
-        status: 'EN_COURS', // Ensure status is EN_COURS
-      },
+    const missionStatus = normalizeMissionStatus(String(mission.status));
+    if (!['ASSIGNE', 'EN_COURS'].includes(missionStatus)) {
+      return NextResponse.json(
+        { error: `Impossible de confirmer la mission depuis le statut: ${mission.status}` },
+        { status: 409 }
+      );
+    }
+
+    if (missionStatus === 'ASSIGNE') {
+      const transitionResult = await transitionMission({
+        missionId,
+        expectedCurrentStatus: mission.status,
+        newStatus: 'EN_COURS',
+        notes: 'Transporteur a confirmé la réception au relais de départ',
+        syncParcel: false,
+      });
+
+      if (!transitionResult.updated) {
+        return NextResponse.json(
+          { error: transitionResult.reason, code: 'CONCURRENT_MODIFICATION' },
+          { status: 409 }
+        );
+      }
+    }
+
+    // Marqueur de double validation (idempotent)
+    await (db as any).mission.updateMany({
+      where: { id: missionId, transporteurConfirmed: false },
+      data: { transporteurConfirmed: true },
     });
+
+    const updatedMission = await (db as any).mission.findUnique({ where: { id: missionId } });
 
     // Log confirmation
     await (db as any).qrSecurityLog.create({
@@ -140,12 +166,12 @@ export async function POST(
       },
     });
 
-    // Create tracking history entry
+    // Trace explicite de la double validation (sans changer le statut colis)
     await db.trackingHistory.create({
       data: {
         colisId: parcel.id,
-        status: 'EN_COURS',
-        notes: `Transporteur a confirmé la réception du colis au relais de départ (double validation complétée)`,
+        status: 'EN_TRANSPORT',
+        notes: 'Transporteur a confirmé la réception du colis au relais de départ (double validation complétée)',
         userId: auth.payload.id,
       },
     });
