@@ -144,9 +144,13 @@ export function generateQRData(trackingNumber: string, baseUrl?: string): string
 
 /** Ordered status transitions for the MVP workflow */
 export const PARCEL_STATUS_FLOW: Record<string, string | null> = {
-  CREATED:                    'PAID_RELAY',
+  CREATED:                    'PENDING_PAYMENT',
+  PENDING_PAYMENT:            'READY_FOR_DEPOSIT',
+  READY_FOR_DEPOSIT:          'DEPOSITED_RELAY',
+  // Legacy cash shortcut still accepted by QR routes
   PAID_RELAY:                 'DEPOSITED_RELAY',
-  DEPOSITED_RELAY:            'EN_TRANSPORT',
+  DEPOSITED_RELAY:            'PICKED_UP',
+  PICKED_UP:                  'EN_TRANSPORT',
   EN_TRANSPORT:               'ARRIVE_RELAIS_DESTINATION',
   ARRIVE_RELAIS_DESTINATION:  'LIVRE',
   LIVRE:                      null,

@@ -230,7 +230,7 @@ async function getActiveMissionCountMap(transporteurIds: string[]): Promise<Map<
     by: ['transporteurId'],
     where: {
       transporteurId: { in: transporteurIds },
-      status: { in: ['ASSIGNE', 'EN_COURS', 'PICKED_UP'] },
+      status: { in: ['ASSIGNE', 'EN_COURS'] },
     },
     _count: { _all: true },
   });
@@ -330,7 +330,7 @@ export async function matchColisToTrajets(colis: {
   const existingMission = await db.mission.findFirst({
     where: {
       colisId: colis.id,
-      status: { in: ['ASSIGNE', 'EN_COURS', 'PICKED_UP'] },
+      status: { in: ['ASSIGNE', 'EN_COURS'] },
     },
   });
   if (existingMission) {
@@ -371,7 +371,7 @@ export async function matchColisToTrajets(colis: {
       const activeMission = await tx.mission.findFirst({
         where: {
           colisId: colis.id,
-          status: { in: ['ASSIGNE', 'EN_COURS', 'PICKED_UP'] },
+          status: { in: ['ASSIGNE', 'EN_COURS'] },
         },
       });
 
@@ -454,7 +454,7 @@ export async function autoAssignUnmatchedColis(limit = 50): Promise<AutoAssignRe
     status: { in: eligibleStatuses },
     missions: {
       none: {
-        status: { in: ['ASSIGNE', 'EN_COURS', 'PICKED_UP'] },
+        status: { in: ['ASSIGNE', 'EN_COURS'] },
       },
     },
   };
