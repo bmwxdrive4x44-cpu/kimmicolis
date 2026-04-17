@@ -93,7 +93,11 @@ export default function AdminDashboard() {
     setIsLoading(true);
     try {
       const response = await fetch('/api/stats');
-      const data = await response.json();
+      const data = await response.json().catch(() => null);
+      if (!response.ok || !data) {
+        console.error('fetchStats error', response.status);
+        return;
+      }
       setStats(data);
     } catch (error) {
       console.error('Error fetching stats:', error);
@@ -800,7 +804,10 @@ function TransportersTab() {
     setIsLoading(true);
     try {
       const response = await fetch('/api/transporters');
-      const data = await response.json();
+      const data = await response.json().catch(() => null);
+      if (!response.ok || !data) {
+        throw new Error(`HTTP ${response.status}`);
+      }
       setApplications(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Error fetching transporter applications:', error);
@@ -3097,20 +3104,26 @@ function MessagesTab({ onUnreadCountChange }: { onUnreadCountChange?: (count: nu
   }, [fetchMessages]);
 
   const markRead = async (msg: any, isRead: boolean) => {
-    await fetch('/api/admin/messages', {
+    try {
+    const res = await fetch('/api/admin/messages', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: msg.id, isRead }),
     });
+    if (!res.ok) return;
     setMessages((prev) => prev.map((m) => (m.id === msg.id ? { ...m, isRead } : m)));
     if (selected?.id === msg.id) setSelected({ ...msg, isRead });
     void syncUnreadCount();
+    } catch { /* transient — ignore */ }
   };
 
   const deleteMsg = async (id: string) => {
-    await fetch(`/api/admin/messages?id=${id}`, { method: 'DELETE' });
+    try {
+    const res = await fetch(`/api/admin/messages?id=${id}`, { method: 'DELETE' });
+    if (!res.ok) return;
     setMessages((prev) => prev.filter((m) => m.id !== id));
     setTotal((t) => t - 1);
+    } catch { /* transient — ignore */ }
     if (selected?.id === id) setSelected(null);
     void syncUnreadCount();
   };
