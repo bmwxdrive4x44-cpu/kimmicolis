@@ -18,13 +18,14 @@
     "@prisma/client": "^6.19.2",
     "next": "^16.2.3",
     "next-auth": "^4.24.11",
+    "next-intl": "^4.9.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "zod": "^4.0.2"
   },
   "devDependencies": {
+    "eslint": "^9",
     "prisma": "^6.19.2",
-    "typescript": "^5",
-    "eslint": "^9"
+    "typescript": "^5"
   }
 }
