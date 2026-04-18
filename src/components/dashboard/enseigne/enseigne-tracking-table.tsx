@@ -58,13 +58,13 @@ export function EnseigneTrackingTable({
   }
 
   return (
-    <div className="mt-4">
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <p className="text-sm text-slate-600">{items.length} colis</p>
+    <div className="mt-4 space-y-4">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+        <p className="text-sm font-medium text-slate-600">{items.length} colis</p>
         <ParcelLabelsBulkButton parcels={items} />
       </div>
-      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
-      <table className="min-w-full divide-y divide-slate-200 text-sm">
+      <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white/95 shadow-[0_16px_35px_-28px_rgba(15,23,42,0.35)]">
+      <table className="min-w-[980px] divide-y divide-slate-200 text-sm">
         <thead className="bg-slate-50">
           <tr>
             <th className="px-4 py-3 text-left font-semibold text-slate-700">Tracking</th>

@@ -13,8 +13,11 @@ import {
   DashboardHero,
   DashboardMetricCard,
   DashboardPanel,
+  DashboardSection,
   DashboardShell,
   DashboardStatsGrid,
+  dashboardMetaBadgeClass,
+  dashboardTabsContentClass,
   dashboardTabsListClass,
   getDashboardTabsTriggerClass,
 } from '@/components/dashboard/dashboard-shell';
@@ -250,32 +253,32 @@ export default async function EnseigneDashboardPage({
     : 100;
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950">
+    <div className="min-h-screen flex flex-col bg-[radial-gradient(circle_at_top,_#f8fafc,_#eef2ff_42%,_#dbeafe_100%)] dark:bg-slate-950">
       <Header />
-      <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8">
-        <DashboardShell tone="client" className="mx-auto max-w-7xl">
+      <main className="flex-1 px-4 py-10 sm:px-6 lg:px-8">
+        <DashboardShell tone="enseigne" className="mx-auto max-w-[92rem]">
           <DashboardHero
-            tone="client"
+            tone="enseigne"
             eyebrow="Operations enseigne"
             title="Tour de controle e-commerce"
             description="Flux enseigne 100% digital: paiement en ligne, depot physique au relais partenaire, puis collecte et transport orchestras par la plateforme."
             meta={
               <>
-                <Badge variant="outline" className="border-white/70 bg-white/70 text-slate-700">
+                <Badge variant="outline" className={dashboardMetaBadgeClass}>
                   {enseigne?.businessName || session.user.name || 'Votre enseigne'}
                 </Badge>
                 {enseigne?.operationalCity ? (
-                  <Badge variant="outline" className="border-white/70 bg-white/70 text-slate-700">
+                  <Badge variant="outline" className={dashboardMetaBadgeClass}>
                     Base: {enseigne.operationalCity}
                   </Badge>
                 ) : null}
-                <Badge variant="outline" className="border-white/70 bg-white/70 text-slate-700">
+                <Badge variant="outline" className={dashboardMetaBadgeClass}>
                   Taux de livraison: {deliveryRate}%
                 </Badge>
-                <Badge variant="outline" className="border-white/70 bg-white/70 text-slate-700">
+                <Badge variant="outline" className={dashboardMetaBadgeClass}>
                   CA livre: {Math.round(deliveredRevenue).toLocaleString('fr-DZ')} DA
                 </Badge>
-                <Badge variant="outline" className="border-white/70 bg-white/70 text-slate-700">
+                <Badge variant="outline" className={dashboardMetaBadgeClass}>
                   <Star className="h-3 w-3 mr-1 text-amber-500" />
                   Score PRO: {proScore}/100
                 </Badge>
@@ -360,95 +363,110 @@ export default async function EnseigneDashboardPage({
             </div>
           )}
 
-          <section className="space-y-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-600">KPI business</p>
+          <DashboardSection
+            tone="enseigne"
+            eyebrow="Business"
+            title="KPI enseigne"
+            description="Séparez la performance commerciale de l’exécution logistique pour prioriser les bonnes actions."
+          >
             <DashboardStatsGrid>
               <DashboardMetricCard
-                tone="client"
+                tone="enseigne"
                 label="Colis total"
                 value={totalParcelsKpi}
                 icon={<Package className="h-5 w-5" />}
                 detail="volume global"
               />
               <DashboardMetricCard
-                tone="client"
+                tone="enseigne"
                 label="Taux livraison"
                 value={`${deliveryRate}%`}
                 icon={<CheckCircle className="h-5 w-5" />}
                 detail={`${deliveredParcelsKpi} colis livres`}
               />
               <DashboardMetricCard
-                tone="client"
+                tone="enseigne"
                 label="CA livre"
                 value={`${Math.round(deliveredRevenue).toLocaleString('fr-DZ')} DA`}
                 icon={<CreditCard className="h-5 w-5" />}
                 detail="encaisse sur colis livres"
               />
               <DashboardMetricCard
-                tone="client"
+                tone="enseigne"
                 label="CA engage"
                 value={`${Math.round(committedRevenue).toLocaleString('fr-DZ')} DA`}
                 icon={<Star className="h-5 w-5" />}
                 detail={`score PRO ${proScore}/100`}
               />
             </DashboardStatsGrid>
-          </section>
+          </DashboardSection>
 
-          <section className="space-y-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-600">Etats logistiques</p>
+          <DashboardSection
+            tone="enseigne"
+            eyebrow="Opérations"
+            title="Etats logistiques"
+            description="Lecture claire des colis bloqués, à déposer et en transit pour fluidifier le flux quotidien."
+          >
             <DashboardStatsGrid>
               <DashboardMetricCard
-                tone="client"
+                tone="enseigne"
                 label="Non payes"
                 value={pendingPaymentKpi}
                 icon={<CreditCard className="h-5 w-5" />}
                 detail={`${createdOnlyParcels} crees · ${pendingPaymentParcels} en attente`}
               />
               <DashboardMetricCard
-                tone="client"
+                tone="enseigne"
                 label="A deposer au relais"
                 value={readyForDepositKpi}
                 icon={<Package className="h-5 w-5" />}
                 detail="payes, attente depot physique"
               />
               <DashboardMetricCard
-                tone="client"
+                tone="enseigne"
                 label="Collecte / transport"
                 value={inTransitKpi}
                 icon={<Truck className="h-5 w-5" />}
                 detail={`${activeMissions} missions actives`}
               />
               <DashboardMetricCard
-                tone="client"
+                tone="enseigne"
                 label="Arrives relais dest"
                 value={arrivedRelayKpi}
                 icon={<CheckCircle className="h-5 w-5" />}
                 detail={`${pendingAssignmentParcels} en attente assignation`}
               />
             </DashboardStatsGrid>
-          </section>
+          </DashboardSection>
 
-          <DashboardPanel tone="client">
-            <Tabs key={initialTab} defaultValue={initialTab}>
-              <TabsList className={`${dashboardTabsListClass} grid grid-cols-2 lg:grid-cols-5`}>
-                <TabsTrigger value="overview" className={getDashboardTabsTriggerClass('client')}>
+          <DashboardSection
+            tone="enseigne"
+            eyebrow="Modules"
+            title="Cockpit opérationnel"
+            description="Accès structuré aux vues suivi, paiements, imports et configuration."
+            contentClassName="bg-transparent p-0 border-0 shadow-none ring-0"
+          >
+            <DashboardPanel tone="enseigne">
+              <Tabs key={initialTab} defaultValue={initialTab}>
+                <TabsList className={`${dashboardTabsListClass} grid grid-cols-2 lg:grid-cols-5`}>
+                <TabsTrigger value="overview" className={getDashboardTabsTriggerClass('enseigne')}>
                   Vue d ensemble
                 </TabsTrigger>
-                <TabsTrigger value="tracking" className={getDashboardTabsTriggerClass('client')}>
+                <TabsTrigger value="tracking" className={getDashboardTabsTriggerClass('enseigne')}>
                   Suivi colis
                 </TabsTrigger>
-                <TabsTrigger value="payments" className={getDashboardTabsTriggerClass('client')}>
+                <TabsTrigger value="payments" className={getDashboardTabsTriggerClass('enseigne')}>
                   Paiements
                 </TabsTrigger>
-                <TabsTrigger value="imports" className={getDashboardTabsTriggerClass('client')}>
+                <TabsTrigger value="imports" className={getDashboardTabsTriggerClass('enseigne')}>
                   Imports CSV
                 </TabsTrigger>
-                <TabsTrigger value="settings" className={getDashboardTabsTriggerClass('client')}>
+                <TabsTrigger value="settings" className={getDashboardTabsTriggerClass('enseigne')}>
                   Configuration
                 </TabsTrigger>
               </TabsList>
 
-              <TabsContent value="overview" className="space-y-4" id="enseigne-overview">
+              <TabsContent value="overview" className={`${dashboardTabsContentClass} space-y-4`} id="enseigne-overview">
                 <div className="grid gap-4 xl:grid-cols-2">
                   <section className="rounded-2xl border border-slate-200 bg-white/85 p-5">
                     <h2 className="text-lg font-semibold text-slate-900">Plan operationnel quotidien</h2>
@@ -592,7 +610,7 @@ export default async function EnseigneDashboardPage({
                 </section>
               </TabsContent>
 
-              <TabsContent value="tracking" className="space-y-4" id="enseigne-tracking">
+              <TabsContent value="tracking" className={`${dashboardTabsContentClass} space-y-4`} id="enseigne-tracking">
                 <section>
                   <div className="mb-4 grid gap-3 sm:grid-cols-3">
                     <article className="rounded-xl border border-violet-200 bg-violet-50 p-4">
@@ -629,11 +647,11 @@ export default async function EnseigneDashboardPage({
                 </section>
               </TabsContent>
 
-              <TabsContent value="payments" className="space-y-4" id="enseigne-payments">
+              <TabsContent value="payments" className={`${dashboardTabsContentClass} space-y-4`} id="enseigne-payments">
                 <EnseignePaymentsTab clientId={session.user.id} isPro={isProClient} />
               </TabsContent>
 
-              <TabsContent value="imports" className="space-y-4" id="enseigne-import-bulk">
+              <TabsContent value="imports" className={`${dashboardTabsContentClass} space-y-4`} id="enseigne-import-bulk">
                 <section className="space-y-4">
                   <h2 className="text-lg font-semibold text-slate-900">Operations d import CSV</h2>
                   <p className="text-sm text-slate-600">Traitement bulk, gestion des presets, historique et exports de controle.</p>
@@ -641,7 +659,7 @@ export default async function EnseigneDashboardPage({
                 </section>
               </TabsContent>
 
-              <TabsContent value="settings" className="space-y-4" id="enseigne-profile">
+                <TabsContent value="settings" className={`${dashboardTabsContentClass} space-y-4`} id="enseigne-profile">
                 <section className="space-y-4">
                   <h2 className="text-lg font-semibold text-slate-900">Configuration enseigne</h2>
                   <p className="text-sm text-slate-600">Parametres legaux et operationnels utilises par les equipes SwiftColis.</p>
@@ -656,10 +674,11 @@ export default async function EnseigneDashboardPage({
                       operationalCity: enseigne?.operationalCity || null,
                     }}
                   />
-                </section>
-              </TabsContent>
-            </Tabs>
-          </DashboardPanel>
+                  </section>
+                </TabsContent>
+              </Tabs>
+            </DashboardPanel>
+          </DashboardSection>
         </DashboardShell>
       </main>
       <Footer />

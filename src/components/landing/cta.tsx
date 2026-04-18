@@ -1,91 +1,80 @@
 'use client';
 
-import { useTranslations } from 'next-intl';
 import { Link } from '@/i18n/routing';
 import { Button } from '@/components/ui/button';
-import { Package, Truck, Store, ArrowRight, CheckCircle } from 'lucide-react';
+import { Package, Truck, Store, ArrowRight, CheckCircle, Sparkles } from 'lucide-react';
 
 export function CTA() {
   return (
-    <section className="py-20 bg-gradient-to-b from-slate-800 to-slate-900 relative overflow-hidden">
-      {/* Background Decorations */}
-      <div className="absolute inset-0">
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-emerald-500/10 rounded-full blur-3xl" />
-      </div>
+    <section className="relative overflow-hidden bg-slate-900 py-24 sm:py-28 lg:py-32">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_10%,rgba(16,185,129,0.15),transparent_38%),radial-gradient(circle_at_20%_80%,rgba(14,165,233,0.12),transparent_34%)]" />
 
-      <div className="container px-4 relative">
-        <div className="max-w-4xl mx-auto text-center">
-          <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-6">
-            Prêt à démarrer avec{' '}
-            <span className="bg-gradient-to-r from-emerald-400 to-teal-300 bg-clip-text text-transparent">
-              SwiftColis
-            </span>
-            ?
-          </h2>
-          <p className="text-lg text-slate-400 mb-10 max-w-2xl mx-auto">
-            Rejoignez des milliers d'utilisateurs qui font confiance à SwiftColis pour leurs envois 
-            à travers l'Algérie. Créez votre compte et déposez votre dossier partenaire en ligne.
+      <div className="container relative px-4">
+        <div className="mx-auto max-w-5xl overflow-hidden rounded-3xl border border-slate-700 bg-slate-950/80 p-8 text-center shadow-[0_40px_120px_-60px_rgba(16,185,129,0.55)] backdrop-blur sm:p-10 lg:p-14">
+          <p className="inline-flex items-center gap-2 rounded-full border border-emerald-300/25 bg-emerald-500/10 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-200">
+            <Sparkles className="h-3.5 w-3.5" />
+            Activation rapide
           </p>
 
-          {/* Benefits */}
-          <div className="flex flex-wrap justify-center gap-6 mb-10">
+          <h2 className="mx-auto mt-6 max-w-4xl text-3xl font-black leading-tight tracking-tight text-white sm:text-4xl lg:text-5xl">
+            Lancez vos envois avec un workflow moderne, lisible et previsible.
+          </h2>
+
+          <p className="mx-auto mt-5 max-w-3xl text-sm leading-relaxed text-slate-300 sm:text-base lg:text-lg">
+            Creez votre compte, activez votre role et pilotez toutes vos operations logistiques depuis une seule interface.
+          </p>
+
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-3 text-sm text-slate-200">
             {[
               'Inscription gratuite',
-              'Validation du dossier',
+              'Onboarding guide',
               'Support 7j/7',
-            ].map((benefit, i) => (
-              <div key={i} className="flex items-center gap-2 text-slate-300">
-                <CheckCircle className="h-5 w-5 text-emerald-400" />
-                <span>{benefit}</span>
-              </div>
+            ].map((benefit) => (
+              <span key={benefit} className="inline-flex items-center gap-2 rounded-full border border-slate-600 bg-slate-900/70 px-3 py-1.5">
+                <CheckCircle className="h-4 w-4 text-emerald-300" />
+                {benefit}
+              </span>
             ))}
           </div>
 
-            <p className="text-sm text-slate-500 mb-8 max-w-2xl mx-auto">
-              Pour les points relais : activation apres verification du dossier avec periode d essai de 30 jours, puis validation operationnelle complete.
-            </p>
+          <p className="mx-auto mt-6 max-w-2xl text-xs leading-relaxed text-slate-300">
+            Pour les points relais: activation apres verification du dossier, avec periode d essai et validation operationnelle progressive.
+          </p>
 
-          {/* CTA Buttons */}
-          <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16">
-            <Link href="/auth/register">
-              <Button size="lg" className="bg-emerald-500 hover:bg-emerald-600 w-full sm:w-auto gap-2 shadow-lg shadow-emerald-500/25 px-8">
-                <Package className="h-5 w-5" />
-                Envoyer un colis
-                <ArrowRight className="h-4 w-4 ml-1" />
+          <div className="mt-10 grid gap-3 sm:grid-cols-3">
+            <Link href="/auth/register" className="sm:col-span-3 lg:col-span-1">
+              <Button size="lg" className="h-12 w-full rounded-xl bg-emerald-500 text-sm font-semibold hover:bg-emerald-400">
+                <Package className="mr-2 h-4 w-4" />
+                Expédier maintenant
+                <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </Link>
             <Link href="/auth/register?role=TRANSPORTER">
-              <Button size="lg" variant="outline" className="w-full sm:w-auto gap-2 bg-transparent border-slate-600 text-white hover:bg-slate-800 hover:text-white">
-                <Truck className="h-5 w-5" />
-                Devenir transporteur
+              <Button size="lg" variant="outline" className="h-12 w-full rounded-xl border-slate-500/70 bg-slate-900/60 text-sm font-semibold text-white hover:bg-slate-800/80">
+                <Truck className="mr-2 h-4 w-4" />
+                Je suis transporteur
               </Button>
             </Link>
             <Link href="/become-relay">
-              <Button size="lg" variant="outline" className="w-full sm:w-auto gap-2 bg-transparent border-slate-600 text-white hover:bg-slate-800 hover:text-white">
-                <Store className="h-5 w-5" />
-                Devenir relais
+              <Button size="lg" variant="outline" className="h-12 w-full rounded-xl border-slate-500/70 bg-slate-900/60 text-sm font-semibold text-white hover:bg-slate-800/80">
+                <Store className="mr-2 h-4 w-4" />
+                Ouvrir un point relais
               </Button>
             </Link>
           </div>
 
-          {/* Trust Badges */}
-          <div className="flex flex-wrap justify-center gap-8 pt-8 border-t border-slate-800">
-            <div className="text-center">
-              <div className="text-3xl font-bold text-white">48</div>
-              <div className="text-sm text-slate-500">Wilayas couvertes</div>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl font-bold text-white">500+</div>
-              <div className="text-sm text-slate-500">Points relais</div>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl font-bold text-white">1000+</div>
-              <div className="text-sm text-slate-500">Transporteurs</div>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl font-bold text-white">50K+</div>
-              <div className="text-sm text-slate-500">Colis livrés</div>
-            </div>
+          <div className="mt-10 grid gap-4 border-t border-slate-800 pt-8 text-left sm:grid-cols-2 lg:grid-cols-4">
+            {[
+              ['48', 'Wilayas couvertes'],
+              ['500+', 'Points relais'],
+              ['1000+', 'Transporteurs'],
+              ['50K+', 'Colis livres'],
+            ].map(([value, label]) => (
+              <div key={label} className="rounded-xl border border-slate-800 bg-slate-900/70 px-4 py-3">
+                <p className="text-2xl font-black tracking-tight text-white">{value}</p>
+                <p className="text-xs text-slate-300">{label}</p>
+              </div>
+            ))}
           </div>
         </div>
       </div>

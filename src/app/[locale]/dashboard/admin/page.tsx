@@ -19,17 +19,23 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { MatchingAutoAssignPanel } from '@/components/dashboard/admin/matching-auto-assign-panel';
 import {
+  DashboardEmptyState,
   DashboardHero,
+  DashboardLoadingState,
   DashboardMetricCard,
   DashboardPanel,
+  DashboardSection,
+  DashboardSectionLoading,
   DashboardShell,
   DashboardStatsGrid,
+  dashboardMetaBadgeClass,
+  dashboardTabsContentClass,
   dashboardTabsListClass,
   getDashboardTabsTriggerClass,
 } from '@/components/dashboard/dashboard-shell';
 import { WILAYAS, USER_ROLES, PARCEL_STATUS, RELAIS_STATUS } from '@/lib/constants';
 import { parseLocaleFloat } from '@/lib/utils';
-import { Users, Package, Truck, Store, DollarSign, CheckCircle, XCircle, Loader2, Plus, Settings, BarChart3, MapPin, Trash2, Pencil, Eye, EyeOff, AlertCircle, ScrollText, RefreshCw, ChevronDown, ChevronRight, Award, PlayCircle, Mail, MailOpen, Reply, Inbox } from 'lucide-react';
+import { Users, Package, Truck, Store, DollarSign, CheckCircle, XCircle, Loader2, Plus, Settings, BarChart3, MapPin, Trash2, Pencil, Eye, EyeOff, AlertCircle, ScrollText, RefreshCw, ChevronDown, ChevronRight, Award, PlayCircle, Mail, MailOpen, Reply, Inbox, Clock } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 // Helper function to get the correct dashboard path based on role
@@ -118,11 +124,7 @@ export default function AdminDashboard() {
   }, []);
 
   if (status === 'loading' || isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
-        <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
-      </div>
-    );
+    return <DashboardLoadingState tone="admin" title="Chargement du cockpit admin" />;
   }
 
   if (!session?.user || session.user.role !== 'ADMIN') {
@@ -130,10 +132,10 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-900">
+    <div className="min-h-screen flex flex-col bg-[radial-gradient(circle_at_top,_#f8fafc,_#ecfdf5_42%,_#ecfeff_100%)] dark:bg-slate-900">
       <Header />
-      <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8">
-        <DashboardShell tone="admin" className="mx-auto max-w-7xl">
+      <main className="flex-1 px-4 py-10 sm:px-6 lg:px-8">
+        <DashboardShell tone="admin" className="mx-auto max-w-[92rem]">
           <DashboardHero
             tone="admin"
             eyebrow="Centre de pilotage"
@@ -141,25 +143,40 @@ export default function AdminDashboard() {
             description="Surveillez la plateforme, arbitrez les flux sensibles et pilotez les opérations depuis une interface plus nette, plus dense et plus lisible."
             meta={
               <>
-                <Badge variant="outline" className="border-white/70 bg-white/70 text-slate-700">Connecté: {session?.user?.name}</Badge>
-                <Badge variant="outline" className="border-white/70 bg-white/70 text-slate-700">{stats?.counts?.pendingRelais || 0} relais à valider</Badge>
-                <Badge variant="outline" className="border-white/70 bg-white/70 text-slate-700">{stats?.counts?.pendingTransporters || 0} transporteurs à valider</Badge>
+                <Badge variant="outline" className={dashboardMetaBadgeClass}>Connecté: {session?.user?.name}</Badge>
+                <Badge variant="outline" className={dashboardMetaBadgeClass}>{stats?.counts?.pendingRelais || 0} relais à valider</Badge>
+                <Badge variant="outline" className={dashboardMetaBadgeClass}>{stats?.counts?.pendingTransporters || 0} transporteurs à valider</Badge>
               </>
             }
           />
 
-          <DashboardStatsGrid className="xl:grid-cols-5">
-            <DashboardMetricCard tone="admin" label="Utilisateurs" value={stats?.counts?.users || 0} icon={<Users className="h-5 w-5" />} />
-            <DashboardMetricCard tone="admin" label="Colis" value={stats?.counts?.parcels || 0} icon={<Package className="h-5 w-5" />} />
-            <DashboardMetricCard tone="admin" label="Transporteurs" value={stats?.counts?.transporters || 0} icon={<Truck className="h-5 w-5" />} detail={stats?.counts?.pendingTransporters > 0 ? `${stats.counts.pendingTransporters} en attente` : 'Aucun dossier en attente'} />
-            <DashboardMetricCard tone="admin" label="Points relais" value={stats?.counts?.relais || 0} icon={<Store className="h-5 w-5" />} detail={stats?.counts?.pendingRelais > 0 ? `${stats.counts.pendingRelais} en attente` : 'Aucun dossier en attente'} />
-            <DashboardMetricCard tone="admin" label="Revenus" value={`${(stats?.revenue || 0).toFixed(0)} DA`} icon={<DollarSign className="h-5 w-5" />} />
-          </DashboardStatsGrid>
+          <DashboardSection
+            tone="admin"
+            eyebrow="Vue management"
+            title="KPI plateforme"
+            description="Distinguez en un regard le volume, les validations en attente et la santé business globale."
+          >
+            <DashboardStatsGrid className="xl:grid-cols-6">
+              <DashboardMetricCard tone="admin" label="Utilisateurs" value={stats?.counts?.users || 0} icon={<Users className="h-5 w-5" />} />
+              <DashboardMetricCard tone="admin" label="Colis" value={stats?.counts?.parcels || 0} icon={<Package className="h-5 w-5" />} />
+              <DashboardMetricCard tone="admin" label="Transporteurs" value={stats?.counts?.transporters || 0} icon={<Truck className="h-5 w-5" />} detail={stats?.counts?.pendingTransporters > 0 ? `${stats.counts.pendingTransporters} en attente` : 'Aucun dossier en attente'} />
+              <DashboardMetricCard tone="admin" label="Points relais" value={stats?.counts?.relais || 0} icon={<Store className="h-5 w-5" />} detail={stats?.counts?.pendingRelais > 0 ? `${stats.counts.pendingRelais} en attente` : 'Aucun dossier en attente'} />
+              <DashboardMetricCard tone="admin" label="Messages non lus" value={unreadMessagesCount} icon={<Inbox className="h-5 w-5" />} detail="support et moderation" />
+              <DashboardMetricCard tone="admin" label="Revenus" value={`${(stats?.revenue || 0).toFixed(0)} DA`} icon={<DollarSign className="h-5 w-5" />} />
+            </DashboardStatsGrid>
+          </DashboardSection>
 
-          <DashboardPanel tone="admin">
-            <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <div className="mb-6 overflow-x-auto pb-1 md:overflow-visible md:pb-0">
-                <TabsList className={`${dashboardTabsListClass} mb-0 inline-flex h-auto w-max min-w-full flex-nowrap md:w-full md:min-w-0 md:flex-wrap`}>
+          <DashboardSection
+            tone="admin"
+            eyebrow="Modules"
+            title="Espace de travail"
+            description="Naviguez entre les domaines opérationnels sans perdre de contexte."
+            contentClassName="bg-transparent p-0 border-0 shadow-none ring-0"
+          >
+            <DashboardPanel tone="admin">
+              <Tabs value={activeTab} onValueChange={setActiveTab}>
+                <div className="mb-6 overflow-x-auto pb-1 md:overflow-visible md:pb-0">
+                  <TabsList className={`${dashboardTabsListClass} mb-0 inline-flex h-auto w-max min-w-full flex-nowrap md:w-full md:min-w-0 md:flex-wrap`}>
                   <TabsTrigger value="overview" className={`${getDashboardTabsTriggerClass('admin')} shrink-0 whitespace-nowrap`}><BarChart3 className="h-4 w-4 mr-2" />Vue d'ensemble</TabsTrigger>
                   <TabsTrigger value="users" className={`${getDashboardTabsTriggerClass('admin')} shrink-0 whitespace-nowrap`}><Users className="h-4 w-4 mr-2" />Utilisateurs</TabsTrigger>
                   <TabsTrigger value="parcels" className={`${getDashboardTabsTriggerClass('admin')} shrink-0 whitespace-nowrap`}><Package className="h-4 w-4 mr-2" />Colis</TabsTrigger>
@@ -183,44 +200,45 @@ export default function AdminDashboard() {
                     )}
                   </TabsTrigger>
                   <TabsTrigger value="settings" className={`${getDashboardTabsTriggerClass('admin')} shrink-0 whitespace-nowrap`}><Settings className="h-4 w-4 mr-2" />Paramètres</TabsTrigger>
-                </TabsList>
-              </div>
+                  </TabsList>
+                </div>
 
-              <TabsContent value="overview">
+              <TabsContent value="overview" className={dashboardTabsContentClass}>
                 <OverviewTab stats={stats} setActiveTab={setActiveTab} />
               </TabsContent>
-              <TabsContent value="users">
+              <TabsContent value="users" className={dashboardTabsContentClass}>
                 <UsersTab />
               </TabsContent>
-              <TabsContent value="parcels">
+              <TabsContent value="parcels" className={dashboardTabsContentClass}>
                 <ParcelsTab />
               </TabsContent>
-              <TabsContent value="relays">
+              <TabsContent value="relays" className={dashboardTabsContentClass}>
                 <RelaysTab />
               </TabsContent>
-               <TabsContent value="transporters">
+               <TabsContent value="transporters" className={dashboardTabsContentClass}>
                  <TransportersTab />
                </TabsContent>
-              <TabsContent value="lines">
+              <TabsContent value="lines" className={dashboardTabsContentClass}>
                 <LinesTab />
               </TabsContent>
-              <TabsContent value="loyalty">
+              <TabsContent value="loyalty" className={dashboardTabsContentClass}>
                 <LoyaltyTab />
               </TabsContent>
-              <TabsContent value="audit">
+              <TabsContent value="audit" className={dashboardTabsContentClass}>
                 <AuditTab />
               </TabsContent>
-              <TabsContent value="disputes">
+              <TabsContent value="disputes" className={dashboardTabsContentClass}>
                 <DisputesTab />
               </TabsContent>
-              <TabsContent value="messages">
+              <TabsContent value="messages" className={dashboardTabsContentClass}>
                 <MessagesTab onUnreadCountChange={setUnreadMessagesCount} />
               </TabsContent>
-              <TabsContent value="settings">
-                <SettingsTab stats={stats} />
-              </TabsContent>
-            </Tabs>
-          </DashboardPanel>
+                <TabsContent value="settings" className={dashboardTabsContentClass}>
+                  <SettingsTab stats={stats} />
+                </TabsContent>
+              </Tabs>
+            </DashboardPanel>
+          </DashboardSection>
         </DashboardShell>
       </main>
       <Footer />
@@ -308,7 +326,7 @@ function OverviewTab({ stats, setActiveTab }: { stats: any; setActiveTab: (tab: 
                 </div>
               ))
             ) : (
-              <p className="text-slate-500 text-center py-4">Aucun colis</p>
+              <DashboardEmptyState icon={<Package className="h-5 w-5" />} title="Aucun colis" description="Les statuts apparaîtront ici dès la première activité." />
             )}
           </div>
         </CardContent>
@@ -328,7 +346,7 @@ function OverviewTab({ stats, setActiveTab }: { stats: any; setActiveTab: (tab: 
                 </div>
               ))
             ) : (
-              <p className="text-slate-500 text-center py-4">Aucune donnée</p>
+              <DashboardEmptyState icon={<MapPin className="h-5 w-5" />} title="Aucune donnée géographique" description="Les villes actives seront listées après les premiers flux." />
             )}
           </div>
         </CardContent>
@@ -382,7 +400,7 @@ function OverviewTab({ stats, setActiveTab }: { stats: any; setActiveTab: (tab: 
                 </div>
               ))
             ) : (
-              <p className="text-slate-500 text-center py-4">Aucun colis récent</p>
+              <DashboardEmptyState icon={<Clock className="h-5 w-5" />} title="Aucun colis récent" description="Les derniers mouvements apparaîtront ici en temps réel." />
             )}
           </div>
         </CardContent>
@@ -437,6 +455,7 @@ function UsersTab() {
           name: editUser.name,
           phone: editUser.phone,
           email: editUser.email,
+          address: editUser.address,
           isActive: editUser.isActive,
           clientType: editUser.clientType,
         }),
@@ -516,6 +535,12 @@ function UsersTab() {
     }
   };
 
+  const normalizeAddressLine = (value?: unknown) => {
+    if (typeof value !== 'string') return null;
+    const normalized = value.trim();
+    return normalized.length > 0 ? normalized : null;
+  };
+
   const getAddressLines = (user: any) => {
     if (user.role === 'RELAIS') {
       if (!user.relais) {
@@ -525,7 +550,7 @@ function UsersTab() {
             : 'Compte relais créé - email non vérifié',
         ];
       }
-      return [user.relais?.address, getWilayaName(user.relais?.ville)].filter(Boolean);
+      return [normalizeAddressLine(user.relais?.address), normalizeAddressLine(getWilayaName(user.relais?.ville))].filter(Boolean);
     }
 
     if (user.role === 'ENSEIGNE') {
@@ -536,10 +561,10 @@ function UsersTab() {
             : 'Compte enseigne créé - email non vérifié',
         ];
       }
-      return [user.address, getWilayaName(user.enseigne?.operationalCity)].filter(Boolean);
+      return [normalizeAddressLine(user.address), normalizeAddressLine(getWilayaName(user.enseigne?.operationalCity))].filter(Boolean);
     }
 
-    return [user.address].filter(Boolean);
+    return [normalizeAddressLine(user.address)].filter(Boolean);
   };
 
   const getRoleDetails = (user: any) => {
@@ -622,7 +647,7 @@ function UsersTab() {
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <div className="flex justify-center py-8"><Loader2 className="h-8 w-8 animate-spin text-emerald-600" /></div>
+            <DashboardSectionLoading label="Chargement des utilisateurs..." />
           ) : (
             <Table className="min-w-[1050px]">
               <TableHeader>
@@ -666,7 +691,7 @@ function UsersTab() {
                             )
                           ))
                         ) : (
-                          <span className="text-xs text-slate-400">Adresse non renseignée</span>
+                          <span className="text-xs font-medium text-amber-600 dark:text-amber-300">Adresse non renseignée</span>
                         )}
                       </div>
                     </TableCell>
@@ -738,6 +763,15 @@ function UsersTab() {
               <div className="space-y-2">
                 <Label>Téléphone</Label>
                 <Input value={editUser.phone || ''} onChange={(e) => setEditUser({ ...editUser, phone: e.target.value })} />
+              </div>
+              <div className="space-y-2">
+                <Label>Adresse</Label>
+                <Textarea
+                  value={editUser.address || ''}
+                  onChange={(e) => setEditUser({ ...editUser, address: e.target.value })}
+                  placeholder="Adresse complète"
+                  rows={2}
+                />
               </div>
               <div className="flex items-center gap-2">
                 <input type="checkbox" id="isActive" checked={editUser.isActive} onChange={(e) => setEditUser({ ...editUser, isActive: e.target.checked })} />
@@ -910,9 +944,9 @@ function TransportersTab() {
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <div className="flex justify-center py-8"><Loader2 className="h-8 w-8 animate-spin text-blue-600" /></div>
+            <DashboardSectionLoading label="Chargement des dossiers transporteurs..." />
           ) : filtered.length === 0 ? (
-            <p className="text-center text-slate-500 py-8">{emptyStateMessage}</p>
+            <DashboardEmptyState icon={<Truck className="h-5 w-5" />} title="Aucun dossier" description={emptyStateMessage} />
           ) : (
             <div className="space-y-4">
               {filtered.map((app) => {
@@ -1060,7 +1094,7 @@ function ParcelsTab() {
       </CardHeader>
       <CardContent>
         {isLoading ? (
-          <div className="flex justify-center py-8"><Loader2 className="h-8 w-8 animate-spin text-emerald-600" /></div>
+          <DashboardSectionLoading label="Chargement des colis..." />
         ) : (
           <Table>
             <TableHeader>
@@ -1279,9 +1313,6 @@ function RelaysTab() {
           commerceName: editRelais.commerceName,
           address: editRelais.address,
           ville: editRelais.ville,
-          commissionPetit: parseLocaleFloat(editRelais.commissionPetit),
-          commissionMoyen: parseLocaleFloat(editRelais.commissionMoyen),
-          commissionGros: parseLocaleFloat(editRelais.commissionGros),
           status: editRelais.status,
           operationalStatus: editRelais.operationalStatus || 'ACTIF',
           suspensionReason: (editRelais.operationalStatus || 'ACTIF') === 'SUSPENDU' ? editRelais.suspensionReason || 'Suspendu par un administrateur' : null,
@@ -1691,9 +1722,9 @@ function RelaysTab() {
           </CardHeader>
           <CardContent>
             {isTrackingLoading ? (
-              <div className="flex justify-center py-8"><Loader2 className="h-8 w-8 animate-spin text-emerald-600" /></div>
+              <DashboardSectionLoading label="Chargement du suivi relais..." />
             ) : effectiveTrackingRelais.length === 0 ? (
-              <p className="text-center text-slate-500 py-8">Aucun relais à afficher</p>
+              <DashboardEmptyState icon={<Store className="h-5 w-5" />} title="Aucun relais à afficher" description="Les points relais suivis apparaîtront ici." />
             ) : (
               <div className="space-y-4">
                 {effectiveTrackingRelais.map((relay) => (
@@ -1825,9 +1856,9 @@ function RelaysTab() {
           </CardHeader>
           <CardContent>
             {isCashPickupsLoading ? (
-              <div className="flex justify-center py-8"><Loader2 className="h-8 w-8 animate-spin text-emerald-600" /></div>
+              <DashboardSectionLoading label="Chargement des collectes cash..." />
             ) : cashPickups.length === 0 ? (
-              <p className="text-center text-slate-500 py-8">Aucune collecte cash</p>
+              <DashboardEmptyState icon={<DollarSign className="h-5 w-5" />} title="Aucune collecte cash" description="Les opérations de collecte apparaîtront ici." />
             ) : (
               <div className="space-y-4">
                 {cashPickups.map((pickup) => (
@@ -1921,7 +1952,7 @@ function RelaysTab() {
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <div className="flex justify-center py-8"><Loader2 className="h-8 w-8 animate-spin text-emerald-600" /></div>
+            <DashboardSectionLoading label="Chargement des points relais..." />
           ) : (
             <div className="space-y-4">
               {filteredRelais.map((r) => (
@@ -2022,7 +2053,7 @@ function RelaysTab() {
                   </div>
                 </div>
               ))}
-              {filteredRelais.length === 0 && <p className="text-center text-slate-500 py-8">Aucun relais</p>}
+              {filteredRelais.length === 0 && <DashboardEmptyState icon={<Store className="h-5 w-5" />} title="Aucun relais" description="Aucun point relais ne correspond au filtre actuel." />}
             </div>
           )}
         </CardContent>
@@ -2115,20 +2146,6 @@ function RelaysTab() {
                     {WILAYAS.map(w => <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
-              </div>
-              <div className="grid gap-4 md:grid-cols-3">
-                <div className="space-y-2">
-                  <Label>Commission Petit (DA)</Label>
-                  <Input type="number" value={editRelais.commissionPetit} onChange={(e) => setEditRelais({ ...editRelais, commissionPetit: e.target.value })} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Commission Moyen (DA)</Label>
-                  <Input type="number" value={editRelais.commissionMoyen} onChange={(e) => setEditRelais({ ...editRelais, commissionMoyen: e.target.value })} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Commission Gros (DA)</Label>
-                  <Input type="number" value={editRelais.commissionGros} onChange={(e) => setEditRelais({ ...editRelais, commissionGros: e.target.value })} />
-                </div>
               </div>
               <div className="space-y-2">
                 <Label>Statut</Label>
@@ -2485,7 +2502,7 @@ function LinesTab() {
           </CardHeader>
           <CardContent>
             {isLoading ? (
-              <div className="flex justify-center py-8"><Loader2 className="h-8 w-8 animate-spin text-emerald-600" /></div>
+              <DashboardSectionLoading label="Chargement des lignes tarifaires..." />
             ) : (
               <Table>
                 <TableHeader>
@@ -2753,7 +2770,7 @@ function AuditTab() {
         </CardHeader>
         <CardContent className="p-0">
           {isLoading ? (
-            <div className="flex justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-emerald-600" /></div>
+            <DashboardSectionLoading label="Chargement des logs d'audit..." />
           ) : logs.length === 0 ? (
             <div className="flex flex-col items-center gap-2 py-16 text-slate-400">
               <ScrollText className="h-10 w-10 opacity-30" />
@@ -2939,9 +2956,9 @@ function DisputesTab() {
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-emerald-600" /></div>
+            <DashboardSectionLoading label="Chargement des litiges..." />
           ) : disputes.length === 0 ? (
-            <p className="text-center text-slate-500 py-8">Aucun litige trouvé</p>
+            <DashboardEmptyState icon={<AlertCircle className="h-5 w-5" />} title="Aucun litige trouvé" description="Les incidents ouverts apparaîtront ici." />
           ) : (
             <Table>
               <TableHeader>
@@ -3365,14 +3382,11 @@ function SettingsTab({ stats }: { stats: any }) {
   }>>([]);
   const [settings, setSettings] = useState({
     platformCommission: '10',
-    commissionPetit: '100',
-    commissionMoyen: '200',
-    commissionGros: '300',
     pricingAdminFee: '50',
     pricingRatePerKg: '120',
     pricingRatePerKm: '2.5',
-    pricingRelayDepartureRate: '0.1',
-    pricingRelayArrivalRate: '0.1',
+    pricingRelayDepartureRate: '10',
+    pricingRelayArrivalRate: '10',
     pricingRelayPrintFee: '30',
     pricingRoundTo: '10',
   });
@@ -3396,14 +3410,11 @@ function SettingsTab({ stats }: { stats: any }) {
 
       setSettings({
         platformCommission: String(data.platformCommission || 10),
-        commissionPetit: String(data.commissionPetit || 100),
-        commissionMoyen: String(data.commissionMoyen || 200),
-        commissionGros: String(data.commissionGros || 300),
         pricingAdminFee: String(data.pricingAdminFee || 50),
         pricingRatePerKg: String(data.pricingRatePerKg || 120),
         pricingRatePerKm: String(data.pricingRatePerKm || 2.5),
-        pricingRelayDepartureRate: String(data.pricingRelayDepartureRate || 0.1),
-        pricingRelayArrivalRate: String(data.pricingRelayArrivalRate || 0.1),
+        pricingRelayDepartureRate: String(((data.pricingRelayDepartureRate || 0.1) * 100).toFixed(2)),
+        pricingRelayArrivalRate: String(((data.pricingRelayArrivalRate || 0.1) * 100).toFixed(2)),
         pricingRelayPrintFee: String(data.pricingRelayPrintFee || 30),
         pricingRoundTo: String(data.pricingRoundTo || 10),
       });
@@ -3432,14 +3443,11 @@ function SettingsTab({ stats }: { stats: any }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           platformCommission: parseLocaleFloat(settings.platformCommission),
-          commissionPetit: parseLocaleFloat(settings.commissionPetit),
-          commissionMoyen: parseLocaleFloat(settings.commissionMoyen),
-          commissionGros: parseLocaleFloat(settings.commissionGros),
           pricingAdminFee: parseLocaleFloat(settings.pricingAdminFee),
           pricingRatePerKg: parseLocaleFloat(settings.pricingRatePerKg),
           pricingRatePerKm: parseLocaleFloat(settings.pricingRatePerKm),
-          pricingRelayDepartureRate: parseLocaleFloat(settings.pricingRelayDepartureRate),
-          pricingRelayArrivalRate: parseLocaleFloat(settings.pricingRelayArrivalRate),
+          pricingRelayDepartureRate: parseLocaleFloat(settings.pricingRelayDepartureRate) / 100,
+          pricingRelayArrivalRate: parseLocaleFloat(settings.pricingRelayArrivalRate) / 100,
           pricingRelayPrintFee: parseLocaleFloat(settings.pricingRelayPrintFee),
           pricingRoundTo: parseLocaleFloat(settings.pricingRoundTo),
         }),
@@ -3502,7 +3510,7 @@ function SettingsTab({ stats }: { stats: any }) {
         </CardHeader>
         <CardContent className="space-y-6">
           {isLoading ? (
-            <div className="flex justify-center py-8"><Loader2 className="h-8 w-8 animate-spin text-emerald-600" /></div>
+            <DashboardSectionLoading label="Chargement des paramètres..." />
           ) : (
             <>
               <div className="space-y-2">
@@ -3516,42 +3524,54 @@ function SettingsTab({ stats }: { stats: any }) {
                 <p className="text-xs text-slate-500">Pourcentage prélevé sur chaque transaction</p>
               </div>
               <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
-                Les anciens réglages de commission par format sont désormais dépréciés. La tarification active repose sur le poids, la distance estimée et les commissions dynamiques ci-dessous.
+                La tarification repose sur le poids, la distance estimée et les commissions dynamiques ci-dessous.
               </div>
 
               <div className="space-y-4">
                 <Label>Tarification dynamique colis</Label>
-                <div className="grid gap-4 md:grid-cols-2 max-w-2xl">
-                  <div className="space-y-2">
-                    <Label className="text-sm">Frais admin fixes (DA)</Label>
-                    <Input type="number" step="1" value={settings.pricingAdminFee} onChange={(e) => setSettings({ ...settings, pricingAdminFee: e.target.value })} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-sm">Tarif par kg (DA)</Label>
-                    <Input type="number" step="1" value={settings.pricingRatePerKg} onChange={(e) => setSettings({ ...settings, pricingRatePerKg: e.target.value })} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-sm">Tarif par km (DA)</Label>
-                    <Input type="number" step="0.1" value={settings.pricingRatePerKm} onChange={(e) => setSettings({ ...settings, pricingRatePerKm: e.target.value })} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-sm">Arrondi (DA)</Label>
-                    <Input type="number" step="1" value={settings.pricingRoundTo} onChange={(e) => setSettings({ ...settings, pricingRoundTo: e.target.value })} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-sm">Commission relais départ (taux)</Label>
-                    <Input type="number" step="0.01" value={settings.pricingRelayDepartureRate} onChange={(e) => setSettings({ ...settings, pricingRelayDepartureRate: e.target.value })} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-sm">Commission relais arrivée (taux)</Label>
-                    <Input type="number" step="0.01" value={settings.pricingRelayArrivalRate} onChange={(e) => setSettings({ ...settings, pricingRelayArrivalRate: e.target.value })} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-sm">Frais impression au relais (DA)</Label>
-                    <Input type="number" step="1" value={settings.pricingRelayPrintFee} onChange={(e) => setSettings({ ...settings, pricingRelayPrintFee: e.target.value })} />
+
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50/60 p-4">
+                  <p className="mb-3 text-sm font-semibold text-emerald-800">Champs essentiels</p>
+                  <div className="grid max-w-2xl gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label className="text-sm">Frais admin fixes (DA)</Label>
+                      <Input type="number" step="1" value={settings.pricingAdminFee} onChange={(e) => setSettings({ ...settings, pricingAdminFee: e.target.value })} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm">Tarif par kg (DA)</Label>
+                      <Input type="number" step="1" value={settings.pricingRatePerKg} onChange={(e) => setSettings({ ...settings, pricingRatePerKg: e.target.value })} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm">Tarif par km (DA)</Label>
+                      <Input type="number" step="0.1" value={settings.pricingRatePerKm} onChange={(e) => setSettings({ ...settings, pricingRatePerKm: e.target.value })} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm">Arrondi (DA)</Label>
+                      <Input type="number" step="1" value={settings.pricingRoundTo} onChange={(e) => setSettings({ ...settings, pricingRoundTo: e.target.value })} />
+                    </div>
                   </div>
                 </div>
-                <p className="text-xs text-slate-500">Exemple: 0.10 = 10%.</p>
+
+                <details className="max-w-2xl rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-950/40">
+                  <summary className="cursor-pointer list-none text-sm font-semibold text-slate-700 dark:text-slate-200">
+                    Options avancées (relais)
+                  </summary>
+                  <div className="mt-3 grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label className="text-sm">Commission relais départ (%)</Label>
+                      <Input type="number" step="0.1" min="0" max="100" value={settings.pricingRelayDepartureRate} onChange={(e) => setSettings({ ...settings, pricingRelayDepartureRate: e.target.value })} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm">Commission relais arrivée (%)</Label>
+                      <Input type="number" step="0.1" min="0" max="100" value={settings.pricingRelayArrivalRate} onChange={(e) => setSettings({ ...settings, pricingRelayArrivalRate: e.target.value })} />
+                    </div>
+                    <div className="space-y-2 md:col-span-2">
+                      <Label className="text-sm">Frais impression au relais (DA)</Label>
+                      <Input type="number" step="1" value={settings.pricingRelayPrintFee} onChange={(e) => setSettings({ ...settings, pricingRelayPrintFee: e.target.value })} />
+                    </div>
+                  </div>
+                  <p className="mt-2 text-xs text-slate-500">Pour les commissions: 10 signifie 10% du coût transport.</p>
+                </details>
               </div>
 
               <div className="space-y-3">
@@ -3892,9 +3912,9 @@ function LoyaltyTab() {
           </div>
 
           {isLoading ? (
-            <div className="flex justify-center py-8"><Loader2 className="h-8 w-8 animate-spin text-emerald-600" /></div>
+            <DashboardSectionLoading label="Chargement du programme fidélité..." />
           ) : clients.length === 0 ? (
-            <p className="text-center text-slate-500 py-8">Aucun client inscrit</p>
+            <DashboardEmptyState icon={<Users className="h-5 w-5" />} title="Aucun client inscrit" description="Les clients éligibles fidélité apparaîtront ici." />
           ) : (
             <Table>
               <TableHeader>

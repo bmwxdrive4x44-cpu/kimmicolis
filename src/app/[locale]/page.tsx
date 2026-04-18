@@ -12,13 +12,12 @@ export default function HomePage() {
       <Header />
       <main className="flex-1">
         <Hero />
+        <Stats />
         <Features />
         <HowItWorks />
-        <Stats />
         <CTA />
       </main>
       <Footer />
     </div>
   );
 }
-// Trigger rebuild

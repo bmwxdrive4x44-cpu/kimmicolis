@@ -81,9 +81,7 @@ function RegisterForm() {
       errors.confirmPassword = 'Les mots de passe ne correspondent pas.';
     }
 
-    if (formData.personalAddress && formData.personalAddress.length > 200) {
-      errors.address = 'Adresse trop longue (maximum 200 caractères).';
-    }
+
 
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
@@ -115,7 +113,6 @@ function RegisterForm() {
           name: fullName,
           firstName: formData.firstName,
           lastName: formData.lastName,
-          address: formData.personalAddress,
           email: formData.email.trim().toLowerCase(),
           phone: formData.phone.trim(),
           password: formData.password,
@@ -238,25 +235,9 @@ function RegisterForm() {
               </div>
             </div>
 
-            <div className="space-y-1.5">
-              <Label htmlFor="personalAddress" className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                Adresse personnelle <span className="text-slate-400 font-normal">(optionnel)</span>
-              </Label>
-              <AddressAutocompleteInput
-                value={formData.personalAddress}
-                onChange={(value) => {
-                  setFormData({ ...formData, personalAddress: value });
-                  setFieldErrors((prev) => ({ ...prev, address: undefined }));
-                }}
-                onSelect={(suggestion) => {
-                  setFormData({ ...formData, personalAddress: suggestion.label });
-                  setFieldErrors((prev) => ({ ...prev, address: undefined }));
-                }}
-                placeholder="Ex: 12 Rue Didouche Mourad"
-                className="h-11 bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700"
-              />
-              <p className="text-xs text-slate-500">Suggestions d'adresse via OpenStreetMap (Algérie).</p>
-              <FormFieldError message={fieldErrors.address} />
+            <div className="rounded-xl border border-blue-200 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-800 p-4 text-sm text-blue-700 dark:text-blue-300">
+              <p className="font-medium">✓ Inscription rapide</p>
+              <p className="text-xs mt-1">Vous pourrez ajouter votre adresse lors de la création de votre premier colis pour localiser les relais proches.</p>
             </div>
 
             <div className="grid gap-4 md:grid-cols-2">

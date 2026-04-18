@@ -143,6 +143,26 @@ export type TransporterPenalty = $Result.DefaultSelection<Prisma.$TransporterPen
  * 
  */
 export type QrSecurityLog = $Result.DefaultSelection<Prisma.$QrSecurityLogPayload>
+/**
+ * Model Event
+ * 
+ */
+export type Event = $Result.DefaultSelection<Prisma.$EventPayload>
+/**
+ * Model KpiTransporter
+ * 
+ */
+export type KpiTransporter = $Result.DefaultSelection<Prisma.$KpiTransporterPayload>
+/**
+ * Model KpiEnseigne
+ * 
+ */
+export type KpiEnseigne = $Result.DefaultSelection<Prisma.$KpiEnseignePayload>
+/**
+ * Model KpiRelais
+ * 
+ */
+export type KpiRelais = $Result.DefaultSelection<Prisma.$KpiRelaisPayload>
 
 /**
  * ##  Prisma Client ʲˢ
@@ -521,6 +541,46 @@ export class PrismaClient<
     * ```
     */
   get qrSecurityLog(): Prisma.QrSecurityLogDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.event`: Exposes CRUD operations for the **Event** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more Events
+    * const events = await prisma.event.findMany()
+    * ```
+    */
+  get event(): Prisma.EventDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.kpiTransporter`: Exposes CRUD operations for the **KpiTransporter** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more KpiTransporters
+    * const kpiTransporters = await prisma.kpiTransporter.findMany()
+    * ```
+    */
+  get kpiTransporter(): Prisma.KpiTransporterDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.kpiEnseigne`: Exposes CRUD operations for the **KpiEnseigne** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more KpiEnseignes
+    * const kpiEnseignes = await prisma.kpiEnseigne.findMany()
+    * ```
+    */
+  get kpiEnseigne(): Prisma.KpiEnseigneDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.kpiRelais`: Exposes CRUD operations for the **KpiRelais** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more KpiRelais
+    * const kpiRelais = await prisma.kpiRelais.findMany()
+    * ```
+    */
+  get kpiRelais(): Prisma.KpiRelaisDelegate<ExtArgs, ClientOptions>;
 }
 
 export namespace Prisma {
@@ -987,7 +1047,11 @@ export namespace Prisma {
     CashPickup: 'CashPickup',
     TransporterScore: 'TransporterScore',
     TransporterPenalty: 'TransporterPenalty',
-    QrSecurityLog: 'QrSecurityLog'
+    QrSecurityLog: 'QrSecurityLog',
+    Event: 'Event',
+    KpiTransporter: 'KpiTransporter',
+    KpiEnseigne: 'KpiEnseigne',
+    KpiRelais: 'KpiRelais'
   };
 
   export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -1006,7 +1070,7 @@ export namespace Prisma {
       omit: GlobalOmitOptions
     }
     meta: {
-      modelProps: "user" | "enseigne" | "passwordResetToken" | "contactMessage" | "relais" | "transporterApplication" | "transporterPreferences" | "ligne" | "colis" | "payment" | "trajet" | "mission" | "trackingHistory" | "notification" | "setting" | "transporterWallet" | "relaisCash" | "dispute" | "relaisSanction" | "relaisAudit" | "actionLog" | "deliveryProof" | "cashPickup" | "transporterScore" | "transporterPenalty" | "qrSecurityLog"
+      modelProps: "user" | "enseigne" | "passwordResetToken" | "contactMessage" | "relais" | "transporterApplication" | "transporterPreferences" | "ligne" | "colis" | "payment" | "trajet" | "mission" | "trackingHistory" | "notification" | "setting" | "transporterWallet" | "relaisCash" | "dispute" | "relaisSanction" | "relaisAudit" | "actionLog" | "deliveryProof" | "cashPickup" | "transporterScore" | "transporterPenalty" | "qrSecurityLog" | "event" | "kpiTransporter" | "kpiEnseigne" | "kpiRelais"
       txIsolationLevel: Prisma.TransactionIsolationLevel
     }
     model: {
@@ -2934,6 +2998,302 @@ export namespace Prisma {
           }
         }
       }
+      Event: {
+        payload: Prisma.$EventPayload<ExtArgs>
+        fields: Prisma.EventFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.EventFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$EventPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.EventFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$EventPayload>
+          }
+          findFirst: {
+            args: Prisma.EventFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$EventPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.EventFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$EventPayload>
+          }
+          findMany: {
+            args: Prisma.EventFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$EventPayload>[]
+          }
+          create: {
+            args: Prisma.EventCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$EventPayload>
+          }
+          createMany: {
+            args: Prisma.EventCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.EventCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$EventPayload>[]
+          }
+          delete: {
+            args: Prisma.EventDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$EventPayload>
+          }
+          update: {
+            args: Prisma.EventUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$EventPayload>
+          }
+          deleteMany: {
+            args: Prisma.EventDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.EventUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.EventUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$EventPayload>[]
+          }
+          upsert: {
+            args: Prisma.EventUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$EventPayload>
+          }
+          aggregate: {
+            args: Prisma.EventAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateEvent>
+          }
+          groupBy: {
+            args: Prisma.EventGroupByArgs<ExtArgs>
+            result: $Utils.Optional<EventGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.EventCountArgs<ExtArgs>
+            result: $Utils.Optional<EventCountAggregateOutputType> | number
+          }
+        }
+      }
+      KpiTransporter: {
+        payload: Prisma.$KpiTransporterPayload<ExtArgs>
+        fields: Prisma.KpiTransporterFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.KpiTransporterFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$KpiTransporterPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.KpiTransporterFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$KpiTransporterPayload>
+          }
+          findFirst: {
+            args: Prisma.KpiTransporterFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$KpiTransporterPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.KpiTransporterFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$KpiTransporterPayload>
+          }
+          findMany: {
+            args: Prisma.KpiTransporterFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$KpiTransporterPayload>[]
+          }
+          create: {
+            args: Prisma.KpiTransporterCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$KpiTransporterPayload>
+          }
+          createMany: {
+            args: Prisma.KpiTransporterCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.KpiTransporterCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$KpiTransporterPayload>[]
+          }
+          delete: {
+            args: Prisma.KpiTransporterDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$KpiTransporterPayload>
+          }
+          update: {
+            args: Prisma.KpiTransporterUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$KpiTransporterPayload>
+          }
+          deleteMany: {
+            args: Prisma.KpiTransporterDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.KpiTransporterUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.KpiTransporterUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$KpiTransporterPayload>[]
+          }
+          upsert: {
+            args: Prisma.KpiTransporterUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$KpiTransporterPayload>
+          }
+          aggregate: {
+            args: Prisma.KpiTransporterAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateKpiTransporter>
+          }
+          groupBy: {
+            args: Prisma.KpiTransporterGroupByArgs<ExtArgs>
+            result: $Utils.Optional<KpiTransporterGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.KpiTransporterCountArgs<ExtArgs>
+            result: $Utils.Optional<KpiTransporterCountAggregateOutputType> | number
+          }
+        }
+      }
+      KpiEnseigne: {
+        payload: Prisma.$KpiEnseignePayload<ExtArgs>
+        fields: Prisma.KpiEnseigneFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.KpiEnseigneFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$KpiEnseignePayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.KpiEnseigneFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$KpiEnseignePayload>
+          }
+          findFirst: {
+            args: Prisma.KpiEnseigneFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$KpiEnseignePayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.KpiEnseigneFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$KpiEnseignePayload>
+          }
+          findMany: {
+            args: Prisma.KpiEnseigneFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$KpiEnseignePayload>[]
+          }
+          create: {
+            args: Prisma.KpiEnseigneCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$KpiEnseignePayload>
+          }
+          createMany: {
+            args: Prisma.KpiEnseigneCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.KpiEnseigneCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$KpiEnseignePayload>[]
+          }
+          delete: {
+            args: Prisma.KpiEnseigneDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$KpiEnseignePayload>
+          }
+          update: {
+            args: Prisma.KpiEnseigneUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$KpiEnseignePayload>
+          }
+          deleteMany: {
+            args: Prisma.KpiEnseigneDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.KpiEnseigneUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.KpiEnseigneUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$KpiEnseignePayload>[]
+          }
+          upsert: {
+            args: Prisma.KpiEnseigneUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$KpiEnseignePayload>
+          }
+          aggregate: {
+            args: Prisma.KpiEnseigneAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateKpiEnseigne>
+          }
+          groupBy: {
+            args: Prisma.KpiEnseigneGroupByArgs<ExtArgs>
+            result: $Utils.Optional<KpiEnseigneGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.KpiEnseigneCountArgs<ExtArgs>
+            result: $Utils.Optional<KpiEnseigneCountAggregateOutputType> | number
+          }
+        }
+      }
+      KpiRelais: {
+        payload: Prisma.$KpiRelaisPayload<ExtArgs>
+        fields: Prisma.KpiRelaisFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.KpiRelaisFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$KpiRelaisPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.KpiRelaisFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$KpiRelaisPayload>
+          }
+          findFirst: {
+            args: Prisma.KpiRelaisFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$KpiRelaisPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.KpiRelaisFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$KpiRelaisPayload>
+          }
+          findMany: {
+            args: Prisma.KpiRelaisFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$KpiRelaisPayload>[]
+          }
+          create: {
+            args: Prisma.KpiRelaisCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$KpiRelaisPayload>
+          }
+          createMany: {
+            args: Prisma.KpiRelaisCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.KpiRelaisCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$KpiRelaisPayload>[]
+          }
+          delete: {
+            args: Prisma.KpiRelaisDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$KpiRelaisPayload>
+          }
+          update: {
+            args: Prisma.KpiRelaisUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$KpiRelaisPayload>
+          }
+          deleteMany: {
+            args: Prisma.KpiRelaisDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.KpiRelaisUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.KpiRelaisUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$KpiRelaisPayload>[]
+          }
+          upsert: {
+            args: Prisma.KpiRelaisUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$KpiRelaisPayload>
+          }
+          aggregate: {
+            args: Prisma.KpiRelaisAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateKpiRelais>
+          }
+          groupBy: {
+            args: Prisma.KpiRelaisGroupByArgs<ExtArgs>
+            result: $Utils.Optional<KpiRelaisGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.KpiRelaisCountArgs<ExtArgs>
+            result: $Utils.Optional<KpiRelaisCountAggregateOutputType> | number
+          }
+        }
+      }
     }
   } & {
     other: {
@@ -3052,6 +3412,10 @@ export namespace Prisma {
     transporterScore?: TransporterScoreOmit
     transporterPenalty?: TransporterPenaltyOmit
     qrSecurityLog?: QrSecurityLogOmit
+    event?: EventOmit
+    kpiTransporter?: KpiTransporterOmit
+    kpiEnseigne?: KpiEnseigneOmit
+    kpiRelais?: KpiRelaisOmit
   }
 
   /* Types for Logging */
@@ -34861,6 +35225,4351 @@ export namespace Prisma {
 
 
   /**
+   * Model Event
+   */
+
+  export type AggregateEvent = {
+    _count: EventCountAggregateOutputType | null
+    _min: EventMinAggregateOutputType | null
+    _max: EventMaxAggregateOutputType | null
+  }
+
+  export type EventMinAggregateOutputType = {
+    id: string | null
+    type: string | null
+    aggregateType: string | null
+    aggregateId: string | null
+    payload: string | null
+    createdAt: Date | null
+  }
+
+  export type EventMaxAggregateOutputType = {
+    id: string | null
+    type: string | null
+    aggregateType: string | null
+    aggregateId: string | null
+    payload: string | null
+    createdAt: Date | null
+  }
+
+  export type EventCountAggregateOutputType = {
+    id: number
+    type: number
+    aggregateType: number
+    aggregateId: number
+    payload: number
+    createdAt: number
+    _all: number
+  }
+
+
+  export type EventMinAggregateInputType = {
+    id?: true
+    type?: true
+    aggregateType?: true
+    aggregateId?: true
+    payload?: true
+    createdAt?: true
+  }
+
+  export type EventMaxAggregateInputType = {
+    id?: true
+    type?: true
+    aggregateType?: true
+    aggregateId?: true
+    payload?: true
+    createdAt?: true
+  }
+
+  export type EventCountAggregateInputType = {
+    id?: true
+    type?: true
+    aggregateType?: true
+    aggregateId?: true
+    payload?: true
+    createdAt?: true
+    _all?: true
+  }
+
+  export type EventAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which Event to aggregate.
+     */
+    where?: EventWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of Events to fetch.
+     */
+    orderBy?: EventOrderByWithRelationInput | EventOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: EventWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` Events from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` Events.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned Events
+    **/
+    _count?: true | EventCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: EventMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: EventMaxAggregateInputType
+  }
+
+  export type GetEventAggregateType<T extends EventAggregateArgs> = {
+        [P in keyof T & keyof AggregateEvent]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateEvent[P]>
+      : GetScalarType<T[P], AggregateEvent[P]>
+  }
+
+
+
+
+  export type EventGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: EventWhereInput
+    orderBy?: EventOrderByWithAggregationInput | EventOrderByWithAggregationInput[]
+    by: EventScalarFieldEnum[] | EventScalarFieldEnum
+    having?: EventScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: EventCountAggregateInputType | true
+    _min?: EventMinAggregateInputType
+    _max?: EventMaxAggregateInputType
+  }
+
+  export type EventGroupByOutputType = {
+    id: string
+    type: string
+    aggregateType: string
+    aggregateId: string
+    payload: string
+    createdAt: Date
+    _count: EventCountAggregateOutputType | null
+    _min: EventMinAggregateOutputType | null
+    _max: EventMaxAggregateOutputType | null
+  }
+
+  type GetEventGroupByPayload<T extends EventGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<EventGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof EventGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], EventGroupByOutputType[P]>
+            : GetScalarType<T[P], EventGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type EventSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    type?: boolean
+    aggregateType?: boolean
+    aggregateId?: boolean
+    payload?: boolean
+    createdAt?: boolean
+  }, ExtArgs["result"]["event"]>
+
+  export type EventSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    type?: boolean
+    aggregateType?: boolean
+    aggregateId?: boolean
+    payload?: boolean
+    createdAt?: boolean
+  }, ExtArgs["result"]["event"]>
+
+  export type EventSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    type?: boolean
+    aggregateType?: boolean
+    aggregateId?: boolean
+    payload?: boolean
+    createdAt?: boolean
+  }, ExtArgs["result"]["event"]>
+
+  export type EventSelectScalar = {
+    id?: boolean
+    type?: boolean
+    aggregateType?: boolean
+    aggregateId?: boolean
+    payload?: boolean
+    createdAt?: boolean
+  }
+
+  export type EventOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "type" | "aggregateType" | "aggregateId" | "payload" | "createdAt", ExtArgs["result"]["event"]>
+
+  export type $EventPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "Event"
+    objects: {}
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      type: string
+      aggregateType: string
+      aggregateId: string
+      payload: string
+      createdAt: Date
+    }, ExtArgs["result"]["event"]>
+    composites: {}
+  }
+
+  type EventGetPayload<S extends boolean | null | undefined | EventDefaultArgs> = $Result.GetResult<Prisma.$EventPayload, S>
+
+  type EventCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<EventFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: EventCountAggregateInputType | true
+    }
+
+  export interface EventDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['Event'], meta: { name: 'Event' } }
+    /**
+     * Find zero or one Event that matches the filter.
+     * @param {EventFindUniqueArgs} args - Arguments to find a Event
+     * @example
+     * // Get one Event
+     * const event = await prisma.event.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends EventFindUniqueArgs>(args: SelectSubset<T, EventFindUniqueArgs<ExtArgs>>): Prisma__EventClient<$Result.GetResult<Prisma.$EventPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one Event that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {EventFindUniqueOrThrowArgs} args - Arguments to find a Event
+     * @example
+     * // Get one Event
+     * const event = await prisma.event.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends EventFindUniqueOrThrowArgs>(args: SelectSubset<T, EventFindUniqueOrThrowArgs<ExtArgs>>): Prisma__EventClient<$Result.GetResult<Prisma.$EventPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first Event that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {EventFindFirstArgs} args - Arguments to find a Event
+     * @example
+     * // Get one Event
+     * const event = await prisma.event.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends EventFindFirstArgs>(args?: SelectSubset<T, EventFindFirstArgs<ExtArgs>>): Prisma__EventClient<$Result.GetResult<Prisma.$EventPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first Event that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {EventFindFirstOrThrowArgs} args - Arguments to find a Event
+     * @example
+     * // Get one Event
+     * const event = await prisma.event.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends EventFindFirstOrThrowArgs>(args?: SelectSubset<T, EventFindFirstOrThrowArgs<ExtArgs>>): Prisma__EventClient<$Result.GetResult<Prisma.$EventPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more Events that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {EventFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all Events
+     * const events = await prisma.event.findMany()
+     * 
+     * // Get first 10 Events
+     * const events = await prisma.event.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const eventWithIdOnly = await prisma.event.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends EventFindManyArgs>(args?: SelectSubset<T, EventFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$EventPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a Event.
+     * @param {EventCreateArgs} args - Arguments to create a Event.
+     * @example
+     * // Create one Event
+     * const Event = await prisma.event.create({
+     *   data: {
+     *     // ... data to create a Event
+     *   }
+     * })
+     * 
+     */
+    create<T extends EventCreateArgs>(args: SelectSubset<T, EventCreateArgs<ExtArgs>>): Prisma__EventClient<$Result.GetResult<Prisma.$EventPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many Events.
+     * @param {EventCreateManyArgs} args - Arguments to create many Events.
+     * @example
+     * // Create many Events
+     * const event = await prisma.event.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends EventCreateManyArgs>(args?: SelectSubset<T, EventCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many Events and returns the data saved in the database.
+     * @param {EventCreateManyAndReturnArgs} args - Arguments to create many Events.
+     * @example
+     * // Create many Events
+     * const event = await prisma.event.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many Events and only return the `id`
+     * const eventWithIdOnly = await prisma.event.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends EventCreateManyAndReturnArgs>(args?: SelectSubset<T, EventCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$EventPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a Event.
+     * @param {EventDeleteArgs} args - Arguments to delete one Event.
+     * @example
+     * // Delete one Event
+     * const Event = await prisma.event.delete({
+     *   where: {
+     *     // ... filter to delete one Event
+     *   }
+     * })
+     * 
+     */
+    delete<T extends EventDeleteArgs>(args: SelectSubset<T, EventDeleteArgs<ExtArgs>>): Prisma__EventClient<$Result.GetResult<Prisma.$EventPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one Event.
+     * @param {EventUpdateArgs} args - Arguments to update one Event.
+     * @example
+     * // Update one Event
+     * const event = await prisma.event.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends EventUpdateArgs>(args: SelectSubset<T, EventUpdateArgs<ExtArgs>>): Prisma__EventClient<$Result.GetResult<Prisma.$EventPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more Events.
+     * @param {EventDeleteManyArgs} args - Arguments to filter Events to delete.
+     * @example
+     * // Delete a few Events
+     * const { count } = await prisma.event.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends EventDeleteManyArgs>(args?: SelectSubset<T, EventDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more Events.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {EventUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many Events
+     * const event = await prisma.event.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends EventUpdateManyArgs>(args: SelectSubset<T, EventUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more Events and returns the data updated in the database.
+     * @param {EventUpdateManyAndReturnArgs} args - Arguments to update many Events.
+     * @example
+     * // Update many Events
+     * const event = await prisma.event.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more Events and only return the `id`
+     * const eventWithIdOnly = await prisma.event.updateManyAndReturn({
+     *   select: { id: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends EventUpdateManyAndReturnArgs>(args: SelectSubset<T, EventUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$EventPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one Event.
+     * @param {EventUpsertArgs} args - Arguments to update or create a Event.
+     * @example
+     * // Update or create a Event
+     * const event = await prisma.event.upsert({
+     *   create: {
+     *     // ... data to create a Event
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the Event we want to update
+     *   }
+     * })
+     */
+    upsert<T extends EventUpsertArgs>(args: SelectSubset<T, EventUpsertArgs<ExtArgs>>): Prisma__EventClient<$Result.GetResult<Prisma.$EventPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of Events.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {EventCountArgs} args - Arguments to filter Events to count.
+     * @example
+     * // Count the number of Events
+     * const count = await prisma.event.count({
+     *   where: {
+     *     // ... the filter for the Events we want to count
+     *   }
+     * })
+    **/
+    count<T extends EventCountArgs>(
+      args?: Subset<T, EventCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], EventCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a Event.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {EventAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends EventAggregateArgs>(args: Subset<T, EventAggregateArgs>): Prisma.PrismaPromise<GetEventAggregateType<T>>
+
+    /**
+     * Group by Event.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {EventGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends EventGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: EventGroupByArgs['orderBy'] }
+        : { orderBy?: EventGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, EventGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetEventGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the Event model
+   */
+  readonly fields: EventFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for Event.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__EventClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the Event model
+   */
+  interface EventFieldRefs {
+    readonly id: FieldRef<"Event", 'String'>
+    readonly type: FieldRef<"Event", 'String'>
+    readonly aggregateType: FieldRef<"Event", 'String'>
+    readonly aggregateId: FieldRef<"Event", 'String'>
+    readonly payload: FieldRef<"Event", 'String'>
+    readonly createdAt: FieldRef<"Event", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * Event findUnique
+   */
+  export type EventFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Event
+     */
+    select?: EventSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Event
+     */
+    omit?: EventOmit<ExtArgs> | null
+    /**
+     * Filter, which Event to fetch.
+     */
+    where: EventWhereUniqueInput
+  }
+
+  /**
+   * Event findUniqueOrThrow
+   */
+  export type EventFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Event
+     */
+    select?: EventSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Event
+     */
+    omit?: EventOmit<ExtArgs> | null
+    /**
+     * Filter, which Event to fetch.
+     */
+    where: EventWhereUniqueInput
+  }
+
+  /**
+   * Event findFirst
+   */
+  export type EventFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Event
+     */
+    select?: EventSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Event
+     */
+    omit?: EventOmit<ExtArgs> | null
+    /**
+     * Filter, which Event to fetch.
+     */
+    where?: EventWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of Events to fetch.
+     */
+    orderBy?: EventOrderByWithRelationInput | EventOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for Events.
+     */
+    cursor?: EventWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` Events from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` Events.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of Events.
+     */
+    distinct?: EventScalarFieldEnum | EventScalarFieldEnum[]
+  }
+
+  /**
+   * Event findFirstOrThrow
+   */
+  export type EventFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Event
+     */
+    select?: EventSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Event
+     */
+    omit?: EventOmit<ExtArgs> | null
+    /**
+     * Filter, which Event to fetch.
+     */
+    where?: EventWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of Events to fetch.
+     */
+    orderBy?: EventOrderByWithRelationInput | EventOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for Events.
+     */
+    cursor?: EventWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` Events from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` Events.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of Events.
+     */
+    distinct?: EventScalarFieldEnum | EventScalarFieldEnum[]
+  }
+
+  /**
+   * Event findMany
+   */
+  export type EventFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Event
+     */
+    select?: EventSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Event
+     */
+    omit?: EventOmit<ExtArgs> | null
+    /**
+     * Filter, which Events to fetch.
+     */
+    where?: EventWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of Events to fetch.
+     */
+    orderBy?: EventOrderByWithRelationInput | EventOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing Events.
+     */
+    cursor?: EventWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` Events from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` Events.
+     */
+    skip?: number
+    distinct?: EventScalarFieldEnum | EventScalarFieldEnum[]
+  }
+
+  /**
+   * Event create
+   */
+  export type EventCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Event
+     */
+    select?: EventSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Event
+     */
+    omit?: EventOmit<ExtArgs> | null
+    /**
+     * The data needed to create a Event.
+     */
+    data: XOR<EventCreateInput, EventUncheckedCreateInput>
+  }
+
+  /**
+   * Event createMany
+   */
+  export type EventCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many Events.
+     */
+    data: EventCreateManyInput | EventCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * Event createManyAndReturn
+   */
+  export type EventCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Event
+     */
+    select?: EventSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the Event
+     */
+    omit?: EventOmit<ExtArgs> | null
+    /**
+     * The data used to create many Events.
+     */
+    data: EventCreateManyInput | EventCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * Event update
+   */
+  export type EventUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Event
+     */
+    select?: EventSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Event
+     */
+    omit?: EventOmit<ExtArgs> | null
+    /**
+     * The data needed to update a Event.
+     */
+    data: XOR<EventUpdateInput, EventUncheckedUpdateInput>
+    /**
+     * Choose, which Event to update.
+     */
+    where: EventWhereUniqueInput
+  }
+
+  /**
+   * Event updateMany
+   */
+  export type EventUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update Events.
+     */
+    data: XOR<EventUpdateManyMutationInput, EventUncheckedUpdateManyInput>
+    /**
+     * Filter which Events to update
+     */
+    where?: EventWhereInput
+    /**
+     * Limit how many Events to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * Event updateManyAndReturn
+   */
+  export type EventUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Event
+     */
+    select?: EventSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the Event
+     */
+    omit?: EventOmit<ExtArgs> | null
+    /**
+     * The data used to update Events.
+     */
+    data: XOR<EventUpdateManyMutationInput, EventUncheckedUpdateManyInput>
+    /**
+     * Filter which Events to update
+     */
+    where?: EventWhereInput
+    /**
+     * Limit how many Events to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * Event upsert
+   */
+  export type EventUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Event
+     */
+    select?: EventSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Event
+     */
+    omit?: EventOmit<ExtArgs> | null
+    /**
+     * The filter to search for the Event to update in case it exists.
+     */
+    where: EventWhereUniqueInput
+    /**
+     * In case the Event found by the `where` argument doesn't exist, create a new Event with this data.
+     */
+    create: XOR<EventCreateInput, EventUncheckedCreateInput>
+    /**
+     * In case the Event was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<EventUpdateInput, EventUncheckedUpdateInput>
+  }
+
+  /**
+   * Event delete
+   */
+  export type EventDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Event
+     */
+    select?: EventSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Event
+     */
+    omit?: EventOmit<ExtArgs> | null
+    /**
+     * Filter which Event to delete.
+     */
+    where: EventWhereUniqueInput
+  }
+
+  /**
+   * Event deleteMany
+   */
+  export type EventDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which Events to delete
+     */
+    where?: EventWhereInput
+    /**
+     * Limit how many Events to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * Event without action
+   */
+  export type EventDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Event
+     */
+    select?: EventSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Event
+     */
+    omit?: EventOmit<ExtArgs> | null
+  }
+
+
+  /**
+   * Model KpiTransporter
+   */
+
+  export type AggregateKpiTransporter = {
+    _count: KpiTransporterCountAggregateOutputType | null
+    _avg: KpiTransporterAvgAggregateOutputType | null
+    _sum: KpiTransporterSumAggregateOutputType | null
+    _min: KpiTransporterMinAggregateOutputType | null
+    _max: KpiTransporterMaxAggregateOutputType | null
+  }
+
+  export type KpiTransporterAvgAggregateOutputType = {
+    missionsTotal: number | null
+    missionsActive: number | null
+    missionsAssigned: number | null
+    missionsInProgress: number | null
+    missionsCompleted: number | null
+    earningsTotal: number | null
+  }
+
+  export type KpiTransporterSumAggregateOutputType = {
+    missionsTotal: number | null
+    missionsActive: number | null
+    missionsAssigned: number | null
+    missionsInProgress: number | null
+    missionsCompleted: number | null
+    earningsTotal: number | null
+  }
+
+  export type KpiTransporterMinAggregateOutputType = {
+    transporteurId: string | null
+    missionsTotal: number | null
+    missionsActive: number | null
+    missionsAssigned: number | null
+    missionsInProgress: number | null
+    missionsCompleted: number | null
+    earningsTotal: number | null
+    updatedAt: Date | null
+    createdAt: Date | null
+  }
+
+  export type KpiTransporterMaxAggregateOutputType = {
+    transporteurId: string | null
+    missionsTotal: number | null
+    missionsActive: number | null
+    missionsAssigned: number | null
+    missionsInProgress: number | null
+    missionsCompleted: number | null
+    earningsTotal: number | null
+    updatedAt: Date | null
+    createdAt: Date | null
+  }
+
+  export type KpiTransporterCountAggregateOutputType = {
+    transporteurId: number
+    missionsTotal: number
+    missionsActive: number
+    missionsAssigned: number
+    missionsInProgress: number
+    missionsCompleted: number
+    earningsTotal: number
+    updatedAt: number
+    createdAt: number
+    _all: number
+  }
+
+
+  export type KpiTransporterAvgAggregateInputType = {
+    missionsTotal?: true
+    missionsActive?: true
+    missionsAssigned?: true
+    missionsInProgress?: true
+    missionsCompleted?: true
+    earningsTotal?: true
+  }
+
+  export type KpiTransporterSumAggregateInputType = {
+    missionsTotal?: true
+    missionsActive?: true
+    missionsAssigned?: true
+    missionsInProgress?: true
+    missionsCompleted?: true
+    earningsTotal?: true
+  }
+
+  export type KpiTransporterMinAggregateInputType = {
+    transporteurId?: true
+    missionsTotal?: true
+    missionsActive?: true
+    missionsAssigned?: true
+    missionsInProgress?: true
+    missionsCompleted?: true
+    earningsTotal?: true
+    updatedAt?: true
+    createdAt?: true
+  }
+
+  export type KpiTransporterMaxAggregateInputType = {
+    transporteurId?: true
+    missionsTotal?: true
+    missionsActive?: true
+    missionsAssigned?: true
+    missionsInProgress?: true
+    missionsCompleted?: true
+    earningsTotal?: true
+    updatedAt?: true
+    createdAt?: true
+  }
+
+  export type KpiTransporterCountAggregateInputType = {
+    transporteurId?: true
+    missionsTotal?: true
+    missionsActive?: true
+    missionsAssigned?: true
+    missionsInProgress?: true
+    missionsCompleted?: true
+    earningsTotal?: true
+    updatedAt?: true
+    createdAt?: true
+    _all?: true
+  }
+
+  export type KpiTransporterAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which KpiTransporter to aggregate.
+     */
+    where?: KpiTransporterWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of KpiTransporters to fetch.
+     */
+    orderBy?: KpiTransporterOrderByWithRelationInput | KpiTransporterOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: KpiTransporterWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` KpiTransporters from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` KpiTransporters.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned KpiTransporters
+    **/
+    _count?: true | KpiTransporterCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to average
+    **/
+    _avg?: KpiTransporterAvgAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to sum
+    **/
+    _sum?: KpiTransporterSumAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: KpiTransporterMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: KpiTransporterMaxAggregateInputType
+  }
+
+  export type GetKpiTransporterAggregateType<T extends KpiTransporterAggregateArgs> = {
+        [P in keyof T & keyof AggregateKpiTransporter]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateKpiTransporter[P]>
+      : GetScalarType<T[P], AggregateKpiTransporter[P]>
+  }
+
+
+
+
+  export type KpiTransporterGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: KpiTransporterWhereInput
+    orderBy?: KpiTransporterOrderByWithAggregationInput | KpiTransporterOrderByWithAggregationInput[]
+    by: KpiTransporterScalarFieldEnum[] | KpiTransporterScalarFieldEnum
+    having?: KpiTransporterScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: KpiTransporterCountAggregateInputType | true
+    _avg?: KpiTransporterAvgAggregateInputType
+    _sum?: KpiTransporterSumAggregateInputType
+    _min?: KpiTransporterMinAggregateInputType
+    _max?: KpiTransporterMaxAggregateInputType
+  }
+
+  export type KpiTransporterGroupByOutputType = {
+    transporteurId: string
+    missionsTotal: number
+    missionsActive: number
+    missionsAssigned: number
+    missionsInProgress: number
+    missionsCompleted: number
+    earningsTotal: number
+    updatedAt: Date
+    createdAt: Date
+    _count: KpiTransporterCountAggregateOutputType | null
+    _avg: KpiTransporterAvgAggregateOutputType | null
+    _sum: KpiTransporterSumAggregateOutputType | null
+    _min: KpiTransporterMinAggregateOutputType | null
+    _max: KpiTransporterMaxAggregateOutputType | null
+  }
+
+  type GetKpiTransporterGroupByPayload<T extends KpiTransporterGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<KpiTransporterGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof KpiTransporterGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], KpiTransporterGroupByOutputType[P]>
+            : GetScalarType<T[P], KpiTransporterGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type KpiTransporterSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    transporteurId?: boolean
+    missionsTotal?: boolean
+    missionsActive?: boolean
+    missionsAssigned?: boolean
+    missionsInProgress?: boolean
+    missionsCompleted?: boolean
+    earningsTotal?: boolean
+    updatedAt?: boolean
+    createdAt?: boolean
+  }, ExtArgs["result"]["kpiTransporter"]>
+
+  export type KpiTransporterSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    transporteurId?: boolean
+    missionsTotal?: boolean
+    missionsActive?: boolean
+    missionsAssigned?: boolean
+    missionsInProgress?: boolean
+    missionsCompleted?: boolean
+    earningsTotal?: boolean
+    updatedAt?: boolean
+    createdAt?: boolean
+  }, ExtArgs["result"]["kpiTransporter"]>
+
+  export type KpiTransporterSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    transporteurId?: boolean
+    missionsTotal?: boolean
+    missionsActive?: boolean
+    missionsAssigned?: boolean
+    missionsInProgress?: boolean
+    missionsCompleted?: boolean
+    earningsTotal?: boolean
+    updatedAt?: boolean
+    createdAt?: boolean
+  }, ExtArgs["result"]["kpiTransporter"]>
+
+  export type KpiTransporterSelectScalar = {
+    transporteurId?: boolean
+    missionsTotal?: boolean
+    missionsActive?: boolean
+    missionsAssigned?: boolean
+    missionsInProgress?: boolean
+    missionsCompleted?: boolean
+    earningsTotal?: boolean
+    updatedAt?: boolean
+    createdAt?: boolean
+  }
+
+  export type KpiTransporterOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"transporteurId" | "missionsTotal" | "missionsActive" | "missionsAssigned" | "missionsInProgress" | "missionsCompleted" | "earningsTotal" | "updatedAt" | "createdAt", ExtArgs["result"]["kpiTransporter"]>
+
+  export type $KpiTransporterPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "KpiTransporter"
+    objects: {}
+    scalars: $Extensions.GetPayloadResult<{
+      transporteurId: string
+      missionsTotal: number
+      missionsActive: number
+      missionsAssigned: number
+      missionsInProgress: number
+      missionsCompleted: number
+      earningsTotal: number
+      updatedAt: Date
+      createdAt: Date
+    }, ExtArgs["result"]["kpiTransporter"]>
+    composites: {}
+  }
+
+  type KpiTransporterGetPayload<S extends boolean | null | undefined | KpiTransporterDefaultArgs> = $Result.GetResult<Prisma.$KpiTransporterPayload, S>
+
+  type KpiTransporterCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<KpiTransporterFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: KpiTransporterCountAggregateInputType | true
+    }
+
+  export interface KpiTransporterDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['KpiTransporter'], meta: { name: 'KpiTransporter' } }
+    /**
+     * Find zero or one KpiTransporter that matches the filter.
+     * @param {KpiTransporterFindUniqueArgs} args - Arguments to find a KpiTransporter
+     * @example
+     * // Get one KpiTransporter
+     * const kpiTransporter = await prisma.kpiTransporter.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends KpiTransporterFindUniqueArgs>(args: SelectSubset<T, KpiTransporterFindUniqueArgs<ExtArgs>>): Prisma__KpiTransporterClient<$Result.GetResult<Prisma.$KpiTransporterPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one KpiTransporter that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {KpiTransporterFindUniqueOrThrowArgs} args - Arguments to find a KpiTransporter
+     * @example
+     * // Get one KpiTransporter
+     * const kpiTransporter = await prisma.kpiTransporter.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends KpiTransporterFindUniqueOrThrowArgs>(args: SelectSubset<T, KpiTransporterFindUniqueOrThrowArgs<ExtArgs>>): Prisma__KpiTransporterClient<$Result.GetResult<Prisma.$KpiTransporterPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first KpiTransporter that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {KpiTransporterFindFirstArgs} args - Arguments to find a KpiTransporter
+     * @example
+     * // Get one KpiTransporter
+     * const kpiTransporter = await prisma.kpiTransporter.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends KpiTransporterFindFirstArgs>(args?: SelectSubset<T, KpiTransporterFindFirstArgs<ExtArgs>>): Prisma__KpiTransporterClient<$Result.GetResult<Prisma.$KpiTransporterPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first KpiTransporter that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {KpiTransporterFindFirstOrThrowArgs} args - Arguments to find a KpiTransporter
+     * @example
+     * // Get one KpiTransporter
+     * const kpiTransporter = await prisma.kpiTransporter.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends KpiTransporterFindFirstOrThrowArgs>(args?: SelectSubset<T, KpiTransporterFindFirstOrThrowArgs<ExtArgs>>): Prisma__KpiTransporterClient<$Result.GetResult<Prisma.$KpiTransporterPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more KpiTransporters that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {KpiTransporterFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all KpiTransporters
+     * const kpiTransporters = await prisma.kpiTransporter.findMany()
+     * 
+     * // Get first 10 KpiTransporters
+     * const kpiTransporters = await prisma.kpiTransporter.findMany({ take: 10 })
+     * 
+     * // Only select the `transporteurId`
+     * const kpiTransporterWithTransporteurIdOnly = await prisma.kpiTransporter.findMany({ select: { transporteurId: true } })
+     * 
+     */
+    findMany<T extends KpiTransporterFindManyArgs>(args?: SelectSubset<T, KpiTransporterFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$KpiTransporterPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a KpiTransporter.
+     * @param {KpiTransporterCreateArgs} args - Arguments to create a KpiTransporter.
+     * @example
+     * // Create one KpiTransporter
+     * const KpiTransporter = await prisma.kpiTransporter.create({
+     *   data: {
+     *     // ... data to create a KpiTransporter
+     *   }
+     * })
+     * 
+     */
+    create<T extends KpiTransporterCreateArgs>(args: SelectSubset<T, KpiTransporterCreateArgs<ExtArgs>>): Prisma__KpiTransporterClient<$Result.GetResult<Prisma.$KpiTransporterPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many KpiTransporters.
+     * @param {KpiTransporterCreateManyArgs} args - Arguments to create many KpiTransporters.
+     * @example
+     * // Create many KpiTransporters
+     * const kpiTransporter = await prisma.kpiTransporter.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends KpiTransporterCreateManyArgs>(args?: SelectSubset<T, KpiTransporterCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many KpiTransporters and returns the data saved in the database.
+     * @param {KpiTransporterCreateManyAndReturnArgs} args - Arguments to create many KpiTransporters.
+     * @example
+     * // Create many KpiTransporters
+     * const kpiTransporter = await prisma.kpiTransporter.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many KpiTransporters and only return the `transporteurId`
+     * const kpiTransporterWithTransporteurIdOnly = await prisma.kpiTransporter.createManyAndReturn({
+     *   select: { transporteurId: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends KpiTransporterCreateManyAndReturnArgs>(args?: SelectSubset<T, KpiTransporterCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$KpiTransporterPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a KpiTransporter.
+     * @param {KpiTransporterDeleteArgs} args - Arguments to delete one KpiTransporter.
+     * @example
+     * // Delete one KpiTransporter
+     * const KpiTransporter = await prisma.kpiTransporter.delete({
+     *   where: {
+     *     // ... filter to delete one KpiTransporter
+     *   }
+     * })
+     * 
+     */
+    delete<T extends KpiTransporterDeleteArgs>(args: SelectSubset<T, KpiTransporterDeleteArgs<ExtArgs>>): Prisma__KpiTransporterClient<$Result.GetResult<Prisma.$KpiTransporterPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one KpiTransporter.
+     * @param {KpiTransporterUpdateArgs} args - Arguments to update one KpiTransporter.
+     * @example
+     * // Update one KpiTransporter
+     * const kpiTransporter = await prisma.kpiTransporter.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends KpiTransporterUpdateArgs>(args: SelectSubset<T, KpiTransporterUpdateArgs<ExtArgs>>): Prisma__KpiTransporterClient<$Result.GetResult<Prisma.$KpiTransporterPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more KpiTransporters.
+     * @param {KpiTransporterDeleteManyArgs} args - Arguments to filter KpiTransporters to delete.
+     * @example
+     * // Delete a few KpiTransporters
+     * const { count } = await prisma.kpiTransporter.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends KpiTransporterDeleteManyArgs>(args?: SelectSubset<T, KpiTransporterDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more KpiTransporters.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {KpiTransporterUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many KpiTransporters
+     * const kpiTransporter = await prisma.kpiTransporter.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends KpiTransporterUpdateManyArgs>(args: SelectSubset<T, KpiTransporterUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more KpiTransporters and returns the data updated in the database.
+     * @param {KpiTransporterUpdateManyAndReturnArgs} args - Arguments to update many KpiTransporters.
+     * @example
+     * // Update many KpiTransporters
+     * const kpiTransporter = await prisma.kpiTransporter.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more KpiTransporters and only return the `transporteurId`
+     * const kpiTransporterWithTransporteurIdOnly = await prisma.kpiTransporter.updateManyAndReturn({
+     *   select: { transporteurId: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends KpiTransporterUpdateManyAndReturnArgs>(args: SelectSubset<T, KpiTransporterUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$KpiTransporterPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one KpiTransporter.
+     * @param {KpiTransporterUpsertArgs} args - Arguments to update or create a KpiTransporter.
+     * @example
+     * // Update or create a KpiTransporter
+     * const kpiTransporter = await prisma.kpiTransporter.upsert({
+     *   create: {
+     *     // ... data to create a KpiTransporter
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the KpiTransporter we want to update
+     *   }
+     * })
+     */
+    upsert<T extends KpiTransporterUpsertArgs>(args: SelectSubset<T, KpiTransporterUpsertArgs<ExtArgs>>): Prisma__KpiTransporterClient<$Result.GetResult<Prisma.$KpiTransporterPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of KpiTransporters.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {KpiTransporterCountArgs} args - Arguments to filter KpiTransporters to count.
+     * @example
+     * // Count the number of KpiTransporters
+     * const count = await prisma.kpiTransporter.count({
+     *   where: {
+     *     // ... the filter for the KpiTransporters we want to count
+     *   }
+     * })
+    **/
+    count<T extends KpiTransporterCountArgs>(
+      args?: Subset<T, KpiTransporterCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], KpiTransporterCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a KpiTransporter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {KpiTransporterAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends KpiTransporterAggregateArgs>(args: Subset<T, KpiTransporterAggregateArgs>): Prisma.PrismaPromise<GetKpiTransporterAggregateType<T>>
+
+    /**
+     * Group by KpiTransporter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {KpiTransporterGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends KpiTransporterGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: KpiTransporterGroupByArgs['orderBy'] }
+        : { orderBy?: KpiTransporterGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, KpiTransporterGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetKpiTransporterGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the KpiTransporter model
+   */
+  readonly fields: KpiTransporterFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for KpiTransporter.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__KpiTransporterClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the KpiTransporter model
+   */
+  interface KpiTransporterFieldRefs {
+    readonly transporteurId: FieldRef<"KpiTransporter", 'String'>
+    readonly missionsTotal: FieldRef<"KpiTransporter", 'Int'>
+    readonly missionsActive: FieldRef<"KpiTransporter", 'Int'>
+    readonly missionsAssigned: FieldRef<"KpiTransporter", 'Int'>
+    readonly missionsInProgress: FieldRef<"KpiTransporter", 'Int'>
+    readonly missionsCompleted: FieldRef<"KpiTransporter", 'Int'>
+    readonly earningsTotal: FieldRef<"KpiTransporter", 'Float'>
+    readonly updatedAt: FieldRef<"KpiTransporter", 'DateTime'>
+    readonly createdAt: FieldRef<"KpiTransporter", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * KpiTransporter findUnique
+   */
+  export type KpiTransporterFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the KpiTransporter
+     */
+    select?: KpiTransporterSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the KpiTransporter
+     */
+    omit?: KpiTransporterOmit<ExtArgs> | null
+    /**
+     * Filter, which KpiTransporter to fetch.
+     */
+    where: KpiTransporterWhereUniqueInput
+  }
+
+  /**
+   * KpiTransporter findUniqueOrThrow
+   */
+  export type KpiTransporterFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the KpiTransporter
+     */
+    select?: KpiTransporterSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the KpiTransporter
+     */
+    omit?: KpiTransporterOmit<ExtArgs> | null
+    /**
+     * Filter, which KpiTransporter to fetch.
+     */
+    where: KpiTransporterWhereUniqueInput
+  }
+
+  /**
+   * KpiTransporter findFirst
+   */
+  export type KpiTransporterFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the KpiTransporter
+     */
+    select?: KpiTransporterSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the KpiTransporter
+     */
+    omit?: KpiTransporterOmit<ExtArgs> | null
+    /**
+     * Filter, which KpiTransporter to fetch.
+     */
+    where?: KpiTransporterWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of KpiTransporters to fetch.
+     */
+    orderBy?: KpiTransporterOrderByWithRelationInput | KpiTransporterOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for KpiTransporters.
+     */
+    cursor?: KpiTransporterWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` KpiTransporters from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` KpiTransporters.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of KpiTransporters.
+     */
+    distinct?: KpiTransporterScalarFieldEnum | KpiTransporterScalarFieldEnum[]
+  }
+
+  /**
+   * KpiTransporter findFirstOrThrow
+   */
+  export type KpiTransporterFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the KpiTransporter
+     */
+    select?: KpiTransporterSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the KpiTransporter
+     */
+    omit?: KpiTransporterOmit<ExtArgs> | null
+    /**
+     * Filter, which KpiTransporter to fetch.
+     */
+    where?: KpiTransporterWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of KpiTransporters to fetch.
+     */
+    orderBy?: KpiTransporterOrderByWithRelationInput | KpiTransporterOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for KpiTransporters.
+     */
+    cursor?: KpiTransporterWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` KpiTransporters from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` KpiTransporters.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of KpiTransporters.
+     */
+    distinct?: KpiTransporterScalarFieldEnum | KpiTransporterScalarFieldEnum[]
+  }
+
+  /**
+   * KpiTransporter findMany
+   */
+  export type KpiTransporterFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the KpiTransporter
+     */
+    select?: KpiTransporterSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the KpiTransporter
+     */
+    omit?: KpiTransporterOmit<ExtArgs> | null
+    /**
+     * Filter, which KpiTransporters to fetch.
+     */
+    where?: KpiTransporterWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of KpiTransporters to fetch.
+     */
+    orderBy?: KpiTransporterOrderByWithRelationInput | KpiTransporterOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing KpiTransporters.
+     */
+    cursor?: KpiTransporterWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` KpiTransporters from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` KpiTransporters.
+     */
+    skip?: number
+    distinct?: KpiTransporterScalarFieldEnum | KpiTransporterScalarFieldEnum[]
+  }
+
+  /**
+   * KpiTransporter create
+   */
+  export type KpiTransporterCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the KpiTransporter
+     */
+    select?: KpiTransporterSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the KpiTransporter
+     */
+    omit?: KpiTransporterOmit<ExtArgs> | null
+    /**
+     * The data needed to create a KpiTransporter.
+     */
+    data: XOR<KpiTransporterCreateInput, KpiTransporterUncheckedCreateInput>
+  }
+
+  /**
+   * KpiTransporter createMany
+   */
+  export type KpiTransporterCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many KpiTransporters.
+     */
+    data: KpiTransporterCreateManyInput | KpiTransporterCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * KpiTransporter createManyAndReturn
+   */
+  export type KpiTransporterCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the KpiTransporter
+     */
+    select?: KpiTransporterSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the KpiTransporter
+     */
+    omit?: KpiTransporterOmit<ExtArgs> | null
+    /**
+     * The data used to create many KpiTransporters.
+     */
+    data: KpiTransporterCreateManyInput | KpiTransporterCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * KpiTransporter update
+   */
+  export type KpiTransporterUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the KpiTransporter
+     */
+    select?: KpiTransporterSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the KpiTransporter
+     */
+    omit?: KpiTransporterOmit<ExtArgs> | null
+    /**
+     * The data needed to update a KpiTransporter.
+     */
+    data: XOR<KpiTransporterUpdateInput, KpiTransporterUncheckedUpdateInput>
+    /**
+     * Choose, which KpiTransporter to update.
+     */
+    where: KpiTransporterWhereUniqueInput
+  }
+
+  /**
+   * KpiTransporter updateMany
+   */
+  export type KpiTransporterUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update KpiTransporters.
+     */
+    data: XOR<KpiTransporterUpdateManyMutationInput, KpiTransporterUncheckedUpdateManyInput>
+    /**
+     * Filter which KpiTransporters to update
+     */
+    where?: KpiTransporterWhereInput
+    /**
+     * Limit how many KpiTransporters to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * KpiTransporter updateManyAndReturn
+   */
+  export type KpiTransporterUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the KpiTransporter
+     */
+    select?: KpiTransporterSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the KpiTransporter
+     */
+    omit?: KpiTransporterOmit<ExtArgs> | null
+    /**
+     * The data used to update KpiTransporters.
+     */
+    data: XOR<KpiTransporterUpdateManyMutationInput, KpiTransporterUncheckedUpdateManyInput>
+    /**
+     * Filter which KpiTransporters to update
+     */
+    where?: KpiTransporterWhereInput
+    /**
+     * Limit how many KpiTransporters to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * KpiTransporter upsert
+   */
+  export type KpiTransporterUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the KpiTransporter
+     */
+    select?: KpiTransporterSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the KpiTransporter
+     */
+    omit?: KpiTransporterOmit<ExtArgs> | null
+    /**
+     * The filter to search for the KpiTransporter to update in case it exists.
+     */
+    where: KpiTransporterWhereUniqueInput
+    /**
+     * In case the KpiTransporter found by the `where` argument doesn't exist, create a new KpiTransporter with this data.
+     */
+    create: XOR<KpiTransporterCreateInput, KpiTransporterUncheckedCreateInput>
+    /**
+     * In case the KpiTransporter was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<KpiTransporterUpdateInput, KpiTransporterUncheckedUpdateInput>
+  }
+
+  /**
+   * KpiTransporter delete
+   */
+  export type KpiTransporterDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the KpiTransporter
+     */
+    select?: KpiTransporterSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the KpiTransporter
+     */
+    omit?: KpiTransporterOmit<ExtArgs> | null
+    /**
+     * Filter which KpiTransporter to delete.
+     */
+    where: KpiTransporterWhereUniqueInput
+  }
+
+  /**
+   * KpiTransporter deleteMany
+   */
+  export type KpiTransporterDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which KpiTransporters to delete
+     */
+    where?: KpiTransporterWhereInput
+    /**
+     * Limit how many KpiTransporters to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * KpiTransporter without action
+   */
+  export type KpiTransporterDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the KpiTransporter
+     */
+    select?: KpiTransporterSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the KpiTransporter
+     */
+    omit?: KpiTransporterOmit<ExtArgs> | null
+  }
+
+
+  /**
+   * Model KpiEnseigne
+   */
+
+  export type AggregateKpiEnseigne = {
+    _count: KpiEnseigneCountAggregateOutputType | null
+    _avg: KpiEnseigneAvgAggregateOutputType | null
+    _sum: KpiEnseigneSumAggregateOutputType | null
+    _min: KpiEnseigneMinAggregateOutputType | null
+    _max: KpiEnseigneMaxAggregateOutputType | null
+  }
+
+  export type KpiEnseigneAvgAggregateOutputType = {
+    parcelsTotal: number | null
+    parcelsDelivered: number | null
+    pendingPayment: number | null
+    readyForDeposit: number | null
+    inTransit: number | null
+    arrivedRelay: number | null
+    revenueDelivered: number | null
+    revenueCommitted: number | null
+  }
+
+  export type KpiEnseigneSumAggregateOutputType = {
+    parcelsTotal: number | null
+    parcelsDelivered: number | null
+    pendingPayment: number | null
+    readyForDeposit: number | null
+    inTransit: number | null
+    arrivedRelay: number | null
+    revenueDelivered: number | null
+    revenueCommitted: number | null
+  }
+
+  export type KpiEnseigneMinAggregateOutputType = {
+    enseigneId: string | null
+    parcelsTotal: number | null
+    parcelsDelivered: number | null
+    pendingPayment: number | null
+    readyForDeposit: number | null
+    inTransit: number | null
+    arrivedRelay: number | null
+    revenueDelivered: number | null
+    revenueCommitted: number | null
+    updatedAt: Date | null
+    createdAt: Date | null
+  }
+
+  export type KpiEnseigneMaxAggregateOutputType = {
+    enseigneId: string | null
+    parcelsTotal: number | null
+    parcelsDelivered: number | null
+    pendingPayment: number | null
+    readyForDeposit: number | null
+    inTransit: number | null
+    arrivedRelay: number | null
+    revenueDelivered: number | null
+    revenueCommitted: number | null
+    updatedAt: Date | null
+    createdAt: Date | null
+  }
+
+  export type KpiEnseigneCountAggregateOutputType = {
+    enseigneId: number
+    parcelsTotal: number
+    parcelsDelivered: number
+    pendingPayment: number
+    readyForDeposit: number
+    inTransit: number
+    arrivedRelay: number
+    revenueDelivered: number
+    revenueCommitted: number
+    updatedAt: number
+    createdAt: number
+    _all: number
+  }
+
+
+  export type KpiEnseigneAvgAggregateInputType = {
+    parcelsTotal?: true
+    parcelsDelivered?: true
+    pendingPayment?: true
+    readyForDeposit?: true
+    inTransit?: true
+    arrivedRelay?: true
+    revenueDelivered?: true
+    revenueCommitted?: true
+  }
+
+  export type KpiEnseigneSumAggregateInputType = {
+    parcelsTotal?: true
+    parcelsDelivered?: true
+    pendingPayment?: true
+    readyForDeposit?: true
+    inTransit?: true
+    arrivedRelay?: true
+    revenueDelivered?: true
+    revenueCommitted?: true
+  }
+
+  export type KpiEnseigneMinAggregateInputType = {
+    enseigneId?: true
+    parcelsTotal?: true
+    parcelsDelivered?: true
+    pendingPayment?: true
+    readyForDeposit?: true
+    inTransit?: true
+    arrivedRelay?: true
+    revenueDelivered?: true
+    revenueCommitted?: true
+    updatedAt?: true
+    createdAt?: true
+  }
+
+  export type KpiEnseigneMaxAggregateInputType = {
+    enseigneId?: true
+    parcelsTotal?: true
+    parcelsDelivered?: true
+    pendingPayment?: true
+    readyForDeposit?: true
+    inTransit?: true
+    arrivedRelay?: true
+    revenueDelivered?: true
+    revenueCommitted?: true
+    updatedAt?: true
+    createdAt?: true
+  }
+
+  export type KpiEnseigneCountAggregateInputType = {
+    enseigneId?: true
+    parcelsTotal?: true
+    parcelsDelivered?: true
+    pendingPayment?: true
+    readyForDeposit?: true
+    inTransit?: true
+    arrivedRelay?: true
+    revenueDelivered?: true
+    revenueCommitted?: true
+    updatedAt?: true
+    createdAt?: true
+    _all?: true
+  }
+
+  export type KpiEnseigneAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which KpiEnseigne to aggregate.
+     */
+    where?: KpiEnseigneWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of KpiEnseignes to fetch.
+     */
+    orderBy?: KpiEnseigneOrderByWithRelationInput | KpiEnseigneOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: KpiEnseigneWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` KpiEnseignes from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` KpiEnseignes.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned KpiEnseignes
+    **/
+    _count?: true | KpiEnseigneCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to average
+    **/
+    _avg?: KpiEnseigneAvgAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to sum
+    **/
+    _sum?: KpiEnseigneSumAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: KpiEnseigneMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: KpiEnseigneMaxAggregateInputType
+  }
+
+  export type GetKpiEnseigneAggregateType<T extends KpiEnseigneAggregateArgs> = {
+        [P in keyof T & keyof AggregateKpiEnseigne]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateKpiEnseigne[P]>
+      : GetScalarType<T[P], AggregateKpiEnseigne[P]>
+  }
+
+
+
+
+  export type KpiEnseigneGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: KpiEnseigneWhereInput
+    orderBy?: KpiEnseigneOrderByWithAggregationInput | KpiEnseigneOrderByWithAggregationInput[]
+    by: KpiEnseigneScalarFieldEnum[] | KpiEnseigneScalarFieldEnum
+    having?: KpiEnseigneScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: KpiEnseigneCountAggregateInputType | true
+    _avg?: KpiEnseigneAvgAggregateInputType
+    _sum?: KpiEnseigneSumAggregateInputType
+    _min?: KpiEnseigneMinAggregateInputType
+    _max?: KpiEnseigneMaxAggregateInputType
+  }
+
+  export type KpiEnseigneGroupByOutputType = {
+    enseigneId: string
+    parcelsTotal: number
+    parcelsDelivered: number
+    pendingPayment: number
+    readyForDeposit: number
+    inTransit: number
+    arrivedRelay: number
+    revenueDelivered: number
+    revenueCommitted: number
+    updatedAt: Date
+    createdAt: Date
+    _count: KpiEnseigneCountAggregateOutputType | null
+    _avg: KpiEnseigneAvgAggregateOutputType | null
+    _sum: KpiEnseigneSumAggregateOutputType | null
+    _min: KpiEnseigneMinAggregateOutputType | null
+    _max: KpiEnseigneMaxAggregateOutputType | null
+  }
+
+  type GetKpiEnseigneGroupByPayload<T extends KpiEnseigneGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<KpiEnseigneGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof KpiEnseigneGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], KpiEnseigneGroupByOutputType[P]>
+            : GetScalarType<T[P], KpiEnseigneGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type KpiEnseigneSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    enseigneId?: boolean
+    parcelsTotal?: boolean
+    parcelsDelivered?: boolean
+    pendingPayment?: boolean
+    readyForDeposit?: boolean
+    inTransit?: boolean
+    arrivedRelay?: boolean
+    revenueDelivered?: boolean
+    revenueCommitted?: boolean
+    updatedAt?: boolean
+    createdAt?: boolean
+  }, ExtArgs["result"]["kpiEnseigne"]>
+
+  export type KpiEnseigneSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    enseigneId?: boolean
+    parcelsTotal?: boolean
+    parcelsDelivered?: boolean
+    pendingPayment?: boolean
+    readyForDeposit?: boolean
+    inTransit?: boolean
+    arrivedRelay?: boolean
+    revenueDelivered?: boolean
+    revenueCommitted?: boolean
+    updatedAt?: boolean
+    createdAt?: boolean
+  }, ExtArgs["result"]["kpiEnseigne"]>
+
+  export type KpiEnseigneSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    enseigneId?: boolean
+    parcelsTotal?: boolean
+    parcelsDelivered?: boolean
+    pendingPayment?: boolean
+    readyForDeposit?: boolean
+    inTransit?: boolean
+    arrivedRelay?: boolean
+    revenueDelivered?: boolean
+    revenueCommitted?: boolean
+    updatedAt?: boolean
+    createdAt?: boolean
+  }, ExtArgs["result"]["kpiEnseigne"]>
+
+  export type KpiEnseigneSelectScalar = {
+    enseigneId?: boolean
+    parcelsTotal?: boolean
+    parcelsDelivered?: boolean
+    pendingPayment?: boolean
+    readyForDeposit?: boolean
+    inTransit?: boolean
+    arrivedRelay?: boolean
+    revenueDelivered?: boolean
+    revenueCommitted?: boolean
+    updatedAt?: boolean
+    createdAt?: boolean
+  }
+
+  export type KpiEnseigneOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"enseigneId" | "parcelsTotal" | "parcelsDelivered" | "pendingPayment" | "readyForDeposit" | "inTransit" | "arrivedRelay" | "revenueDelivered" | "revenueCommitted" | "updatedAt" | "createdAt", ExtArgs["result"]["kpiEnseigne"]>
+
+  export type $KpiEnseignePayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "KpiEnseigne"
+    objects: {}
+    scalars: $Extensions.GetPayloadResult<{
+      enseigneId: string
+      parcelsTotal: number
+      parcelsDelivered: number
+      pendingPayment: number
+      readyForDeposit: number
+      inTransit: number
+      arrivedRelay: number
+      revenueDelivered: number
+      revenueCommitted: number
+      updatedAt: Date
+      createdAt: Date
+    }, ExtArgs["result"]["kpiEnseigne"]>
+    composites: {}
+  }
+
+  type KpiEnseigneGetPayload<S extends boolean | null | undefined | KpiEnseigneDefaultArgs> = $Result.GetResult<Prisma.$KpiEnseignePayload, S>
+
+  type KpiEnseigneCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<KpiEnseigneFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: KpiEnseigneCountAggregateInputType | true
+    }
+
+  export interface KpiEnseigneDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['KpiEnseigne'], meta: { name: 'KpiEnseigne' } }
+    /**
+     * Find zero or one KpiEnseigne that matches the filter.
+     * @param {KpiEnseigneFindUniqueArgs} args - Arguments to find a KpiEnseigne
+     * @example
+     * // Get one KpiEnseigne
+     * const kpiEnseigne = await prisma.kpiEnseigne.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends KpiEnseigneFindUniqueArgs>(args: SelectSubset<T, KpiEnseigneFindUniqueArgs<ExtArgs>>): Prisma__KpiEnseigneClient<$Result.GetResult<Prisma.$KpiEnseignePayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one KpiEnseigne that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {KpiEnseigneFindUniqueOrThrowArgs} args - Arguments to find a KpiEnseigne
+     * @example
+     * // Get one KpiEnseigne
+     * const kpiEnseigne = await prisma.kpiEnseigne.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends KpiEnseigneFindUniqueOrThrowArgs>(args: SelectSubset<T, KpiEnseigneFindUniqueOrThrowArgs<ExtArgs>>): Prisma__KpiEnseigneClient<$Result.GetResult<Prisma.$KpiEnseignePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first KpiEnseigne that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {KpiEnseigneFindFirstArgs} args - Arguments to find a KpiEnseigne
+     * @example
+     * // Get one KpiEnseigne
+     * const kpiEnseigne = await prisma.kpiEnseigne.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends KpiEnseigneFindFirstArgs>(args?: SelectSubset<T, KpiEnseigneFindFirstArgs<ExtArgs>>): Prisma__KpiEnseigneClient<$Result.GetResult<Prisma.$KpiEnseignePayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first KpiEnseigne that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {KpiEnseigneFindFirstOrThrowArgs} args - Arguments to find a KpiEnseigne
+     * @example
+     * // Get one KpiEnseigne
+     * const kpiEnseigne = await prisma.kpiEnseigne.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends KpiEnseigneFindFirstOrThrowArgs>(args?: SelectSubset<T, KpiEnseigneFindFirstOrThrowArgs<ExtArgs>>): Prisma__KpiEnseigneClient<$Result.GetResult<Prisma.$KpiEnseignePayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more KpiEnseignes that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {KpiEnseigneFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all KpiEnseignes
+     * const kpiEnseignes = await prisma.kpiEnseigne.findMany()
+     * 
+     * // Get first 10 KpiEnseignes
+     * const kpiEnseignes = await prisma.kpiEnseigne.findMany({ take: 10 })
+     * 
+     * // Only select the `enseigneId`
+     * const kpiEnseigneWithEnseigneIdOnly = await prisma.kpiEnseigne.findMany({ select: { enseigneId: true } })
+     * 
+     */
+    findMany<T extends KpiEnseigneFindManyArgs>(args?: SelectSubset<T, KpiEnseigneFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$KpiEnseignePayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a KpiEnseigne.
+     * @param {KpiEnseigneCreateArgs} args - Arguments to create a KpiEnseigne.
+     * @example
+     * // Create one KpiEnseigne
+     * const KpiEnseigne = await prisma.kpiEnseigne.create({
+     *   data: {
+     *     // ... data to create a KpiEnseigne
+     *   }
+     * })
+     * 
+     */
+    create<T extends KpiEnseigneCreateArgs>(args: SelectSubset<T, KpiEnseigneCreateArgs<ExtArgs>>): Prisma__KpiEnseigneClient<$Result.GetResult<Prisma.$KpiEnseignePayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many KpiEnseignes.
+     * @param {KpiEnseigneCreateManyArgs} args - Arguments to create many KpiEnseignes.
+     * @example
+     * // Create many KpiEnseignes
+     * const kpiEnseigne = await prisma.kpiEnseigne.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends KpiEnseigneCreateManyArgs>(args?: SelectSubset<T, KpiEnseigneCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many KpiEnseignes and returns the data saved in the database.
+     * @param {KpiEnseigneCreateManyAndReturnArgs} args - Arguments to create many KpiEnseignes.
+     * @example
+     * // Create many KpiEnseignes
+     * const kpiEnseigne = await prisma.kpiEnseigne.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many KpiEnseignes and only return the `enseigneId`
+     * const kpiEnseigneWithEnseigneIdOnly = await prisma.kpiEnseigne.createManyAndReturn({
+     *   select: { enseigneId: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends KpiEnseigneCreateManyAndReturnArgs>(args?: SelectSubset<T, KpiEnseigneCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$KpiEnseignePayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a KpiEnseigne.
+     * @param {KpiEnseigneDeleteArgs} args - Arguments to delete one KpiEnseigne.
+     * @example
+     * // Delete one KpiEnseigne
+     * const KpiEnseigne = await prisma.kpiEnseigne.delete({
+     *   where: {
+     *     // ... filter to delete one KpiEnseigne
+     *   }
+     * })
+     * 
+     */
+    delete<T extends KpiEnseigneDeleteArgs>(args: SelectSubset<T, KpiEnseigneDeleteArgs<ExtArgs>>): Prisma__KpiEnseigneClient<$Result.GetResult<Prisma.$KpiEnseignePayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one KpiEnseigne.
+     * @param {KpiEnseigneUpdateArgs} args - Arguments to update one KpiEnseigne.
+     * @example
+     * // Update one KpiEnseigne
+     * const kpiEnseigne = await prisma.kpiEnseigne.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends KpiEnseigneUpdateArgs>(args: SelectSubset<T, KpiEnseigneUpdateArgs<ExtArgs>>): Prisma__KpiEnseigneClient<$Result.GetResult<Prisma.$KpiEnseignePayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more KpiEnseignes.
+     * @param {KpiEnseigneDeleteManyArgs} args - Arguments to filter KpiEnseignes to delete.
+     * @example
+     * // Delete a few KpiEnseignes
+     * const { count } = await prisma.kpiEnseigne.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends KpiEnseigneDeleteManyArgs>(args?: SelectSubset<T, KpiEnseigneDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more KpiEnseignes.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {KpiEnseigneUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many KpiEnseignes
+     * const kpiEnseigne = await prisma.kpiEnseigne.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends KpiEnseigneUpdateManyArgs>(args: SelectSubset<T, KpiEnseigneUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more KpiEnseignes and returns the data updated in the database.
+     * @param {KpiEnseigneUpdateManyAndReturnArgs} args - Arguments to update many KpiEnseignes.
+     * @example
+     * // Update many KpiEnseignes
+     * const kpiEnseigne = await prisma.kpiEnseigne.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more KpiEnseignes and only return the `enseigneId`
+     * const kpiEnseigneWithEnseigneIdOnly = await prisma.kpiEnseigne.updateManyAndReturn({
+     *   select: { enseigneId: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends KpiEnseigneUpdateManyAndReturnArgs>(args: SelectSubset<T, KpiEnseigneUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$KpiEnseignePayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one KpiEnseigne.
+     * @param {KpiEnseigneUpsertArgs} args - Arguments to update or create a KpiEnseigne.
+     * @example
+     * // Update or create a KpiEnseigne
+     * const kpiEnseigne = await prisma.kpiEnseigne.upsert({
+     *   create: {
+     *     // ... data to create a KpiEnseigne
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the KpiEnseigne we want to update
+     *   }
+     * })
+     */
+    upsert<T extends KpiEnseigneUpsertArgs>(args: SelectSubset<T, KpiEnseigneUpsertArgs<ExtArgs>>): Prisma__KpiEnseigneClient<$Result.GetResult<Prisma.$KpiEnseignePayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of KpiEnseignes.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {KpiEnseigneCountArgs} args - Arguments to filter KpiEnseignes to count.
+     * @example
+     * // Count the number of KpiEnseignes
+     * const count = await prisma.kpiEnseigne.count({
+     *   where: {
+     *     // ... the filter for the KpiEnseignes we want to count
+     *   }
+     * })
+    **/
+    count<T extends KpiEnseigneCountArgs>(
+      args?: Subset<T, KpiEnseigneCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], KpiEnseigneCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a KpiEnseigne.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {KpiEnseigneAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends KpiEnseigneAggregateArgs>(args: Subset<T, KpiEnseigneAggregateArgs>): Prisma.PrismaPromise<GetKpiEnseigneAggregateType<T>>
+
+    /**
+     * Group by KpiEnseigne.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {KpiEnseigneGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends KpiEnseigneGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: KpiEnseigneGroupByArgs['orderBy'] }
+        : { orderBy?: KpiEnseigneGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, KpiEnseigneGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetKpiEnseigneGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the KpiEnseigne model
+   */
+  readonly fields: KpiEnseigneFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for KpiEnseigne.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__KpiEnseigneClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the KpiEnseigne model
+   */
+  interface KpiEnseigneFieldRefs {
+    readonly enseigneId: FieldRef<"KpiEnseigne", 'String'>
+    readonly parcelsTotal: FieldRef<"KpiEnseigne", 'Int'>
+    readonly parcelsDelivered: FieldRef<"KpiEnseigne", 'Int'>
+    readonly pendingPayment: FieldRef<"KpiEnseigne", 'Int'>
+    readonly readyForDeposit: FieldRef<"KpiEnseigne", 'Int'>
+    readonly inTransit: FieldRef<"KpiEnseigne", 'Int'>
+    readonly arrivedRelay: FieldRef<"KpiEnseigne", 'Int'>
+    readonly revenueDelivered: FieldRef<"KpiEnseigne", 'Float'>
+    readonly revenueCommitted: FieldRef<"KpiEnseigne", 'Float'>
+    readonly updatedAt: FieldRef<"KpiEnseigne", 'DateTime'>
+    readonly createdAt: FieldRef<"KpiEnseigne", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * KpiEnseigne findUnique
+   */
+  export type KpiEnseigneFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the KpiEnseigne
+     */
+    select?: KpiEnseigneSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the KpiEnseigne
+     */
+    omit?: KpiEnseigneOmit<ExtArgs> | null
+    /**
+     * Filter, which KpiEnseigne to fetch.
+     */
+    where: KpiEnseigneWhereUniqueInput
+  }
+
+  /**
+   * KpiEnseigne findUniqueOrThrow
+   */
+  export type KpiEnseigneFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the KpiEnseigne
+     */
+    select?: KpiEnseigneSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the KpiEnseigne
+     */
+    omit?: KpiEnseigneOmit<ExtArgs> | null
+    /**
+     * Filter, which KpiEnseigne to fetch.
+     */
+    where: KpiEnseigneWhereUniqueInput
+  }
+
+  /**
+   * KpiEnseigne findFirst
+   */
+  export type KpiEnseigneFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the KpiEnseigne
+     */
+    select?: KpiEnseigneSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the KpiEnseigne
+     */
+    omit?: KpiEnseigneOmit<ExtArgs> | null
+    /**
+     * Filter, which KpiEnseigne to fetch.
+     */
+    where?: KpiEnseigneWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of KpiEnseignes to fetch.
+     */
+    orderBy?: KpiEnseigneOrderByWithRelationInput | KpiEnseigneOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for KpiEnseignes.
+     */
+    cursor?: KpiEnseigneWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` KpiEnseignes from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` KpiEnseignes.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of KpiEnseignes.
+     */
+    distinct?: KpiEnseigneScalarFieldEnum | KpiEnseigneScalarFieldEnum[]
+  }
+
+  /**
+   * KpiEnseigne findFirstOrThrow
+   */
+  export type KpiEnseigneFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the KpiEnseigne
+     */
+    select?: KpiEnseigneSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the KpiEnseigne
+     */
+    omit?: KpiEnseigneOmit<ExtArgs> | null
+    /**
+     * Filter, which KpiEnseigne to fetch.
+     */
+    where?: KpiEnseigneWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of KpiEnseignes to fetch.
+     */
+    orderBy?: KpiEnseigneOrderByWithRelationInput | KpiEnseigneOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for KpiEnseignes.
+     */
+    cursor?: KpiEnseigneWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` KpiEnseignes from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` KpiEnseignes.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of KpiEnseignes.
+     */
+    distinct?: KpiEnseigneScalarFieldEnum | KpiEnseigneScalarFieldEnum[]
+  }
+
+  /**
+   * KpiEnseigne findMany
+   */
+  export type KpiEnseigneFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the KpiEnseigne
+     */
+    select?: KpiEnseigneSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the KpiEnseigne
+     */
+    omit?: KpiEnseigneOmit<ExtArgs> | null
+    /**
+     * Filter, which KpiEnseignes to fetch.
+     */
+    where?: KpiEnseigneWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of KpiEnseignes to fetch.
+     */
+    orderBy?: KpiEnseigneOrderByWithRelationInput | KpiEnseigneOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing KpiEnseignes.
+     */
+    cursor?: KpiEnseigneWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` KpiEnseignes from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` KpiEnseignes.
+     */
+    skip?: number
+    distinct?: KpiEnseigneScalarFieldEnum | KpiEnseigneScalarFieldEnum[]
+  }
+
+  /**
+   * KpiEnseigne create
+   */
+  export type KpiEnseigneCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the KpiEnseigne
+     */
+    select?: KpiEnseigneSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the KpiEnseigne
+     */
+    omit?: KpiEnseigneOmit<ExtArgs> | null
+    /**
+     * The data needed to create a KpiEnseigne.
+     */
+    data: XOR<KpiEnseigneCreateInput, KpiEnseigneUncheckedCreateInput>
+  }
+
+  /**
+   * KpiEnseigne createMany
+   */
+  export type KpiEnseigneCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many KpiEnseignes.
+     */
+    data: KpiEnseigneCreateManyInput | KpiEnseigneCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * KpiEnseigne createManyAndReturn
+   */
+  export type KpiEnseigneCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the KpiEnseigne
+     */
+    select?: KpiEnseigneSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the KpiEnseigne
+     */
+    omit?: KpiEnseigneOmit<ExtArgs> | null
+    /**
+     * The data used to create many KpiEnseignes.
+     */
+    data: KpiEnseigneCreateManyInput | KpiEnseigneCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * KpiEnseigne update
+   */
+  export type KpiEnseigneUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the KpiEnseigne
+     */
+    select?: KpiEnseigneSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the KpiEnseigne
+     */
+    omit?: KpiEnseigneOmit<ExtArgs> | null
+    /**
+     * The data needed to update a KpiEnseigne.
+     */
+    data: XOR<KpiEnseigneUpdateInput, KpiEnseigneUncheckedUpdateInput>
+    /**
+     * Choose, which KpiEnseigne to update.
+     */
+    where: KpiEnseigneWhereUniqueInput
+  }
+
+  /**
+   * KpiEnseigne updateMany
+   */
+  export type KpiEnseigneUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update KpiEnseignes.
+     */
+    data: XOR<KpiEnseigneUpdateManyMutationInput, KpiEnseigneUncheckedUpdateManyInput>
+    /**
+     * Filter which KpiEnseignes to update
+     */
+    where?: KpiEnseigneWhereInput
+    /**
+     * Limit how many KpiEnseignes to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * KpiEnseigne updateManyAndReturn
+   */
+  export type KpiEnseigneUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the KpiEnseigne
+     */
+    select?: KpiEnseigneSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the KpiEnseigne
+     */
+    omit?: KpiEnseigneOmit<ExtArgs> | null
+    /**
+     * The data used to update KpiEnseignes.
+     */
+    data: XOR<KpiEnseigneUpdateManyMutationInput, KpiEnseigneUncheckedUpdateManyInput>
+    /**
+     * Filter which KpiEnseignes to update
+     */
+    where?: KpiEnseigneWhereInput
+    /**
+     * Limit how many KpiEnseignes to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * KpiEnseigne upsert
+   */
+  export type KpiEnseigneUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the KpiEnseigne
+     */
+    select?: KpiEnseigneSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the KpiEnseigne
+     */
+    omit?: KpiEnseigneOmit<ExtArgs> | null
+    /**
+     * The filter to search for the KpiEnseigne to update in case it exists.
+     */
+    where: KpiEnseigneWhereUniqueInput
+    /**
+     * In case the KpiEnseigne found by the `where` argument doesn't exist, create a new KpiEnseigne with this data.
+     */
+    create: XOR<KpiEnseigneCreateInput, KpiEnseigneUncheckedCreateInput>
+    /**
+     * In case the KpiEnseigne was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<KpiEnseigneUpdateInput, KpiEnseigneUncheckedUpdateInput>
+  }
+
+  /**
+   * KpiEnseigne delete
+   */
+  export type KpiEnseigneDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the KpiEnseigne
+     */
+    select?: KpiEnseigneSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the KpiEnseigne
+     */
+    omit?: KpiEnseigneOmit<ExtArgs> | null
+    /**
+     * Filter which KpiEnseigne to delete.
+     */
+    where: KpiEnseigneWhereUniqueInput
+  }
+
+  /**
+   * KpiEnseigne deleteMany
+   */
+  export type KpiEnseigneDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which KpiEnseignes to delete
+     */
+    where?: KpiEnseigneWhereInput
+    /**
+     * Limit how many KpiEnseignes to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * KpiEnseigne without action
+   */
+  export type KpiEnseigneDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the KpiEnseigne
+     */
+    select?: KpiEnseigneSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the KpiEnseigne
+     */
+    omit?: KpiEnseigneOmit<ExtArgs> | null
+  }
+
+
+  /**
+   * Model KpiRelais
+   */
+
+  export type AggregateKpiRelais = {
+    _count: KpiRelaisCountAggregateOutputType | null
+    _avg: KpiRelaisAvgAggregateOutputType | null
+    _sum: KpiRelaisSumAggregateOutputType | null
+    _min: KpiRelaisMinAggregateOutputType | null
+    _max: KpiRelaisMaxAggregateOutputType | null
+  }
+
+  export type KpiRelaisAvgAggregateOutputType = {
+    pendingActions: number | null
+    stockDeparture: number | null
+    stockArrival: number | null
+    handoversCompleted: number | null
+    cashOnHand: number | null
+    commissionsTotal: number | null
+  }
+
+  export type KpiRelaisSumAggregateOutputType = {
+    pendingActions: number | null
+    stockDeparture: number | null
+    stockArrival: number | null
+    handoversCompleted: number | null
+    cashOnHand: number | null
+    commissionsTotal: number | null
+  }
+
+  export type KpiRelaisMinAggregateOutputType = {
+    relaisId: string | null
+    pendingActions: number | null
+    stockDeparture: number | null
+    stockArrival: number | null
+    handoversCompleted: number | null
+    cashOnHand: number | null
+    commissionsTotal: number | null
+    updatedAt: Date | null
+    createdAt: Date | null
+  }
+
+  export type KpiRelaisMaxAggregateOutputType = {
+    relaisId: string | null
+    pendingActions: number | null
+    stockDeparture: number | null
+    stockArrival: number | null
+    handoversCompleted: number | null
+    cashOnHand: number | null
+    commissionsTotal: number | null
+    updatedAt: Date | null
+    createdAt: Date | null
+  }
+
+  export type KpiRelaisCountAggregateOutputType = {
+    relaisId: number
+    pendingActions: number
+    stockDeparture: number
+    stockArrival: number
+    handoversCompleted: number
+    cashOnHand: number
+    commissionsTotal: number
+    updatedAt: number
+    createdAt: number
+    _all: number
+  }
+
+
+  export type KpiRelaisAvgAggregateInputType = {
+    pendingActions?: true
+    stockDeparture?: true
+    stockArrival?: true
+    handoversCompleted?: true
+    cashOnHand?: true
+    commissionsTotal?: true
+  }
+
+  export type KpiRelaisSumAggregateInputType = {
+    pendingActions?: true
+    stockDeparture?: true
+    stockArrival?: true
+    handoversCompleted?: true
+    cashOnHand?: true
+    commissionsTotal?: true
+  }
+
+  export type KpiRelaisMinAggregateInputType = {
+    relaisId?: true
+    pendingActions?: true
+    stockDeparture?: true
+    stockArrival?: true
+    handoversCompleted?: true
+    cashOnHand?: true
+    commissionsTotal?: true
+    updatedAt?: true
+    createdAt?: true
+  }
+
+  export type KpiRelaisMaxAggregateInputType = {
+    relaisId?: true
+    pendingActions?: true
+    stockDeparture?: true
+    stockArrival?: true
+    handoversCompleted?: true
+    cashOnHand?: true
+    commissionsTotal?: true
+    updatedAt?: true
+    createdAt?: true
+  }
+
+  export type KpiRelaisCountAggregateInputType = {
+    relaisId?: true
+    pendingActions?: true
+    stockDeparture?: true
+    stockArrival?: true
+    handoversCompleted?: true
+    cashOnHand?: true
+    commissionsTotal?: true
+    updatedAt?: true
+    createdAt?: true
+    _all?: true
+  }
+
+  export type KpiRelaisAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which KpiRelais to aggregate.
+     */
+    where?: KpiRelaisWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of KpiRelais to fetch.
+     */
+    orderBy?: KpiRelaisOrderByWithRelationInput | KpiRelaisOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: KpiRelaisWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` KpiRelais from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` KpiRelais.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned KpiRelais
+    **/
+    _count?: true | KpiRelaisCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to average
+    **/
+    _avg?: KpiRelaisAvgAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to sum
+    **/
+    _sum?: KpiRelaisSumAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: KpiRelaisMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: KpiRelaisMaxAggregateInputType
+  }
+
+  export type GetKpiRelaisAggregateType<T extends KpiRelaisAggregateArgs> = {
+        [P in keyof T & keyof AggregateKpiRelais]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateKpiRelais[P]>
+      : GetScalarType<T[P], AggregateKpiRelais[P]>
+  }
+
+
+
+
+  export type KpiRelaisGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: KpiRelaisWhereInput
+    orderBy?: KpiRelaisOrderByWithAggregationInput | KpiRelaisOrderByWithAggregationInput[]
+    by: KpiRelaisScalarFieldEnum[] | KpiRelaisScalarFieldEnum
+    having?: KpiRelaisScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: KpiRelaisCountAggregateInputType | true
+    _avg?: KpiRelaisAvgAggregateInputType
+    _sum?: KpiRelaisSumAggregateInputType
+    _min?: KpiRelaisMinAggregateInputType
+    _max?: KpiRelaisMaxAggregateInputType
+  }
+
+  export type KpiRelaisGroupByOutputType = {
+    relaisId: string
+    pendingActions: number
+    stockDeparture: number
+    stockArrival: number
+    handoversCompleted: number
+    cashOnHand: number
+    commissionsTotal: number
+    updatedAt: Date
+    createdAt: Date
+    _count: KpiRelaisCountAggregateOutputType | null
+    _avg: KpiRelaisAvgAggregateOutputType | null
+    _sum: KpiRelaisSumAggregateOutputType | null
+    _min: KpiRelaisMinAggregateOutputType | null
+    _max: KpiRelaisMaxAggregateOutputType | null
+  }
+
+  type GetKpiRelaisGroupByPayload<T extends KpiRelaisGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<KpiRelaisGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof KpiRelaisGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], KpiRelaisGroupByOutputType[P]>
+            : GetScalarType<T[P], KpiRelaisGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type KpiRelaisSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    relaisId?: boolean
+    pendingActions?: boolean
+    stockDeparture?: boolean
+    stockArrival?: boolean
+    handoversCompleted?: boolean
+    cashOnHand?: boolean
+    commissionsTotal?: boolean
+    updatedAt?: boolean
+    createdAt?: boolean
+  }, ExtArgs["result"]["kpiRelais"]>
+
+  export type KpiRelaisSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    relaisId?: boolean
+    pendingActions?: boolean
+    stockDeparture?: boolean
+    stockArrival?: boolean
+    handoversCompleted?: boolean
+    cashOnHand?: boolean
+    commissionsTotal?: boolean
+    updatedAt?: boolean
+    createdAt?: boolean
+  }, ExtArgs["result"]["kpiRelais"]>
+
+  export type KpiRelaisSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    relaisId?: boolean
+    pendingActions?: boolean
+    stockDeparture?: boolean
+    stockArrival?: boolean
+    handoversCompleted?: boolean
+    cashOnHand?: boolean
+    commissionsTotal?: boolean
+    updatedAt?: boolean
+    createdAt?: boolean
+  }, ExtArgs["result"]["kpiRelais"]>
+
+  export type KpiRelaisSelectScalar = {
+    relaisId?: boolean
+    pendingActions?: boolean
+    stockDeparture?: boolean
+    stockArrival?: boolean
+    handoversCompleted?: boolean
+    cashOnHand?: boolean
+    commissionsTotal?: boolean
+    updatedAt?: boolean
+    createdAt?: boolean
+  }
+
+  export type KpiRelaisOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"relaisId" | "pendingActions" | "stockDeparture" | "stockArrival" | "handoversCompleted" | "cashOnHand" | "commissionsTotal" | "updatedAt" | "createdAt", ExtArgs["result"]["kpiRelais"]>
+
+  export type $KpiRelaisPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "KpiRelais"
+    objects: {}
+    scalars: $Extensions.GetPayloadResult<{
+      relaisId: string
+      pendingActions: number
+      stockDeparture: number
+      stockArrival: number
+      handoversCompleted: number
+      cashOnHand: number
+      commissionsTotal: number
+      updatedAt: Date
+      createdAt: Date
+    }, ExtArgs["result"]["kpiRelais"]>
+    composites: {}
+  }
+
+  type KpiRelaisGetPayload<S extends boolean | null | undefined | KpiRelaisDefaultArgs> = $Result.GetResult<Prisma.$KpiRelaisPayload, S>
+
+  type KpiRelaisCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<KpiRelaisFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: KpiRelaisCountAggregateInputType | true
+    }
+
+  export interface KpiRelaisDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['KpiRelais'], meta: { name: 'KpiRelais' } }
+    /**
+     * Find zero or one KpiRelais that matches the filter.
+     * @param {KpiRelaisFindUniqueArgs} args - Arguments to find a KpiRelais
+     * @example
+     * // Get one KpiRelais
+     * const kpiRelais = await prisma.kpiRelais.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends KpiRelaisFindUniqueArgs>(args: SelectSubset<T, KpiRelaisFindUniqueArgs<ExtArgs>>): Prisma__KpiRelaisClient<$Result.GetResult<Prisma.$KpiRelaisPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one KpiRelais that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {KpiRelaisFindUniqueOrThrowArgs} args - Arguments to find a KpiRelais
+     * @example
+     * // Get one KpiRelais
+     * const kpiRelais = await prisma.kpiRelais.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends KpiRelaisFindUniqueOrThrowArgs>(args: SelectSubset<T, KpiRelaisFindUniqueOrThrowArgs<ExtArgs>>): Prisma__KpiRelaisClient<$Result.GetResult<Prisma.$KpiRelaisPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first KpiRelais that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {KpiRelaisFindFirstArgs} args - Arguments to find a KpiRelais
+     * @example
+     * // Get one KpiRelais
+     * const kpiRelais = await prisma.kpiRelais.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends KpiRelaisFindFirstArgs>(args?: SelectSubset<T, KpiRelaisFindFirstArgs<ExtArgs>>): Prisma__KpiRelaisClient<$Result.GetResult<Prisma.$KpiRelaisPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first KpiRelais that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {KpiRelaisFindFirstOrThrowArgs} args - Arguments to find a KpiRelais
+     * @example
+     * // Get one KpiRelais
+     * const kpiRelais = await prisma.kpiRelais.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends KpiRelaisFindFirstOrThrowArgs>(args?: SelectSubset<T, KpiRelaisFindFirstOrThrowArgs<ExtArgs>>): Prisma__KpiRelaisClient<$Result.GetResult<Prisma.$KpiRelaisPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more KpiRelais that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {KpiRelaisFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all KpiRelais
+     * const kpiRelais = await prisma.kpiRelais.findMany()
+     * 
+     * // Get first 10 KpiRelais
+     * const kpiRelais = await prisma.kpiRelais.findMany({ take: 10 })
+     * 
+     * // Only select the `relaisId`
+     * const kpiRelaisWithRelaisIdOnly = await prisma.kpiRelais.findMany({ select: { relaisId: true } })
+     * 
+     */
+    findMany<T extends KpiRelaisFindManyArgs>(args?: SelectSubset<T, KpiRelaisFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$KpiRelaisPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a KpiRelais.
+     * @param {KpiRelaisCreateArgs} args - Arguments to create a KpiRelais.
+     * @example
+     * // Create one KpiRelais
+     * const KpiRelais = await prisma.kpiRelais.create({
+     *   data: {
+     *     // ... data to create a KpiRelais
+     *   }
+     * })
+     * 
+     */
+    create<T extends KpiRelaisCreateArgs>(args: SelectSubset<T, KpiRelaisCreateArgs<ExtArgs>>): Prisma__KpiRelaisClient<$Result.GetResult<Prisma.$KpiRelaisPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many KpiRelais.
+     * @param {KpiRelaisCreateManyArgs} args - Arguments to create many KpiRelais.
+     * @example
+     * // Create many KpiRelais
+     * const kpiRelais = await prisma.kpiRelais.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends KpiRelaisCreateManyArgs>(args?: SelectSubset<T, KpiRelaisCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many KpiRelais and returns the data saved in the database.
+     * @param {KpiRelaisCreateManyAndReturnArgs} args - Arguments to create many KpiRelais.
+     * @example
+     * // Create many KpiRelais
+     * const kpiRelais = await prisma.kpiRelais.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many KpiRelais and only return the `relaisId`
+     * const kpiRelaisWithRelaisIdOnly = await prisma.kpiRelais.createManyAndReturn({
+     *   select: { relaisId: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends KpiRelaisCreateManyAndReturnArgs>(args?: SelectSubset<T, KpiRelaisCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$KpiRelaisPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a KpiRelais.
+     * @param {KpiRelaisDeleteArgs} args - Arguments to delete one KpiRelais.
+     * @example
+     * // Delete one KpiRelais
+     * const KpiRelais = await prisma.kpiRelais.delete({
+     *   where: {
+     *     // ... filter to delete one KpiRelais
+     *   }
+     * })
+     * 
+     */
+    delete<T extends KpiRelaisDeleteArgs>(args: SelectSubset<T, KpiRelaisDeleteArgs<ExtArgs>>): Prisma__KpiRelaisClient<$Result.GetResult<Prisma.$KpiRelaisPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one KpiRelais.
+     * @param {KpiRelaisUpdateArgs} args - Arguments to update one KpiRelais.
+     * @example
+     * // Update one KpiRelais
+     * const kpiRelais = await prisma.kpiRelais.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends KpiRelaisUpdateArgs>(args: SelectSubset<T, KpiRelaisUpdateArgs<ExtArgs>>): Prisma__KpiRelaisClient<$Result.GetResult<Prisma.$KpiRelaisPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more KpiRelais.
+     * @param {KpiRelaisDeleteManyArgs} args - Arguments to filter KpiRelais to delete.
+     * @example
+     * // Delete a few KpiRelais
+     * const { count } = await prisma.kpiRelais.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends KpiRelaisDeleteManyArgs>(args?: SelectSubset<T, KpiRelaisDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more KpiRelais.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {KpiRelaisUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many KpiRelais
+     * const kpiRelais = await prisma.kpiRelais.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends KpiRelaisUpdateManyArgs>(args: SelectSubset<T, KpiRelaisUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more KpiRelais and returns the data updated in the database.
+     * @param {KpiRelaisUpdateManyAndReturnArgs} args - Arguments to update many KpiRelais.
+     * @example
+     * // Update many KpiRelais
+     * const kpiRelais = await prisma.kpiRelais.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more KpiRelais and only return the `relaisId`
+     * const kpiRelaisWithRelaisIdOnly = await prisma.kpiRelais.updateManyAndReturn({
+     *   select: { relaisId: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends KpiRelaisUpdateManyAndReturnArgs>(args: SelectSubset<T, KpiRelaisUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$KpiRelaisPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one KpiRelais.
+     * @param {KpiRelaisUpsertArgs} args - Arguments to update or create a KpiRelais.
+     * @example
+     * // Update or create a KpiRelais
+     * const kpiRelais = await prisma.kpiRelais.upsert({
+     *   create: {
+     *     // ... data to create a KpiRelais
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the KpiRelais we want to update
+     *   }
+     * })
+     */
+    upsert<T extends KpiRelaisUpsertArgs>(args: SelectSubset<T, KpiRelaisUpsertArgs<ExtArgs>>): Prisma__KpiRelaisClient<$Result.GetResult<Prisma.$KpiRelaisPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of KpiRelais.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {KpiRelaisCountArgs} args - Arguments to filter KpiRelais to count.
+     * @example
+     * // Count the number of KpiRelais
+     * const count = await prisma.kpiRelais.count({
+     *   where: {
+     *     // ... the filter for the KpiRelais we want to count
+     *   }
+     * })
+    **/
+    count<T extends KpiRelaisCountArgs>(
+      args?: Subset<T, KpiRelaisCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], KpiRelaisCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a KpiRelais.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {KpiRelaisAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends KpiRelaisAggregateArgs>(args: Subset<T, KpiRelaisAggregateArgs>): Prisma.PrismaPromise<GetKpiRelaisAggregateType<T>>
+
+    /**
+     * Group by KpiRelais.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {KpiRelaisGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends KpiRelaisGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: KpiRelaisGroupByArgs['orderBy'] }
+        : { orderBy?: KpiRelaisGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, KpiRelaisGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetKpiRelaisGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the KpiRelais model
+   */
+  readonly fields: KpiRelaisFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for KpiRelais.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__KpiRelaisClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the KpiRelais model
+   */
+  interface KpiRelaisFieldRefs {
+    readonly relaisId: FieldRef<"KpiRelais", 'String'>
+    readonly pendingActions: FieldRef<"KpiRelais", 'Int'>
+    readonly stockDeparture: FieldRef<"KpiRelais", 'Int'>
+    readonly stockArrival: FieldRef<"KpiRelais", 'Int'>
+    readonly handoversCompleted: FieldRef<"KpiRelais", 'Int'>
+    readonly cashOnHand: FieldRef<"KpiRelais", 'Float'>
+    readonly commissionsTotal: FieldRef<"KpiRelais", 'Float'>
+    readonly updatedAt: FieldRef<"KpiRelais", 'DateTime'>
+    readonly createdAt: FieldRef<"KpiRelais", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * KpiRelais findUnique
+   */
+  export type KpiRelaisFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the KpiRelais
+     */
+    select?: KpiRelaisSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the KpiRelais
+     */
+    omit?: KpiRelaisOmit<ExtArgs> | null
+    /**
+     * Filter, which KpiRelais to fetch.
+     */
+    where: KpiRelaisWhereUniqueInput
+  }
+
+  /**
+   * KpiRelais findUniqueOrThrow
+   */
+  export type KpiRelaisFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the KpiRelais
+     */
+    select?: KpiRelaisSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the KpiRelais
+     */
+    omit?: KpiRelaisOmit<ExtArgs> | null
+    /**
+     * Filter, which KpiRelais to fetch.
+     */
+    where: KpiRelaisWhereUniqueInput
+  }
+
+  /**
+   * KpiRelais findFirst
+   */
+  export type KpiRelaisFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the KpiRelais
+     */
+    select?: KpiRelaisSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the KpiRelais
+     */
+    omit?: KpiRelaisOmit<ExtArgs> | null
+    /**
+     * Filter, which KpiRelais to fetch.
+     */
+    where?: KpiRelaisWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of KpiRelais to fetch.
+     */
+    orderBy?: KpiRelaisOrderByWithRelationInput | KpiRelaisOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for KpiRelais.
+     */
+    cursor?: KpiRelaisWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` KpiRelais from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` KpiRelais.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of KpiRelais.
+     */
+    distinct?: KpiRelaisScalarFieldEnum | KpiRelaisScalarFieldEnum[]
+  }
+
+  /**
+   * KpiRelais findFirstOrThrow
+   */
+  export type KpiRelaisFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the KpiRelais
+     */
+    select?: KpiRelaisSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the KpiRelais
+     */
+    omit?: KpiRelaisOmit<ExtArgs> | null
+    /**
+     * Filter, which KpiRelais to fetch.
+     */
+    where?: KpiRelaisWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of KpiRelais to fetch.
+     */
+    orderBy?: KpiRelaisOrderByWithRelationInput | KpiRelaisOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for KpiRelais.
+     */
+    cursor?: KpiRelaisWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` KpiRelais from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` KpiRelais.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of KpiRelais.
+     */
+    distinct?: KpiRelaisScalarFieldEnum | KpiRelaisScalarFieldEnum[]
+  }
+
+  /**
+   * KpiRelais findMany
+   */
+  export type KpiRelaisFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the KpiRelais
+     */
+    select?: KpiRelaisSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the KpiRelais
+     */
+    omit?: KpiRelaisOmit<ExtArgs> | null
+    /**
+     * Filter, which KpiRelais to fetch.
+     */
+    where?: KpiRelaisWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of KpiRelais to fetch.
+     */
+    orderBy?: KpiRelaisOrderByWithRelationInput | KpiRelaisOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing KpiRelais.
+     */
+    cursor?: KpiRelaisWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` KpiRelais from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` KpiRelais.
+     */
+    skip?: number
+    distinct?: KpiRelaisScalarFieldEnum | KpiRelaisScalarFieldEnum[]
+  }
+
+  /**
+   * KpiRelais create
+   */
+  export type KpiRelaisCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the KpiRelais
+     */
+    select?: KpiRelaisSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the KpiRelais
+     */
+    omit?: KpiRelaisOmit<ExtArgs> | null
+    /**
+     * The data needed to create a KpiRelais.
+     */
+    data: XOR<KpiRelaisCreateInput, KpiRelaisUncheckedCreateInput>
+  }
+
+  /**
+   * KpiRelais createMany
+   */
+  export type KpiRelaisCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many KpiRelais.
+     */
+    data: KpiRelaisCreateManyInput | KpiRelaisCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * KpiRelais createManyAndReturn
+   */
+  export type KpiRelaisCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the KpiRelais
+     */
+    select?: KpiRelaisSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the KpiRelais
+     */
+    omit?: KpiRelaisOmit<ExtArgs> | null
+    /**
+     * The data used to create many KpiRelais.
+     */
+    data: KpiRelaisCreateManyInput | KpiRelaisCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * KpiRelais update
+   */
+  export type KpiRelaisUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the KpiRelais
+     */
+    select?: KpiRelaisSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the KpiRelais
+     */
+    omit?: KpiRelaisOmit<ExtArgs> | null
+    /**
+     * The data needed to update a KpiRelais.
+     */
+    data: XOR<KpiRelaisUpdateInput, KpiRelaisUncheckedUpdateInput>
+    /**
+     * Choose, which KpiRelais to update.
+     */
+    where: KpiRelaisWhereUniqueInput
+  }
+
+  /**
+   * KpiRelais updateMany
+   */
+  export type KpiRelaisUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update KpiRelais.
+     */
+    data: XOR<KpiRelaisUpdateManyMutationInput, KpiRelaisUncheckedUpdateManyInput>
+    /**
+     * Filter which KpiRelais to update
+     */
+    where?: KpiRelaisWhereInput
+    /**
+     * Limit how many KpiRelais to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * KpiRelais updateManyAndReturn
+   */
+  export type KpiRelaisUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the KpiRelais
+     */
+    select?: KpiRelaisSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the KpiRelais
+     */
+    omit?: KpiRelaisOmit<ExtArgs> | null
+    /**
+     * The data used to update KpiRelais.
+     */
+    data: XOR<KpiRelaisUpdateManyMutationInput, KpiRelaisUncheckedUpdateManyInput>
+    /**
+     * Filter which KpiRelais to update
+     */
+    where?: KpiRelaisWhereInput
+    /**
+     * Limit how many KpiRelais to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * KpiRelais upsert
+   */
+  export type KpiRelaisUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the KpiRelais
+     */
+    select?: KpiRelaisSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the KpiRelais
+     */
+    omit?: KpiRelaisOmit<ExtArgs> | null
+    /**
+     * The filter to search for the KpiRelais to update in case it exists.
+     */
+    where: KpiRelaisWhereUniqueInput
+    /**
+     * In case the KpiRelais found by the `where` argument doesn't exist, create a new KpiRelais with this data.
+     */
+    create: XOR<KpiRelaisCreateInput, KpiRelaisUncheckedCreateInput>
+    /**
+     * In case the KpiRelais was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<KpiRelaisUpdateInput, KpiRelaisUncheckedUpdateInput>
+  }
+
+  /**
+   * KpiRelais delete
+   */
+  export type KpiRelaisDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the KpiRelais
+     */
+    select?: KpiRelaisSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the KpiRelais
+     */
+    omit?: KpiRelaisOmit<ExtArgs> | null
+    /**
+     * Filter which KpiRelais to delete.
+     */
+    where: KpiRelaisWhereUniqueInput
+  }
+
+  /**
+   * KpiRelais deleteMany
+   */
+  export type KpiRelaisDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which KpiRelais to delete
+     */
+    where?: KpiRelaisWhereInput
+    /**
+     * Limit how many KpiRelais to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * KpiRelais without action
+   */
+  export type KpiRelaisDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the KpiRelais
+     */
+    select?: KpiRelaisSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the KpiRelais
+     */
+    omit?: KpiRelaisOmit<ExtArgs> | null
+  }
+
+
+  /**
    * Enums
    */
 
@@ -35369,6 +40078,65 @@ export namespace Prisma {
   };
 
   export type QrSecurityLogScalarFieldEnum = (typeof QrSecurityLogScalarFieldEnum)[keyof typeof QrSecurityLogScalarFieldEnum]
+
+
+  export const EventScalarFieldEnum: {
+    id: 'id',
+    type: 'type',
+    aggregateType: 'aggregateType',
+    aggregateId: 'aggregateId',
+    payload: 'payload',
+    createdAt: 'createdAt'
+  };
+
+  export type EventScalarFieldEnum = (typeof EventScalarFieldEnum)[keyof typeof EventScalarFieldEnum]
+
+
+  export const KpiTransporterScalarFieldEnum: {
+    transporteurId: 'transporteurId',
+    missionsTotal: 'missionsTotal',
+    missionsActive: 'missionsActive',
+    missionsAssigned: 'missionsAssigned',
+    missionsInProgress: 'missionsInProgress',
+    missionsCompleted: 'missionsCompleted',
+    earningsTotal: 'earningsTotal',
+    updatedAt: 'updatedAt',
+    createdAt: 'createdAt'
+  };
+
+  export type KpiTransporterScalarFieldEnum = (typeof KpiTransporterScalarFieldEnum)[keyof typeof KpiTransporterScalarFieldEnum]
+
+
+  export const KpiEnseigneScalarFieldEnum: {
+    enseigneId: 'enseigneId',
+    parcelsTotal: 'parcelsTotal',
+    parcelsDelivered: 'parcelsDelivered',
+    pendingPayment: 'pendingPayment',
+    readyForDeposit: 'readyForDeposit',
+    inTransit: 'inTransit',
+    arrivedRelay: 'arrivedRelay',
+    revenueDelivered: 'revenueDelivered',
+    revenueCommitted: 'revenueCommitted',
+    updatedAt: 'updatedAt',
+    createdAt: 'createdAt'
+  };
+
+  export type KpiEnseigneScalarFieldEnum = (typeof KpiEnseigneScalarFieldEnum)[keyof typeof KpiEnseigneScalarFieldEnum]
+
+
+  export const KpiRelaisScalarFieldEnum: {
+    relaisId: 'relaisId',
+    pendingActions: 'pendingActions',
+    stockDeparture: 'stockDeparture',
+    stockArrival: 'stockArrival',
+    handoversCompleted: 'handoversCompleted',
+    cashOnHand: 'cashOnHand',
+    commissionsTotal: 'commissionsTotal',
+    updatedAt: 'updatedAt',
+    createdAt: 'createdAt'
+  };
+
+  export type KpiRelaisScalarFieldEnum = (typeof KpiRelaisScalarFieldEnum)[keyof typeof KpiRelaisScalarFieldEnum]
 
 
   export const SortOrder: {
@@ -38067,6 +42835,295 @@ export namespace Prisma {
     fraudReason?: StringNullableWithAggregatesFilter<"QrSecurityLog"> | string | null
     scanTimestamp?: DateTimeWithAggregatesFilter<"QrSecurityLog"> | Date | string
     createdAt?: DateTimeWithAggregatesFilter<"QrSecurityLog"> | Date | string
+  }
+
+  export type EventWhereInput = {
+    AND?: EventWhereInput | EventWhereInput[]
+    OR?: EventWhereInput[]
+    NOT?: EventWhereInput | EventWhereInput[]
+    id?: StringFilter<"Event"> | string
+    type?: StringFilter<"Event"> | string
+    aggregateType?: StringFilter<"Event"> | string
+    aggregateId?: StringFilter<"Event"> | string
+    payload?: StringFilter<"Event"> | string
+    createdAt?: DateTimeFilter<"Event"> | Date | string
+  }
+
+  export type EventOrderByWithRelationInput = {
+    id?: SortOrder
+    type?: SortOrder
+    aggregateType?: SortOrder
+    aggregateId?: SortOrder
+    payload?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type EventWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    AND?: EventWhereInput | EventWhereInput[]
+    OR?: EventWhereInput[]
+    NOT?: EventWhereInput | EventWhereInput[]
+    type?: StringFilter<"Event"> | string
+    aggregateType?: StringFilter<"Event"> | string
+    aggregateId?: StringFilter<"Event"> | string
+    payload?: StringFilter<"Event"> | string
+    createdAt?: DateTimeFilter<"Event"> | Date | string
+  }, "id">
+
+  export type EventOrderByWithAggregationInput = {
+    id?: SortOrder
+    type?: SortOrder
+    aggregateType?: SortOrder
+    aggregateId?: SortOrder
+    payload?: SortOrder
+    createdAt?: SortOrder
+    _count?: EventCountOrderByAggregateInput
+    _max?: EventMaxOrderByAggregateInput
+    _min?: EventMinOrderByAggregateInput
+  }
+
+  export type EventScalarWhereWithAggregatesInput = {
+    AND?: EventScalarWhereWithAggregatesInput | EventScalarWhereWithAggregatesInput[]
+    OR?: EventScalarWhereWithAggregatesInput[]
+    NOT?: EventScalarWhereWithAggregatesInput | EventScalarWhereWithAggregatesInput[]
+    id?: StringWithAggregatesFilter<"Event"> | string
+    type?: StringWithAggregatesFilter<"Event"> | string
+    aggregateType?: StringWithAggregatesFilter<"Event"> | string
+    aggregateId?: StringWithAggregatesFilter<"Event"> | string
+    payload?: StringWithAggregatesFilter<"Event"> | string
+    createdAt?: DateTimeWithAggregatesFilter<"Event"> | Date | string
+  }
+
+  export type KpiTransporterWhereInput = {
+    AND?: KpiTransporterWhereInput | KpiTransporterWhereInput[]
+    OR?: KpiTransporterWhereInput[]
+    NOT?: KpiTransporterWhereInput | KpiTransporterWhereInput[]
+    transporteurId?: StringFilter<"KpiTransporter"> | string
+    missionsTotal?: IntFilter<"KpiTransporter"> | number
+    missionsActive?: IntFilter<"KpiTransporter"> | number
+    missionsAssigned?: IntFilter<"KpiTransporter"> | number
+    missionsInProgress?: IntFilter<"KpiTransporter"> | number
+    missionsCompleted?: IntFilter<"KpiTransporter"> | number
+    earningsTotal?: FloatFilter<"KpiTransporter"> | number
+    updatedAt?: DateTimeFilter<"KpiTransporter"> | Date | string
+    createdAt?: DateTimeFilter<"KpiTransporter"> | Date | string
+  }
+
+  export type KpiTransporterOrderByWithRelationInput = {
+    transporteurId?: SortOrder
+    missionsTotal?: SortOrder
+    missionsActive?: SortOrder
+    missionsAssigned?: SortOrder
+    missionsInProgress?: SortOrder
+    missionsCompleted?: SortOrder
+    earningsTotal?: SortOrder
+    updatedAt?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type KpiTransporterWhereUniqueInput = Prisma.AtLeast<{
+    transporteurId?: string
+    AND?: KpiTransporterWhereInput | KpiTransporterWhereInput[]
+    OR?: KpiTransporterWhereInput[]
+    NOT?: KpiTransporterWhereInput | KpiTransporterWhereInput[]
+    missionsTotal?: IntFilter<"KpiTransporter"> | number
+    missionsActive?: IntFilter<"KpiTransporter"> | number
+    missionsAssigned?: IntFilter<"KpiTransporter"> | number
+    missionsInProgress?: IntFilter<"KpiTransporter"> | number
+    missionsCompleted?: IntFilter<"KpiTransporter"> | number
+    earningsTotal?: FloatFilter<"KpiTransporter"> | number
+    updatedAt?: DateTimeFilter<"KpiTransporter"> | Date | string
+    createdAt?: DateTimeFilter<"KpiTransporter"> | Date | string
+  }, "transporteurId">
+
+  export type KpiTransporterOrderByWithAggregationInput = {
+    transporteurId?: SortOrder
+    missionsTotal?: SortOrder
+    missionsActive?: SortOrder
+    missionsAssigned?: SortOrder
+    missionsInProgress?: SortOrder
+    missionsCompleted?: SortOrder
+    earningsTotal?: SortOrder
+    updatedAt?: SortOrder
+    createdAt?: SortOrder
+    _count?: KpiTransporterCountOrderByAggregateInput
+    _avg?: KpiTransporterAvgOrderByAggregateInput
+    _max?: KpiTransporterMaxOrderByAggregateInput
+    _min?: KpiTransporterMinOrderByAggregateInput
+    _sum?: KpiTransporterSumOrderByAggregateInput
+  }
+
+  export type KpiTransporterScalarWhereWithAggregatesInput = {
+    AND?: KpiTransporterScalarWhereWithAggregatesInput | KpiTransporterScalarWhereWithAggregatesInput[]
+    OR?: KpiTransporterScalarWhereWithAggregatesInput[]
+    NOT?: KpiTransporterScalarWhereWithAggregatesInput | KpiTransporterScalarWhereWithAggregatesInput[]
+    transporteurId?: StringWithAggregatesFilter<"KpiTransporter"> | string
+    missionsTotal?: IntWithAggregatesFilter<"KpiTransporter"> | number
+    missionsActive?: IntWithAggregatesFilter<"KpiTransporter"> | number
+    missionsAssigned?: IntWithAggregatesFilter<"KpiTransporter"> | number
+    missionsInProgress?: IntWithAggregatesFilter<"KpiTransporter"> | number
+    missionsCompleted?: IntWithAggregatesFilter<"KpiTransporter"> | number
+    earningsTotal?: FloatWithAggregatesFilter<"KpiTransporter"> | number
+    updatedAt?: DateTimeWithAggregatesFilter<"KpiTransporter"> | Date | string
+    createdAt?: DateTimeWithAggregatesFilter<"KpiTransporter"> | Date | string
+  }
+
+  export type KpiEnseigneWhereInput = {
+    AND?: KpiEnseigneWhereInput | KpiEnseigneWhereInput[]
+    OR?: KpiEnseigneWhereInput[]
+    NOT?: KpiEnseigneWhereInput | KpiEnseigneWhereInput[]
+    enseigneId?: StringFilter<"KpiEnseigne"> | string
+    parcelsTotal?: IntFilter<"KpiEnseigne"> | number
+    parcelsDelivered?: IntFilter<"KpiEnseigne"> | number
+    pendingPayment?: IntFilter<"KpiEnseigne"> | number
+    readyForDeposit?: IntFilter<"KpiEnseigne"> | number
+    inTransit?: IntFilter<"KpiEnseigne"> | number
+    arrivedRelay?: IntFilter<"KpiEnseigne"> | number
+    revenueDelivered?: FloatFilter<"KpiEnseigne"> | number
+    revenueCommitted?: FloatFilter<"KpiEnseigne"> | number
+    updatedAt?: DateTimeFilter<"KpiEnseigne"> | Date | string
+    createdAt?: DateTimeFilter<"KpiEnseigne"> | Date | string
+  }
+
+  export type KpiEnseigneOrderByWithRelationInput = {
+    enseigneId?: SortOrder
+    parcelsTotal?: SortOrder
+    parcelsDelivered?: SortOrder
+    pendingPayment?: SortOrder
+    readyForDeposit?: SortOrder
+    inTransit?: SortOrder
+    arrivedRelay?: SortOrder
+    revenueDelivered?: SortOrder
+    revenueCommitted?: SortOrder
+    updatedAt?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type KpiEnseigneWhereUniqueInput = Prisma.AtLeast<{
+    enseigneId?: string
+    AND?: KpiEnseigneWhereInput | KpiEnseigneWhereInput[]
+    OR?: KpiEnseigneWhereInput[]
+    NOT?: KpiEnseigneWhereInput | KpiEnseigneWhereInput[]
+    parcelsTotal?: IntFilter<"KpiEnseigne"> | number
+    parcelsDelivered?: IntFilter<"KpiEnseigne"> | number
+    pendingPayment?: IntFilter<"KpiEnseigne"> | number
+    readyForDeposit?: IntFilter<"KpiEnseigne"> | number
+    inTransit?: IntFilter<"KpiEnseigne"> | number
+    arrivedRelay?: IntFilter<"KpiEnseigne"> | number
+    revenueDelivered?: FloatFilter<"KpiEnseigne"> | number
+    revenueCommitted?: FloatFilter<"KpiEnseigne"> | number
+    updatedAt?: DateTimeFilter<"KpiEnseigne"> | Date | string
+    createdAt?: DateTimeFilter<"KpiEnseigne"> | Date | string
+  }, "enseigneId">
+
+  export type KpiEnseigneOrderByWithAggregationInput = {
+    enseigneId?: SortOrder
+    parcelsTotal?: SortOrder
+    parcelsDelivered?: SortOrder
+    pendingPayment?: SortOrder
+    readyForDeposit?: SortOrder
+    inTransit?: SortOrder
+    arrivedRelay?: SortOrder
+    revenueDelivered?: SortOrder
+    revenueCommitted?: SortOrder
+    updatedAt?: SortOrder
+    createdAt?: SortOrder
+    _count?: KpiEnseigneCountOrderByAggregateInput
+    _avg?: KpiEnseigneAvgOrderByAggregateInput
+    _max?: KpiEnseigneMaxOrderByAggregateInput
+    _min?: KpiEnseigneMinOrderByAggregateInput
+    _sum?: KpiEnseigneSumOrderByAggregateInput
+  }
+
+  export type KpiEnseigneScalarWhereWithAggregatesInput = {
+    AND?: KpiEnseigneScalarWhereWithAggregatesInput | KpiEnseigneScalarWhereWithAggregatesInput[]
+    OR?: KpiEnseigneScalarWhereWithAggregatesInput[]
+    NOT?: KpiEnseigneScalarWhereWithAggregatesInput | KpiEnseigneScalarWhereWithAggregatesInput[]
+    enseigneId?: StringWithAggregatesFilter<"KpiEnseigne"> | string
+    parcelsTotal?: IntWithAggregatesFilter<"KpiEnseigne"> | number
+    parcelsDelivered?: IntWithAggregatesFilter<"KpiEnseigne"> | number
+    pendingPayment?: IntWithAggregatesFilter<"KpiEnseigne"> | number
+    readyForDeposit?: IntWithAggregatesFilter<"KpiEnseigne"> | number
+    inTransit?: IntWithAggregatesFilter<"KpiEnseigne"> | number
+    arrivedRelay?: IntWithAggregatesFilter<"KpiEnseigne"> | number
+    revenueDelivered?: FloatWithAggregatesFilter<"KpiEnseigne"> | number
+    revenueCommitted?: FloatWithAggregatesFilter<"KpiEnseigne"> | number
+    updatedAt?: DateTimeWithAggregatesFilter<"KpiEnseigne"> | Date | string
+    createdAt?: DateTimeWithAggregatesFilter<"KpiEnseigne"> | Date | string
+  }
+
+  export type KpiRelaisWhereInput = {
+    AND?: KpiRelaisWhereInput | KpiRelaisWhereInput[]
+    OR?: KpiRelaisWhereInput[]
+    NOT?: KpiRelaisWhereInput | KpiRelaisWhereInput[]
+    relaisId?: StringFilter<"KpiRelais"> | string
+    pendingActions?: IntFilter<"KpiRelais"> | number
+    stockDeparture?: IntFilter<"KpiRelais"> | number
+    stockArrival?: IntFilter<"KpiRelais"> | number
+    handoversCompleted?: IntFilter<"KpiRelais"> | number
+    cashOnHand?: FloatFilter<"KpiRelais"> | number
+    commissionsTotal?: FloatFilter<"KpiRelais"> | number
+    updatedAt?: DateTimeFilter<"KpiRelais"> | Date | string
+    createdAt?: DateTimeFilter<"KpiRelais"> | Date | string
+  }
+
+  export type KpiRelaisOrderByWithRelationInput = {
+    relaisId?: SortOrder
+    pendingActions?: SortOrder
+    stockDeparture?: SortOrder
+    stockArrival?: SortOrder
+    handoversCompleted?: SortOrder
+    cashOnHand?: SortOrder
+    commissionsTotal?: SortOrder
+    updatedAt?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type KpiRelaisWhereUniqueInput = Prisma.AtLeast<{
+    relaisId?: string
+    AND?: KpiRelaisWhereInput | KpiRelaisWhereInput[]
+    OR?: KpiRelaisWhereInput[]
+    NOT?: KpiRelaisWhereInput | KpiRelaisWhereInput[]
+    pendingActions?: IntFilter<"KpiRelais"> | number
+    stockDeparture?: IntFilter<"KpiRelais"> | number
+    stockArrival?: IntFilter<"KpiRelais"> | number
+    handoversCompleted?: IntFilter<"KpiRelais"> | number
+    cashOnHand?: FloatFilter<"KpiRelais"> | number
+    commissionsTotal?: FloatFilter<"KpiRelais"> | number
+    updatedAt?: DateTimeFilter<"KpiRelais"> | Date | string
+    createdAt?: DateTimeFilter<"KpiRelais"> | Date | string
+  }, "relaisId">
+
+  export type KpiRelaisOrderByWithAggregationInput = {
+    relaisId?: SortOrder
+    pendingActions?: SortOrder
+    stockDeparture?: SortOrder
+    stockArrival?: SortOrder
+    handoversCompleted?: SortOrder
+    cashOnHand?: SortOrder
+    commissionsTotal?: SortOrder
+    updatedAt?: SortOrder
+    createdAt?: SortOrder
+    _count?: KpiRelaisCountOrderByAggregateInput
+    _avg?: KpiRelaisAvgOrderByAggregateInput
+    _max?: KpiRelaisMaxOrderByAggregateInput
+    _min?: KpiRelaisMinOrderByAggregateInput
+    _sum?: KpiRelaisSumOrderByAggregateInput
+  }
+
+  export type KpiRelaisScalarWhereWithAggregatesInput = {
+    AND?: KpiRelaisScalarWhereWithAggregatesInput | KpiRelaisScalarWhereWithAggregatesInput[]
+    OR?: KpiRelaisScalarWhereWithAggregatesInput[]
+    NOT?: KpiRelaisScalarWhereWithAggregatesInput | KpiRelaisScalarWhereWithAggregatesInput[]
+    relaisId?: StringWithAggregatesFilter<"KpiRelais"> | string
+    pendingActions?: IntWithAggregatesFilter<"KpiRelais"> | number
+    stockDeparture?: IntWithAggregatesFilter<"KpiRelais"> | number
+    stockArrival?: IntWithAggregatesFilter<"KpiRelais"> | number
+    handoversCompleted?: IntWithAggregatesFilter<"KpiRelais"> | number
+    cashOnHand?: FloatWithAggregatesFilter<"KpiRelais"> | number
+    commissionsTotal?: FloatWithAggregatesFilter<"KpiRelais"> | number
+    updatedAt?: DateTimeWithAggregatesFilter<"KpiRelais"> | Date | string
+    createdAt?: DateTimeWithAggregatesFilter<"KpiRelais"> | Date | string
   }
 
   export type UserCreateInput = {
@@ -41083,6 +46140,335 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
+  export type EventCreateInput = {
+    id?: string
+    type: string
+    aggregateType: string
+    aggregateId: string
+    payload: string
+    createdAt?: Date | string
+  }
+
+  export type EventUncheckedCreateInput = {
+    id?: string
+    type: string
+    aggregateType: string
+    aggregateId: string
+    payload: string
+    createdAt?: Date | string
+  }
+
+  export type EventUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    type?: StringFieldUpdateOperationsInput | string
+    aggregateType?: StringFieldUpdateOperationsInput | string
+    aggregateId?: StringFieldUpdateOperationsInput | string
+    payload?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type EventUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    type?: StringFieldUpdateOperationsInput | string
+    aggregateType?: StringFieldUpdateOperationsInput | string
+    aggregateId?: StringFieldUpdateOperationsInput | string
+    payload?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type EventCreateManyInput = {
+    id?: string
+    type: string
+    aggregateType: string
+    aggregateId: string
+    payload: string
+    createdAt?: Date | string
+  }
+
+  export type EventUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    type?: StringFieldUpdateOperationsInput | string
+    aggregateType?: StringFieldUpdateOperationsInput | string
+    aggregateId?: StringFieldUpdateOperationsInput | string
+    payload?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type EventUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    type?: StringFieldUpdateOperationsInput | string
+    aggregateType?: StringFieldUpdateOperationsInput | string
+    aggregateId?: StringFieldUpdateOperationsInput | string
+    payload?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type KpiTransporterCreateInput = {
+    transporteurId: string
+    missionsTotal?: number
+    missionsActive?: number
+    missionsAssigned?: number
+    missionsInProgress?: number
+    missionsCompleted?: number
+    earningsTotal?: number
+    updatedAt?: Date | string
+    createdAt?: Date | string
+  }
+
+  export type KpiTransporterUncheckedCreateInput = {
+    transporteurId: string
+    missionsTotal?: number
+    missionsActive?: number
+    missionsAssigned?: number
+    missionsInProgress?: number
+    missionsCompleted?: number
+    earningsTotal?: number
+    updatedAt?: Date | string
+    createdAt?: Date | string
+  }
+
+  export type KpiTransporterUpdateInput = {
+    transporteurId?: StringFieldUpdateOperationsInput | string
+    missionsTotal?: IntFieldUpdateOperationsInput | number
+    missionsActive?: IntFieldUpdateOperationsInput | number
+    missionsAssigned?: IntFieldUpdateOperationsInput | number
+    missionsInProgress?: IntFieldUpdateOperationsInput | number
+    missionsCompleted?: IntFieldUpdateOperationsInput | number
+    earningsTotal?: FloatFieldUpdateOperationsInput | number
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type KpiTransporterUncheckedUpdateInput = {
+    transporteurId?: StringFieldUpdateOperationsInput | string
+    missionsTotal?: IntFieldUpdateOperationsInput | number
+    missionsActive?: IntFieldUpdateOperationsInput | number
+    missionsAssigned?: IntFieldUpdateOperationsInput | number
+    missionsInProgress?: IntFieldUpdateOperationsInput | number
+    missionsCompleted?: IntFieldUpdateOperationsInput | number
+    earningsTotal?: FloatFieldUpdateOperationsInput | number
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type KpiTransporterCreateManyInput = {
+    transporteurId: string
+    missionsTotal?: number
+    missionsActive?: number
+    missionsAssigned?: number
+    missionsInProgress?: number
+    missionsCompleted?: number
+    earningsTotal?: number
+    updatedAt?: Date | string
+    createdAt?: Date | string
+  }
+
+  export type KpiTransporterUpdateManyMutationInput = {
+    transporteurId?: StringFieldUpdateOperationsInput | string
+    missionsTotal?: IntFieldUpdateOperationsInput | number
+    missionsActive?: IntFieldUpdateOperationsInput | number
+    missionsAssigned?: IntFieldUpdateOperationsInput | number
+    missionsInProgress?: IntFieldUpdateOperationsInput | number
+    missionsCompleted?: IntFieldUpdateOperationsInput | number
+    earningsTotal?: FloatFieldUpdateOperationsInput | number
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type KpiTransporterUncheckedUpdateManyInput = {
+    transporteurId?: StringFieldUpdateOperationsInput | string
+    missionsTotal?: IntFieldUpdateOperationsInput | number
+    missionsActive?: IntFieldUpdateOperationsInput | number
+    missionsAssigned?: IntFieldUpdateOperationsInput | number
+    missionsInProgress?: IntFieldUpdateOperationsInput | number
+    missionsCompleted?: IntFieldUpdateOperationsInput | number
+    earningsTotal?: FloatFieldUpdateOperationsInput | number
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type KpiEnseigneCreateInput = {
+    enseigneId: string
+    parcelsTotal?: number
+    parcelsDelivered?: number
+    pendingPayment?: number
+    readyForDeposit?: number
+    inTransit?: number
+    arrivedRelay?: number
+    revenueDelivered?: number
+    revenueCommitted?: number
+    updatedAt?: Date | string
+    createdAt?: Date | string
+  }
+
+  export type KpiEnseigneUncheckedCreateInput = {
+    enseigneId: string
+    parcelsTotal?: number
+    parcelsDelivered?: number
+    pendingPayment?: number
+    readyForDeposit?: number
+    inTransit?: number
+    arrivedRelay?: number
+    revenueDelivered?: number
+    revenueCommitted?: number
+    updatedAt?: Date | string
+    createdAt?: Date | string
+  }
+
+  export type KpiEnseigneUpdateInput = {
+    enseigneId?: StringFieldUpdateOperationsInput | string
+    parcelsTotal?: IntFieldUpdateOperationsInput | number
+    parcelsDelivered?: IntFieldUpdateOperationsInput | number
+    pendingPayment?: IntFieldUpdateOperationsInput | number
+    readyForDeposit?: IntFieldUpdateOperationsInput | number
+    inTransit?: IntFieldUpdateOperationsInput | number
+    arrivedRelay?: IntFieldUpdateOperationsInput | number
+    revenueDelivered?: FloatFieldUpdateOperationsInput | number
+    revenueCommitted?: FloatFieldUpdateOperationsInput | number
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type KpiEnseigneUncheckedUpdateInput = {
+    enseigneId?: StringFieldUpdateOperationsInput | string
+    parcelsTotal?: IntFieldUpdateOperationsInput | number
+    parcelsDelivered?: IntFieldUpdateOperationsInput | number
+    pendingPayment?: IntFieldUpdateOperationsInput | number
+    readyForDeposit?: IntFieldUpdateOperationsInput | number
+    inTransit?: IntFieldUpdateOperationsInput | number
+    arrivedRelay?: IntFieldUpdateOperationsInput | number
+    revenueDelivered?: FloatFieldUpdateOperationsInput | number
+    revenueCommitted?: FloatFieldUpdateOperationsInput | number
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type KpiEnseigneCreateManyInput = {
+    enseigneId: string
+    parcelsTotal?: number
+    parcelsDelivered?: number
+    pendingPayment?: number
+    readyForDeposit?: number
+    inTransit?: number
+    arrivedRelay?: number
+    revenueDelivered?: number
+    revenueCommitted?: number
+    updatedAt?: Date | string
+    createdAt?: Date | string
+  }
+
+  export type KpiEnseigneUpdateManyMutationInput = {
+    enseigneId?: StringFieldUpdateOperationsInput | string
+    parcelsTotal?: IntFieldUpdateOperationsInput | number
+    parcelsDelivered?: IntFieldUpdateOperationsInput | number
+    pendingPayment?: IntFieldUpdateOperationsInput | number
+    readyForDeposit?: IntFieldUpdateOperationsInput | number
+    inTransit?: IntFieldUpdateOperationsInput | number
+    arrivedRelay?: IntFieldUpdateOperationsInput | number
+    revenueDelivered?: FloatFieldUpdateOperationsInput | number
+    revenueCommitted?: FloatFieldUpdateOperationsInput | number
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type KpiEnseigneUncheckedUpdateManyInput = {
+    enseigneId?: StringFieldUpdateOperationsInput | string
+    parcelsTotal?: IntFieldUpdateOperationsInput | number
+    parcelsDelivered?: IntFieldUpdateOperationsInput | number
+    pendingPayment?: IntFieldUpdateOperationsInput | number
+    readyForDeposit?: IntFieldUpdateOperationsInput | number
+    inTransit?: IntFieldUpdateOperationsInput | number
+    arrivedRelay?: IntFieldUpdateOperationsInput | number
+    revenueDelivered?: FloatFieldUpdateOperationsInput | number
+    revenueCommitted?: FloatFieldUpdateOperationsInput | number
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type KpiRelaisCreateInput = {
+    relaisId: string
+    pendingActions?: number
+    stockDeparture?: number
+    stockArrival?: number
+    handoversCompleted?: number
+    cashOnHand?: number
+    commissionsTotal?: number
+    updatedAt?: Date | string
+    createdAt?: Date | string
+  }
+
+  export type KpiRelaisUncheckedCreateInput = {
+    relaisId: string
+    pendingActions?: number
+    stockDeparture?: number
+    stockArrival?: number
+    handoversCompleted?: number
+    cashOnHand?: number
+    commissionsTotal?: number
+    updatedAt?: Date | string
+    createdAt?: Date | string
+  }
+
+  export type KpiRelaisUpdateInput = {
+    relaisId?: StringFieldUpdateOperationsInput | string
+    pendingActions?: IntFieldUpdateOperationsInput | number
+    stockDeparture?: IntFieldUpdateOperationsInput | number
+    stockArrival?: IntFieldUpdateOperationsInput | number
+    handoversCompleted?: IntFieldUpdateOperationsInput | number
+    cashOnHand?: FloatFieldUpdateOperationsInput | number
+    commissionsTotal?: FloatFieldUpdateOperationsInput | number
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type KpiRelaisUncheckedUpdateInput = {
+    relaisId?: StringFieldUpdateOperationsInput | string
+    pendingActions?: IntFieldUpdateOperationsInput | number
+    stockDeparture?: IntFieldUpdateOperationsInput | number
+    stockArrival?: IntFieldUpdateOperationsInput | number
+    handoversCompleted?: IntFieldUpdateOperationsInput | number
+    cashOnHand?: FloatFieldUpdateOperationsInput | number
+    commissionsTotal?: FloatFieldUpdateOperationsInput | number
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type KpiRelaisCreateManyInput = {
+    relaisId: string
+    pendingActions?: number
+    stockDeparture?: number
+    stockArrival?: number
+    handoversCompleted?: number
+    cashOnHand?: number
+    commissionsTotal?: number
+    updatedAt?: Date | string
+    createdAt?: Date | string
+  }
+
+  export type KpiRelaisUpdateManyMutationInput = {
+    relaisId?: StringFieldUpdateOperationsInput | string
+    pendingActions?: IntFieldUpdateOperationsInput | number
+    stockDeparture?: IntFieldUpdateOperationsInput | number
+    stockArrival?: IntFieldUpdateOperationsInput | number
+    handoversCompleted?: IntFieldUpdateOperationsInput | number
+    cashOnHand?: FloatFieldUpdateOperationsInput | number
+    commissionsTotal?: FloatFieldUpdateOperationsInput | number
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type KpiRelaisUncheckedUpdateManyInput = {
+    relaisId?: StringFieldUpdateOperationsInput | string
+    pendingActions?: IntFieldUpdateOperationsInput | number
+    stockDeparture?: IntFieldUpdateOperationsInput | number
+    stockArrival?: IntFieldUpdateOperationsInput | number
+    handoversCompleted?: IntFieldUpdateOperationsInput | number
+    cashOnHand?: FloatFieldUpdateOperationsInput | number
+    commissionsTotal?: FloatFieldUpdateOperationsInput | number
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
   export type StringFilter<$PrismaModel = never> = {
     equals?: string | StringFieldRefInput<$PrismaModel>
     in?: string[] | ListStringFieldRefInput<$PrismaModel>
@@ -42950,6 +48336,205 @@ export namespace Prisma {
 
   export type QrSecurityLogSumOrderByAggregateInput = {
     pinAttempts?: SortOrder
+  }
+
+  export type EventCountOrderByAggregateInput = {
+    id?: SortOrder
+    type?: SortOrder
+    aggregateType?: SortOrder
+    aggregateId?: SortOrder
+    payload?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type EventMaxOrderByAggregateInput = {
+    id?: SortOrder
+    type?: SortOrder
+    aggregateType?: SortOrder
+    aggregateId?: SortOrder
+    payload?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type EventMinOrderByAggregateInput = {
+    id?: SortOrder
+    type?: SortOrder
+    aggregateType?: SortOrder
+    aggregateId?: SortOrder
+    payload?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type KpiTransporterCountOrderByAggregateInput = {
+    transporteurId?: SortOrder
+    missionsTotal?: SortOrder
+    missionsActive?: SortOrder
+    missionsAssigned?: SortOrder
+    missionsInProgress?: SortOrder
+    missionsCompleted?: SortOrder
+    earningsTotal?: SortOrder
+    updatedAt?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type KpiTransporterAvgOrderByAggregateInput = {
+    missionsTotal?: SortOrder
+    missionsActive?: SortOrder
+    missionsAssigned?: SortOrder
+    missionsInProgress?: SortOrder
+    missionsCompleted?: SortOrder
+    earningsTotal?: SortOrder
+  }
+
+  export type KpiTransporterMaxOrderByAggregateInput = {
+    transporteurId?: SortOrder
+    missionsTotal?: SortOrder
+    missionsActive?: SortOrder
+    missionsAssigned?: SortOrder
+    missionsInProgress?: SortOrder
+    missionsCompleted?: SortOrder
+    earningsTotal?: SortOrder
+    updatedAt?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type KpiTransporterMinOrderByAggregateInput = {
+    transporteurId?: SortOrder
+    missionsTotal?: SortOrder
+    missionsActive?: SortOrder
+    missionsAssigned?: SortOrder
+    missionsInProgress?: SortOrder
+    missionsCompleted?: SortOrder
+    earningsTotal?: SortOrder
+    updatedAt?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type KpiTransporterSumOrderByAggregateInput = {
+    missionsTotal?: SortOrder
+    missionsActive?: SortOrder
+    missionsAssigned?: SortOrder
+    missionsInProgress?: SortOrder
+    missionsCompleted?: SortOrder
+    earningsTotal?: SortOrder
+  }
+
+  export type KpiEnseigneCountOrderByAggregateInput = {
+    enseigneId?: SortOrder
+    parcelsTotal?: SortOrder
+    parcelsDelivered?: SortOrder
+    pendingPayment?: SortOrder
+    readyForDeposit?: SortOrder
+    inTransit?: SortOrder
+    arrivedRelay?: SortOrder
+    revenueDelivered?: SortOrder
+    revenueCommitted?: SortOrder
+    updatedAt?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type KpiEnseigneAvgOrderByAggregateInput = {
+    parcelsTotal?: SortOrder
+    parcelsDelivered?: SortOrder
+    pendingPayment?: SortOrder
+    readyForDeposit?: SortOrder
+    inTransit?: SortOrder
+    arrivedRelay?: SortOrder
+    revenueDelivered?: SortOrder
+    revenueCommitted?: SortOrder
+  }
+
+  export type KpiEnseigneMaxOrderByAggregateInput = {
+    enseigneId?: SortOrder
+    parcelsTotal?: SortOrder
+    parcelsDelivered?: SortOrder
+    pendingPayment?: SortOrder
+    readyForDeposit?: SortOrder
+    inTransit?: SortOrder
+    arrivedRelay?: SortOrder
+    revenueDelivered?: SortOrder
+    revenueCommitted?: SortOrder
+    updatedAt?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type KpiEnseigneMinOrderByAggregateInput = {
+    enseigneId?: SortOrder
+    parcelsTotal?: SortOrder
+    parcelsDelivered?: SortOrder
+    pendingPayment?: SortOrder
+    readyForDeposit?: SortOrder
+    inTransit?: SortOrder
+    arrivedRelay?: SortOrder
+    revenueDelivered?: SortOrder
+    revenueCommitted?: SortOrder
+    updatedAt?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type KpiEnseigneSumOrderByAggregateInput = {
+    parcelsTotal?: SortOrder
+    parcelsDelivered?: SortOrder
+    pendingPayment?: SortOrder
+    readyForDeposit?: SortOrder
+    inTransit?: SortOrder
+    arrivedRelay?: SortOrder
+    revenueDelivered?: SortOrder
+    revenueCommitted?: SortOrder
+  }
+
+  export type KpiRelaisCountOrderByAggregateInput = {
+    relaisId?: SortOrder
+    pendingActions?: SortOrder
+    stockDeparture?: SortOrder
+    stockArrival?: SortOrder
+    handoversCompleted?: SortOrder
+    cashOnHand?: SortOrder
+    commissionsTotal?: SortOrder
+    updatedAt?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type KpiRelaisAvgOrderByAggregateInput = {
+    pendingActions?: SortOrder
+    stockDeparture?: SortOrder
+    stockArrival?: SortOrder
+    handoversCompleted?: SortOrder
+    cashOnHand?: SortOrder
+    commissionsTotal?: SortOrder
+  }
+
+  export type KpiRelaisMaxOrderByAggregateInput = {
+    relaisId?: SortOrder
+    pendingActions?: SortOrder
+    stockDeparture?: SortOrder
+    stockArrival?: SortOrder
+    handoversCompleted?: SortOrder
+    cashOnHand?: SortOrder
+    commissionsTotal?: SortOrder
+    updatedAt?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type KpiRelaisMinOrderByAggregateInput = {
+    relaisId?: SortOrder
+    pendingActions?: SortOrder
+    stockDeparture?: SortOrder
+    stockArrival?: SortOrder
+    handoversCompleted?: SortOrder
+    cashOnHand?: SortOrder
+    commissionsTotal?: SortOrder
+    updatedAt?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type KpiRelaisSumOrderByAggregateInput = {
+    pendingActions?: SortOrder
+    stockDeparture?: SortOrder
+    stockArrival?: SortOrder
+    handoversCompleted?: SortOrder
+    cashOnHand?: SortOrder
+    commissionsTotal?: SortOrder
   }
 
   export type ColisCreateNestedManyWithoutClientInput = {

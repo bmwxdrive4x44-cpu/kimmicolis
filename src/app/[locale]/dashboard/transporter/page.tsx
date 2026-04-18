@@ -1,17 +1,19 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { useSession } from 'next-auth/react';
-import { useLocale } from 'next-intl';
-import { useRouter } from 'next/navigation';
 import { Header } from '@/components/layout/header';
 import { Footer } from '@/components/layout/footer';
 import {
+  DashboardEmptyState,
   DashboardHero,
+  DashboardLoadingState,
   DashboardMetricCard,
   DashboardPanel,
+  DashboardSection,
   DashboardShell,
   DashboardStatsGrid,
+  dashboardMetaBadgeClass,
+  dashboardTabsContentClass,
   dashboardTabsListClass,
   getDashboardTabsTriggerClass,
 } from '@/components/dashboard/dashboard-shell';
@@ -27,181 +29,40 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { WILAYAS, PARCEL_STATUS, TRAJET_STATUS } from '@/lib/constants';
 import { parseLocaleFloat } from '@/lib/utils';
-import { normalizeRole } from '@/lib/roles';
+import { asArray, parseStoredStringArray } from '@/lib/safe-data';
 import { Truck, Plus, Package, MapPin, DollarSign, Loader2, CheckCircle, Clock, Route, QrCode, Navigation, Scan, Wallet, ArrowUpFromLine, TrendingUp, History, Save, Pencil, User, Zap, Settings, BarChart2, AlertCircle, RefreshCw, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-
-function getRoleBasedDashboardPath(role: string, locale: string): string {
-  switch (role) {
-    case 'ADMIN': return `/${locale}/dashboard/admin`;
-    case 'TRANSPORTER': return `/${locale}/dashboard/transporter`;
-    case 'RELAIS': return `/${locale}/dashboard/relais`;
-    case 'ENSEIGNE': return `/${locale}/dashboard/enseigne`;
-    default: return `/${locale}/dashboard/client`;
-  }
-}
-
-function asArray<T = any>(value: unknown): T[] {
-  return Array.isArray(value) ? value : [];
-}
-
-function parseStoredStringArray(value: unknown): string[] {
-  if (Array.isArray(value)) {
-    return value.map((item) => String(item).trim()).filter(Boolean);
-  }
-
-  if (typeof value === 'string' && value.trim()) {
-    try {
-      const parsed = JSON.parse(value);
-      if (Array.isArray(parsed)) {
-        return parsed.map((item) => String(item).trim()).filter(Boolean);
-      }
-    } catch {
-      return [];
-    }
-  }
-
-  return [];
-}
+import { useTransporterDashboardController } from '@/hooks/use-transporter-dashboard-controller';
 
 export default function TransporterDashboard() {
-  const { data: session, status } = useSession();
-  const locale = useLocale();
-  const router = useRouter();
   const [activeTab, setActiveTab] = useState('overview');
-  const [stats, setStats] = useState({
-    trajets: 0,
-    totalMissions: 0,
-    activeMissions: 0,
-    assignedMissions: 0,
-    inProgressMissions: 0,
-    completedMissions: 0,
-    earnings: 0,
-  });
-  const [kpiLoading, setKpiLoading] = useState(true);
-  const [isInitialLoading, setIsInitialLoading] = useState(true);
-  const [hasProfile, setHasProfile] = useState(true);
-  const [isProfileChecking, setIsProfileChecking] = useState(true);
-  const [applicationStatus, setApplicationStatus] = useState<'APPROVED' | 'PENDING' | 'REJECTED' | 'MISSING'>('MISSING');
+  const {
+    userId,
+    userName,
+    stats,
+    kpiLoading,
+    applicationStatus,
+    isDashboardLoading,
+    shouldRenderNull,
+    completionRate,
+    refreshStats,
+    goToProfileCompletion,
+  } = useTransporterDashboardController();
 
-  useEffect(() => {
-    if (status === 'unauthenticated') {
-      router.push(`/${locale}/auth/login`);
-    } else if (status === 'authenticated' && session?.user?.role) {
-      const userRole = normalizeRole(session.user.role);
-      if (userRole !== 'TRANSPORTER') {
-        router.replace(getRoleBasedDashboardPath(userRole, locale));
-      }
-    }
-  }, [status, session, router, locale]);
-
-  // Check if user has transporter profile
-  useEffect(() => {
-    const checkProfile = async () => {
-      if (!session?.user?.id) return;
-      setIsProfileChecking(true);
-      try {
-        const response = await fetch(`/api/transporters?userId=${session.user.id}`);
-        const data = await response.json();
-        if (Array.isArray(data) && data.length > 0) {
-          setHasProfile(true);
-          setApplicationStatus(data[0]?.status === 'APPROVED' ? 'APPROVED' : data[0]?.status === 'REJECTED' ? 'REJECTED' : 'PENDING');
-        } else {
-          setApplicationStatus('MISSING');
-          setHasProfile(false);
-          // Redirect to profile completion page
-          router.push(`/${locale}/complete-profile/transporter`);
-        }
-      } catch (error) {
-        console.error('Error checking profile:', error);
-        // Avoid rendering a blank page during transient network issues.
-        setHasProfile(true);
-        setApplicationStatus('APPROVED');
-      } finally {
-        setIsProfileChecking(false);
-      }
-    };
-
-    if (status === 'authenticated' && session?.user?.id) {
-      checkProfile();
-    }
-  }, [status, session, router, locale]);
-
-  useEffect(() => {
-    if (session?.user?.id && hasProfile && applicationStatus === 'APPROVED') {
-      fetchStats(false);
-    }
-  }, [session?.user?.id, hasProfile, applicationStatus]);
-
-  useEffect(() => {
-    if (!session?.user?.id || !hasProfile || applicationStatus !== 'APPROVED') return;
-
-    const intervalId = window.setInterval(() => {
-      fetchStats(true);
-    }, 15000);
-
-    const handleFocus = () => {
-      fetchStats(true);
-    };
-
-    window.addEventListener('focus', handleFocus);
-    return () => {
-      window.clearInterval(intervalId);
-      window.removeEventListener('focus', handleFocus);
-    };
-  }, [session?.user?.id, hasProfile, applicationStatus]);
-
-  const fetchStats = async (background = false) => {
-    if (!background) {
-      setIsInitialLoading(true);
-    }
-    try {
-      const [trajetsRes, kpiRes] = await Promise.all([
-        fetch(`/api/trajets?transporteurId=${session?.user?.id}`),
-        fetch(`/api/kpi/transporter/${session?.user?.id}`),
-      ]);
-      const trajetsData = await trajetsRes.json().catch(() => null);
-      const trajets = asArray<any>(trajetsData);
-      const kpiData = (await kpiRes.json().catch(() => null)) as Record<string, unknown> | null;
-
-      setStats({
-        trajets: trajets.length,
-        totalMissions: Number(kpiData?.missionsTotal || 0),
-        activeMissions: Number(kpiData?.missionsActive || 0),
-        assignedMissions: Number(kpiData?.missionsAssigned || 0),
-        inProgressMissions: Number(kpiData?.missionsInProgress || 0),
-        completedMissions: Number(kpiData?.missionsCompleted || 0),
-        earnings: Number(kpiData?.earningsTotal || 0),
-      });
-      setKpiLoading(false);
-    } catch (error) {
-      console.error('Error fetching stats:', error);
-      setKpiLoading(false);
-    } finally {
-      if (!background) {
-        setIsInitialLoading(false);
-      }
-    }
-  };
-
-  if (status === 'loading' || isProfileChecking || (isInitialLoading && hasProfile && applicationStatus === 'APPROVED')) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
-        <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
-      </div>
-    );
+  if (isDashboardLoading) {
+    return <DashboardLoadingState tone="transporteur" title="Chargement de votre espace transporteur" description="Synchronisation des missions, KPI et trajets..." />;
   }
 
-  if (!session?.user || normalizeRole(session.user.role) !== 'TRANSPORTER' || !hasProfile) {
+  if (shouldRenderNull || !userId) {
     return null;
   }
 
   if (applicationStatus !== 'APPROVED') {
     const isRejected = applicationStatus === 'REJECTED';
     return (
-      <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-900">
+      <div className="min-h-screen flex flex-col bg-[radial-gradient(circle_at_top,_#f8fafc,_#ecfeff_42%,_#cffafe_100%)] dark:bg-slate-900">
         <Header />
-        <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8">
+        <main className="flex-1 px-4 py-10 sm:px-6 lg:px-8">
           <DashboardShell tone="transporteur" className="mx-auto max-w-3xl">
             <DashboardPanel tone="transporteur">
               <Card>
@@ -214,7 +75,7 @@ export default function TransporterDashboard() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="flex flex-wrap gap-3">
-                  <Button onClick={() => router.push(`/${locale}/complete-profile/transporter`)}>
+                  <Button onClick={goToProfileCompletion}>
                     Mettre à jour mon dossier
                   </Button>
                   <Badge variant="outline" className="border-orange-300 bg-orange-50 text-orange-700">
@@ -230,15 +91,11 @@ export default function TransporterDashboard() {
     );
   }
 
-  const completionRate = stats.totalMissions > 0
-    ? Math.round((stats.completedMissions / stats.totalMissions) * 100)
-    : 0;
-
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-900">
+    <div className="min-h-screen flex flex-col bg-[radial-gradient(circle_at_top,_#f8fafc,_#ecfeff_42%,_#cffafe_100%)] dark:bg-slate-900">
       <Header />
-      <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8">
-        <DashboardShell tone="transporteur" className="mx-auto max-w-7xl">
+      <main className="flex-1 px-4 py-10 sm:px-6 lg:px-8">
+        <DashboardShell tone="transporteur" className="mx-auto max-w-[92rem]">
           <DashboardHero
             tone="transporteur"
             eyebrow="Mobilité terrain"
@@ -246,34 +103,49 @@ export default function TransporterDashboard() {
             description="Pilotez vos trajets, missions, scans et revenus depuis une vue plus fluide, pensée pour une lecture rapide entre deux départs."
             meta={
               <>
-                <Badge variant="outline" className="border-white/70 bg-white/70 text-slate-700">Bienvenue, {session.user.name}</Badge>
-                <Badge variant="outline" className="border-white/70 bg-white/70 text-slate-700">Profil actif</Badge>
+                <Badge variant="outline" className={dashboardMetaBadgeClass}>Bienvenue, {userName}</Badge>
+                <Badge variant="outline" className={dashboardMetaBadgeClass}>Profil actif</Badge>
               </>
             }
           />
 
-          <section className="space-y-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-600">KPI business</p>
+          <DashboardSection
+            tone="transporteur"
+            eyebrow="Performance"
+            title="KPI activité"
+            description="Suivez la cadence business et vos résultats de livraison avec une lecture immédiate."
+          >
             <DashboardStatsGrid>
               <DashboardMetricCard tone="transporteur" label="Mes trajets" value={stats.trajets} icon={<Route className="h-5 w-5" />} detail="trajets publies" />
               <DashboardMetricCard tone="transporteur" label="Missions totales" value={stats.totalMissions} icon={<Package className="h-5 w-5" />} detail={kpiLoading ? 'chargement KPI...' : `${stats.activeMissions} actives`} />
               <DashboardMetricCard tone="transporteur" label="Taux de completion" value={`${completionRate}%`} icon={<CheckCircle className="h-5 w-5" />} detail={`${stats.completedMissions} livrees`} />
               <DashboardMetricCard tone="transporteur" label="Gains" value={`${stats.earnings} DA`} icon={<DollarSign className="h-5 w-5" />} detail="missions livrees" />
             </DashboardStatsGrid>
-          </section>
+          </DashboardSection>
 
-          <section className="space-y-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-600">Etats missions</p>
+          <DashboardSection
+            tone="transporteur"
+            eyebrow="Flux"
+            title="Etats missions"
+            description="Séparez clairement les missions assignées, en cours et finalisées."
+          >
             <DashboardStatsGrid className="md:grid-cols-3 xl:grid-cols-3">
               <DashboardMetricCard tone="transporteur" label="Assignees" value={stats.assignedMissions} icon={<Clock className="h-5 w-5" />} detail="en attente de prise en charge" />
               <DashboardMetricCard tone="transporteur" label="En cours" value={stats.inProgressMissions} icon={<Truck className="h-5 w-5" />} detail="collecte ou transport" />
               <DashboardMetricCard tone="transporteur" label="Livrees" value={stats.completedMissions} icon={<CheckCircle className="h-5 w-5" />} detail="missions finalisees" />
             </DashboardStatsGrid>
-          </section>
+          </DashboardSection>
 
-          <DashboardPanel tone="transporteur">
-            <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className={`${dashboardTabsListClass} grid grid-cols-2 lg:grid-cols-7`}>
+          <DashboardSection
+            tone="transporteur"
+            eyebrow="Modules"
+            title="Pilotage opérationnel"
+            description="Accédez aux écrans missions, scan, portefeuille et profil dans un layout cohérent."
+            contentClassName="bg-transparent p-0 border-0 shadow-none ring-0"
+          >
+            <DashboardPanel tone="transporteur">
+              <Tabs value={activeTab} onValueChange={setActiveTab}>
+                <TabsList className={`${dashboardTabsListClass} grid grid-cols-2 lg:grid-cols-7`}>
                 <TabsTrigger value="overview" className={getDashboardTabsTriggerClass('transporteur')}><MapPin className="h-4 w-4 mr-1 hidden sm:inline" />Vue d'ensemble</TabsTrigger>
                 <TabsTrigger value="trajets" className={getDashboardTabsTriggerClass('transporteur')}><Route className="h-4 w-4 mr-1 hidden sm:inline" />Trajets</TabsTrigger>
                 <TabsTrigger value="missions" className={getDashboardTabsTriggerClass('transporteur')}><Package className="h-4 w-4 mr-1 hidden sm:inline" />Missions</TabsTrigger>
@@ -283,29 +155,30 @@ export default function TransporterDashboard() {
                 <TabsTrigger value="profil" className={getDashboardTabsTriggerClass('transporteur')}><Truck className="h-4 w-4 mr-1 hidden sm:inline" />Infos perso</TabsTrigger>
               </TabsList>
 
-              <TabsContent value="overview">
-                <OverviewTab userId={session.user.id} setActiveTab={setActiveTab} />
+              <TabsContent value="overview" className={dashboardTabsContentClass}>
+                <OverviewTab userId={userId} setActiveTab={setActiveTab} />
               </TabsContent>
-              <TabsContent value="trajets">
-                <TrajetsTab userId={session.user.id} />
+              <TabsContent value="trajets" className={dashboardTabsContentClass}>
+                <TrajetsTab userId={userId} />
               </TabsContent>
-              <TabsContent value="missions">
-                <MissionsTab userId={session.user.id} onRefreshStats={fetchStats} />
+              <TabsContent value="missions" className={dashboardTabsContentClass}>
+                <MissionsTab userId={userId} onRefreshStats={refreshStats} />
               </TabsContent>
-              <TabsContent value="scan">
-                <ScanTab userId={session.user.id} onRefreshStats={fetchStats} />
+              <TabsContent value="scan" className={dashboardTabsContentClass}>
+                <ScanTab userId={userId} onRefreshStats={refreshStats} />
               </TabsContent>
-              <TabsContent value="wallet">
-                <WalletTab userId={session.user.id} />
+              <TabsContent value="wallet" className={dashboardTabsContentClass}>
+                <WalletTab userId={userId} />
               </TabsContent>
-              <TabsContent value="auto-assign">
-                <AutoAssignTab userId={session.user.id} />
+              <TabsContent value="auto-assign" className={dashboardTabsContentClass}>
+                <AutoAssignTab userId={userId} />
               </TabsContent>
-              <TabsContent value="profil">
-                <ProfilTab userId={session.user.id} userName={session.user.name || ''} />
-              </TabsContent>
-            </Tabs>
-          </DashboardPanel>
+                <TabsContent value="profil" className={dashboardTabsContentClass}>
+                  <ProfilTab userId={userId} userName={userName} />
+                </TabsContent>
+              </Tabs>
+            </DashboardPanel>
+          </DashboardSection>
         </DashboardShell>
       </main>
       <Footer />
@@ -374,7 +247,7 @@ function OverviewTab({ userId, setActiveTab }: { userId: string; setActiveTab: (
         </CardHeader>
         <CardContent>
           {availableMissions.length === 0 ? (
-            <p className="text-center text-slate-500 py-4">Aucune mission disponible</p>
+            <DashboardEmptyState title="Aucune mission disponible" description="De nouvelles opportunités apparaîtront ici dès qu'un colis est proposé." icon={<Package className="h-5 w-5" />} />
           ) : (
             <div className="space-y-3">
               {availableMissions.slice(0, 5).map((m) => (
@@ -418,7 +291,7 @@ function OverviewTab({ userId, setActiveTab }: { userId: string; setActiveTab: (
         </CardHeader>
         <CardContent>
           {myTrajets.filter(t => t.status === 'PROGRAMME').length === 0 ? (
-            <p className="text-center text-slate-500 py-4">Aucun trajet programmé</p>
+            <DashboardEmptyState title="Aucun trajet programmé" description="Créez un trajet pour recevoir des missions compatibles automatiquement." icon={<Route className="h-5 w-5" />} />
           ) : (
             <div className="space-y-3">
               {myTrajets.filter(t => t.status === 'PROGRAMME').map((t) => (

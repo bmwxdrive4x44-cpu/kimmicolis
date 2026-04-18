@@ -9,11 +9,17 @@ import { Link } from '@/i18n/routing';
 import { Header } from '@/components/layout/header';
 import { Footer } from '@/components/layout/footer';
 import {
+  DashboardEmptyState,
   DashboardHero,
+  DashboardLoadingState,
   DashboardMetricCard,
   DashboardPanel,
+  DashboardSection,
+  DashboardSectionLoading,
   DashboardShell,
   DashboardStatsGrid,
+  dashboardMetaBadgeClass,
+  dashboardTabsContentClass,
   dashboardTabsListClass,
   getDashboardTabsTriggerClass,
 } from '@/components/dashboard/dashboard-shell';
@@ -24,7 +30,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { WILAYAS, PARCEL_STATUS, RELAIS_STATUS, DEFAULT_RELAY_COMMISSION, RELAY_CASH_ALERT_THRESHOLD } from '@/lib/constants';
+import { WILAYAS, PARCEL_STATUS, RELAIS_STATUS, RELAY_CASH_ALERT_THRESHOLD } from '@/lib/constants';
 import { parseLocaleFloat } from '@/lib/utils';
 import { extractTrackingFromQrPayload } from '@/lib/qr-payload';
 import { normalizeRole } from '@/lib/roles';
@@ -74,11 +80,6 @@ export default function RelaisDashboard() {
     commissionsTotal: 0,
   });
   const [cashInfo, setCashInfo] = useState({ cashCollected: 0, cashReversed: 0, balance: 0, totalCommissions: 0 });
-  const [adminCommissions, setAdminCommissions] = useState({
-    petit: DEFAULT_RELAY_COMMISSION.PETIT,
-    moyen: DEFAULT_RELAY_COMMISSION.MOYEN,
-    gros: DEFAULT_RELAY_COMMISSION.GROS,
-  });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [printerStatus, setPrinterStatus] = useState<'READY' | 'BROKEN' | 'OUT_OF_PAPER' | 'NOT_EQUIPPED'>('READY');
@@ -131,12 +132,11 @@ export default function RelaisDashboard() {
         setRelaisInfo(relais);
         console.log('[Relais Dashboard] State relaisInfo mise à jour');
         
-        // Fetch states + KPI + cash and admin-controlled commission barème in parallel
-        const [statsRes, kpiRes, cashRes, settingsRes] = await Promise.all([
+        // Fetch states + KPI + cash for this relais
+        const [statsRes, kpiRes, cashRes] = await Promise.all([
           fetch(`/api/relais/${relais.id}/stats?_=${nonce}`, { cache: 'no-store' }).catch(() => null),
           fetch(`/api/kpi/relais/${relais.id}?_=${nonce}`, { cache: 'no-store' }).catch(() => null),
           fetch(`/api/relais-cash?relaisId=${relais.id}&_=${nonce}`, { cache: 'no-store' }).catch(() => null),
-          fetch(`/api/settings?_=${nonce}`, { cache: 'no-store' }).catch(() => null),
         ]);
         if (statsRes?.ok) setStats(await statsRes.json());
         if (kpiRes?.ok) {
@@ -148,17 +148,6 @@ export default function RelaisDashboard() {
           });
         }
         if (cashRes?.ok) setCashInfo(await cashRes.json());
-        if (settingsRes?.ok) {
-          const settingsData = await settingsRes.json();
-          const petit = Number(settingsData?.commissionPetit);
-          const moyen = Number(settingsData?.commissionMoyen);
-          const gros = Number(settingsData?.commissionGros);
-          setAdminCommissions({
-            petit: Number.isFinite(petit) ? petit : DEFAULT_RELAY_COMMISSION.PETIT,
-            moyen: Number.isFinite(moyen) ? moyen : DEFAULT_RELAY_COMMISSION.MOYEN,
-            gros: Number.isFinite(gros) ? gros : DEFAULT_RELAY_COMMISSION.GROS,
-          });
-        }
 
         const printerRes = await fetch(`/api/relais/printers?_=${nonce}`, { cache: 'no-store' }).catch(() => null);
         if (printerRes?.ok) {
@@ -249,46 +238,25 @@ export default function RelaisDashboard() {
 
   // Loading state
   if (status === 'loading' || (status === 'authenticated' && isLoading)) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin text-emerald-600 mx-auto mb-4" />
-          <p className="text-slate-600">Chargement...</p>
-        </div>
-      </div>
-    );
+    return <DashboardLoadingState tone="relais" title="Chargement de votre espace relais" />;
   }
 
   // Not authenticated
   if (status === 'unauthenticated' || !session?.user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin text-emerald-600 mx-auto mb-4" />
-          <p className="text-slate-600">Redirection...</p>
-        </div>
-      </div>
-    );
+    return <DashboardLoadingState tone="relais" title="Redirection en cours" description="Vérification de votre session..." />;
   }
 
   // Wrong role
   if (normalizeRole(session.user.role) !== 'RELAIS') {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin text-emerald-600 mx-auto mb-4" />
-          <p className="text-slate-600">Redirection vers votre espace...</p>
-        </div>
-      </div>
-    );
+    return <DashboardLoadingState tone="relais" title="Redirection vers votre espace" description="Application du bon dashboard selon votre rôle..." />;
   }
 
   if (relaisInfo?.status && relaisInfo.status !== 'APPROVED') {
     const isRejected = relaisInfo.status === 'REJECTED';
     return (
-      <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-900">
+      <div className="min-h-screen flex flex-col bg-[radial-gradient(circle_at_top,_#f8fafc,_#ecfdf5_42%,_#dcfce7_100%)] dark:bg-slate-900">
         <Header />
-        <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8">
+        <main className="flex-1 px-4 py-10 sm:px-6 lg:px-8">
           <DashboardShell tone="relais" className="mx-auto max-w-3xl">
             <DashboardPanel tone="relais">
               <Card>
@@ -318,10 +286,10 @@ export default function RelaisDashboard() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-900">
+    <div className="min-h-screen flex flex-col bg-[radial-gradient(circle_at_top,_#f8fafc,_#ecfdf5_42%,_#dcfce7_100%)] dark:bg-slate-900">
       <Header />
-      <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8">
-        <DashboardShell tone="relais" className="mx-auto max-w-7xl">
+      <main className="flex-1 px-4 py-10 sm:px-6 lg:px-8">
+        <DashboardShell tone="relais" className="mx-auto max-w-[92rem]">
           <DashboardHero
             tone="relais"
             eyebrow="Point relais"
@@ -329,7 +297,7 @@ export default function RelaisDashboard() {
             description="Centralisez les scans, la caisse et le suivi opérationnel dans une interface plus structurée, plus lumineuse et plus lisible au quotidien."
             meta={
               <>
-                <Badge variant="outline" className="border-white/70 bg-white/70 text-slate-700 flex items-center gap-2"><Store className="h-3.5 w-3.5" />{relaisInfo?.commerceName || session.user.name}</Badge>
+                <Badge variant="outline" className={`${dashboardMetaBadgeClass} flex items-center gap-2`}><Store className="h-3.5 w-3.5" />{relaisInfo?.commerceName || session.user.name}</Badge>
                 {relaisInfo ? (
                   <Badge className={`${RELAIS_STATUS.find(s => s.id === relaisInfo.status)?.color} text-white`}>
                     {RELAIS_STATUS.find(s => s.id === relaisInfo.status)?.label}
@@ -395,28 +363,43 @@ export default function RelaisDashboard() {
           </Card>
         )}
 
-          <section className="space-y-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-600">KPI business</p>
+          <DashboardSection
+            tone="relais"
+            eyebrow="Performance caisse"
+            title="KPI point relais"
+            description="Distinguez immédiatement les chiffres financiers des opérations de remise."
+          >
             <DashboardStatsGrid>
               <DashboardMetricCard tone="relais" label="Cash en main" value={`${kpi.cashOnHand.toFixed(0)} DA`} icon={<BanknoteIcon className="h-5 w-5" />} detail="a reverser" className={kpi.cashOnHand >= RELAY_CASH_ALERT_THRESHOLD ? 'ring-1 ring-red-300' : ''} />
               <DashboardMetricCard tone="relais" label="Commissions" value={`${kpi.commissionsTotal.toFixed(0)} DA`} icon={<DollarSign className="h-5 w-5" />} detail="total gagne" />
               <DashboardMetricCard tone="relais" label="Remises finalisees" value={kpi.handoversCompleted} icon={<CheckCircle className="h-5 w-5" />} detail="colis remis au destinataire" />
               <DashboardMetricCard tone="relais" label="Taux de remise" value={`${handoverRate}%`} icon={<TrendingUp className="h-5 w-5" />} detail="sur colis arrives au relais destination" />
             </DashboardStatsGrid>
-          </section>
+          </DashboardSection>
 
-          <section className="space-y-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-600">Etats logistiques</p>
+          <DashboardSection
+            tone="relais"
+            eyebrow="Flux logistique"
+            title="Etats colis"
+            description="Séparez la charge immédiate, le stock départ et le stock arrivée."
+          >
             <DashboardStatsGrid className="md:grid-cols-3 xl:grid-cols-3">
               <DashboardMetricCard tone="relais" label="A traiter" value={stats.pending} icon={<Clock className="h-5 w-5" />} detail="actions en file relais" />
               <DashboardMetricCard tone="relais" label="Stock depart" value={stats.inStockDeparture} icon={<ArrowDownToLine className="h-5 w-5" />} detail="deposes, attente transporteur" />
               <DashboardMetricCard tone="relais" label="Stock arrivee" value={stats.inStockArrival} icon={<Package className="h-5 w-5" />} detail="a remettre au destinataire" />
             </DashboardStatsGrid>
-          </section>
+          </DashboardSection>
 
-          <DashboardPanel tone="relais">
-            <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className={`${dashboardTabsListClass} grid grid-cols-2 lg:grid-cols-8`}>
+          <DashboardSection
+            tone="relais"
+            eyebrow="Modules"
+            title="Centre opérationnel"
+            description="Retrouvez vos écrans de scan, tâches, caisse et paramétrage dans un bloc homogène."
+            contentClassName="bg-transparent p-0 border-0 shadow-none ring-0"
+          >
+            <DashboardPanel tone="relais">
+              <Tabs value={activeTab} onValueChange={setActiveTab}>
+                <TabsList className={`${dashboardTabsListClass} grid grid-cols-2 lg:grid-cols-8`}>
                 <TabsTrigger value="overview" className={getDashboardTabsTriggerClass('relais')}><BarChart3 className="h-4 w-4 mr-1 hidden sm:inline" />Vue d'ensemble</TabsTrigger>
                 <TabsTrigger value="tasks" className={getDashboardTabsTriggerClass('relais')}><Package className="h-4 w-4 mr-1 hidden sm:inline" />A traiter</TabsTrigger>
                 <TabsTrigger value="scan" className={getDashboardTabsTriggerClass('relais')}><QrCode className="h-4 w-4 mr-1 hidden sm:inline" />Scanner QR</TabsTrigger>
@@ -427,15 +410,14 @@ export default function RelaisDashboard() {
                 <TabsTrigger value="profil" className={getDashboardTabsTriggerClass('relais')}><User className="h-4 w-4 mr-1 hidden sm:inline" />Infos perso</TabsTrigger>
               </TabsList>
 
-              <TabsContent value="overview">
+              <TabsContent value="overview" className={dashboardTabsContentClass}>
                 <OverviewTab
                   relaisInfo={relaisInfo}
                   setActiveTab={setActiveTab}
                   cashInfo={cashInfo}
-                  adminCommissions={adminCommissions}
                 />
               </TabsContent>
-              <TabsContent value="tasks">
+              <TabsContent value="tasks" className={dashboardTabsContentClass}>
                 <TasksTab
                   relaisId={relaisInfo?.id}
                   onOpenScan={(tracking) => {
@@ -444,26 +426,27 @@ export default function RelaisDashboard() {
                   }}
                 />
               </TabsContent>
-              <TabsContent value="scan">
+              <TabsContent value="scan" className={dashboardTabsContentClass}>
                 <ScanTab relaisId={relaisInfo?.id} userId={session.user.id} onRefresh={fetchRelaisInfo} onDashboardUpdate={handleScanDashboardUpdate} prefilledTracking={scanTrackingPrefill} />
               </TabsContent>
-              <TabsContent value="cash">
+              <TabsContent value="cash" className={dashboardTabsContentClass}>
                 <CashTab relaisId={relaisInfo?.id} cashInfo={cashInfo} userId={session.user.id} onRefresh={fetchRelaisInfo} />
               </TabsContent>
-              <TabsContent value="gains">
+              <TabsContent value="gains" className={dashboardTabsContentClass}>
                 <GainsTab relaisId={relaisInfo?.id} />
               </TabsContent>
-              <TabsContent value="alerts">
+              <TabsContent value="alerts" className={dashboardTabsContentClass}>
                 <RelayAlertsTab userId={session.user.id} />
               </TabsContent>
-              <TabsContent value="settings">
+              <TabsContent value="settings" className={dashboardTabsContentClass}>
                 <SettingsTab relaisInfo={relaisInfo} onUpdate={fetchRelaisInfo} />
               </TabsContent>
-              <TabsContent value="profil">
-                <ProfilRelaisTab userId={session.user.id} relaisInfo={relaisInfo} />
-              </TabsContent>
-            </Tabs>
-          </DashboardPanel>
+                <TabsContent value="profil" className={dashboardTabsContentClass}>
+                  <ProfilRelaisTab userId={session.user.id} relaisInfo={relaisInfo} />
+                </TabsContent>
+              </Tabs>
+            </DashboardPanel>
+          </DashboardSection>
         </DashboardShell>
       </main>
       <Footer />
@@ -577,7 +560,7 @@ function RelayAlertsTab({ userId }: { userId: string }) {
         </CardHeader>
         <CardContent>
           {notifications.length === 0 ? (
-            <p className="py-8 text-center text-slate-500">Aucune notification</p>
+            <DashboardEmptyState title="Aucune notification" description="Votre centre d'alertes est à jour." icon={<Bell className="h-5 w-5" />} />
           ) : (
             <div className="space-y-3">
               {notifications.map((n) => (
@@ -841,7 +824,7 @@ function TasksTab({ relaisId, onOpenScan }: { relaisId: string | undefined; onOp
             <span>{lastUpdatedAt ? `Dernière mise à jour : ${lastUpdatedAt.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}` : 'Mise à jour en attente'}</span>
           </div>
           {!filteredItems.length ? (
-            <p className="py-8 text-center text-slate-500">Aucun colis pour ce filtre</p>
+            <DashboardEmptyState title="Aucun colis pour ce filtre" description="Essayez un autre filtre ou actualisez la file de tâches." icon={<Package className="h-5 w-5" />} />
           ) : (
             <div className="space-y-3">
               {groupedItems.created.length > 0 ? (
@@ -1170,12 +1153,10 @@ function OverviewTab({
   relaisInfo,
   setActiveTab,
   cashInfo,
-  adminCommissions,
 }: {
   relaisInfo: any;
   setActiveTab: (tab: string) => void;
   cashInfo: any;
-  adminCommissions: { petit: number; moyen: number; gros: number };
 }) {
   const arrivalReliability = getArrivalReliabilityBadge(relaisInfo?.complianceScore || 0);
 
@@ -1209,36 +1190,6 @@ function OverviewTab({
           <div className="flex justify-between"><span className="text-slate-500">Total reversé</span><span className="font-bold text-blue-600">{cashInfo.cashReversed.toFixed(0)} DA</span></div>
           <div className="flex justify-between border-t pt-2"><span className="font-semibold">Solde à reverser</span><span className="font-bold text-orange-600">{cashInfo.balance.toFixed(0)} DA</span></div>
           <div className="flex justify-between"><span className="text-slate-500">Commissions relais</span><span className="font-bold text-emerald-600">{cashInfo.totalCommissions.toFixed(0)} DA</span></div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Barème de commissions</CardTitle>
-          <p className="text-xs text-slate-500">Montant gagné par livraison selon le format du colis.</p>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid gap-3 md:grid-cols-3">
-            <div className="p-4 border rounded-lg text-center bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800">
-              <p className="text-xs font-medium text-emerald-700 dark:text-emerald-400 mb-1">Petit colis</p>
-              <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-300">{adminCommissions.petit} DA</p>
-              <p className="text-xs text-slate-500 mt-1">par livraison</p>
-            </div>
-            <div className="p-4 border rounded-lg text-center bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
-              <p className="text-xs font-medium text-blue-700 dark:text-blue-400 mb-1">Moyen colis</p>
-              <p className="text-2xl font-bold text-blue-700 dark:text-blue-300">{adminCommissions.moyen} DA</p>
-              <p className="text-xs text-slate-500 mt-1">par livraison</p>
-            </div>
-            <div className="p-4 border rounded-lg text-center bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800">
-              <p className="text-xs font-medium text-purple-700 dark:text-purple-400 mb-1">Gros colis</p>
-              <p className="text-2xl font-bold text-purple-700 dark:text-purple-300">{adminCommissions.gros} DA</p>
-              <p className="text-xs text-slate-500 mt-1">par livraison</p>
-            </div>
-          </div>
-          <div className="flex items-center justify-between rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/20 px-4 py-3">
-            <span className="text-sm text-slate-600 dark:text-slate-300">Total commissions gagnées</span>
-            <span className="text-lg font-bold text-emerald-700 dark:text-emerald-400">{(cashInfo?.totalCommissions ?? 0).toFixed(0)} DA</span>
-          </div>
         </CardContent>
       </Card>
 
@@ -2162,9 +2113,9 @@ function CashTab({ relaisId, cashInfo: initialCashInfo, userId, onRefresh }: { r
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-emerald-600" /></div>
+            <DashboardSectionLoading label="Chargement des transactions..." />
           ) : ledgerRows.length === 0 ? (
-            <p className="text-center text-slate-500 py-8">Aucune transaction</p>
+            <DashboardEmptyState title="Aucune transaction" description="Les scans et reversements apparaîtront ici." icon={<History className="h-5 w-5" />} />
           ) : (
             <div className="space-y-3">
               <div className="hidden md:grid md:grid-cols-6 text-xs font-semibold uppercase tracking-wide text-slate-500 border rounded-lg px-3 py-2 bg-slate-50">
@@ -2226,9 +2177,9 @@ function CashTab({ relaisId, cashInfo: initialCashInfo, userId, onRefresh }: { r
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-emerald-600" /></div>
+            <DashboardSectionLoading label="Chargement des collectes physiques..." />
           ) : cashPickups.length === 0 ? (
-            <p className="text-center text-slate-500 py-8">Aucune collecte physique demandée</p>
+            <DashboardEmptyState title="Aucune collecte physique" description="Créez une demande de collecte quand la caisse dépasse votre seuil." icon={<Clock className="h-5 w-5" />} />
           ) : (
             <div className="space-y-3">
               {cashPickups.map((pickup: any) => (

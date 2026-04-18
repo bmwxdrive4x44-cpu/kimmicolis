@@ -62,11 +62,11 @@ export function ParcelHistory({ userId }: ParcelHistoryProps) {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {parcels.map((parcel) => (
-        <Card key={parcel.id} className="overflow-hidden">
+        <Card key={parcel.id} className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white/95 shadow-[0_18px_40px_-30px_rgba(15,23,42,0.35)]">
           <div className="flex flex-col md:flex-row">
-            <div className="flex-1 p-6">
+            <div className="flex-1 p-5 sm:p-6">
               <div className="flex items-start justify-between mb-4">
                 <div>
                   <h3 className="font-bold text-lg">{parcel.trackingNumber}</h3>
@@ -77,7 +77,7 @@ export function ParcelHistory({ userId }: ParcelHistoryProps) {
                 {getStatusBadge(parcel.status)}
               </div>
               
-              <div className="grid gap-4 md:grid-cols-2 text-sm">
+              <div className="grid gap-3 sm:gap-4 md:grid-cols-2 text-sm">
                 <div className="flex items-center gap-2">
                   <MapPin className="h-4 w-4 text-muted-foreground" />
                   <span>
@@ -91,7 +91,7 @@ export function ParcelHistory({ userId }: ParcelHistoryProps) {
               </div>
             </div>
             
-            <div className="border-t md:border-t-0 md:border-l p-6 bg-slate-50 dark:bg-slate-800">
+            <div className="border-t md:border-t-0 md:border-l p-5 sm:p-6 bg-slate-50 dark:bg-slate-800">
               <div className="space-y-2">
                 <p className="text-sm font-semibold">Points relais:</p>
                 <p className="text-xs text-muted-foreground">

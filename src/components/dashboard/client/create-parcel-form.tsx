@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AddressAutocompleteInput } from '@/components/ui/address-autocomplete-input';
 import { FormGlobalError } from '@/components/ui/form-error';
@@ -18,6 +19,8 @@ import { normalizePhone, validatePhone } from '@/lib/validators';
 import { CheckCircle, CircleHelp, CreditCard, History, Loader2, Package, Plus, Printer } from 'lucide-react';
 
 const LABEL_STORAGE_KEY = 'swiftcolis.parcel-labels';
+const SAVED_ADDRESSES_KEY = 'swiftcolis.saved-addresses';
+const PARCEL_RECREATE_DRAFT_KEY = 'swiftcolis.recreate-draft';
 
 const RelaySelectionMap = dynamic(
   () => import('@/components/maps/relay-selection-map').then((mod) => mod.RelaySelectionMap),
@@ -114,11 +117,53 @@ export function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart 
   const [formData, setFormData] = useState<FormState>(initialFormState);
   const [homeAddress, setHomeAddress] = useState('');
   const [homeCoords, setHomeCoords] = useState<{ lat: number; lon: number } | null>(null);
+  const [shouldSaveAddress, setShouldSaveAddress] = useState(true);
   const [calculatedPrice, setCalculatedPrice] = useState<any>(null);
+  const [savedAddresses, setSavedAddresses] = useState<{ label: string; lat: number; lon: number }[]>([]);
 
   const formatRelayHours = (relay: any) => {
     if (!relay?.openTime || !relay?.closeTime) return 'Horaires non renseignés';
     return `${relay.openTime} - ${relay.closeTime}`;
+  };
+
+  const loadSavedAddresses = () => {
+    try {
+      const saved = localStorage.getItem(SAVED_ADDRESSES_KEY);
+      if (saved) {
+        setSavedAddresses(JSON.parse(saved));
+      }
+    } catch {
+      // Ignore localStorage errors
+    }
+  };
+
+  const saveAddress = (label: string, lat: number, lon: number) => {
+    try {
+      const updated = [...savedAddresses];
+      // Remove duplicate if exists
+      const index = updated.findIndex(a => a.label === label);
+      if (index > -1) {
+        updated.splice(index, 1);
+      }
+      // Add to top
+      updated.unshift({ label, lat, lon });
+      // Keep only last 5 addresses
+      const trimmed = updated.slice(0, 5);
+      localStorage.setItem(SAVED_ADDRESSES_KEY, JSON.stringify(trimmed));
+      setSavedAddresses(trimmed);
+    } catch {
+      // Ignore localStorage errors
+    }
+  };
+
+  const removeAddress = (label: string) => {
+    try {
+      const updated = savedAddresses.filter(a => a.label !== label);
+      localStorage.setItem(SAVED_ADDRESSES_KEY, JSON.stringify(updated));
+      setSavedAddresses(updated);
+    } catch {
+      // Ignore localStorage errors
+    }
   };
 
   useEffect(() => {
@@ -127,6 +172,28 @@ export function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart 
     void fetchPricingSettings();
     void fetchLignesActives();
     void fetchUserProfile();
+    loadSavedAddresses();
+
+    try {
+      const rawDraft = sessionStorage.getItem(PARCEL_RECREATE_DRAFT_KEY);
+      if (rawDraft) {
+        const draft = JSON.parse(rawDraft) as Partial<FormState>;
+        setFormData((prev) => ({
+          ...prev,
+          villeDepart: typeof draft.villeDepart === 'string' ? draft.villeDepart : prev.villeDepart,
+          villeArrivee: typeof draft.villeArrivee === 'string' ? draft.villeArrivee : prev.villeArrivee,
+          recipientFirstName: typeof draft.recipientFirstName === 'string' ? draft.recipientFirstName : prev.recipientFirstName,
+          recipientLastName: typeof draft.recipientLastName === 'string' ? draft.recipientLastName : prev.recipientLastName,
+          recipientPhone: typeof draft.recipientPhone === 'string' ? draft.recipientPhone : prev.recipientPhone,
+          recipientEmail: typeof draft.recipientEmail === 'string' ? draft.recipientEmail : prev.recipientEmail,
+          weight: typeof draft.weight === 'string' ? draft.weight : prev.weight,
+          description: typeof draft.description === 'string' ? draft.description : prev.description,
+        }));
+        sessionStorage.removeItem(PARCEL_RECREATE_DRAFT_KEY);
+      }
+    } catch {
+      // Ignore malformed draft payloads.
+    }
   }, []);
 
   useEffect(() => {
@@ -516,6 +583,20 @@ export function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart 
         return;
       }
 
+      if (!homeAddress.trim()) {
+        const message = 'Adresse requise: sélectionnez votre adresse de domicile.';
+        setSubmitError(message);
+        toast({ title: 'Erreur', description: message, variant: 'destructive' });
+        return;
+      }
+
+      if (!homeCoords || !Number.isFinite(homeCoords.lat) || !Number.isFinite(homeCoords.lon)) {
+        const message = 'Coordonnées adresse invalides: veuillez sélectionner une adresse depuis l\'autocomplete.';
+        setSubmitError(message);
+        toast({ title: 'Erreur', description: message, variant: 'destructive' });
+        return;
+      }
+
       const trackingNumber = generateTrackingNumber();
       const qrData = generateQRData(trackingNumber);
       const response = await fetch('/api/parcels', {
@@ -537,6 +618,10 @@ export function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart 
           recipientLastName: formData.recipientLastName,
           recipientPhone: formData.recipientPhone,
           recipientEmail: formData.recipientEmail,
+          address: homeAddress.trim(),
+          addressLat: homeCoords.lat,
+          addressLon: homeCoords.lon,
+          saveAddress: shouldSaveAddress,
           labelPrintMode: formData.labelPrintMode,
           prixClient: calculatedPrice?.finalClientPrice || 0,
           commissionPlateforme: calculatedPrice?.platformMargin || 0,
@@ -764,6 +849,26 @@ export function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart 
 
   return (
     <div className="mx-auto w-full max-w-4xl">
+      {!homeAddress && (
+        <div className="mb-4 rounded-2xl border border-blue-200 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-800 p-4 sm:p-5">
+          <p className="text-sm font-medium text-blue-900 dark:text-blue-200 mb-2">📍 Ajouter votre adresse</p>
+          <p className="text-sm text-blue-800 dark:text-blue-300 mb-4">Vous n'avez pas encore d'adresse enregistrée. En l'ajoutant ici, nous pourrons vous localiser les points relais les plus proches de chez vous, ce qui facilite vos dépôts de colis.</p>
+          <Button
+            type="button"
+            size="sm"
+            className="h-9 bg-blue-600 hover:bg-blue-700 text-white"
+            onClick={() => {
+              const addressSection = document.getElementById('address-input-section');
+              if (addressSection) {
+                addressSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              }
+            }}
+          >
+            Ajouter mon adresse
+          </Button>
+        </div>
+      )}
+
       <Card className="border-slate-200 shadow-sm">
         <CardHeader className="pb-4 text-center">
           <CardTitle className="text-2xl">Créer un nouveau colis</CardTitle>
@@ -861,8 +966,32 @@ export function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart 
                   <span className="w-6 h-6 rounded-full bg-emerald-600 text-white text-sm flex items-center justify-center">2</span>
                   Points relais
                 </h3>
-                <div className="mb-4 space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                <div className="mb-4 space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-3" id="address-input-section">
                   <Label className="text-sm">Adresse du domicile (pour trier les relais proches)</Label>
+                  {savedAddresses.length > 0 && (
+                    <div className="space-y-1.5">
+                      <p className="text-xs text-slate-500">Adresses récentes:</p>
+                      <div className="flex flex-wrap gap-2">
+                        {savedAddresses.map((addr, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-all ${
+                              homeAddress === addr.label
+                                ? 'border-emerald-400 bg-emerald-50 text-emerald-700'
+                                : 'border-slate-300 bg-white text-slate-600 hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700'
+                            }`}
+                            onClick={() => {
+                              setHomeAddress(addr.label);
+                              setHomeCoords({ lat: addr.lat, lon: addr.lon });
+                            }}
+                          >
+                            {addr.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   <AddressAutocompleteInput
                     value={homeAddress}
                     onChange={(value) => {
@@ -872,10 +1001,26 @@ export function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart 
                     onSelect={(suggestion) => {
                       setHomeAddress(suggestion.label);
                       setHomeCoords({ lat: suggestion.lat, lon: suggestion.lon });
+                      if (shouldSaveAddress) {
+                        saveAddress(suggestion.label, suggestion.lat, suggestion.lon);
+                      }
                     }}
                     placeholder="Ex: Bab Ezzouar, Alger"
                     className="h-10"
                   />
+                  <div className="flex items-start gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2">
+                    <Checkbox
+                      id="save-address-checkbox"
+                      checked={shouldSaveAddress}
+                      onCheckedChange={(checked) => setShouldSaveAddress(checked === true)}
+                    />
+                    <div className="space-y-0.5">
+                      <Label htmlFor="save-address-checkbox" className="cursor-pointer text-xs font-medium text-slate-700">
+                        Enregistrer cette adresse
+                      </Label>
+                      <p className="text-xs text-slate-500">Activé: cache local rapide + mise à jour de votre profil.</p>
+                    </div>
+                  </div>
                   <p className="text-xs text-slate-500">Astuce: choisissez votre adresse pour voir les relais les plus proches sur la carte.</p>
                   {nearestRelayDepart && homeCoords && (
                     <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600">

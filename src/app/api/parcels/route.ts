@@ -1032,6 +1032,10 @@ export async function POST(request: NextRequest) {
       recipientLastName,
       recipientPhone,
       recipientEmail,
+      address,
+      addressLat,
+      addressLon,
+      saveAddress,
       labelPrintMode,
       withdrawalCode,
       relaisDepartId,
@@ -1076,6 +1080,19 @@ export async function POST(request: NextRequest) {
     if (normalizedRecipientEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedRecipientEmail)) {
       return badRequest('INVALID_RECIPIENT_EMAIL', 'Email destinataire invalide');
     }
+
+    const normalizedAddress = String(address || '').trim();
+    if (!normalizedAddress) {
+      return badRequest('MISSING_ADDRESS', 'Adresse requise');
+    }
+
+    const parsedAddressLat = Number(addressLat);
+    const parsedAddressLon = Number(addressLon);
+    if (!Number.isFinite(parsedAddressLat) || !Number.isFinite(parsedAddressLon)) {
+      return badRequest('INVALID_ADDRESS_COORDS', 'Coordonnées adresse invalides');
+    }
+
+    const shouldPersistAddress = Boolean(saveAddress);
 
     const parsedWeight = Number(weight ?? 0);
     if (!Number.isFinite(parsedWeight) || parsedWeight <= 0) {
@@ -1457,11 +1474,38 @@ export async function POST(request: NextRequest) {
           relaisArriveeId,
           villeDepart,
           villeArrivee,
+          senderAddress: normalizedAddress,
+          senderAddressLat: parsedAddressLat,
+          senderAddressLon: parsedAddressLon,
           amount: Number(prixClient || 0),
         },
       });
     } catch (eventError) {
       console.warn('[api/parcels] event emission failed (non-blocking):', eventError);
+    }
+
+    if (shouldPersistAddress) {
+      try {
+        try {
+          await db.$executeRaw`
+            UPDATE "User"
+            SET "address" = ${normalizedAddress},
+                "addressLat" = ${parsedAddressLat},
+                "addressLon" = ${parsedAddressLon}
+            WHERE "id" = ${clientId}
+          `;
+        } catch {
+          // Backward-compatible fallback when lat/lon columns are not deployed yet.
+          await db.user.update({
+            where: { id: clientId },
+            data: {
+              address: normalizedAddress,
+            },
+          });
+        }
+      } catch (profileAddressError) {
+        console.warn('[api/parcels] profile address update failed (non-blocking):', profileAddressError);
+      }
     }
 
     errorStep = 'POST_ELIGIBILITY_REFRESH';

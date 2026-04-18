@@ -3,212 +3,113 @@
 import { useTranslations } from 'next-intl';
 import { Link } from '@/i18n/routing';
 import { Button } from '@/components/ui/button';
-import { Package, Truck, MapPin, Shield, ArrowRight, Search } from 'lucide-react';
+import { Package, Truck, MapPin, ShieldCheck, ArrowRight, Search, Sparkles, Clock3 } from 'lucide-react';
 import { useState } from 'react';
 
 export function Hero() {
   const t = useTranslations('landing.hero');
   const [trackingNumber, setTrackingNumber] = useState('');
 
+  const trustItems = [
+    { icon: MapPin, label: '48 wilayas couvertes' },
+    { icon: Truck, label: 'Transporteurs verifies' },
+    { icon: ShieldCheck, label: 'Flux colis securises' },
+  ];
+
   return (
     <section className="relative overflow-hidden bg-slate-950">
-      {/* Gradient background */}
-      <div className="absolute inset-0 z-0 bg-[radial-gradient(ellipse_at_top_left,_#064e3b_0%,_#0f172a_55%,_#020617_100%)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_14%_20%,rgba(16,185,129,0.24),transparent_36%),radial-gradient(circle_at_86%_14%,rgba(14,165,233,0.2),transparent_34%),linear-gradient(180deg,#020617_0%,#0b1220_54%,#0f172a_100%)]" />
+      <div className="absolute inset-0 opacity-20 [background-image:linear-gradient(to_right,rgba(148,163,184,0.18)_1px,transparent_1px),linear-gradient(to_bottom,rgba(148,163,184,0.18)_1px,transparent_1px)] [background-size:46px_46px]" />
 
-      {/* Algeria logistics network — SVG background */}
-      <svg
-        className="absolute inset-0 z-0 w-full h-full"
-        viewBox="0 0 1400 700"
-        preserveAspectRatio="xMidYMid slice"
-        xmlns="http://www.w3.org/2000/svg"
-      >
-        <defs>
-          <filter id="nodeGlow" x="-60%" y="-60%" width="220%" height="220%">
-            <feGaussianBlur stdDeviation="3" result="blur" />
-            <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-          </filter>
-        </defs>
-
-        {/* Route connections — glowing lines */}
-        {([
-          [630,145, 290,200],
-          [630,145, 970,220],
-          [630,145, 750,310],
-          [630,145, 880,170],
-          [290,200, 200,310],
-          [290,200, 420,380],
-          [970,220, 1050,340],
-          [970,220, 820,420],
-          [750,310, 820,420],
-          [750,310, 580,520],
-          [420,380, 350,490],
-          [420,380, 480,460],
-          [480,460, 580,520],
-          [820,420, 1050,340],
-          [200,310, 350,490],
-          [880,170, 1050,340],
-        ] as [number,number,number,number][]).map(([x1,y1,x2,y2], i) => (
-          <line
-            key={i}
-            x1={x1} y1={y1} x2={x2} y2={y2}
-            stroke="#10b981"
-            strokeWidth="1.5"
-            strokeOpacity="0.45"
-            strokeDasharray="8 5"
-          />
-        ))}
-
-        {/* Secondary city nodes */}
-        {([
-          [290, 200, 'Oran'],
-          [970, 220, 'Constantine'],
-          [750, 310, 'Sétif'],
-          [420, 380, 'Djelfa'],
-          [480, 460, 'Ghardaïa'],
-          [820, 420, 'Batna'],
-          [200, 310, 'Tlemcen'],
-          [1050, 340, 'Annaba'],
-          [580, 520, 'Ouargla'],
-          [350, 490, 'Laghouat'],
-          [880, 170, 'Skikda'],
-        ] as [number,number,string][]).map(([cx, cy, label], i) => (
-          <g key={i} filter="url(#nodeGlow)">
-            <circle cx={cx} cy={cy} r="5" fill="#22c55e" fillOpacity="0.9" />
-            <circle cx={cx} cy={cy} r="10" fill="none" stroke="#22c55e" strokeWidth="1" strokeOpacity="0.35" />
-            <text
-              x={cx + 14} y={cy + 4}
-              fontSize="11"
-              fill="#6ee7b7"
-              fillOpacity="0.75"
-              fontFamily="Inter, Arial, sans-serif"
-              fontWeight="500"
-            >{label}</text>
-          </g>
-        ))}
-
-        {/* Alger — main hub, brighter */}
-        {/* Alger — main hub */}
-        <g filter="url(#nodeGlow)">
-          <circle cx="630" cy="145" r="16" fill="none" stroke="#22c55e" strokeWidth="1.5" strokeOpacity="0.5" />
-          <circle cx="630" cy="145" r="6" fill="#4ade80" fillOpacity="1" />
-          <text x="652" y="141" fontSize="13" fill="#86efac" fillOpacity="0.9" fontFamily="Inter, Arial, sans-serif" fontWeight="700">Alger</text>
-          <text x="652" y="156" fontSize="9.5" fill="#6ee7b7" fillOpacity="0.55" fontFamily="Inter, Arial, sans-serif">Hub central</text>
-        </g>
-      </svg>
-
-      {/* Ambient glow blobs */}
-      <div className="absolute inset-0 z-0 overflow-hidden">
-        <div className="absolute -top-20 -left-20 w-[500px] h-[500px] bg-emerald-600/15 rounded-full blur-[100px]" />
-        <div className="absolute bottom-0 right-0 w-[600px] h-[500px] bg-teal-700/10 rounded-full blur-[120px]" />
-      </div>
-
-      <div className="container relative z-10 px-4 py-16 md:py-24 lg:py-32">
-        <div className="grid gap-12 lg:grid-cols-2 lg:gap-8 items-center">
-          {/* Left Content */}
-          <div className="flex flex-col items-start gap-6">
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-sm font-medium backdrop-blur-sm">
-              <Truck className="h-4 w-4" />
-              Livraison inter-wilayas
+      <div className="container relative z-10 px-4 pb-24 pt-16 md:pt-20 lg:pb-32 lg:pt-28">
+        <div className="grid items-center gap-12 lg:grid-cols-[1.08fr_0.92fr] lg:gap-14">
+          <div className="space-y-8">
+            <div className="inline-flex items-center gap-2 rounded-full border border-emerald-300/35 bg-emerald-400/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-emerald-200">
+              <Sparkles className="h-3.5 w-3.5" />
+              SaaS logistique nouvelle generation
             </div>
 
-            <h1 className="text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl text-white">
-              <span className="bg-gradient-to-r from-emerald-400 to-teal-300 bg-clip-text text-transparent">
+            <div className="space-y-5">
+              <h1 className="max-w-3xl text-4xl font-black leading-[1.02] tracking-[-0.03em] text-white sm:text-5xl md:text-6xl lg:text-7xl">
                 {t('title')}
-              </span>
-            </h1>
+                <span className="block bg-gradient-to-r from-emerald-300 via-cyan-300 to-sky-300 bg-clip-text text-transparent">Expediez plus vite avec une visibilite complete sur chaque colis.</span>
+              </h1>
+              <p className="max-w-2xl text-base leading-relaxed text-slate-300 sm:text-lg md:text-xl">
+                {t('subtitle')}
+              </p>
+              <p className="max-w-2xl text-sm leading-relaxed text-slate-400 sm:text-base">
+                {t('description')}
+              </p>
+            </div>
 
-            <p className="text-xl text-slate-300 max-w-xl">
-              {t('subtitle')}
-            </p>
-
-            <p className="text-slate-400 max-w-xl">
-              {t('description')}
-            </p>
-
-            <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
               <Link href="/auth/register">
-                <Button size="lg" className="bg-emerald-500 hover:bg-emerald-600 w-full sm:w-auto gap-2 shadow-lg shadow-emerald-500/25">
-                  <Package className="h-5 w-5" />
+                <Button size="lg" className="h-12 rounded-xl bg-emerald-500 px-7 text-sm font-semibold text-white hover:bg-emerald-400 sm:h-12">
+                  <Package className="mr-2 h-4 w-4" />
                   {t('cta.send')}
-                  <ArrowRight className="h-4 w-4 ml-1" />
+                  <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </Link>
               <Link href="/become-relay">
-                <Button variant="outline" size="lg" className="w-full sm:w-auto bg-white/10 border-white/20 text-white hover:bg-white/20 backdrop-blur-sm">
+                <Button variant="outline" size="lg" className="h-12 rounded-xl border-slate-500/60 bg-slate-900/40 px-7 text-sm font-semibold text-white hover:bg-slate-800/70">
                   {t('cta.partner')}
                 </Button>
               </Link>
             </div>
+
+            <div className="grid gap-3 pt-2 sm:grid-cols-3">
+              {trustItems.map(({ icon: Icon, label }) => (
+                <div key={label} className="flex items-center gap-2.5 rounded-xl border border-slate-800 bg-slate-900/65 px-3 py-3 text-slate-200 backdrop-blur">
+                  <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/15 text-emerald-300">
+                    <Icon className="h-4 w-4" />
+                  </span>
+                  <span className="text-xs font-medium leading-snug">{label}</span>
+                </div>
+              ))}
+            </div>
           </div>
 
-          {/* Right Content - Tracking Card */}
-          <div className="flex flex-col gap-6">
-            {/* Tracking Form */}
-            <div className="bg-white/10 backdrop-blur-xl rounded-2xl shadow-2xl p-6 border border-white/20">
-              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2 text-white">
-                <Search className="h-5 w-5 text-emerald-400" />
-                {t('cta.track')}
-              </h3>
-              <div className="flex gap-2">
+          <div className="relative">
+            <div className="absolute -inset-5 rounded-[2rem] bg-gradient-to-br from-emerald-500/20 via-cyan-500/10 to-transparent blur-2xl" />
+            <div className="relative overflow-hidden rounded-[1.6rem] border border-slate-700/70 bg-slate-900/80 p-6 shadow-[0_35px_90px_-45px_rgba(16,185,129,0.6)] backdrop-blur-xl">
+              <div className="mb-5 flex items-start justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-300/90">Suivi instantane</p>
+                  <h3 className="mt-2 text-xl font-bold text-white">{t('cta.track')}</h3>
+                </div>
+                <span className="inline-flex items-center gap-1 rounded-full border border-emerald-300/30 bg-emerald-500/10 px-3 py-1 text-[11px] font-medium text-emerald-200">
+                  <Clock3 className="h-3.5 w-3.5" />
+                  Temps reel
+                </span>
+              </div>
+
+              <div className="mb-6 flex gap-2">
                 <input
                   type="text"
                   placeholder="SCXXXXXXXXX"
                   value={trackingNumber}
                   onChange={(e) => setTrackingNumber(e.target.value)}
-                  className="flex-1 px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                  className="h-12 flex-1 rounded-xl border border-slate-600 bg-slate-950/65 px-4 text-sm text-white placeholder:text-slate-500 focus:border-emerald-400 focus:outline-none"
                 />
                 <Link href={`/dashboard/client?track=${trackingNumber}`}>
-                  <Button className="bg-emerald-500 hover:bg-emerald-600 h-full px-6">
-                    <Search className="h-5 w-5" />
+                  <Button className="h-12 rounded-xl bg-emerald-500 px-4 hover:bg-emerald-400">
+                    <Search className="h-4 w-4" />
                   </Button>
                 </Link>
               </div>
-            </div>
 
-            {/* Stats Cards */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="bg-white/10 backdrop-blur-xl rounded-xl shadow-xl p-5 border border-white/20">
-                <div className="flex items-center gap-3">
-                  <div className="p-3 rounded-lg bg-emerald-500/20">
-                    <Package className="h-6 w-6 text-emerald-400" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold text-white">50K+</p>
-                    <p className="text-sm text-slate-400">Colis livrés</p>
-                  </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-xl border border-slate-700 bg-slate-950/70 p-4">
+                  <p className="text-xs text-slate-300">Colis traites</p>
+                  <p className="mt-1 text-2xl font-black tracking-tight text-white">50K+</p>
                 </div>
-              </div>
-              <div className="bg-white/10 backdrop-blur-xl rounded-xl shadow-xl p-5 border border-white/20">
-                <div className="flex items-center gap-3">
-                  <div className="p-3 rounded-lg bg-blue-500/20">
-                    <MapPin className="h-6 w-6 text-blue-400" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold text-white">48</p>
-                    <p className="text-sm text-slate-400">Wilayas</p>
-                  </div>
+                <div className="rounded-xl border border-slate-700 bg-slate-950/70 p-4">
+                  <p className="text-xs text-slate-300">Points relais actifs</p>
+                  <p className="mt-1 text-2xl font-black tracking-tight text-white">500+</p>
                 </div>
-              </div>
-              <div className="bg-white/10 backdrop-blur-xl rounded-xl shadow-xl p-5 border border-white/20">
-                <div className="flex items-center gap-3">
-                  <div className="p-3 rounded-lg bg-orange-500/20">
-                    <Shield className="h-6 w-6 text-orange-400" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold text-white">500+</p>
-                    <p className="text-sm text-slate-400">Points relais</p>
-                  </div>
-                </div>
-              </div>
-              <div className="bg-white/10 backdrop-blur-xl rounded-xl shadow-xl p-5 border border-white/20">
-                <div className="flex items-center gap-3">
-                  <div className="p-3 rounded-lg bg-purple-500/20">
-                    <Truck className="h-6 w-6 text-purple-400" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold text-white">1K+</p>
-                    <p className="text-sm text-slate-400">Transporteurs</p>
-                  </div>
+                <div className="rounded-xl border border-slate-700 bg-slate-950/70 p-4 sm:col-span-2">
+                  <p className="text-xs text-slate-300">Engagement produit</p>
+                  <p className="mt-1 text-base font-medium text-slate-200">Interface unifiee pour clients, transporteurs et relais dans un flux unique.</p>
                 </div>
               </div>
             </div>

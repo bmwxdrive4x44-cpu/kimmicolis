@@ -129,10 +129,10 @@ export function EnseignePaymentsTab({ clientId, isPro = false }: { clientId: str
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <Card>
-        <CardHeader>
-          <CardTitle>Paiement des colis</CardTitle>
+        <CardHeader className="space-y-2">
+          <CardTitle className="text-xl font-black tracking-tight text-slate-900">Paiement des colis</CardTitle>
           <CardDescription>
             Selectionnez les colis a payer. Vous serez redirige vers la page de paiement securisee.
             Le matching logistique demarre uniquement apres confirmation du paiement.
@@ -157,7 +157,7 @@ export function EnseignePaymentsTab({ clientId, isPro = false }: { clientId: str
 
           {/* Barre d'actions */}
           {!isLoading && unpaidParcels.length > 0 && (
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
               <Button
                 size="sm"
                 variant="outline"
@@ -201,8 +201,8 @@ export function EnseignePaymentsTab({ clientId, isPro = false }: { clientId: str
               </p>
             </div>
           ) : (
-            <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
-              <table className="min-w-full divide-y divide-slate-200 text-sm">
+            <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white/95 shadow-[0_16px_35px_-28px_rgba(15,23,42,0.35)]">
+              <table className="min-w-[920px] divide-y divide-slate-200 text-sm">
                 <thead className="bg-slate-50">
                   <tr>
                     <th className="px-4 py-3 text-left">

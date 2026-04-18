@@ -540,6 +540,53 @@ exports.Prisma.QrSecurityLogScalarFieldEnum = {
   createdAt: 'createdAt'
 };
 
+exports.Prisma.EventScalarFieldEnum = {
+  id: 'id',
+  type: 'type',
+  aggregateType: 'aggregateType',
+  aggregateId: 'aggregateId',
+  payload: 'payload',
+  createdAt: 'createdAt'
+};
+
+exports.Prisma.KpiTransporterScalarFieldEnum = {
+  transporteurId: 'transporteurId',
+  missionsTotal: 'missionsTotal',
+  missionsActive: 'missionsActive',
+  missionsAssigned: 'missionsAssigned',
+  missionsInProgress: 'missionsInProgress',
+  missionsCompleted: 'missionsCompleted',
+  earningsTotal: 'earningsTotal',
+  updatedAt: 'updatedAt',
+  createdAt: 'createdAt'
+};
+
+exports.Prisma.KpiEnseigneScalarFieldEnum = {
+  enseigneId: 'enseigneId',
+  parcelsTotal: 'parcelsTotal',
+  parcelsDelivered: 'parcelsDelivered',
+  pendingPayment: 'pendingPayment',
+  readyForDeposit: 'readyForDeposit',
+  inTransit: 'inTransit',
+  arrivedRelay: 'arrivedRelay',
+  revenueDelivered: 'revenueDelivered',
+  revenueCommitted: 'revenueCommitted',
+  updatedAt: 'updatedAt',
+  createdAt: 'createdAt'
+};
+
+exports.Prisma.KpiRelaisScalarFieldEnum = {
+  relaisId: 'relaisId',
+  pendingActions: 'pendingActions',
+  stockDeparture: 'stockDeparture',
+  stockArrival: 'stockArrival',
+  handoversCompleted: 'handoversCompleted',
+  cashOnHand: 'cashOnHand',
+  commissionsTotal: 'commissionsTotal',
+  updatedAt: 'updatedAt',
+  createdAt: 'createdAt'
+};
+
 exports.Prisma.SortOrder = {
   asc: 'asc',
   desc: 'desc'
@@ -582,7 +629,11 @@ exports.Prisma.ModelName = {
   CashPickup: 'CashPickup',
   TransporterScore: 'TransporterScore',
   TransporterPenalty: 'TransporterPenalty',
-  QrSecurityLog: 'QrSecurityLog'
+  QrSecurityLog: 'QrSecurityLog',
+  Event: 'Event',
+  KpiTransporter: 'KpiTransporter',
+  KpiEnseigne: 'KpiEnseigne',
+  KpiRelais: 'KpiRelais'
 };
 
 /**

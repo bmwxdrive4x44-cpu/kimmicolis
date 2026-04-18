@@ -17,23 +17,31 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import {
+  DashboardEmptyState,
   DashboardHero,
+  DashboardLoadingState,
   DashboardMetricCard,
   DashboardPanel,
+  DashboardSection,
+  DashboardSectionLoading,
   DashboardShell,
   DashboardStatsGrid,
+  dashboardMetaBadgeClass,
+  dashboardMetaBadgeInteractiveClass,
+  dashboardTabsContentClass,
   dashboardTabsListClass,
   getDashboardTabsTriggerClass,
 } from '@/components/dashboard/dashboard-shell';
 import { WILAYAS, PARCEL_STATUS } from '@/lib/constants';
 import { normalizeRole } from '@/lib/roles';
-import { Package, Plus, History, MapPin, Loader2, CreditCard, Search, Truck, CheckCircle, Clock, QrCode, Printer, User, Pencil, Save, AlertTriangle, XCircle, MessageSquare, Smartphone, Building2, Trash2, CircleHelp } from 'lucide-react';
+import { Package, Plus, History, MapPin, Loader2, CreditCard, Search, Truck, CheckCircle, Clock, QrCode, Printer, User, Pencil, Save, AlertTriangle, XCircle, MessageSquare, Smartphone, Building2, Trash2, CircleHelp, Bell, RefreshCw } from 'lucide-react';
 import { PRO_DISCOUNT_TIERS, getProBatchDiscountRate, getProBatchDiscountTier } from '@/lib/pricing';
 import { useToast } from '@/hooks/use-toast';
 import { ParcelDeleteButton, ParcelEditDialog } from '@/components/dashboard/parcel-edit-dialog';
 import { CreateParcelForm } from '@/components/dashboard/client/create-parcel-form';
 
 const LABEL_STORAGE_KEY = 'swiftcolis.parcel-labels';
+const PARCEL_RECREATE_DRAFT_KEY = 'swiftcolis.recreate-draft';
 
 // Helper function for role-based dashboard path
 function getRoleBasedDashboardPath(role: string, locale: string): string {
@@ -49,6 +57,7 @@ function getRoleBasedDashboardPath(role: string, locale: string): string {
 
 function ClientDashboardContent() {
   const locale = useLocale();
+  const { toast } = useToast();
 
   const { data: session, status, update } = useSession({
     required: true,
@@ -73,20 +82,28 @@ function ClientDashboardContent() {
   const [activeTab, setActiveTab] = useState(initialTab);
   const [trackingNumber, setTrackingNumber] = useState(initialTracking);
   const [stats, setStats] = useState({ created: 0, inTransit: 0, delivered: 0, totalSpent: 0 });
+  const [recentParcels, setRecentParcels] = useState<any[]>([]);
+  const [notifications, setNotifications] = useState<any[]>([]);
   const [cartCount, setCartCount] = useState(0);
   const [implicitPro, setImplicitPro] = useState({ eligible: false, validParcelsCount: 0, remaining: 5, threshold: 5, windowDays: 90 });
   const [sessionLoadingTimedOut, setSessionLoadingTimedOut] = useState(false);
 
   async function fetchStats() {
     try {
-      const [parcelsRes, loyaltyRes] = await Promise.all([
+      const [parcelsRes, loyaltyRes, notificationsRes] = await Promise.all([
         fetch(`/api/parcels?clientId=${session?.user?.id}`),
         fetch('/api/loyalty/status'),
+        fetch(`/api/notifications?userId=${session?.user?.id}`),
       ]);
 
       const parcelsPayload = await parcelsRes.json();
       const parcels = Array.isArray(parcelsPayload) ? parcelsPayload : [];
       const loyalty = await loyaltyRes.json();
+      const notificationsPayload = await notificationsRes.json();
+      const notificationsData = Array.isArray(notificationsPayload) ? notificationsPayload : [];
+
+      setRecentParcels(parcels.slice(0, 5));
+      setNotifications(notificationsData.slice(0, 5));
 
       setCartCount(parcels.filter((p: any) => p.status === 'CREATED').length);
       
@@ -191,15 +208,17 @@ function ClientDashboardContent() {
   }, [status]);
 
   if (status === 'loading') {
+    if (!sessionLoadingTimedOut) {
+      return <DashboardLoadingState tone="client" title="Connexion en cours" description="Préparation de votre espace client..." />;
+    }
+
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin text-emerald-600 mx-auto mb-4" />
-          <p className="text-slate-600">Connexion en cours...</p>
-          {sessionLoadingTimedOut && (
-            <div className="mt-4 space-y-3">
-              <p className="text-sm text-amber-700">La session met trop de temps à se charger.</p>
-              <div className="flex items-center justify-center gap-2">
+      <div className="min-h-screen bg-slate-50 px-4 py-10 dark:bg-slate-900 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-5xl">
+          <DashboardShell tone="client">
+            <div className="mx-auto max-w-md rounded-2xl border border-amber-200 bg-amber-50/90 p-5 text-center shadow-sm dark:border-amber-900/40 dark:bg-amber-900/20">
+              <p className="text-sm text-amber-800 dark:text-amber-200">La session met trop de temps à se charger.</p>
+              <div className="mt-3 flex items-center justify-center gap-2">
                 <Button type="button" variant="outline" onClick={() => window.location.reload()}>
                   Rafraîchir
                 </Button>
@@ -208,7 +227,7 @@ function ClientDashboardContent() {
                 </Button>
               </div>
             </div>
-          )}
+          </DashboardShell>
         </div>
       </div>
     );
@@ -216,47 +235,67 @@ function ClientDashboardContent() {
 
   if (status === 'authenticated' && !session?.user) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
-        <div className="text-center">
-          <p className="text-red-600 font-bold mb-4">Erreur : session utilisateur introuvable</p>
-          <p className="text-slate-600 mb-4">Veuillez rafraîchir ou vous reconnecter.</p>
-          <Button onClick={() => update()}>Réessayer</Button>
-          <Button variant="outline" className="ml-3" onClick={() => router.push(`/${locale}/auth/login`)}>
-            Aller à la connexion
-          </Button>
+      <div className="min-h-screen bg-slate-50 px-4 py-10 dark:bg-slate-900 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-3xl">
+          <DashboardShell tone="client">
+            <div className="rounded-[1.5rem] border border-red-200 bg-red-50/90 p-8 text-center dark:border-red-900/40 dark:bg-red-900/20">
+              <p className="text-base font-semibold text-red-700 dark:text-red-300">Erreur : session utilisateur introuvable</p>
+              <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">Veuillez rafraîchir ou vous reconnecter.</p>
+              <div className="mt-5 flex items-center justify-center gap-3">
+                <Button onClick={() => update()}>Réessayer</Button>
+                <Button variant="outline" onClick={() => router.push(`/${locale}/auth/login`)}>
+                  Aller à la connexion
+                </Button>
+              </div>
+            </div>
+          </DashboardShell>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-900">
+    <div className="min-h-screen flex flex-col bg-[radial-gradient(circle_at_top,_#f8fafc,_#eff6ff_42%,_#e0f2fe_100%)] dark:bg-slate-900">
       <Header />
-      <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8">
-        <DashboardShell tone="client" className="mx-auto max-w-7xl">
+      <main className="flex-1 px-4 py-10 sm:px-6 lg:px-8">
+        <DashboardShell tone="client" className="mx-auto max-w-[92rem]">
           <DashboardHero
             tone="client"
             eyebrow="Expédition personnelle"
             title="Mon Espace Client"
             description="Préparez vos colis, suivez les étapes de transit et gardez une vue claire sur vos paiements dans une interface plus éditoriale et plus lisible."
+            actions={
+              <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+                <Button
+                  size="lg"
+                  className="w-full bg-sky-600 text-white hover:bg-sky-700 sm:w-auto"
+                  onClick={() => setActiveTab('create')}
+                >
+                  <Plus className="mr-2 h-4 w-4" />Créer un colis
+                </Button>
+                <Button size="lg" variant="outline" className="w-full sm:w-auto" onClick={() => void fetchStats()}>
+                  <RefreshCw className="mr-2 h-4 w-4" />Actualiser
+                </Button>
+              </div>
+            }
             meta={
               <>
-                <Badge variant="outline" className="border-white/70 bg-white/70 text-slate-700">Bienvenue, {session.user.name}</Badge>
-                <Badge variant="outline" className="border-white/70 bg-white/70 text-slate-700">Panier: {cartCount}</Badge>
+                <Badge variant="outline" className={dashboardMetaBadgeClass}>Bienvenue, {session.user.name}</Badge>
+                <Badge variant="outline" className={dashboardMetaBadgeClass}>Panier: {cartCount}</Badge>
                 <Link href="/faq">
-                  <Badge variant="outline" className="border-white/70 bg-white/70 text-slate-700 hover:border-sky-200 hover:text-sky-700">
+                  <Badge variant="outline" className={dashboardMetaBadgeInteractiveClass}>
                     <CircleHelp className="mr-1 h-3.5 w-3.5" />Aide / FAQ
                   </Badge>
                 </Link>
                 {implicitPro.eligible ? (
                   <>
                     <Badge className="bg-violet-600 text-white border-violet-700">Tarif fidele actif</Badge>
-                    <Badge variant="outline" className="border-white/70 bg-white/70 text-slate-700">
+                    <Badge variant="outline" className={dashboardMetaBadgeClass}>
                       Fidelite: {implicitPro.validParcelsCount}/{implicitPro.threshold} colis valides sur {implicitPro.windowDays}j
                     </Badge>
                   </>
                 ) : (
-                  <Badge variant="outline" className="border-white/70 bg-white/70 text-slate-700">
+                  <Badge variant="outline" className={dashboardMetaBadgeClass}>
                     Tarif fidele: encore {implicitPro.remaining} colis ({implicitPro.validParcelsCount}/{implicitPro.threshold})
                   </Badge>
                 )}
@@ -264,16 +303,111 @@ function ClientDashboardContent() {
             }
           />
 
-          <DashboardStatsGrid>
-            <DashboardMetricCard tone="client" label="Colis créés" value={stats.created} icon={<Package className="h-5 w-5" />} />
-            <DashboardMetricCard tone="client" label="En transit" value={stats.inTransit} icon={<Truck className="h-5 w-5" />} />
-            <DashboardMetricCard tone="client" label="Livrés" value={stats.delivered} icon={<CheckCircle className="h-5 w-5" />} />
-            <DashboardMetricCard tone="client" label="Total dépensé" value={`${stats.totalSpent} DA`} icon={<CreditCard className="h-5 w-5" />} />
-          </DashboardStatsGrid>
+          <DashboardSection
+            tone="client"
+            eyebrow="Vue rapide"
+            title="KPI de mes expéditions"
+            description="Visualisez votre pipeline personnel avant d’ouvrir un module de travail."
+          >
+            <DashboardStatsGrid>
+              <DashboardMetricCard tone="client" label="Colis créés" value={stats.created} icon={<Package className="h-5 w-5" />} />
+              <DashboardMetricCard tone="client" label="En transit" value={stats.inTransit} icon={<Truck className="h-5 w-5" />} />
+              <DashboardMetricCard tone="client" label="Livrés" value={stats.delivered} icon={<CheckCircle className="h-5 w-5" />} />
+              <DashboardMetricCard tone="client" label="Total dépensé" value={`${stats.totalSpent} DA`} icon={<CreditCard className="h-5 w-5" />} />
+            </DashboardStatsGrid>
+          </DashboardSection>
 
-          <DashboardPanel tone="client">
-            <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className={`${dashboardTabsListClass} grid grid-cols-2 ${implicitPro.eligible ? 'lg:grid-cols-7' : 'lg:grid-cols-6'}`}>
+          <DashboardSection
+            tone="client"
+            eyebrow="Priorités"
+            title="Situation en 5 secondes"
+            description="Vos derniers colis et notifications critiques sont visibles immédiatement."
+          >
+            <div className="grid gap-4 lg:grid-cols-2">
+              <Card className="border-slate-200/80 bg-white/95">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <CardTitle className="text-base">Mes colis récents</CardTitle>
+                      <CardDescription>5 derniers envois</CardDescription>
+                    </div>
+                    <Button size="sm" variant="outline" onClick={() => setActiveTab('history')}>Voir tout</Button>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {recentParcels.length === 0 ? (
+                    <p className="text-sm text-slate-500">Aucun colis récent pour le moment.</p>
+                  ) : (
+                    recentParcels.map((parcel) => {
+                      const statusInfo = PARCEL_STATUS.find((s) => s.id === parcel.status);
+                      return (
+                        <button
+                          key={parcel.id}
+                          type="button"
+                          onClick={() => {
+                            setTrackingNumber(parcel.trackingNumber);
+                            setActiveTab('track');
+                          }}
+                          className="flex w-full items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-left transition hover:border-sky-300 hover:bg-sky-50"
+                        >
+                          <div>
+                            <p className="font-mono text-xs font-semibold text-slate-700">{parcel.trackingNumber}</p>
+                            <p className="text-xs text-slate-500">{new Date(parcel.createdAt).toLocaleDateString('fr-FR')}</p>
+                          </div>
+                          <Badge className={`${statusInfo?.color || 'bg-slate-600'} text-white`}>
+                            {statusInfo?.label || parcel.status}
+                          </Badge>
+                        </button>
+                      );
+                    })
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card className="border-slate-200/80 bg-white/95">
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <Bell className="h-4 w-4 text-amber-600" />Notifications importantes
+                  </CardTitle>
+                  <CardDescription>Colis livré, en cours, action requise</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {notifications.length === 0 ? (
+                    <p className="text-sm text-slate-500">Aucune notification récente.</p>
+                  ) : (
+                    notifications.map((item) => {
+                      const lower = `${item.title || ''} ${item.message || ''}`.toLowerCase();
+                      const isAction = lower.includes('action') || lower.includes('litige') || lower.includes('probleme');
+                      const isDelivered = lower.includes('livr') || lower.includes('delivered');
+                      const toneClass = isAction
+                        ? 'border-rose-200 bg-rose-50 text-rose-700'
+                        : isDelivered
+                          ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                          : 'border-sky-200 bg-sky-50 text-sky-700';
+
+                      return (
+                        <div key={item.id} className={`rounded-lg border px-3 py-2 ${toneClass}`}>
+                          <p className="text-sm font-semibold">{item.title || 'Notification'}</p>
+                          <p className="text-xs opacity-90">{item.message || 'Mise à jour de statut colis'}</p>
+                        </div>
+                      );
+                    })
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </DashboardSection>
+
+          <DashboardSection
+            tone="client"
+            eyebrow="Modules"
+            title="Espace opérations"
+            description="Créez, suivez, payez et gérez vos colis depuis une navigation structurée."
+            contentClassName="bg-transparent p-0 border-0 shadow-none ring-0"
+          >
+            <DashboardPanel tone="client">
+              <Tabs value={activeTab} onValueChange={setActiveTab}>
+                <TabsList className={`${dashboardTabsListClass} grid grid-cols-2 ${implicitPro.eligible ? 'lg:grid-cols-7' : 'lg:grid-cols-6'}`}>
                 <TabsTrigger value="create" className={`${getDashboardTabsTriggerClass('client')} flex items-center gap-2`}>
               <Plus className="h-4 w-4" />
               Créer un colis
@@ -306,7 +440,7 @@ function ClientDashboardContent() {
                 )}
               </TabsList>
 
-              <TabsContent value="create">
+              <TabsContent value="create" className={dashboardTabsContentClass}>
                 <CreateParcelForm
                   userId={session.user.id}
                   onCreated={fetchStats}
@@ -315,34 +449,54 @@ function ClientDashboardContent() {
                 />
               </TabsContent>
 
-              <TabsContent value="track">
+              <TabsContent value="track" className={dashboardTabsContentClass}>
                 <TrackingTab initialTracking={trackingNumber} setTrackingNumber={setTrackingNumber} />
               </TabsContent>
 
-              <TabsContent value="payment">
+              <TabsContent value="payment" className={dashboardTabsContentClass}>
                 <PaymentTab userId={session.user.id} />
               </TabsContent>
 
-              <TabsContent value="history">
+              <TabsContent value="history" className={dashboardTabsContentClass}>
                 <ParcelHistory
                   userId={session.user.id}
                   onTrack={(tn: string) => { setTrackingNumber(tn); setActiveTab('track'); }}
+                  onRecreate={(parcel: any) => {
+                    if (typeof window !== 'undefined') {
+                      sessionStorage.setItem(
+                        PARCEL_RECREATE_DRAFT_KEY,
+                        JSON.stringify({
+                          villeDepart: parcel.villeDepart || '',
+                          villeArrivee: parcel.villeArrivee || '',
+                          recipientFirstName: parcel.recipientFirstName || '',
+                          recipientLastName: parcel.recipientLastName || '',
+                          recipientPhone: parcel.recipientPhone || '',
+                          recipientEmail: parcel.recipientEmail || '',
+                          weight: parcel.weight ? String(parcel.weight) : '',
+                          description: parcel.description || '',
+                        })
+                      );
+                    }
+                    toast({ title: 'Brouillon prêt', description: 'Colis prérempli. Vérifiez et validez.' });
+                    setActiveTab('create');
+                  }}
                   senderName={session.user.name || ''}
                 />
               </TabsContent>
-              <TabsContent value="profil">
+              <TabsContent value="profil" className={dashboardTabsContentClass}>
                 <ProfilClientTab userId={session.user.id} />
               </TabsContent>
-              <TabsContent value="litiges">
+              <TabsContent value="litiges" className={dashboardTabsContentClass}>
                 <LitigesTab userId={session.user.id} />
               </TabsContent>
-              {implicitPro.eligible && (
-                <TabsContent value="bulk-pro">
-                  <BulkProCreateForm userId={session.user.id} onCreated={fetchStats} />
-                </TabsContent>
-              )}
-            </Tabs>
-          </DashboardPanel>
+                {implicitPro.eligible && (
+                <TabsContent value="bulk-pro" className={dashboardTabsContentClass}>
+                    <BulkProCreateForm userId={session.user.id} onCreated={fetchStats} />
+                  </TabsContent>
+                )}
+              </Tabs>
+            </DashboardPanel>
+          </DashboardSection>
         </DashboardShell>
       </main>
       <Footer />
@@ -461,10 +615,9 @@ function TrackingTab({ initialTracking, setTrackingNumber }: { initialTracking: 
         </div>
 
         {notFound && (
-          <div className="text-center py-8 text-slate-500">
-            <Package className="h-12 w-12 mx-auto mb-3 opacity-30" />
-            <p>Aucun colis trouvé pour ce numéro de suivi.</p>
-            <p className="text-xs mt-2">
+          <div className="space-y-2 py-2">
+            <DashboardEmptyState title="Aucun colis trouvé" description="Ce numéro de suivi ne correspond à aucun envoi." icon={<Package className="h-5 w-5" />} />
+            <p className="text-center text-xs text-slate-500">
               Numéro perdu ou inconnu ? <Link href="/faq" className="text-emerald-600 underline hover:text-emerald-700">Consulter la FAQ</Link>
             </p>
           </div>
@@ -646,13 +799,10 @@ function PaymentTab({ userId }: { userId: string }) {
           </div>
         </div>
         {isLoading ? (
-          <div className="flex justify-center py-8">
-            <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
-          </div>
+          <DashboardSectionLoading label="Chargement du panier de paiement..." />
         ) : parcels.length === 0 ? (
-          <div className="text-center py-12">
-            <Package className="h-16 w-16 mx-auto mb-4 opacity-30" />
-            <p className="text-slate-600 mb-4">Votre panier est vide (aucun colis créé en attente de paiement)</p>
+          <div className="space-y-4 py-2">
+            <DashboardEmptyState title="Panier vide" description="Aucun colis créé en attente de paiement." icon={<Package className="h-5 w-5" />} />
             <Button variant="outline" onClick={() => push(`/${locale}/dashboard/client?tab=create`)}>
               Créer un nouveau colis
             </Button>
@@ -755,11 +905,25 @@ function PaymentTab({ userId }: { userId: string }) {
 }
 
 // Parcel History
-function ParcelHistory({ userId, onTrack, senderName = '' }: { userId: string; onTrack: (tn: string) => void; senderName?: string }) {
+function ParcelHistory({
+  userId,
+  onTrack,
+  onRecreate,
+  senderName = '',
+}: {
+  userId: string;
+  onTrack: (tn: string) => void;
+  onRecreate: (parcel: any) => void;
+  senderName?: string;
+}) {
   const { toast } = useToast();
   const [colis, setColis] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [filter, setFilter] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [dateFilter, setDateFilter] = useState('all');
+  const [transporterFilter, setTransporterFilter] = useState('all');
+  const [selectedDetail, setSelectedDetail] = useState<any | null>(null);
 
   useEffect(() => { fetchColis(); }, [userId]);
 
@@ -775,7 +939,49 @@ function ParcelHistory({ userId, onTrack, senderName = '' }: { userId: string; o
     }
   };
 
-  const filtered = filter === 'all' ? colis : colis.filter(c => c.status === filter);
+  const transporterOptions = useMemo(() => {
+    const labels = new Set<string>();
+    colis.forEach((parcel) => {
+      const names = Array.isArray(parcel?.missions)
+        ? parcel.missions.map((m: any) => m?.transporteur?.name).filter(Boolean)
+        : [];
+      if (names.length === 0) {
+        labels.add('Non assigné');
+      } else {
+        names.forEach((name: string) => labels.add(name));
+      }
+    });
+    return Array.from(labels);
+  }, [colis]);
+
+  const filtered = useMemo(() => {
+    const normalizedSearch = searchQuery.trim().toLowerCase();
+    return colis.filter((parcel) => {
+      if (statusFilter !== 'all' && parcel.status !== statusFilter) return false;
+
+      if (dateFilter !== 'all') {
+        const createdAt = new Date(parcel.createdAt).getTime();
+        const now = Date.now();
+        const days = Number(dateFilter);
+        if (Number.isFinite(days) && createdAt < now - days * 24 * 60 * 60 * 1000) {
+          return false;
+        }
+      }
+
+      if (transporterFilter !== 'all') {
+        const names = Array.isArray(parcel?.missions)
+          ? parcel.missions.map((m: any) => m?.transporteur?.name).filter(Boolean)
+          : [];
+        const label = names[0] || 'Non assigné';
+        if (label !== transporterFilter) return false;
+      }
+
+      if (!normalizedSearch) return true;
+      const recipient = `${parcel.recipientFirstName || ''} ${parcel.recipientLastName || ''}`.trim().toLowerCase();
+      const tracking = String(parcel.trackingNumber || '').toLowerCase();
+      return tracking.includes(normalizedSearch) || recipient.includes(normalizedSearch);
+    });
+  }, [colis, searchQuery, statusFilter, dateFilter, transporterFilter]);
 
   const printStoredOrLiveLabel = (parcel: any) => {
     const senderNameProp = senderName;
@@ -955,17 +1161,42 @@ function ParcelHistory({ userId, onTrack, senderName = '' }: { userId: string; o
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <CardTitle>Historique de mes colis</CardTitle>
-            <CardDescription>{filtered.length} colis{filter !== 'all' ? ' filtrés' : ''} sur {colis.length}</CardDescription>
+            <CardTitle>Mes colis</CardTitle>
+            <CardDescription>{filtered.length} colis affichés sur {colis.length}</CardDescription>
           </div>
-          <Select value={filter} onValueChange={setFilter}>
-            <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
+        </div>
+        <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-4">
+          <Input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Recherche (N° colis / destinataire)"
+          />
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger><SelectValue placeholder="Statut" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Tous les statuts</SelectItem>
-              {PARCEL_STATUS.map(s => (
+              {PARCEL_STATUS.map((s) => (
                 <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={dateFilter} onValueChange={setDateFilter}>
+            <SelectTrigger><SelectValue placeholder="Date" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Toutes les dates</SelectItem>
+              <SelectItem value="7">7 derniers jours</SelectItem>
+              <SelectItem value="30">30 derniers jours</SelectItem>
+              <SelectItem value="90">90 derniers jours</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={transporterFilter} onValueChange={setTransporterFilter}>
+            <SelectTrigger><SelectValue placeholder="Transporteur" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Tous les transporteurs</SelectItem>
+              {transporterOptions.map((name) => (
+                <SelectItem key={name} value={name}>{name}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -973,13 +1204,12 @@ function ParcelHistory({ userId, onTrack, senderName = '' }: { userId: string; o
       </CardHeader>
       <CardContent>
         {isLoading ? (
-          <div className="flex justify-center py-8"><Loader2 className="h-8 w-8 animate-spin text-emerald-600" /></div>
+          <DashboardSectionLoading label="Chargement de l'historique colis..." />
         ) : filtered.length === 0 ? (
-          <div className="text-center py-8 text-slate-500">
-            <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
-            <p>{colis.length === 0 ? 'Aucun colis pour le moment' : 'Aucun colis pour ce filtre'}</p>
+          <div className="space-y-2">
+            <DashboardEmptyState title={colis.length === 0 ? 'Aucun colis pour le moment' : 'Aucun colis pour ce filtre'} description={colis.length === 0 ? 'Créez votre premier colis pour démarrer vos envois.' : 'Essayez un autre filtre de statut.'} icon={<Package className="h-5 w-5" />} />
             {colis.length === 0 && (
-              <p className="text-xs mt-2">
+              <p className="text-center text-xs mt-2">
                 <Link href="/faq" className="text-emerald-600 underline hover:text-emerald-700">Comment créer mon premier colis ? → FAQ</Link>
               </p>
             )}
@@ -989,8 +1219,9 @@ function ParcelHistory({ userId, onTrack, senderName = '' }: { userId: string; o
             <TableHeader>
               <TableRow>
                 <TableHead>N° Suivi</TableHead>
+                <TableHead>Destinataire</TableHead>
                 <TableHead>Trajet</TableHead>
-                <TableHead>Poids</TableHead>
+                <TableHead>Transporteur</TableHead>
                 <TableHead>Prix</TableHead>
                 <TableHead>Statut</TableHead>
                 <TableHead>Date</TableHead>
@@ -999,12 +1230,23 @@ function ParcelHistory({ userId, onTrack, senderName = '' }: { userId: string; o
             </TableHeader>
             <TableBody>
               {filtered.map((c) => (
-                <TableRow key={c.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                <TableRow
+                  key={c.id}
+                  className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50"
+                  onClick={() => setSelectedDetail(c)}
+                >
                   <TableCell className="font-mono font-medium text-sm">{c.trackingNumber}</TableCell>
+                  <TableCell className="text-sm">
+                    {`${c.recipientFirstName || ''} ${c.recipientLastName || ''}`.trim() || '—'}
+                  </TableCell>
                   <TableCell className="text-sm">
                     {WILAYAS.find(w => w.id === c.villeDepart)?.name} → {WILAYAS.find(w => w.id === c.villeArrivee)?.name}
                   </TableCell>
-                  <TableCell>{c.weight ? `${c.weight} kg` : '—'}</TableCell>
+                  <TableCell className="text-sm">
+                    {Array.isArray(c.missions) && c.missions[0]?.transporteur?.name
+                      ? c.missions[0].transporteur.name
+                      : 'Non assigné'}
+                  </TableCell>
                   <TableCell className="font-semibold">{c.prixClient} DA</TableCell>
                   <TableCell>
                     <Badge className={`${PARCEL_STATUS.find(s => s.id === c.status)?.color} text-white text-xs`}>
@@ -1013,9 +1255,15 @@ function ParcelHistory({ userId, onTrack, senderName = '' }: { userId: string; o
                   </TableCell>
                   <TableCell className="text-sm text-slate-500">{new Date(c.createdAt).toLocaleDateString('fr-FR')}</TableCell>
                   <TableCell>
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2" onClick={(e) => e.stopPropagation()}>
+                      <Button type="button" size="sm" variant="outline" onClick={() => setSelectedDetail(c)}>
+                        Détail
+                      </Button>
                       <Button type="button" size="sm" variant="outline" onClick={() => onTrack(c.trackingNumber)}>
                         <MapPin className="h-3 w-3 mr-1" />Suivre
+                      </Button>
+                      <Button type="button" size="sm" variant="outline" onClick={() => onRecreate(c)}>
+                        <History className="h-3 w-3 mr-1" />Recréer
                       </Button>
                       <ParcelEditDialog parcel={c} buttonLabel="Modifier" onSaved={fetchColis} />
                       <ParcelDeleteButton parcel={c} onSaved={fetchColis} />
@@ -1029,6 +1277,55 @@ function ParcelHistory({ userId, onTrack, senderName = '' }: { userId: string; o
             </TableBody>
           </Table>
         )}
+
+        <Dialog open={Boolean(selectedDetail)} onOpenChange={(open) => { if (!open) setSelectedDetail(null); }}>
+          <DialogContent className="max-w-xl">
+            <DialogHeader>
+              <DialogTitle>Détail colis {selectedDetail?.trackingNumber}</DialogTitle>
+            </DialogHeader>
+            {selectedDetail && (
+              <div className="space-y-3 text-sm">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <p className="text-xs text-slate-500">Destinataire</p>
+                    <p className="font-medium">{`${selectedDetail.recipientFirstName || ''} ${selectedDetail.recipientLastName || ''}`.trim() || '—'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-500">Téléphone</p>
+                    <p className="font-medium">{selectedDetail.recipientPhone || '—'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-500">Poids</p>
+                    <p className="font-medium">{selectedDetail.weight ? `${selectedDetail.weight} kg` : '—'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-500">Prix</p>
+                    <p className="font-medium">{selectedDetail.prixClient} DA</p>
+                  </div>
+                  <div className="col-span-2">
+                    <p className="text-xs text-slate-500">Description</p>
+                    <p className="font-medium">{selectedDetail.description || '—'}</p>
+                  </div>
+                </div>
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                  <p className="text-xs text-slate-500">Trajet</p>
+                  <p className="font-medium">{WILAYAS.find(w => w.id === selectedDetail.villeDepart)?.name} → {WILAYAS.find(w => w.id === selectedDetail.villeArrivee)?.name}</p>
+                </div>
+              </div>
+            )}
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setSelectedDetail(null)}>Fermer</Button>
+              {selectedDetail && (
+                <Button type="button" onClick={() => {
+                  onTrack(selectedDetail.trackingNumber);
+                  setSelectedDetail(null);
+                }}>
+                  Ouvrir le suivi
+                </Button>
+              )}
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </CardContent>
     </Card>
   );
