@@ -17,17 +17,28 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
+import { ParcelLabelButton, type LabelParcel } from '@/components/dashboard/parcel-label-button';
 import { Loader2, Pencil, Trash2 } from 'lucide-react';
 
 export type EditableParcel = {
   id: string;
   status: string;
+  trackingNumber?: string;
+  villeDepart?: string;
+  villeArrivee?: string;
+  senderFirstName?: string | null;
+  senderLastName?: string | null;
+  senderPhone?: string | null;
   recipientFirstName?: string | null;
   recipientLastName?: string | null;
   recipientPhone?: string | null;
   recipientEmail?: string | null;
   weight?: number | null;
   description?: string | null;
+  prixClient?: number;
+  qrCodeImage?: string | null;
+  relaisDepart?: { commerceName: string; address: string; ville: string } | null;
+  relaisArrivee?: { commerceName: string; address: string; ville: string } | null;
 };
 
 const EDITABLE_STATUSES = new Set(['CREATED', 'PENDING_PAYMENT']);
@@ -103,6 +114,51 @@ export function ParcelEditDialog({
     setFieldErrors(errors);
     return Object.keys(errors).length === 0;
   };
+
+  const printableLabelParcel = useMemo<LabelParcel | null>(() => {
+    if (!parcel.trackingNumber || !parcel.villeDepart || !parcel.villeArrivee) return null;
+
+    return {
+      id: parcel.id,
+      trackingNumber: parcel.trackingNumber,
+      villeDepart: parcel.villeDepart,
+      villeArrivee: parcel.villeArrivee,
+      senderFirstName: parcel.senderFirstName,
+      senderLastName: parcel.senderLastName,
+      senderPhone: parcel.senderPhone,
+      recipientFirstName: form.recipientFirstName.trim() || parcel.recipientFirstName || null,
+      recipientLastName: form.recipientLastName.trim() || parcel.recipientLastName || null,
+      recipientPhone: form.recipientPhone.replace(/\s+/g, '').trim() || parcel.recipientPhone || null,
+      weight: Number.isFinite(Number(form.weight)) ? Number(form.weight) : parcel.weight,
+      description: form.description.trim() || parcel.description || null,
+      prixClient: Number.isFinite(Number(parcel.prixClient)) ? Number(parcel.prixClient) : 0,
+      qrCodeImage: parcel.qrCodeImage || null,
+      relaisDepart: parcel.relaisDepart || null,
+      relaisArrivee: parcel.relaisArrivee || null,
+    };
+  }, [
+    parcel.id,
+    parcel.trackingNumber,
+    parcel.villeDepart,
+    parcel.villeArrivee,
+    parcel.senderFirstName,
+    parcel.senderLastName,
+    parcel.senderPhone,
+    parcel.recipientFirstName,
+    parcel.recipientLastName,
+    parcel.recipientPhone,
+    parcel.weight,
+    parcel.description,
+    parcel.prixClient,
+    parcel.qrCodeImage,
+    parcel.relaisDepart,
+    parcel.relaisArrivee,
+    form.recipientFirstName,
+    form.recipientLastName,
+    form.recipientPhone,
+    form.weight,
+    form.description,
+  ]);
 
   const handleSave = async () => {
     if (!canEdit) {
@@ -214,6 +270,13 @@ export function ParcelEditDialog({
         </div>
 
         <DialogFooter>
+          {printableLabelParcel ? (
+            <ParcelLabelButton parcel={printableLabelParcel} />
+          ) : (
+            <Button type="button" variant="outline" disabled title="Informations insuffisantes pour l etiquette">
+              Imprimer
+            </Button>
+          )}
           <Button type="button" variant="outline" onClick={() => {
             setOpen(false);
             setFieldErrors({});

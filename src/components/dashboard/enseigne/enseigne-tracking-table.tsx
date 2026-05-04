@@ -63,35 +63,41 @@ export function EnseigneTrackingTable({
         <p className="text-sm font-medium text-slate-600">{items.length} colis</p>
         <ParcelLabelsBulkButton parcels={items} />
       </div>
-      <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white/95 shadow-[0_16px_35px_-28px_rgba(15,23,42,0.35)]">
+      <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-[0_18px_40px_-30px_rgba(15,23,42,0.35)]">
       <table className="min-w-[980px] divide-y divide-slate-200 text-sm">
-        <thead className="bg-slate-50">
+        <thead className="bg-slate-50/90">
           <tr>
-            <th className="px-4 py-3 text-left font-semibold text-slate-700">Tracking</th>
-            <th className="px-4 py-3 text-left font-semibold text-slate-700">Destinataire</th>
-            <th className="px-4 py-3 text-left font-semibold text-slate-700">Route</th>
-            <th className="px-4 py-3 text-left font-semibold text-slate-700">Statut</th>
-            <th className="px-4 py-3 text-left font-semibold text-slate-700">Montant</th>
-            <th className="px-4 py-3 text-left font-semibold text-slate-700">Date</th>
-            <th className="px-4 py-3 text-left font-semibold text-slate-700">Actions</th>
+            <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-[0.12em] text-slate-600">Tracking</th>
+            <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-[0.12em] text-slate-600">Destinataire</th>
+            <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-[0.12em] text-slate-600">Route</th>
+            <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-[0.12em] text-slate-600">Statut</th>
+            <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-[0.12em] text-slate-600">Montant</th>
+            <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-[0.12em] text-slate-600">Date</th>
+            <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-[0.12em] text-slate-600">Actions</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100 bg-white">
           {items.map((parcel) => {
             const statusMeta = getStatusMeta(parcel.status);
             return (
-              <tr key={parcel.id}>
-                <td className="px-4 py-3 font-mono text-xs text-slate-700">{parcel.trackingNumber}</td>
-                <td className="px-4 py-3 text-slate-700">{parcel.recipientFirstName || '—'} {parcel.recipientLastName || ''}</td>
-                <td className="px-4 py-3 text-slate-600">{parcel.villeDepart} - {parcel.villeArrivee}</td>
-                <td className="px-4 py-3">
+              <tr key={parcel.id} className="transition-colors hover:bg-slate-50/80">
+                <td className="px-5 py-4 font-mono text-xs font-semibold text-slate-800">{parcel.trackingNumber}</td>
+                <td className="px-5 py-4 text-slate-700">
+                  <div className="font-medium text-slate-900">{parcel.recipientFirstName || '—'} {parcel.recipientLastName || ''}</div>
+                  <div className="mt-0.5 text-xs text-slate-500">{parcel.recipientPhone || 'Telephone non renseigne'}</div>
+                </td>
+                <td className="px-5 py-4 text-slate-600">
+                  <div className="text-sm font-medium text-slate-700">{parcel.villeDepart} - {parcel.villeArrivee}</div>
+                  <div className="mt-0.5 text-xs text-slate-500">Flux logistique</div>
+                </td>
+                <td className="px-5 py-4">
                   <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-medium ${statusMeta.className}`}>
                     {statusMeta.label}
                   </span>
                 </td>
-                <td className="px-4 py-3 font-medium text-slate-700">{Math.round(parcel.prixClient)} DA</td>
-                <td className="px-4 py-3 text-slate-600">{new Date(parcel.createdAt).toLocaleString('fr-FR')}</td>
-                <td className="px-4 py-3">
+                <td className="px-5 py-4 font-semibold text-slate-900">{Math.round(parcel.prixClient)} DA</td>
+                <td className="px-5 py-4 text-slate-600">{new Date(parcel.createdAt).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
+                <td className="px-5 py-4">
                   <div className="flex items-center gap-2 flex-wrap">
                     <ParcelLabelButton parcel={parcel} />
                     <ParcelEditDialog parcel={parcel} onSaved={handleParcelSaved} buttonLabel="Modifier" />

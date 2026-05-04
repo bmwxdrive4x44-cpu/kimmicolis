@@ -1,0 +1,10 @@
+
+> swiftcolis@1.0.0 dev
+> next dev --webpack
+
+▲ Next.js 16.2.3 (webpack)
+- Local:         http://localhost:3001
+- Network:       http://192.168.1.11:3001
+- Environments: .env.local, .env
+✓ Ready in 7.0s
+[?25h

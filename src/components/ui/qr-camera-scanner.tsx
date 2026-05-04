@@ -3,12 +3,18 @@
 import { useEffect, useRef, useState } from 'react';
 
 // Extrait une représentation string de n'importe quelle erreur (pour comparaison regex)
+// Note: DOMException et certaines erreurs ont des propriétés NON-énumérables (name, message, stack).
+// On les lit explicitement pour éviter une sérialisation vide {}.
 function extractErrString(err: unknown): string {
   if (typeof err === 'string') return err;
   if (err instanceof Error) return `${err.name} ${err.message}`;
   if (err && typeof err === 'object') {
     const o = err as Record<string, unknown>;
-    return [o.name, o.message, o.errorMessage].filter(Boolean).join(' ');
+    const parts = [o.name, o.message, o.errorMessage, o.type].filter(Boolean);
+    if (parts.length) return parts.join(' ');
+    // Dernier recours: toString() → "DOMException: ..."
+    const str = String(err);
+    if (str !== '[object Object]') return str;
   }
   return String(err);
 }
@@ -165,13 +171,17 @@ export function QrCameraScanner({ onScan, disabled = false, onError }: QrCameraS
           else if (/NotReadableError/i.test(err)) errorName = 'NotReadableError';
         } else if (err && typeof err === 'object') {
           // html5-qrcode v2 peut utiliser `errorMessage` au lieu de `message`
+          // DOMException a ses propriétés sur le prototype (non-énumérables) → lire explicitement
           const o = err as Record<string, unknown>;
           errorName = typeof o.name === 'string' ? o.name : undefined;
-          errorMsg = typeof o.message === 'string'
+          const rawMsg = typeof o.message === 'string'
             ? o.message
             : typeof o.errorMessage === 'string'
               ? o.errorMessage
-              : JSON.stringify(err);
+              : undefined;
+          // Fallback: String(err) → "DOMException: Not allowed" au lieu de "[object Object]"
+          const strFallback = String(err);
+          errorMsg = rawMsg ?? (strFallback !== '[object Object]' ? strFallback : extractErrString(err));
           if (!errorName && typeof o.type === 'string') {
             errorName = o.type;
           }
@@ -201,14 +211,31 @@ export function QrCameraScanner({ onScan, disabled = false, onError }: QrCameraS
 
         setErrorMessage(message);
         onError?.(message);
-        // Log brut intégral pour debug
-        console.error('[QrCameraScanner] Erreur caméra ▶', {
-          rawErr: err,
-          errorName,
-          errorMsg,
+        // Log de diagnostic (warning, pas error): l'échec caméra peut être un cas utilisateur attendu
+        const rawErrSerialized =
+          err instanceof Error || (err && typeof err === 'object')
+            ? {
+                name: (err as { name?: unknown }).name,
+                message: (err as { message?: unknown }).message,
+                stack: (err as { stack?: unknown }).stack,
+                code: (err as { code?: unknown }).code,
+                constraint: (err as { constraint?: unknown }).constraint,
+                errorMessage: (err as { errorMessage?: unknown }).errorMessage,
+                type: (err as { type?: unknown }).type,
+                raw: String(err),
+              }
+            : err;
+        const debugPayload = {
+          rawErr: rawErrSerialized,
+          errorName: errorName ?? null,
+          errorMsg: errorMsg ?? null,
           isSecureContext: window.isSecureContext,
           attemptHint: 'Si Requested device not found persiste, le navigateur expose un deviceId invalide ou la caméra est indisponible',
-        });
+        };
+        console.warn(
+          `[QrCameraScanner] Erreur caméra ▶ name=${errorName ?? 'unknown'} msg=${errorMsg ?? extractErrString(err)}`,
+          debugPayload
+        );
 
         await stopScanner();
         if (isMountedRef.current) setIsOpen(false);
@@ -275,32 +302,41 @@ export function QrCameraScanner({ onScan, disabled = false, onError }: QrCameraS
     } catch (err) {
       preflightDeviceIdRef.current = null;
       const errText = extractErrString(err).toLowerCase();
-      let message = 'Caméra indisponible. Vérifiez les permissions puis réessayez.';
-      if (errText.includes('notallowederror') || errText.includes('permission')) {
-        message = 'Accès caméra refusé. Autorisez la caméra dans les réglages du navigateur.';
+      if (errText.includes('notallowederror') || errText.includes('permission denied')) {
+        const message = 'Accès caméra refusé. Autorisez la caméra dans les réglages du navigateur.';
+        setErrorMessage(message);
+        onError?.(message);
+        return;
+      }
+      if (errText.includes('notfounderror') || errText.includes('requested device not found') || errText.includes('could not start video source')) {
+        const message = 'Aucune caméra détectée sur cet appareil. Utilisez "Scanner depuis photo" ci-dessous ou saisissez le code manuellement.';
         setErrorMessage(message);
         onError?.(message);
         return;
       }
 
-      // Certains navigateurs échouent en préflight mais réussissent via html5-qrcode ensuite.
-      // On log puis on continue le flux de démarrage normal.
+      // Autres échecs préflight (ex: OverconstrainedError sur certains navigateurs) :
+      // certains échouent en préflight mais réussissent via html5-qrcode — on tente quand même.
       console.warn('[QrCameraScanner] preflight getUserMedia failed, fallback to scanner strategies', {
         err,
         isSecureContext: window.isSecureContext,
       });
     }
 
-    // Vérification informative des entrées vidéo exposées par le navigateur.
-    // Ne pas bloquer ici: certains navigateurs renvoient 0 caméra avant consentement utilisateur.
+    // Vérification des entrées vidéo exposées par le navigateur.
+    // Avant consentement, certains navigateurs renvoient des labels vides mais gardent le kind='videoinput'.
+    // Si la liste est vraiment vide (0 videoinput), il n'y a aucune caméra hardware disponible.
     try {
       const devices = await navigator.mediaDevices.enumerateDevices();
-      const hasVideoInput = devices.some((d) => d.kind === 'videoinput');
-      if (!hasVideoInput) {
-        console.warn('[QrCameraScanner] enumerateDevices: aucun videoinput avant permission, poursuite du démarrage');
+      const videoInputs = devices.filter((d) => d.kind === 'videoinput');
+      if (videoInputs.length === 0) {
+        const message = 'Aucune caméra détectée sur cet appareil. Utilisez "Scanner depuis photo" ci-dessous ou saisissez le code manuellement.';
+        setErrorMessage(message);
+        onError?.(message);
+        return;
       }
     } catch {
-      // Si enumerateDevices échoue, on continue vers le flux normal.
+      // Si enumerateDevices échoue (rare), on continue vers le flux normal.
     }
 
     // 1. isOpen=true → React re-render → container devient visible avec vraies dimensions

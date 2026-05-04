@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useState, useEffect, useMemo } from 'react';
+import { Suspense, useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { useTranslations, useLocale } from 'next-intl';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -39,6 +39,7 @@ import { PRO_DISCOUNT_TIERS, getProBatchDiscountRate, getProBatchDiscountTier } 
 import { useToast } from '@/hooks/use-toast';
 import { ParcelDeleteButton, ParcelEditDialog } from '@/components/dashboard/parcel-edit-dialog';
 import { CreateParcelForm } from '@/components/dashboard/client/create-parcel-form';
+import { scrollToElementWithDashboardOffset } from '@/lib/dashboard-scroll';
 
 const LABEL_STORAGE_KEY = 'swiftcolis.parcel-labels';
 const PARCEL_RECREATE_DRAFT_KEY = 'swiftcolis.recreate-draft';
@@ -87,13 +88,15 @@ function ClientDashboardContent() {
   const [cartCount, setCartCount] = useState(0);
   const [implicitPro, setImplicitPro] = useState({ eligible: false, validParcelsCount: 0, remaining: 5, threshold: 5, windowDays: 90 });
   const [sessionLoadingTimedOut, setSessionLoadingTimedOut] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const operationsSectionRef = useRef<HTMLDivElement | null>(null);
 
   async function fetchStats() {
     try {
       const [parcelsRes, loyaltyRes, notificationsRes] = await Promise.all([
-        fetch(`/api/parcels?clientId=${session?.user?.id}`),
-        fetch('/api/loyalty/status'),
-        fetch(`/api/notifications?userId=${session?.user?.id}`),
+        fetch(`/api/parcels?clientId=${session?.user?.id}`, { cache: 'no-store' }),
+        fetch('/api/loyalty/status', { cache: 'no-store' }),
+        fetch(`/api/notifications?userId=${session?.user?.id}`, { cache: 'no-store' }),
       ]);
 
       const parcelsPayload = await parcelsRes.json();
@@ -125,8 +128,35 @@ function ClientDashboardContent() {
       }
     } catch (error) {
       console.error('Error fetching stats:', error);
+      throw error;
     }
   }
+
+  const scrollToOperationsSection = useCallback((tab: string) => {
+    setActiveTab(tab);
+    requestAnimationFrame(() => {
+      scrollToElementWithDashboardOffset(operationsSectionRef.current);
+    });
+  }, []);
+
+  const handleManualRefresh = useCallback(async () => {
+    if (isRefreshing) return;
+
+    setIsRefreshing(true);
+    try {
+      await fetchStats();
+      router.refresh();
+      toast({ title: 'Dashboard actualise', description: 'Les donnees client ont ete rechargees.' });
+    } catch {
+      toast({
+        title: 'Echec de l actualisation',
+        description: 'Impossible de recharger les donnees pour le moment.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [fetchStats, isRefreshing, router, toast]);
 
   // Debug logging
   useEffect(() => {
@@ -269,12 +299,18 @@ function ClientDashboardContent() {
                 <Button
                   size="lg"
                   className="w-full bg-sky-600 text-white hover:bg-sky-700 sm:w-auto"
-                  onClick={() => setActiveTab('create')}
+                  onClick={() => scrollToOperationsSection('create')}
                 >
                   <Plus className="mr-2 h-4 w-4" />Créer un colis
                 </Button>
-                <Button size="lg" variant="outline" className="w-full sm:w-auto" onClick={() => void fetchStats()}>
-                  <RefreshCw className="mr-2 h-4 w-4" />Actualiser
+                <Button
+                  size="lg"
+                  variant="outline"
+                  className="w-full sm:w-auto"
+                  onClick={() => void handleManualRefresh()}
+                  disabled={isRefreshing}
+                >
+                  <RefreshCw className={`mr-2 h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />Actualiser
                 </Button>
               </div>
             }
@@ -331,7 +367,7 @@ function ClientDashboardContent() {
                       <CardTitle className="text-base">Mes colis récents</CardTitle>
                       <CardDescription>5 derniers envois</CardDescription>
                     </div>
-                    <Button size="sm" variant="outline" onClick={() => setActiveTab('history')}>Voir tout</Button>
+                    <Button size="sm" variant="outline" onClick={() => scrollToOperationsSection('history')}>Voir tout</Button>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-2">
@@ -346,7 +382,7 @@ function ClientDashboardContent() {
                           type="button"
                           onClick={() => {
                             setTrackingNumber(parcel.trackingNumber);
-                            setActiveTab('track');
+                            scrollToOperationsSection('track');
                           }}
                           className="flex w-full items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-left transition hover:border-sky-300 hover:bg-sky-50"
                         >
@@ -385,11 +421,18 @@ function ClientDashboardContent() {
                           ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
                           : 'border-sky-200 bg-sky-50 text-sky-700';
 
+                      const targetTab = isAction ? 'litiges' : isDelivered ? 'history' : 'track';
+
                       return (
-                        <div key={item.id} className={`rounded-lg border px-3 py-2 ${toneClass}`}>
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => scrollToOperationsSection(targetTab)}
+                          className={`w-full rounded-lg border px-3 py-2 text-left transition hover:opacity-90 ${toneClass}`}
+                        >
                           <p className="text-sm font-semibold">{item.title || 'Notification'}</p>
                           <p className="text-xs opacity-90">{item.message || 'Mise à jour de statut colis'}</p>
-                        </div>
+                        </button>
                       );
                     })
                   )}
@@ -398,14 +441,15 @@ function ClientDashboardContent() {
             </div>
           </DashboardSection>
 
-          <DashboardSection
-            tone="client"
-            eyebrow="Modules"
-            title="Espace opérations"
-            description="Créez, suivez, payez et gérez vos colis depuis une navigation structurée."
-            contentClassName="bg-transparent p-0 border-0 shadow-none ring-0"
-          >
-            <DashboardPanel tone="client">
+          <div ref={operationsSectionRef}>
+            <DashboardSection
+              tone="client"
+              eyebrow="Modules"
+              title="Espace opérations"
+              description="Créez, suivez, payez et gérez vos colis depuis une navigation structurée."
+              contentClassName="bg-transparent p-0 border-0 shadow-none ring-0"
+            >
+              <DashboardPanel tone="client">
               <Tabs value={activeTab} onValueChange={setActiveTab}>
                 <TabsList className={`${dashboardTabsListClass} grid grid-cols-2 ${implicitPro.eligible ? 'lg:grid-cols-7' : 'lg:grid-cols-6'}`}>
                 <TabsTrigger value="create" className={`${getDashboardTabsTriggerClass('client')} flex items-center gap-2`}>
@@ -444,8 +488,8 @@ function ClientDashboardContent() {
                 <CreateParcelForm
                   userId={session.user.id}
                   onCreated={fetchStats}
-                  onGoToHistory={() => { fetchStats(); setActiveTab('history'); }}
-                  onGoToCart={() => { fetchStats(); setActiveTab('payment'); }}
+                  onGoToHistory={() => { void fetchStats(); scrollToOperationsSection('history'); }}
+                  onGoToCart={() => { void fetchStats(); scrollToOperationsSection('payment'); }}
                 />
               </TabsContent>
 
@@ -460,7 +504,7 @@ function ClientDashboardContent() {
               <TabsContent value="history" className={dashboardTabsContentClass}>
                 <ParcelHistory
                   userId={session.user.id}
-                  onTrack={(tn: string) => { setTrackingNumber(tn); setActiveTab('track'); }}
+                  onTrack={(tn: string) => { setTrackingNumber(tn); scrollToOperationsSection('track'); }}
                   onRecreate={(parcel: any) => {
                     if (typeof window !== 'undefined') {
                       sessionStorage.setItem(
@@ -478,7 +522,7 @@ function ClientDashboardContent() {
                       );
                     }
                     toast({ title: 'Brouillon prêt', description: 'Colis prérempli. Vérifiez et validez.' });
-                    setActiveTab('create');
+                    scrollToOperationsSection('create');
                   }}
                   senderName={session.user.name || ''}
                 />
@@ -495,8 +539,9 @@ function ClientDashboardContent() {
                   </TabsContent>
                 )}
               </Tabs>
-            </DashboardPanel>
-          </DashboardSection>
+              </DashboardPanel>
+            </DashboardSection>
+          </div>
         </DashboardShell>
       </main>
       <Footer />

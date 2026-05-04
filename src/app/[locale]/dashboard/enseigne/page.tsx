@@ -252,6 +252,27 @@ export default async function EnseigneDashboardPage({
       )))
     : 100;
 
+  const operationalBacklog = pendingPaymentKpi + readyForDepositKpi;
+  const backlogShare = totalParcelsKpi > 0 ? Math.round((operationalBacklog / totalParcelsKpi) * 100) : 0;
+  const backlogToneClass =
+    operationalBacklog >= 20
+      ? 'border-red-300 bg-red-50 text-red-700'
+      : operationalBacklog >= 8
+        ? 'border-amber-300 bg-amber-50 text-amber-700'
+        : 'border-emerald-300 bg-emerald-50 text-emerald-700';
+  const enseigneFocusMessage =
+    operationalBacklog >= 20
+      ? 'Backlog en hausse - risque de retard sur certaines livraisons.'
+      : operationalBacklog >= 8
+        ? 'Charge moderee - priorisez paiements puis depots relais.'
+        : 'Flux stable aujourd hui - activite normale et maitrisee.';
+  const enseigneAutoRead =
+    backlogShare >= 35
+      ? `${backlogShare}% de votre volume est encore en attente d action immediate.`
+      : backlogShare >= 15
+        ? `${backlogShare}% du volume est en file active, sous surveillance normale.`
+        : `${backlogShare}% du volume seulement en attente - cadence saine.`;
+
   return (
     <div className="min-h-screen flex flex-col bg-[radial-gradient(circle_at_top,_#f8fafc,_#eef2ff_42%,_#dbeafe_100%)] dark:bg-slate-950">
       <Header />
@@ -272,6 +293,9 @@ export default async function EnseigneDashboardPage({
                     Base: {enseigne.operationalCity}
                   </Badge>
                 ) : null}
+                <Badge variant="outline" className={dashboardMetaBadgeClass}>
+                  Aujourd hui
+                </Badge>
                 <Badge variant="outline" className={dashboardMetaBadgeClass}>
                   Taux de livraison: {deliveryRate}%
                 </Badge>
@@ -302,6 +326,64 @@ export default async function EnseigneDashboardPage({
               </div>
             }
           />
+
+          <DashboardSection
+            tone="enseigne"
+            eyebrow="Priorite"
+            title="Focus du jour"
+            description="Un indicateur dominant pour piloter vos actions, puis trois lectures secondaires pour arbitrer vite."
+          >
+            <div className="grid gap-4 lg:grid-cols-[1.55fr_1fr]">
+              <article className="rounded-2xl border border-white/85 bg-white p-6 shadow-[0_22px_60px_-40px_rgba(15,23,42,0.48)]">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Backlog operationnel</p>
+                <div className="mt-3 flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-5xl font-black tracking-tight text-slate-950">{operationalBacklog}</p>
+                    <p className="mt-1 text-sm text-slate-600">Colis qui demandent une action immediate (paiement ou depot)</p>
+                  </div>
+                  <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${backlogToneClass}`}>
+                    {operationalBacklog >= 20 ? 'A traiter maintenant' : operationalBacklog >= 8 ? 'A surveiller' : 'Sous controle'}
+                  </span>
+                </div>
+                <div className={`mt-4 rounded-xl border px-3 py-2 text-xs font-semibold ${backlogToneClass}`}>
+                  <p>{enseigneFocusMessage}</p>
+                  <p className="mt-1 font-medium opacity-90">Lecture automatique: {enseigneAutoRead}</p>
+                </div>
+                <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                  <Link
+                    href="/dashboard/enseigne?tab=payments#enseigne-payments"
+                    className="inline-flex items-center justify-center rounded-xl bg-amber-600 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-700"
+                  >
+                    Regler les colis
+                  </Link>
+                  <Link
+                    href="/dashboard/enseigne?tab=tracking#enseigne-tracking"
+                    className="inline-flex items-center justify-center rounded-xl border border-violet-200 bg-violet-50 px-4 py-2 text-sm font-semibold text-violet-700 hover:bg-violet-100"
+                  >
+                    Declencher les depots
+                  </Link>
+                </div>
+              </article>
+
+              <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
+                <article className="rounded-xl border border-indigo-200 bg-indigo-50 p-4">
+                  <p className="text-xs uppercase tracking-[0.14em] text-indigo-700">Taux livraison</p>
+                  <p className="mt-2 text-2xl font-bold text-indigo-900">{deliveryRate}%</p>
+                  <p className="text-xs text-indigo-700">{deliveredParcelsKpi} colis livres</p>
+                </article>
+                <article className="rounded-xl border border-sky-200 bg-sky-50 p-4">
+                  <p className="text-xs uppercase tracking-[0.14em] text-sky-700">CA livre</p>
+                  <p className="mt-2 text-2xl font-bold text-sky-900">{Math.round(deliveredRevenue).toLocaleString('fr-DZ')} DA</p>
+                  <p className="text-xs text-sky-700">Encaisse</p>
+                </article>
+                <article className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+                  <p className="text-xs uppercase tracking-[0.14em] text-emerald-700">Score PRO</p>
+                  <p className="mt-2 text-2xl font-bold text-emerald-900">{proScore}/100</p>
+                  <p className="text-xs text-emerald-700">Fiabilite globale</p>
+                </article>
+              </div>
+            </div>
+          </DashboardSection>
 
           {/* ─── Actions urgentes ────────────────────────────────────────────── */}
           {(createdOnlyParcels + pendingPaymentParcels > 0 || readyForDepositParcels > 0 || stuckParcels > 0) && (
@@ -348,41 +430,19 @@ export default async function EnseigneDashboardPage({
             </div>
           )}
 
-          {(createdOnlyParcels + pendingPaymentParcels) > 0 && (
-            <div className="flex items-start gap-3 rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-950/40 dark:border-amber-700 p-4 text-amber-800 dark:text-amber-300">
-              <AlertTriangle className="h-5 w-5 mt-0.5 shrink-0 text-amber-600 dark:text-amber-400" />
-              <div>
-                <p className="font-semibold text-sm">
-                  ⚠️ {createdOnlyParcels + pendingPaymentParcels} colis non payé{(createdOnlyParcels + pendingPaymentParcels) > 1 ? 's' : ''} — hors circuit logistique
-                </p>
-                <p className="text-sm mt-0.5">
-                  Tant que le paiement n'est pas confirmé, vos colis ne sont pas pris en charge.
-                  {' '}<strong>Rendez-vous dans l'onglet Paiements pour régulariser.</strong>
-                </p>
-              </div>
-            </div>
-          )}
-
           <DashboardSection
             tone="enseigne"
             eyebrow="Business"
             title="KPI enseigne"
-            description="Séparez la performance commerciale de l’exécution logistique pour prioriser les bonnes actions."
+            description="Indicateurs secondaires pour garder une vue claire sans surcharger l ecran."
           >
-            <DashboardStatsGrid>
+            <DashboardStatsGrid className="xl:grid-cols-3">
               <DashboardMetricCard
                 tone="enseigne"
                 label="Colis total"
                 value={totalParcelsKpi}
                 icon={<Package className="h-5 w-5" />}
                 detail="volume global"
-              />
-              <DashboardMetricCard
-                tone="enseigne"
-                label="Taux livraison"
-                value={`${deliveryRate}%`}
-                icon={<CheckCircle className="h-5 w-5" />}
-                detail={`${deliveredParcelsKpi} colis livres`}
               />
               <DashboardMetricCard
                 tone="enseigne"
@@ -448,7 +508,7 @@ export default async function EnseigneDashboardPage({
           >
             <DashboardPanel tone="enseigne">
               <Tabs key={initialTab} defaultValue={initialTab}>
-                <TabsList className={`${dashboardTabsListClass} grid grid-cols-2 lg:grid-cols-5`}>
+                <TabsList className={`${dashboardTabsListClass} grid grid-cols-2 lg:grid-cols-5 bg-slate-100/80 p-1 ring-0 shadow-none dark:bg-slate-900/70`}>
                 <TabsTrigger value="overview" className={getDashboardTabsTriggerClass('enseigne')}>
                   Vue d ensemble
                 </TabsTrigger>
@@ -466,66 +526,59 @@ export default async function EnseigneDashboardPage({
                 </TabsTrigger>
               </TabsList>
 
-              <TabsContent value="overview" className={`${dashboardTabsContentClass} space-y-4`} id="enseigne-overview">
-                <div className="grid gap-4 xl:grid-cols-2">
-                  <section className="rounded-2xl border border-slate-200 bg-white/85 p-5">
-                    <h2 className="text-lg font-semibold text-slate-900">Plan operationnel quotidien</h2>
-                    <p className="mt-1 text-sm text-slate-600">Chaque etape doit etre completee avant la suivante &mdash; cliquez pour agir.</p>
-                    <ol className="mt-4 space-y-3 text-sm">
-                      <li className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
-                        <div className="flex items-start gap-3">
-                          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-600 text-[11px] font-bold text-white mt-0.5">1</span>
-                          <span className="text-slate-700">Creer les colis (manuel ou CSV) et verifier les informations destinataire.</span>
+              <TabsContent value="overview" className={`${dashboardTabsContentClass} space-y-7`} id="enseigne-overview">
+                <div className="grid gap-6 xl:grid-cols-2">
+                  <section className="rounded-2xl border border-slate-200 bg-white p-5">
+                    <div className="mb-3 flex items-center justify-between">
+                      <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Plan du jour</p>
+                      <p className="text-xs text-slate-400">4 étapes · dans l'ordre</p>
+                    </div>
+                    <ol className="divide-y divide-slate-100">
+                      <li className="flex items-center gap-3 py-2.5">
+                        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-600 text-[10px] font-bold text-white">1</span>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-semibold text-slate-900">Créer les colis</p>
+                          <p className="text-xs text-slate-500">Manuel ou CSV bulk</p>
                         </div>
-                        <Link href="/dashboard/enseigne?tab=imports#enseigne-import-bulk" className="shrink-0 inline-flex items-center rounded-lg bg-slate-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-700 whitespace-nowrap">
-                          Creer un colis
-                        </Link>
+                        <Link href="/dashboard/enseigne?tab=imports#enseigne-import-bulk" className="shrink-0 inline-flex items-center rounded-lg bg-slate-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-slate-700 whitespace-nowrap">Importer</Link>
                       </li>
-                      <li className="flex items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3">
-                        <div className="flex items-start gap-3">
-                          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-600 text-[11px] font-bold text-white mt-0.5">2</span>
-                          <span className="text-amber-800">Regler en ligne. Sans paiement confirme, le colis reste hors circuit logistique.</span>
+                      <li className="flex items-center gap-3 py-2.5">
+                        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-600 text-[10px] font-bold text-white">2</span>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-semibold text-amber-900">Régler en ligne</p>
+                          <p className="text-xs text-amber-700">Sans paiement → hors circuit</p>
                         </div>
-                        <Link href="/dashboard/enseigne?tab=payments#enseigne-payments" className="shrink-0 inline-flex items-center rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700 whitespace-nowrap">
-                          Payer maintenant
-                        </Link>
+                        {(createdOnlyParcels + pendingPaymentParcels) > 0 && (
+                          <span className="shrink-0 rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-bold text-white">{createdOnlyParcels + pendingPaymentParcels}</span>
+                        )}
+                        <Link href="/dashboard/enseigne?tab=payments#enseigne-payments" className="shrink-0 inline-flex items-center rounded-lg bg-amber-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-amber-700 whitespace-nowrap">Payer</Link>
                       </li>
-                      <li className="flex items-center justify-between gap-3 rounded-xl border border-cyan-200 bg-cyan-50 p-3">
-                        <div className="flex items-start gap-3">
-                          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-cyan-600 text-[11px] font-bold text-white mt-0.5">3</span>
-                          <span className="text-cyan-800">
-                            Deposer le colis au relais de depart indique sur l'etiquette.
-                            Le relais scanne le QR pour confirmer le depot — aucun encaissement, le paiement digital est deja effectue.
-                            {readyForDepositParcels > 0 && (
-                              <span className="ml-1 inline-flex items-center rounded-full bg-violet-600 px-2 py-0.5 text-[11px] font-bold text-white">
-                                {readyForDepositParcels} a deposer
-                              </span>
-                            )}
-                          </span>
+                      <li className="flex items-center gap-3 py-2.5">
+                        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-cyan-600 text-[10px] font-bold text-white">3</span>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-semibold text-cyan-900">Déposer au relais</p>
+                          <p className="text-xs text-cyan-700">QR scanné · digital only</p>
                         </div>
-                        <Link
-                          href="/dashboard/enseigne?tab=tracking#enseigne-tracking"
-                          className="shrink-0 inline-flex items-center rounded-lg bg-cyan-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-cyan-700 whitespace-nowrap"
-                        >
-                          Mes colis
-                        </Link>
+                        {readyForDepositParcels > 0 && (
+                          <span className="shrink-0 rounded-full bg-violet-500 px-2 py-0.5 text-[10px] font-bold text-white">{readyForDepositParcels}</span>
+                        )}
+                        <Link href="/dashboard/enseigne?tab=tracking#enseigne-tracking" className="shrink-0 inline-flex items-center rounded-lg bg-cyan-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-cyan-700 whitespace-nowrap">Mes colis</Link>
                       </li>
-                      <li className="flex items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3">
-                        <div className="flex items-start gap-3">
-                          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-[11px] font-bold text-white mt-0.5">4</span>
-                          <span className="text-emerald-800">Le transporteur collecte et livre le colis. Suivez l avancement en temps reel.</span>
+                      <li className="flex items-center gap-3 py-2.5">
+                        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-[10px] font-bold text-white">4</span>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-semibold text-emerald-900">Suivre la livraison</p>
+                          <p className="text-xs text-emerald-700">Transport en temps réel</p>
                         </div>
-                        <Link href="/dashboard/enseigne?tab=tracking#enseigne-tracking" className="shrink-0 inline-flex items-center rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 whitespace-nowrap">
-                          Suivre transport
-                        </Link>
+                        <Link href="/dashboard/enseigne?tab=tracking#enseigne-tracking" className="shrink-0 inline-flex items-center rounded-lg bg-emerald-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-emerald-700 whitespace-nowrap">Suivre</Link>
                       </li>
                     </ol>
                   </section>
 
-                  <section id="enseigne-latest-parcels" className="rounded-2xl border border-slate-200 bg-white/85 p-5">
+                  <section id="enseigne-latest-parcels" className="rounded-2xl border border-slate-200 bg-white/90 p-6">
                     <h2 className="text-lg font-semibold text-slate-900">Pipeline metier</h2>
                     <p className="mt-1 text-sm text-slate-600">Vue etape par etape du flux de traitement.</p>
-                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                    <div className="mt-5 grid gap-4 sm:grid-cols-2">
                       <article className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                         <p className="text-xs uppercase tracking-[0.14em] text-slate-500">Crees (non payes)</p>
                         <p className="mt-2 text-2xl font-bold text-slate-900">{createdOnlyParcels}</p>
@@ -578,10 +631,10 @@ export default async function EnseigneDashboardPage({
                   </section>
                 </div>
 
-                <section>
+                <section className="pt-1">
                   <h2 className="text-lg font-semibold text-slate-900">Centre d actions</h2>
                   <p className="mt-1 text-sm text-slate-600">Acces direct aux operations critiques de la journee.</p>
-                  <div className="mt-4 flex flex-wrap gap-3">
+                  <div className="mt-5 flex flex-wrap gap-3">
                     <Link
                       href="/dashboard/enseigne?tab=imports#enseigne-import-bulk"
                       className="inline-flex items-center rounded-xl bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700"

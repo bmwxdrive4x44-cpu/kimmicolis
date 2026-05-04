@@ -189,8 +189,10 @@ export function EnseignePaymentsTab({ clientId, isPro = false }: { clientId: str
 
           {/* Liste des colis */}
           {isLoading ? (
-            <div className="flex justify-center py-8">
-              <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
+            <div className="space-y-2 pt-2">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="h-12 animate-pulse rounded-lg bg-slate-100" />
+              ))}
             </div>
           ) : unpaidParcels.length === 0 ? (
             <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center">

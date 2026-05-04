@@ -16,7 +16,7 @@ import { AddressAutocompleteInput } from '@/components/ui/address-autocomplete-i
 import { FormGlobalError } from '@/components/ui/form-error';
 import { useToast } from '@/hooks/use-toast';
 import { normalizePhone, validatePhone } from '@/lib/validators';
-import { CheckCircle, CircleHelp, CreditCard, History, Loader2, Package, Plus, Printer } from 'lucide-react';
+import { CheckCircle, CircleHelp, CreditCard, History, Loader2, Package, Plus, Printer, X } from 'lucide-react';
 
 const LABEL_STORAGE_KEY = 'swiftcolis.parcel-labels';
 const SAVED_ADDRESSES_KEY = 'swiftcolis.saved-addresses';
@@ -973,21 +973,38 @@ export function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart 
                       <p className="text-xs text-slate-500">Adresses récentes:</p>
                       <div className="flex flex-wrap gap-2">
                         {savedAddresses.map((addr, idx) => (
-                          <button
-                            key={idx}
-                            type="button"
-                            className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-all ${
-                              homeAddress === addr.label
-                                ? 'border-emerald-400 bg-emerald-50 text-emerald-700'
-                                : 'border-slate-300 bg-white text-slate-600 hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700'
-                            }`}
-                            onClick={() => {
-                              setHomeAddress(addr.label);
-                              setHomeCoords({ lat: addr.lat, lon: addr.lon });
-                            }}
-                          >
-                            {addr.label}
-                          </button>
+                          <div key={idx} className="relative">
+                            <button
+                              type="button"
+                              className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 pr-7 text-xs font-medium transition-all ${
+                                homeAddress === addr.label
+                                  ? 'border-emerald-400 bg-emerald-50 text-emerald-700'
+                                  : 'border-slate-300 bg-white text-slate-600 hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700'
+                              }`}
+                              onClick={() => {
+                                setHomeAddress(addr.label);
+                                setHomeCoords({ lat: addr.lat, lon: addr.lon });
+                              }}
+                            >
+                              {addr.label}
+                            </button>
+                            <button
+                              type="button"
+                              aria-label={`Supprimer l'adresse ${addr.label}`}
+                              className="absolute -right-1 -top-1 inline-flex h-5 w-5 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-500 shadow-sm transition-colors hover:border-red-300 hover:text-red-600"
+                              onClick={(event) => {
+                                event.preventDefault();
+                                event.stopPropagation();
+                                removeAddress(addr.label);
+                                if (homeAddress === addr.label) {
+                                  setHomeAddress('');
+                                  setHomeCoords(null);
+                                }
+                              }}
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </div>
                         ))}
                       </div>
                     </div>

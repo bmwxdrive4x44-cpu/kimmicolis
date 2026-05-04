@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Header } from '@/components/layout/header';
 import { Footer } from '@/components/layout/footer';
 import {
@@ -30,12 +30,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { WILAYAS, PARCEL_STATUS, TRAJET_STATUS } from '@/lib/constants';
 import { parseLocaleFloat } from '@/lib/utils';
 import { asArray, parseStoredStringArray } from '@/lib/safe-data';
+import { scrollToElementWithDashboardOffset } from '@/lib/dashboard-scroll';
 import { Truck, Plus, Package, MapPin, DollarSign, Loader2, CheckCircle, Clock, Route, QrCode, Navigation, Scan, Wallet, ArrowUpFromLine, TrendingUp, History, Save, Pencil, User, Zap, Settings, BarChart2, AlertCircle, RefreshCw, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useTransporterDashboardController } from '@/hooks/use-transporter-dashboard-controller';
 
 export default function TransporterDashboard() {
   const [activeTab, setActiveTab] = useState('overview');
+  const operationsSectionRef = useRef<HTMLDivElement | null>(null);
   const {
     userId,
     userName,
@@ -48,6 +50,29 @@ export default function TransporterDashboard() {
     refreshStats,
     goToProfileCompletion,
   } = useTransporterDashboardController();
+  const transporterFocusToneClass =
+    stats.activeMissions >= 8
+      ? 'border-red-200 bg-red-50 text-red-700'
+      : stats.activeMissions >= 3
+        ? 'border-amber-200 bg-amber-50 text-amber-700'
+        : 'border-emerald-200 bg-emerald-50 text-emerald-700';
+  const transporterFocusMessage =
+    stats.activeMissions >= 8
+      ? `${stats.activeMissions} missions en cours - charge elevee, priorisez les livraisons critiques.`
+      : stats.activeMissions >= 3
+        ? `${stats.activeMissions} missions en cours - activite normale aujourd hui.`
+        : 'Charge legere - profitez-en pour publier plus de trajets.';
+  const transporterAutoRead =
+    stats.totalMissions > 0
+      ? `${Math.round((stats.completedMissions / Math.max(stats.totalMissions, 1)) * 100)}% de vos missions sont deja finalisees.`
+      : 'Aucune mission finalisee pour le moment - nouvelle vague attendue.';
+
+  const navigateToTab = useCallback((tab: string) => {
+    setActiveTab(tab);
+    requestAnimationFrame(() => {
+      scrollToElementWithDashboardOffset(operationsSectionRef.current);
+    });
+  }, []);
 
   if (isDashboardLoading) {
     return <DashboardLoadingState tone="transporteur" title="Chargement de votre espace transporteur" description="Synchronisation des missions, KPI et trajets..." />;
@@ -109,6 +134,59 @@ export default function TransporterDashboard() {
             }
           />
 
+          {/* ─── Focus du jour ─────────────────────────────────────────────── */}
+          <div className="grid gap-4 lg:grid-cols-[1.55fr_1fr]">
+            <article className="rounded-2xl border border-white/85 bg-white p-6 shadow-[0_22px_60px_-40px_rgba(15,23,42,0.48)]">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Missions actives</p>
+              <div className="mt-3 flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-5xl font-black tracking-tight text-slate-950">{stats.activeMissions}</p>
+                  <p className="mt-1 text-sm text-slate-600">Colis assignés ou en cours de livraison</p>
+                </div>
+                <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${stats.activeMissions >= 8 ? 'border-red-300 bg-red-50 text-red-700' : stats.activeMissions >= 3 ? 'border-amber-300 bg-amber-50 text-amber-700' : 'border-emerald-300 bg-emerald-50 text-emerald-700'}`}>
+                  {stats.activeMissions >= 8 ? 'Tension haute' : stats.activeMissions >= 3 ? 'Rythme normal' : 'Disponible'}
+                </span>
+              </div>
+              <div className={`mt-4 rounded-xl border px-3 py-2 text-xs font-semibold ${transporterFocusToneClass}`}>
+                <p>{transporterFocusMessage}</p>
+                <p className="mt-1 font-medium opacity-90">Lecture automatique: {transporterAutoRead}</p>
+              </div>
+              <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() => navigateToTab('missions')}
+                  className="inline-flex items-center justify-center rounded-xl bg-cyan-600 px-4 py-2 text-sm font-semibold text-white hover:bg-cyan-700"
+                >
+                  Traiter les missions
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigateToTab('scan')}
+                  className="inline-flex items-center justify-center rounded-xl border border-cyan-200 bg-cyan-50 px-4 py-2 text-sm font-semibold text-cyan-700 hover:bg-cyan-100"
+                >
+                  Confirmer un scan
+                </button>
+              </div>
+            </article>
+            <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
+              <article className="rounded-xl border border-indigo-200 bg-indigo-50 p-4">
+                <p className="text-xs uppercase tracking-[0.14em] text-indigo-700">Taux de complétion</p>
+                <p className="mt-2 text-2xl font-bold text-indigo-900">{completionRate}%</p>
+                <p className="text-xs text-indigo-700">{stats.completedMissions} livrées</p>
+              </article>
+              <article className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+                <p className="text-xs uppercase tracking-[0.14em] text-emerald-700">Gains</p>
+                <p className="mt-2 text-2xl font-bold text-emerald-900">{stats.earnings} DA</p>
+                <p className="text-xs text-emerald-700">missions livrées</p>
+              </article>
+              <article className="rounded-xl border border-sky-200 bg-sky-50 p-4">
+                <p className="text-xs uppercase tracking-[0.14em] text-sky-700">Trajets publiés</p>
+                <p className="mt-2 text-2xl font-bold text-sky-900">{stats.trajets}</p>
+                <p className="text-xs text-sky-700">trajets actifs</p>
+              </article>
+            </div>
+          </div>
+
           <DashboardSection
             tone="transporteur"
             eyebrow="Performance"
@@ -136,15 +214,16 @@ export default function TransporterDashboard() {
             </DashboardStatsGrid>
           </DashboardSection>
 
-          <DashboardSection
-            tone="transporteur"
-            eyebrow="Modules"
-            title="Pilotage opérationnel"
-            description="Accédez aux écrans missions, scan, portefeuille et profil dans un layout cohérent."
-            contentClassName="bg-transparent p-0 border-0 shadow-none ring-0"
-          >
-            <DashboardPanel tone="transporteur">
-              <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <div ref={operationsSectionRef}>
+            <DashboardSection
+              tone="transporteur"
+              eyebrow="Modules"
+              title="Pilotage opérationnel"
+              description="Accédez aux écrans missions, scan, portefeuille et profil dans un layout cohérent."
+              contentClassName="bg-transparent p-0 border-0 shadow-none ring-0"
+            >
+              <DashboardPanel tone="transporteur">
+                <Tabs value={activeTab} onValueChange={setActiveTab}>
                 <TabsList className={`${dashboardTabsListClass} grid grid-cols-2 lg:grid-cols-7`}>
                 <TabsTrigger value="overview" className={getDashboardTabsTriggerClass('transporteur')}><MapPin className="h-4 w-4 mr-1 hidden sm:inline" />Vue d'ensemble</TabsTrigger>
                 <TabsTrigger value="trajets" className={getDashboardTabsTriggerClass('transporteur')}><Route className="h-4 w-4 mr-1 hidden sm:inline" />Trajets</TabsTrigger>
@@ -155,9 +234,9 @@ export default function TransporterDashboard() {
                 <TabsTrigger value="profil" className={getDashboardTabsTriggerClass('transporteur')}><Truck className="h-4 w-4 mr-1 hidden sm:inline" />Infos perso</TabsTrigger>
               </TabsList>
 
-              <TabsContent value="overview" className={dashboardTabsContentClass}>
-                <OverviewTab userId={userId} setActiveTab={setActiveTab} />
-              </TabsContent>
+                <TabsContent value="overview" className={dashboardTabsContentClass}>
+                  <OverviewTab userId={userId} setActiveTab={navigateToTab} />
+                </TabsContent>
               <TabsContent value="trajets" className={dashboardTabsContentClass}>
                 <TrajetsTab userId={userId} />
               </TabsContent>
@@ -176,9 +255,10 @@ export default function TransporterDashboard() {
                 <TabsContent value="profil" className={dashboardTabsContentClass}>
                   <ProfilTab userId={userId} userName={userName} />
                 </TabsContent>
-              </Tabs>
-            </DashboardPanel>
-          </DashboardSection>
+                </Tabs>
+              </DashboardPanel>
+            </DashboardSection>
+          </div>
         </DashboardShell>
       </main>
       <Footer />

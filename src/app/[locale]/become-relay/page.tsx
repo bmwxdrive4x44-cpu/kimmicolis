@@ -5,6 +5,7 @@ import { Footer } from '@/components/layout/footer';
 import { PartnerApplicationForm } from '@/components/landing/partner-application-form';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { scrollToElementWithDashboardOffset } from '@/lib/dashboard-scroll';
 import { Store, CheckCircle, Clock, Users, TrendingUp, ArrowRight } from 'lucide-react';
 
 const BENEFITS = [
@@ -58,20 +59,12 @@ const RELAY_CONDITIONS = [
 ];
 
 export default function BecomeRelayPage() {
-  const scrollToSection = (id: string) => {
-    const element = document.getElementById(id);
-    if (!element) return;
-
-    const y = element.getBoundingClientRect().top + window.scrollY - 96;
-    window.scrollTo({ top: y, behavior: 'smooth' });
-  };
-
   const handleSignUp = () => {
-    scrollToSection('relay-application-section');
+    scrollToElementWithDashboardOffset(document.getElementById('relay-application-section'));
   };
 
   const handleLearnMore = () => {
-    scrollToSection('relay-conditions-section');
+    scrollToElementWithDashboardOffset(document.getElementById('relay-conditions-section'));
   };
 
   return (

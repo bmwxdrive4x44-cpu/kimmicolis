@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { Input } from '@/components/ui/input';
 
@@ -31,9 +31,18 @@ export function AddressAutocompleteInput({
   const [open, setOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [suggestions, setSuggestions] = useState<AddressSuggestion[]>([]);
+  const lastSelectedValueRef = useRef<string | null>(null);
 
   useEffect(() => {
     const query = value.trim();
+
+    // Après un choix utilisateur, ne pas relancer immédiatement une recherche avec la même valeur.
+    if (query && lastSelectedValueRef.current === query) {
+      setSuggestions([]);
+      setOpen(false);
+      return;
+    }
+
     if (query.length < 3 || disabled) {
       setSuggestions([]);
       setOpen(false);
@@ -70,6 +79,9 @@ export function AddressAutocompleteInput({
       <Input
         value={value}
         onChange={(event) => {
+          if (lastSelectedValueRef.current && event.target.value.trim() !== lastSelectedValueRef.current) {
+            lastSelectedValueRef.current = null;
+          }
           onChange(event.target.value);
           if (!open) setOpen(true);
         }}
@@ -94,6 +106,7 @@ export function AddressAutocompleteInput({
               className="w-full border-b px-3 py-2 text-left text-xs hover:bg-slate-50"
               onMouseDown={(event) => {
                 event.preventDefault();
+                lastSelectedValueRef.current = suggestion.label.trim();
                 onSelect(suggestion);
                 setOpen(false);
                 setSuggestions([]);

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useSession } from 'next-auth/react';
 import { useLocale } from 'next-intl';
@@ -34,6 +34,7 @@ import { WILAYAS, PARCEL_STATUS, RELAIS_STATUS, RELAY_CASH_ALERT_THRESHOLD } fro
 import { parseLocaleFloat } from '@/lib/utils';
 import { extractTrackingFromQrPayload } from '@/lib/qr-payload';
 import { normalizeRole } from '@/lib/roles';
+import { scrollToElementWithDashboardOffset } from '@/lib/dashboard-scroll';
 import { Store, Package, QrCode, DollarSign, Loader2, CheckCircle, Clock, Scan, ArrowDownToLine, ArrowUpFromLine, Settings, BarChart3, AlertCircle, Save, AlertTriangle, CreditCard, History, BanknoteIcon, User, Pencil, TrendingUp, Printer, CircleHelp, RefreshCw, Bell, CheckCheck } from 'lucide-react';
 import { isAlgerianCommerceRegisterNumber } from '@/lib/validators';
 import { QrCameraScanner } from '@/components/ui/qr-camera-scanner';
@@ -64,6 +65,7 @@ export default function RelaisDashboard() {
   const locale = useLocale();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState('overview');
+  const operationsSectionRef = useRef<HTMLDivElement | null>(null);
   const [scanTrackingPrefill, setScanTrackingPrefill] = useState('');
   const [relaisInfo, setRelaisInfo] = useState<any>(null);
   const [stats, setStats] = useState({
@@ -220,6 +222,31 @@ export default function RelaisDashboard() {
 
   const handoverBase = stats.inStockArrival + kpi.handoversCompleted;
   const handoverRate = handoverBase > 0 ? Math.round((kpi.handoversCompleted / handoverBase) * 100) : 100;
+  const relaisFocusToneClass =
+    kpi.cashOnHand >= RELAY_CASH_ALERT_THRESHOLD
+      ? 'border-red-200 bg-red-50 text-red-700'
+      : kpi.cashOnHand > 0
+        ? 'border-amber-200 bg-amber-50 text-amber-700'
+        : 'border-emerald-200 bg-emerald-50 text-emerald-700';
+  const relaisFocusMessage =
+    kpi.cashOnHand >= RELAY_CASH_ALERT_THRESHOLD
+      ? 'Caisse elevee - pensez a effectuer un reversement rapidement.'
+      : kpi.cashOnHand > 0
+        ? 'Caisse en attente - planifiez un reversement en fin de plage.'
+        : 'Caisse stable - aucun reversement urgent aujourd hui.';
+  const relaisAutoRead =
+    stats.inStockArrival >= 10
+      ? `${stats.inStockArrival} colis en stock arrivee - pic de remises probable ce soir.`
+      : stats.inStockArrival > 0
+        ? `${stats.inStockArrival} colis a remettre aujourd hui - flux maitrisable.`
+        : 'Aucun colis en stock arrivee pour le moment - charge legere.';
+
+  const navigateToTab = useCallback((tab: string) => {
+    setActiveTab(tab);
+    requestAnimationFrame(() => {
+      scrollToElementWithDashboardOffset(operationsSectionRef.current);
+    });
+  }, []);
 
   // Fetch relais info when session is ready
   useEffect(() => {
@@ -363,6 +390,59 @@ export default function RelaisDashboard() {
           </Card>
         )}
 
+          {/* ─── Focus du jour ─────────────────────────────────────────────── */}
+          <div className="grid gap-4 lg:grid-cols-[1.55fr_1fr]">
+            <article className="rounded-2xl border border-white/85 bg-white p-6 shadow-[0_22px_60px_-40px_rgba(15,23,42,0.48)]">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Cash en main</p>
+              <div className="mt-3 flex items-start justify-between gap-4">
+                <div>
+                  <p className={`text-5xl font-black tracking-tight ${kpi.cashOnHand >= RELAY_CASH_ALERT_THRESHOLD ? 'text-red-700' : 'text-slate-950'}`}>{kpi.cashOnHand.toFixed(0)} DA</p>
+                  <p className="mt-1 text-sm text-slate-600">À reverser à la plateforme dès que possible</p>
+                </div>
+                <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${kpi.cashOnHand >= RELAY_CASH_ALERT_THRESHOLD ? 'border-red-300 bg-red-50 text-red-700' : kpi.cashOnHand > 0 ? 'border-amber-300 bg-amber-50 text-amber-700' : 'border-emerald-300 bg-emerald-50 text-emerald-700'}`}>
+                  {kpi.cashOnHand >= RELAY_CASH_ALERT_THRESHOLD ? 'Reversal requis' : kpi.cashOnHand > 0 ? 'À reverser' : 'Soldé'}
+                </span>
+              </div>
+              <div className={`mt-4 rounded-xl border px-3 py-2 text-xs font-semibold ${relaisFocusToneClass}`}>
+                <p>{relaisFocusMessage}</p>
+                <p className="mt-1 font-medium opacity-90">Lecture automatique: {relaisAutoRead}</p>
+              </div>
+              <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() => navigateToTab('cash')}
+                  className="inline-flex items-center justify-center rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
+                >
+                  Effectuer un reversement
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigateToTab('scan')}
+                  className="inline-flex items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-100"
+                >
+                  Lancer un scan QR
+                </button>
+              </div>
+            </article>
+            <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
+              <article className="rounded-xl border border-indigo-200 bg-indigo-50 p-4">
+                <p className="text-xs uppercase tracking-[0.14em] text-indigo-700">Taux de remise</p>
+                <p className="mt-2 text-2xl font-bold text-indigo-900">{handoverRate}%</p>
+                <p className="text-xs text-indigo-700">{kpi.handoversCompleted} colis remis</p>
+              </article>
+              <article className="rounded-xl border border-sky-200 bg-sky-50 p-4">
+                <p className="text-xs uppercase tracking-[0.14em] text-sky-700">Stock arrivée</p>
+                <p className="mt-2 text-2xl font-bold text-sky-900">{stats.inStockArrival}</p>
+                <p className="text-xs text-sky-700">à remettre au destinataire</p>
+              </article>
+              <article className="rounded-xl border border-violet-200 bg-violet-50 p-4">
+                <p className="text-xs uppercase tracking-[0.14em] text-violet-700">Commissions</p>
+                <p className="mt-2 text-2xl font-bold text-violet-900">{kpi.commissionsTotal.toFixed(0)} DA</p>
+                <p className="text-xs text-violet-700">total gagné</p>
+              </article>
+            </div>
+          </div>
+
           <DashboardSection
             tone="relais"
             eyebrow="Performance caisse"
@@ -390,15 +470,16 @@ export default function RelaisDashboard() {
             </DashboardStatsGrid>
           </DashboardSection>
 
-          <DashboardSection
-            tone="relais"
-            eyebrow="Modules"
-            title="Centre opérationnel"
-            description="Retrouvez vos écrans de scan, tâches, caisse et paramétrage dans un bloc homogène."
-            contentClassName="bg-transparent p-0 border-0 shadow-none ring-0"
-          >
-            <DashboardPanel tone="relais">
-              <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <div ref={operationsSectionRef}>
+            <DashboardSection
+              tone="relais"
+              eyebrow="Modules"
+              title="Centre opérationnel"
+              description="Retrouvez vos écrans de scan, tâches, caisse et paramétrage dans un bloc homogène."
+              contentClassName="bg-transparent p-0 border-0 shadow-none ring-0"
+            >
+              <DashboardPanel tone="relais">
+                <Tabs value={activeTab} onValueChange={setActiveTab}>
                 <TabsList className={`${dashboardTabsListClass} grid grid-cols-2 lg:grid-cols-8`}>
                 <TabsTrigger value="overview" className={getDashboardTabsTriggerClass('relais')}><BarChart3 className="h-4 w-4 mr-1 hidden sm:inline" />Vue d'ensemble</TabsTrigger>
                 <TabsTrigger value="tasks" className={getDashboardTabsTriggerClass('relais')}><Package className="h-4 w-4 mr-1 hidden sm:inline" />A traiter</TabsTrigger>
@@ -413,7 +494,7 @@ export default function RelaisDashboard() {
               <TabsContent value="overview" className={dashboardTabsContentClass}>
                 <OverviewTab
                   relaisInfo={relaisInfo}
-                  setActiveTab={setActiveTab}
+                  setActiveTab={navigateToTab}
                   cashInfo={cashInfo}
                 />
               </TabsContent>
@@ -422,7 +503,7 @@ export default function RelaisDashboard() {
                   relaisId={relaisInfo?.id}
                   onOpenScan={(tracking) => {
                     setScanTrackingPrefill(tracking);
-                    setActiveTab('scan');
+                    navigateToTab('scan');
                   }}
                 />
               </TabsContent>
@@ -444,9 +525,10 @@ export default function RelaisDashboard() {
                 <TabsContent value="profil" className={dashboardTabsContentClass}>
                   <ProfilRelaisTab userId={session.user.id} relaisInfo={relaisInfo} />
                 </TabsContent>
-              </Tabs>
-            </DashboardPanel>
-          </DashboardSection>
+                </Tabs>
+              </DashboardPanel>
+            </DashboardSection>
+          </div>
         </DashboardShell>
       </main>
       <Footer />

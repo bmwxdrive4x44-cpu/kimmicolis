@@ -5,6 +5,7 @@ import { Footer } from '@/components/layout/footer';
 import { EnseigneOnboardingForm } from '@/components/landing/enseigne-onboarding-form';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { scrollToElementWithDashboardOffset } from '@/lib/dashboard-scroll';
 import { Building2, Boxes, BarChart3, Link2, ArrowRight } from 'lucide-react';
 
 const BENEFITS = [
@@ -27,7 +28,7 @@ const BENEFITS = [
 
 export default function BecomeEnseignePage() {
   const handleScroll = () => {
-    document.getElementById('enseigne-onboarding-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    scrollToElementWithDashboardOffset(document.getElementById('enseigne-onboarding-form'));
   };
 
   return (

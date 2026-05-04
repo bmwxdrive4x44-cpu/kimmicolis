@@ -5,6 +5,7 @@ import { Footer } from '@/components/layout/footer';
 import { PartnerApplicationForm } from '@/components/landing/partner-application-form';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { scrollToElementWithDashboardOffset } from '@/lib/dashboard-scroll';
 import { Truck, Banknote, TrendingUp, Shield, Award, ArrowRight } from 'lucide-react';
 
 const BENEFITS = [
@@ -32,7 +33,7 @@ const BENEFITS = [
 
 export default function BecomeTransporterPage() {
   const handleSignUp = () => {
-    document.getElementById('transporter-application-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    scrollToElementWithDashboardOffset(document.getElementById('transporter-application-form'));
   };
 
   return (
