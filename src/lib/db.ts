@@ -115,10 +115,11 @@ function isSupabaseDirect5432(url: string): boolean {
 // DIRECT_DATABASE_URL is mainly for Prisma CLI/migrations and must not be used by runtime in production.
 const databaseUrl = process.env.DATABASE_URL
 const rebuiltPoolerUrl = buildPoolerUrlFromDirectUrl()
-const runtimeDatabaseUrl =
-  process.env.NODE_ENV === 'production' && rebuiltPoolerUrl
-    ? rebuiltPoolerUrl
-    : databaseUrl
+const shouldUseRebuiltPoolerUrl =
+  process.env.NODE_ENV === 'production' &&
+  (!databaseUrl || isSupabaseDirect5432(databaseUrl)) &&
+  Boolean(rebuiltPoolerUrl)
+const runtimeDatabaseUrl = shouldUseRebuiltPoolerUrl ? rebuiltPoolerUrl : databaseUrl
 const shouldDisableTlsValidation =
   process.env.NODE_ENV === 'production' &&
   typeof runtimeDatabaseUrl === 'string' &&

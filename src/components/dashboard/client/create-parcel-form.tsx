@@ -880,20 +880,60 @@ export function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart 
           </div>
         </CardHeader>
         <CardContent className="space-y-6 px-4 sm:px-6">
-          <div className="mx-auto flex max-w-2xl items-center gap-2 text-sm">
-            <div className={`flex items-center gap-1.5 ${formData.villeDepart && formData.villeArrivee ? 'text-emerald-600 font-medium' : 'text-slate-400'}`}>
-              <span className={`w-6 h-6 rounded-full text-xs flex items-center justify-center ${formData.villeDepart && formData.villeArrivee ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-500'}`}>1</span>
-              Itinéraire
+          <div className="mx-auto grid w-full max-w-2xl grid-cols-1 gap-2 text-sm sm:grid-cols-3">
+            <div
+              className={`flex items-center gap-2 rounded-xl border px-3 py-2 transition-colors ${
+                formData.villeDepart && formData.villeArrivee
+                  ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                  : 'border-slate-200 bg-slate-50 text-slate-500'
+              }`}
+            >
+              <span
+                className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold ${
+                  formData.villeDepart && formData.villeArrivee
+                    ? 'bg-emerald-600 text-white'
+                    : 'bg-slate-200 text-slate-600'
+                }`}
+              >
+                1
+              </span>
+              <span className="font-medium">Itinéraire</span>
             </div>
-            <div className="flex-1 h-px bg-slate-200" />
-            <div className={`flex items-center gap-1.5 ${formData.relaisDepartId && formData.relaisArriveeId ? 'text-emerald-600 font-medium' : 'text-slate-400'}`}>
-              <span className={`w-6 h-6 rounded-full text-xs flex items-center justify-center ${formData.relaisDepartId && formData.relaisArriveeId ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-500'}`}>2</span>
-              Relais
+            <div
+              className={`flex items-center gap-2 rounded-xl border px-3 py-2 transition-colors ${
+                formData.relaisDepartId && formData.relaisArriveeId
+                  ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                  : 'border-slate-200 bg-slate-50 text-slate-500'
+              }`}
+            >
+              <span
+                className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold ${
+                  formData.relaisDepartId && formData.relaisArriveeId
+                    ? 'bg-emerald-600 text-white'
+                    : 'bg-slate-200 text-slate-600'
+                }`}
+              >
+                2
+              </span>
+              <span className="font-medium">Relais</span>
             </div>
-            <div className="flex-1 h-px bg-slate-200" />
-            <div className={`flex items-center gap-1.5 ${formData.senderFirstName && formData.recipientFirstName ? 'text-emerald-600 font-medium' : 'text-slate-400'}`}>
-              <span className={`w-6 h-6 rounded-full text-xs flex items-center justify-center ${formData.senderFirstName && formData.recipientFirstName ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-500'}`}>3</span>
-              Colis & identités
+            <div
+              className={`flex items-center gap-2 rounded-xl border px-3 py-2 transition-colors ${
+                formData.senderFirstName && formData.recipientFirstName
+                  ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                  : 'border-slate-200 bg-slate-50 text-slate-500'
+              }`}
+            >
+              <span
+                className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold ${
+                  formData.senderFirstName && formData.recipientFirstName
+                    ? 'bg-emerald-600 text-white'
+                    : 'bg-slate-200 text-slate-600'
+                }`}
+              >
+                3
+              </span>
+              <span className="font-medium">Colis et identités</span>
             </div>
           </div>
 
@@ -958,6 +998,14 @@ export function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart 
                   {fieldErrors.villeArrivee && <p className="text-xs text-red-600">{fieldErrors.villeArrivee}</p>}
                 </div>
               </div>
+              {formData.villeDepart && formData.villeArrivee && (
+                <div className="mt-4 rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+                  <span className="font-semibold">Trajet sélectionné:</span>{' '}
+                  {departWilayas.find((w) => w.id === formData.villeDepart)?.name ?? formData.villeDepart}
+                  {' -> '}
+                  {arriveeWilayas.find((w) => w.id === formData.villeArrivee)?.name ?? formData.villeArrivee}
+                </div>
+              )}
             </div>
 
             {formData.villeDepart && formData.villeArrivee && (
