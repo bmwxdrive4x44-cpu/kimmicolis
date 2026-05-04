@@ -24,6 +24,24 @@ const buildPrismaEnv = () => {
   return env;
 };
 
+// Run prisma migrate deploy on Vercel builds (applies pending migrations without wiping data)
+const runMigrateDeploy = () => {
+  if (!process.env.VERCEL) return; // Only run on Vercel
+  if (!existsSync(PRISMA_CLI_PATH)) return;
+
+  console.log('[prisma-generate] Running prisma migrate deploy...');
+  const result = spawnSync(
+    process.execPath,
+    [PRISMA_CLI_PATH, 'migrate', 'deploy', '--schema', 'prisma/schema.prisma'],
+    { env: buildPrismaEnv(), encoding: 'utf8' }
+  );
+  if (result.stdout) process.stdout.write(result.stdout);
+  if (result.stderr) process.stderr.write(result.stderr);
+  if (result.status !== 0) {
+    console.warn('[prisma-generate] migrate deploy exited with', result.status, '— continuing build');
+  }
+};
+
 const runGenerate = (args) => {
   if (!existsSync(PRISMA_CLI_PATH)) {
     console.error(`[prisma-generate] Prisma CLI entrypoint not found at ${PRISMA_CLI_PATH}`);
@@ -98,6 +116,9 @@ const runWithWindowsRetry = (args) => {
 
   return result;
 };
+
+// Apply pending migrations on Vercel before generating the client
+runMigrateDeploy();
 
 let result = runWithWindowsRetry(['generate']);
 
