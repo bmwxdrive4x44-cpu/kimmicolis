@@ -148,11 +148,13 @@ function RegisterForm() {
       }
 
       toast({
-        title: 'Compte créé',
+        title: 'Compte créé avec succès !',
         description: data?.emailConfirmationSent
-          ? 'Un email de confirmation vous a ete envoye. Verifiez votre boite mail avant de vous connecter.'
-          : 'Compte cree. Verification email requise avant connexion.',
+          ? 'Un email de confirmation vous a été envoyé. Vérifiez votre boite mail avant de vous connecter.'
+          : 'Compte créé. Vérification email requise avant connexion.',
+        duration: 4000,
       });
+      await new Promise(resolve => setTimeout(resolve, 3000));
       router.replace(`/${locale}/auth/login`);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Impossible de creer le compte';
