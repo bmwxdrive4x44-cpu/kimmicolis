@@ -1,18 +1,9 @@
 
-import nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 
-const FROM = process.env.SMTP_FROM ?? process.env.SMTP_USER ?? 'SwiftColis <no-reply@swiftcolis.com>';
-const SMTP_PORT = Number(process.env.SMTP_PORT) || 587;
+const FROM = process.env.SMTP_FROM ?? 'SwiftColis <onboarding@resend.dev>';
 
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
-  port: SMTP_PORT,
-  secure: SMTP_PORT === 465,
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
-  },
-});
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function sendEmail({
   to,
@@ -26,16 +17,20 @@ export async function sendEmail({
   text?: string;
 }) {
   try {
-    const info = await transporter.sendMail({
+    const { data, error } = await resend.emails.send({
       from: FROM,
       to,
       subject,
       html,
       text,
     });
-    return info;
+    if (error) {
+      console.error('[Resend] Erreur envoi email:', error);
+      throw new Error(error.message);
+    }
+    return data;
   } catch (error) {
-    console.error('[SMTP] Erreur envoi email:', error);
+    console.error('[Resend] Erreur envoi email:', error);
     throw error;
   }
 }
