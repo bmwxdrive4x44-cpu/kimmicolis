@@ -150,7 +150,13 @@ function CheckoutContent() {
 
         if (!paymentRes.ok) { const e = await paymentRes.json(); setLoadError(e.error || 'Paiement introuvable'); return; }
         const data = await paymentRes.json();
-        if (data.status === 'COMPLETED') { setStep('success'); setTxRef(data.transactionRef); }
+        if (data.status === 'COMPLETED') {
+          setStep('success');
+          setTxRef(data.transactionRef);
+        } else if (data.status === 'PENDING' || data.status === 'PROCESSING') {
+          setStep('processing');
+          await waitForBackendConfirmation(data.id || paymentId);
+        }
         setPayment(data);
       } catch { setLoadError('Erreur de connexion'); }
       finally { setIsLoading(false); }

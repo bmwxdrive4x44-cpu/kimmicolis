@@ -176,7 +176,7 @@ export async function getPaymentStatus(paymentId: string): Promise<IPayment | nu
 
   if (
     new Date() > payment.expiresAt &&
-    (payment.status === 'PENDING' || payment.status === 'PROCESSING')
+    payment.status === 'PENDING'
   ) {
     // Remettre le colis en CREATED pour que l'enseigne puisse relancer le paiement
     await db.colis.update({

@@ -974,7 +974,7 @@ function ParcelHistory({
 
   const fetchColis = async () => {
     try {
-      const response = await fetch(`/api/parcels?clientId=${userId}`);
+      const response = await fetch(`/api/parcels?clientId=${userId}`, { cache: 'no-store' });
       const payload = await response.json();
       setColis(Array.isArray(payload) ? payload : []);
     } catch (error) {

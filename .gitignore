@@ -71,3 +71,4 @@ test-results*.log
 e2e-run-output.txt
 playwright-report/
 test-results/
+.env*.local

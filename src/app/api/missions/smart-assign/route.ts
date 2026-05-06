@@ -67,6 +67,20 @@ export async function POST(request: NextRequest) {
         });
       }
 
+      await db.colis.update({
+        where: { id: colisId },
+        data: { status: 'WAITING_PICKUP' },
+        select: { id: true, status: true },
+      });
+
+      await db.trackingHistory.create({
+        data: {
+          colisId,
+          status: 'WAITING_PICKUP',
+          notes: 'Mission assignee intelligemment - en attente de collecte au relais',
+        },
+      });
+
       return NextResponse.json({
         success: true,
         mission: {
@@ -153,6 +167,20 @@ export async function POST(request: NextRequest) {
       title: 'Transporteur assigné',
       message: `Votre colis #${colis.trackingNumber} a été assigné à un transporteur de confiance. Score: ${selectedTransporteur.score}/100.`,
       type: 'IN_APP',
+    });
+
+    await db.colis.update({
+      where: { id: colisId },
+      data: { status: 'WAITING_PICKUP' },
+      select: { id: true, status: true },
+    });
+
+    await db.trackingHistory.create({
+      data: {
+        colisId,
+        status: 'WAITING_PICKUP',
+        notes: `Mission assignee intelligemment (score ${selectedTransporteur.score}/100) - en attente de collecte au relais`,
+      },
     });
 
     return NextResponse.json({

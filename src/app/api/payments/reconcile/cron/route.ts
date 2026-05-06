@@ -4,7 +4,7 @@ import { db } from '@/lib/db';
 /**
  * POST /api/payments/reconcile/cron
  * Reconcile stale payment sessions asynchronously:
- * - PENDING / PROCESSING payments past expiresAt -> FAILED
+ * - PENDING payments past expiresAt -> FAILED
  * - Move colis back to CREATED when still in PENDING_PAYMENT
  */
 export async function POST(request: NextRequest) {
@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
 
     const stalePayments = await db.payment.findMany({
       where: {
-        status: { in: ['PENDING', 'PROCESSING'] },
+        status: 'PENDING',
         expiresAt: { lte: now },
       },
       select: {

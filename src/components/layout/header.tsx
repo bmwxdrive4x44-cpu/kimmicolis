@@ -19,7 +19,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { BrandLogo } from '@/components/brand-logo';
 import { useState, useEffect, useCallback, useRef, useLayoutEffect, useMemo } from 'react';
 import { useSession, signOut } from 'next-auth/react';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 
 // ─── Notification Bell ───────────────────────────────────────────────────────
 function NotificationBell({ userId }: { userId: string }) {
@@ -398,6 +398,10 @@ export function Header() {
               </Button>
             </SheetTrigger>
               <SheetContent side="right" className="w-80 border-l border-emerald-100/80 bg-white/95 backdrop-blur-xl dark:border-emerald-900/40 dark:bg-slate-950/95">
+              <SheetHeader className="sr-only">
+                <SheetTitle>Menu mobile</SheetTitle>
+                <SheetDescription>Navigation principale et actions utilisateur.</SheetDescription>
+              </SheetHeader>
               <div className="mt-4 flex flex-col gap-3">
                 {/* Logo in sheet */}
                   <div className="border-b border-emerald-100/80 pb-3 dark:border-emerald-900/40">

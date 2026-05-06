@@ -26,6 +26,21 @@ const nextConfig: NextConfig = {
     contentDispositionType: 'attachment',
     contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
   },
+  // Exclude only Windows-local Prisma artifacts that bloat deployments.
+  // Keep Linux query engines so Prisma can run in Vercel runtime.
+  outputFileTracingExcludes: {
+    '*': [
+      './node_modules/.prisma/client/libquery_engine-*',
+      './node_modules/@prisma/engines/**',
+      './node_modules/prisma/libquery_engine-*',
+      './node_modules/prisma/migration-engine-*',
+      './node_modules/prisma/introspection-engine-*',
+      './node_modules/prisma/fmt-*',
+      './src/generated/prisma/query-engine-windows.exe',
+      './src/generated/prisma/query-engine-windows.exe.tmp*',
+      './src/generated/prisma/*.tmp*',
+    ],
+  },
   async headers() {
     return [
       {
