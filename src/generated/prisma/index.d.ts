@@ -59,6 +59,11 @@ export type Ligne = $Result.DefaultSelection<Prisma.$LignePayload>
  */
 export type Colis = $Result.DefaultSelection<Prisma.$ColisPayload>
 /**
+ * Model SeoSettings
+ * 
+ */
+export type SeoSettings = $Result.DefaultSelection<Prisma.$SeoSettingsPayload>
+/**
  * Model Payment
  * 
  */
@@ -371,6 +376,16 @@ export class PrismaClient<
     * ```
     */
   get colis(): Prisma.ColisDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.seoSettings`: Exposes CRUD operations for the **SeoSettings** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more SeoSettings
+    * const seoSettings = await prisma.seoSettings.findMany()
+    * ```
+    */
+  get seoSettings(): Prisma.SeoSettingsDelegate<ExtArgs, ClientOptions>;
 
   /**
    * `prisma.payment`: Exposes CRUD operations for the **Payment** model.
@@ -1031,6 +1046,7 @@ export namespace Prisma {
     TransporterPreferences: 'TransporterPreferences',
     Ligne: 'Ligne',
     Colis: 'Colis',
+    SeoSettings: 'SeoSettings',
     Payment: 'Payment',
     Trajet: 'Trajet',
     Mission: 'Mission',
@@ -1070,7 +1086,7 @@ export namespace Prisma {
       omit: GlobalOmitOptions
     }
     meta: {
-      modelProps: "user" | "enseigne" | "passwordResetToken" | "contactMessage" | "relais" | "transporterApplication" | "transporterPreferences" | "ligne" | "colis" | "payment" | "trajet" | "mission" | "trackingHistory" | "notification" | "setting" | "transporterWallet" | "relaisCash" | "dispute" | "relaisSanction" | "relaisAudit" | "actionLog" | "deliveryProof" | "cashPickup" | "transporterScore" | "transporterPenalty" | "qrSecurityLog" | "event" | "kpiTransporter" | "kpiEnseigne" | "kpiRelais"
+      modelProps: "user" | "enseigne" | "passwordResetToken" | "contactMessage" | "relais" | "transporterApplication" | "transporterPreferences" | "ligne" | "colis" | "seoSettings" | "payment" | "trajet" | "mission" | "trackingHistory" | "notification" | "setting" | "transporterWallet" | "relaisCash" | "dispute" | "relaisSanction" | "relaisAudit" | "actionLog" | "deliveryProof" | "cashPickup" | "transporterScore" | "transporterPenalty" | "qrSecurityLog" | "event" | "kpiTransporter" | "kpiEnseigne" | "kpiRelais"
       txIsolationLevel: Prisma.TransactionIsolationLevel
     }
     model: {
@@ -1737,6 +1753,80 @@ export namespace Prisma {
           count: {
             args: Prisma.ColisCountArgs<ExtArgs>
             result: $Utils.Optional<ColisCountAggregateOutputType> | number
+          }
+        }
+      }
+      SeoSettings: {
+        payload: Prisma.$SeoSettingsPayload<ExtArgs>
+        fields: Prisma.SeoSettingsFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.SeoSettingsFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SeoSettingsPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.SeoSettingsFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SeoSettingsPayload>
+          }
+          findFirst: {
+            args: Prisma.SeoSettingsFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SeoSettingsPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.SeoSettingsFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SeoSettingsPayload>
+          }
+          findMany: {
+            args: Prisma.SeoSettingsFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SeoSettingsPayload>[]
+          }
+          create: {
+            args: Prisma.SeoSettingsCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SeoSettingsPayload>
+          }
+          createMany: {
+            args: Prisma.SeoSettingsCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.SeoSettingsCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SeoSettingsPayload>[]
+          }
+          delete: {
+            args: Prisma.SeoSettingsDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SeoSettingsPayload>
+          }
+          update: {
+            args: Prisma.SeoSettingsUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SeoSettingsPayload>
+          }
+          deleteMany: {
+            args: Prisma.SeoSettingsDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.SeoSettingsUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.SeoSettingsUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SeoSettingsPayload>[]
+          }
+          upsert: {
+            args: Prisma.SeoSettingsUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SeoSettingsPayload>
+          }
+          aggregate: {
+            args: Prisma.SeoSettingsAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateSeoSettings>
+          }
+          groupBy: {
+            args: Prisma.SeoSettingsGroupByArgs<ExtArgs>
+            result: $Utils.Optional<SeoSettingsGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.SeoSettingsCountArgs<ExtArgs>
+            result: $Utils.Optional<SeoSettingsCountAggregateOutputType> | number
           }
         }
       }
@@ -3395,6 +3485,7 @@ export namespace Prisma {
     transporterPreferences?: TransporterPreferencesOmit
     ligne?: LigneOmit
     colis?: ColisOmit
+    seoSettings?: SeoSettingsOmit
     payment?: PaymentOmit
     trajet?: TrajetOmit
     mission?: MissionOmit
@@ -15789,6 +15880,1027 @@ export namespace Prisma {
      * Choose, which related nodes to fetch as well
      */
     include?: ColisInclude<ExtArgs> | null
+  }
+
+
+  /**
+   * Model SeoSettings
+   */
+
+  export type AggregateSeoSettings = {
+    _count: SeoSettingsCountAggregateOutputType | null
+    _min: SeoSettingsMinAggregateOutputType | null
+    _max: SeoSettingsMaxAggregateOutputType | null
+  }
+
+  export type SeoSettingsMinAggregateOutputType = {
+    id: string | null
+    title: string | null
+    description: string | null
+    canonical: string | null
+    robots: string | null
+    updatedAt: Date | null
+    createdAt: Date | null
+  }
+
+  export type SeoSettingsMaxAggregateOutputType = {
+    id: string | null
+    title: string | null
+    description: string | null
+    canonical: string | null
+    robots: string | null
+    updatedAt: Date | null
+    createdAt: Date | null
+  }
+
+  export type SeoSettingsCountAggregateOutputType = {
+    id: number
+    title: number
+    description: number
+    canonical: number
+    robots: number
+    updatedAt: number
+    createdAt: number
+    _all: number
+  }
+
+
+  export type SeoSettingsMinAggregateInputType = {
+    id?: true
+    title?: true
+    description?: true
+    canonical?: true
+    robots?: true
+    updatedAt?: true
+    createdAt?: true
+  }
+
+  export type SeoSettingsMaxAggregateInputType = {
+    id?: true
+    title?: true
+    description?: true
+    canonical?: true
+    robots?: true
+    updatedAt?: true
+    createdAt?: true
+  }
+
+  export type SeoSettingsCountAggregateInputType = {
+    id?: true
+    title?: true
+    description?: true
+    canonical?: true
+    robots?: true
+    updatedAt?: true
+    createdAt?: true
+    _all?: true
+  }
+
+  export type SeoSettingsAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which SeoSettings to aggregate.
+     */
+    where?: SeoSettingsWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of SeoSettings to fetch.
+     */
+    orderBy?: SeoSettingsOrderByWithRelationInput | SeoSettingsOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: SeoSettingsWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` SeoSettings from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` SeoSettings.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned SeoSettings
+    **/
+    _count?: true | SeoSettingsCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: SeoSettingsMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: SeoSettingsMaxAggregateInputType
+  }
+
+  export type GetSeoSettingsAggregateType<T extends SeoSettingsAggregateArgs> = {
+        [P in keyof T & keyof AggregateSeoSettings]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateSeoSettings[P]>
+      : GetScalarType<T[P], AggregateSeoSettings[P]>
+  }
+
+
+
+
+  export type SeoSettingsGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: SeoSettingsWhereInput
+    orderBy?: SeoSettingsOrderByWithAggregationInput | SeoSettingsOrderByWithAggregationInput[]
+    by: SeoSettingsScalarFieldEnum[] | SeoSettingsScalarFieldEnum
+    having?: SeoSettingsScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: SeoSettingsCountAggregateInputType | true
+    _min?: SeoSettingsMinAggregateInputType
+    _max?: SeoSettingsMaxAggregateInputType
+  }
+
+  export type SeoSettingsGroupByOutputType = {
+    id: string
+    title: string
+    description: string
+    canonical: string
+    robots: string
+    updatedAt: Date
+    createdAt: Date
+    _count: SeoSettingsCountAggregateOutputType | null
+    _min: SeoSettingsMinAggregateOutputType | null
+    _max: SeoSettingsMaxAggregateOutputType | null
+  }
+
+  type GetSeoSettingsGroupByPayload<T extends SeoSettingsGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<SeoSettingsGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof SeoSettingsGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], SeoSettingsGroupByOutputType[P]>
+            : GetScalarType<T[P], SeoSettingsGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type SeoSettingsSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    title?: boolean
+    description?: boolean
+    canonical?: boolean
+    robots?: boolean
+    updatedAt?: boolean
+    createdAt?: boolean
+  }, ExtArgs["result"]["seoSettings"]>
+
+  export type SeoSettingsSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    title?: boolean
+    description?: boolean
+    canonical?: boolean
+    robots?: boolean
+    updatedAt?: boolean
+    createdAt?: boolean
+  }, ExtArgs["result"]["seoSettings"]>
+
+  export type SeoSettingsSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    title?: boolean
+    description?: boolean
+    canonical?: boolean
+    robots?: boolean
+    updatedAt?: boolean
+    createdAt?: boolean
+  }, ExtArgs["result"]["seoSettings"]>
+
+  export type SeoSettingsSelectScalar = {
+    id?: boolean
+    title?: boolean
+    description?: boolean
+    canonical?: boolean
+    robots?: boolean
+    updatedAt?: boolean
+    createdAt?: boolean
+  }
+
+  export type SeoSettingsOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "title" | "description" | "canonical" | "robots" | "updatedAt" | "createdAt", ExtArgs["result"]["seoSettings"]>
+
+  export type $SeoSettingsPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "SeoSettings"
+    objects: {}
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      title: string
+      description: string
+      canonical: string
+      robots: string
+      updatedAt: Date
+      createdAt: Date
+    }, ExtArgs["result"]["seoSettings"]>
+    composites: {}
+  }
+
+  type SeoSettingsGetPayload<S extends boolean | null | undefined | SeoSettingsDefaultArgs> = $Result.GetResult<Prisma.$SeoSettingsPayload, S>
+
+  type SeoSettingsCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<SeoSettingsFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: SeoSettingsCountAggregateInputType | true
+    }
+
+  export interface SeoSettingsDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['SeoSettings'], meta: { name: 'SeoSettings' } }
+    /**
+     * Find zero or one SeoSettings that matches the filter.
+     * @param {SeoSettingsFindUniqueArgs} args - Arguments to find a SeoSettings
+     * @example
+     * // Get one SeoSettings
+     * const seoSettings = await prisma.seoSettings.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends SeoSettingsFindUniqueArgs>(args: SelectSubset<T, SeoSettingsFindUniqueArgs<ExtArgs>>): Prisma__SeoSettingsClient<$Result.GetResult<Prisma.$SeoSettingsPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one SeoSettings that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {SeoSettingsFindUniqueOrThrowArgs} args - Arguments to find a SeoSettings
+     * @example
+     * // Get one SeoSettings
+     * const seoSettings = await prisma.seoSettings.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends SeoSettingsFindUniqueOrThrowArgs>(args: SelectSubset<T, SeoSettingsFindUniqueOrThrowArgs<ExtArgs>>): Prisma__SeoSettingsClient<$Result.GetResult<Prisma.$SeoSettingsPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first SeoSettings that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SeoSettingsFindFirstArgs} args - Arguments to find a SeoSettings
+     * @example
+     * // Get one SeoSettings
+     * const seoSettings = await prisma.seoSettings.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends SeoSettingsFindFirstArgs>(args?: SelectSubset<T, SeoSettingsFindFirstArgs<ExtArgs>>): Prisma__SeoSettingsClient<$Result.GetResult<Prisma.$SeoSettingsPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first SeoSettings that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SeoSettingsFindFirstOrThrowArgs} args - Arguments to find a SeoSettings
+     * @example
+     * // Get one SeoSettings
+     * const seoSettings = await prisma.seoSettings.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends SeoSettingsFindFirstOrThrowArgs>(args?: SelectSubset<T, SeoSettingsFindFirstOrThrowArgs<ExtArgs>>): Prisma__SeoSettingsClient<$Result.GetResult<Prisma.$SeoSettingsPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more SeoSettings that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SeoSettingsFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all SeoSettings
+     * const seoSettings = await prisma.seoSettings.findMany()
+     * 
+     * // Get first 10 SeoSettings
+     * const seoSettings = await prisma.seoSettings.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const seoSettingsWithIdOnly = await prisma.seoSettings.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends SeoSettingsFindManyArgs>(args?: SelectSubset<T, SeoSettingsFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$SeoSettingsPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a SeoSettings.
+     * @param {SeoSettingsCreateArgs} args - Arguments to create a SeoSettings.
+     * @example
+     * // Create one SeoSettings
+     * const SeoSettings = await prisma.seoSettings.create({
+     *   data: {
+     *     // ... data to create a SeoSettings
+     *   }
+     * })
+     * 
+     */
+    create<T extends SeoSettingsCreateArgs>(args: SelectSubset<T, SeoSettingsCreateArgs<ExtArgs>>): Prisma__SeoSettingsClient<$Result.GetResult<Prisma.$SeoSettingsPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many SeoSettings.
+     * @param {SeoSettingsCreateManyArgs} args - Arguments to create many SeoSettings.
+     * @example
+     * // Create many SeoSettings
+     * const seoSettings = await prisma.seoSettings.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends SeoSettingsCreateManyArgs>(args?: SelectSubset<T, SeoSettingsCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many SeoSettings and returns the data saved in the database.
+     * @param {SeoSettingsCreateManyAndReturnArgs} args - Arguments to create many SeoSettings.
+     * @example
+     * // Create many SeoSettings
+     * const seoSettings = await prisma.seoSettings.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many SeoSettings and only return the `id`
+     * const seoSettingsWithIdOnly = await prisma.seoSettings.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends SeoSettingsCreateManyAndReturnArgs>(args?: SelectSubset<T, SeoSettingsCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$SeoSettingsPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a SeoSettings.
+     * @param {SeoSettingsDeleteArgs} args - Arguments to delete one SeoSettings.
+     * @example
+     * // Delete one SeoSettings
+     * const SeoSettings = await prisma.seoSettings.delete({
+     *   where: {
+     *     // ... filter to delete one SeoSettings
+     *   }
+     * })
+     * 
+     */
+    delete<T extends SeoSettingsDeleteArgs>(args: SelectSubset<T, SeoSettingsDeleteArgs<ExtArgs>>): Prisma__SeoSettingsClient<$Result.GetResult<Prisma.$SeoSettingsPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one SeoSettings.
+     * @param {SeoSettingsUpdateArgs} args - Arguments to update one SeoSettings.
+     * @example
+     * // Update one SeoSettings
+     * const seoSettings = await prisma.seoSettings.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends SeoSettingsUpdateArgs>(args: SelectSubset<T, SeoSettingsUpdateArgs<ExtArgs>>): Prisma__SeoSettingsClient<$Result.GetResult<Prisma.$SeoSettingsPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more SeoSettings.
+     * @param {SeoSettingsDeleteManyArgs} args - Arguments to filter SeoSettings to delete.
+     * @example
+     * // Delete a few SeoSettings
+     * const { count } = await prisma.seoSettings.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends SeoSettingsDeleteManyArgs>(args?: SelectSubset<T, SeoSettingsDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more SeoSettings.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SeoSettingsUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many SeoSettings
+     * const seoSettings = await prisma.seoSettings.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends SeoSettingsUpdateManyArgs>(args: SelectSubset<T, SeoSettingsUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more SeoSettings and returns the data updated in the database.
+     * @param {SeoSettingsUpdateManyAndReturnArgs} args - Arguments to update many SeoSettings.
+     * @example
+     * // Update many SeoSettings
+     * const seoSettings = await prisma.seoSettings.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more SeoSettings and only return the `id`
+     * const seoSettingsWithIdOnly = await prisma.seoSettings.updateManyAndReturn({
+     *   select: { id: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends SeoSettingsUpdateManyAndReturnArgs>(args: SelectSubset<T, SeoSettingsUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$SeoSettingsPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one SeoSettings.
+     * @param {SeoSettingsUpsertArgs} args - Arguments to update or create a SeoSettings.
+     * @example
+     * // Update or create a SeoSettings
+     * const seoSettings = await prisma.seoSettings.upsert({
+     *   create: {
+     *     // ... data to create a SeoSettings
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the SeoSettings we want to update
+     *   }
+     * })
+     */
+    upsert<T extends SeoSettingsUpsertArgs>(args: SelectSubset<T, SeoSettingsUpsertArgs<ExtArgs>>): Prisma__SeoSettingsClient<$Result.GetResult<Prisma.$SeoSettingsPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of SeoSettings.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SeoSettingsCountArgs} args - Arguments to filter SeoSettings to count.
+     * @example
+     * // Count the number of SeoSettings
+     * const count = await prisma.seoSettings.count({
+     *   where: {
+     *     // ... the filter for the SeoSettings we want to count
+     *   }
+     * })
+    **/
+    count<T extends SeoSettingsCountArgs>(
+      args?: Subset<T, SeoSettingsCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], SeoSettingsCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a SeoSettings.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SeoSettingsAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends SeoSettingsAggregateArgs>(args: Subset<T, SeoSettingsAggregateArgs>): Prisma.PrismaPromise<GetSeoSettingsAggregateType<T>>
+
+    /**
+     * Group by SeoSettings.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SeoSettingsGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends SeoSettingsGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: SeoSettingsGroupByArgs['orderBy'] }
+        : { orderBy?: SeoSettingsGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, SeoSettingsGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetSeoSettingsGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the SeoSettings model
+   */
+  readonly fields: SeoSettingsFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for SeoSettings.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__SeoSettingsClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the SeoSettings model
+   */
+  interface SeoSettingsFieldRefs {
+    readonly id: FieldRef<"SeoSettings", 'String'>
+    readonly title: FieldRef<"SeoSettings", 'String'>
+    readonly description: FieldRef<"SeoSettings", 'String'>
+    readonly canonical: FieldRef<"SeoSettings", 'String'>
+    readonly robots: FieldRef<"SeoSettings", 'String'>
+    readonly updatedAt: FieldRef<"SeoSettings", 'DateTime'>
+    readonly createdAt: FieldRef<"SeoSettings", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * SeoSettings findUnique
+   */
+  export type SeoSettingsFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SeoSettings
+     */
+    select?: SeoSettingsSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SeoSettings
+     */
+    omit?: SeoSettingsOmit<ExtArgs> | null
+    /**
+     * Filter, which SeoSettings to fetch.
+     */
+    where: SeoSettingsWhereUniqueInput
+  }
+
+  /**
+   * SeoSettings findUniqueOrThrow
+   */
+  export type SeoSettingsFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SeoSettings
+     */
+    select?: SeoSettingsSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SeoSettings
+     */
+    omit?: SeoSettingsOmit<ExtArgs> | null
+    /**
+     * Filter, which SeoSettings to fetch.
+     */
+    where: SeoSettingsWhereUniqueInput
+  }
+
+  /**
+   * SeoSettings findFirst
+   */
+  export type SeoSettingsFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SeoSettings
+     */
+    select?: SeoSettingsSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SeoSettings
+     */
+    omit?: SeoSettingsOmit<ExtArgs> | null
+    /**
+     * Filter, which SeoSettings to fetch.
+     */
+    where?: SeoSettingsWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of SeoSettings to fetch.
+     */
+    orderBy?: SeoSettingsOrderByWithRelationInput | SeoSettingsOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for SeoSettings.
+     */
+    cursor?: SeoSettingsWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` SeoSettings from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` SeoSettings.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of SeoSettings.
+     */
+    distinct?: SeoSettingsScalarFieldEnum | SeoSettingsScalarFieldEnum[]
+  }
+
+  /**
+   * SeoSettings findFirstOrThrow
+   */
+  export type SeoSettingsFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SeoSettings
+     */
+    select?: SeoSettingsSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SeoSettings
+     */
+    omit?: SeoSettingsOmit<ExtArgs> | null
+    /**
+     * Filter, which SeoSettings to fetch.
+     */
+    where?: SeoSettingsWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of SeoSettings to fetch.
+     */
+    orderBy?: SeoSettingsOrderByWithRelationInput | SeoSettingsOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for SeoSettings.
+     */
+    cursor?: SeoSettingsWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` SeoSettings from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` SeoSettings.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of SeoSettings.
+     */
+    distinct?: SeoSettingsScalarFieldEnum | SeoSettingsScalarFieldEnum[]
+  }
+
+  /**
+   * SeoSettings findMany
+   */
+  export type SeoSettingsFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SeoSettings
+     */
+    select?: SeoSettingsSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SeoSettings
+     */
+    omit?: SeoSettingsOmit<ExtArgs> | null
+    /**
+     * Filter, which SeoSettings to fetch.
+     */
+    where?: SeoSettingsWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of SeoSettings to fetch.
+     */
+    orderBy?: SeoSettingsOrderByWithRelationInput | SeoSettingsOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing SeoSettings.
+     */
+    cursor?: SeoSettingsWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` SeoSettings from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` SeoSettings.
+     */
+    skip?: number
+    distinct?: SeoSettingsScalarFieldEnum | SeoSettingsScalarFieldEnum[]
+  }
+
+  /**
+   * SeoSettings create
+   */
+  export type SeoSettingsCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SeoSettings
+     */
+    select?: SeoSettingsSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SeoSettings
+     */
+    omit?: SeoSettingsOmit<ExtArgs> | null
+    /**
+     * The data needed to create a SeoSettings.
+     */
+    data: XOR<SeoSettingsCreateInput, SeoSettingsUncheckedCreateInput>
+  }
+
+  /**
+   * SeoSettings createMany
+   */
+  export type SeoSettingsCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many SeoSettings.
+     */
+    data: SeoSettingsCreateManyInput | SeoSettingsCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * SeoSettings createManyAndReturn
+   */
+  export type SeoSettingsCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SeoSettings
+     */
+    select?: SeoSettingsSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the SeoSettings
+     */
+    omit?: SeoSettingsOmit<ExtArgs> | null
+    /**
+     * The data used to create many SeoSettings.
+     */
+    data: SeoSettingsCreateManyInput | SeoSettingsCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * SeoSettings update
+   */
+  export type SeoSettingsUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SeoSettings
+     */
+    select?: SeoSettingsSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SeoSettings
+     */
+    omit?: SeoSettingsOmit<ExtArgs> | null
+    /**
+     * The data needed to update a SeoSettings.
+     */
+    data: XOR<SeoSettingsUpdateInput, SeoSettingsUncheckedUpdateInput>
+    /**
+     * Choose, which SeoSettings to update.
+     */
+    where: SeoSettingsWhereUniqueInput
+  }
+
+  /**
+   * SeoSettings updateMany
+   */
+  export type SeoSettingsUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update SeoSettings.
+     */
+    data: XOR<SeoSettingsUpdateManyMutationInput, SeoSettingsUncheckedUpdateManyInput>
+    /**
+     * Filter which SeoSettings to update
+     */
+    where?: SeoSettingsWhereInput
+    /**
+     * Limit how many SeoSettings to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * SeoSettings updateManyAndReturn
+   */
+  export type SeoSettingsUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SeoSettings
+     */
+    select?: SeoSettingsSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the SeoSettings
+     */
+    omit?: SeoSettingsOmit<ExtArgs> | null
+    /**
+     * The data used to update SeoSettings.
+     */
+    data: XOR<SeoSettingsUpdateManyMutationInput, SeoSettingsUncheckedUpdateManyInput>
+    /**
+     * Filter which SeoSettings to update
+     */
+    where?: SeoSettingsWhereInput
+    /**
+     * Limit how many SeoSettings to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * SeoSettings upsert
+   */
+  export type SeoSettingsUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SeoSettings
+     */
+    select?: SeoSettingsSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SeoSettings
+     */
+    omit?: SeoSettingsOmit<ExtArgs> | null
+    /**
+     * The filter to search for the SeoSettings to update in case it exists.
+     */
+    where: SeoSettingsWhereUniqueInput
+    /**
+     * In case the SeoSettings found by the `where` argument doesn't exist, create a new SeoSettings with this data.
+     */
+    create: XOR<SeoSettingsCreateInput, SeoSettingsUncheckedCreateInput>
+    /**
+     * In case the SeoSettings was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<SeoSettingsUpdateInput, SeoSettingsUncheckedUpdateInput>
+  }
+
+  /**
+   * SeoSettings delete
+   */
+  export type SeoSettingsDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SeoSettings
+     */
+    select?: SeoSettingsSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SeoSettings
+     */
+    omit?: SeoSettingsOmit<ExtArgs> | null
+    /**
+     * Filter which SeoSettings to delete.
+     */
+    where: SeoSettingsWhereUniqueInput
+  }
+
+  /**
+   * SeoSettings deleteMany
+   */
+  export type SeoSettingsDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which SeoSettings to delete
+     */
+    where?: SeoSettingsWhereInput
+    /**
+     * Limit how many SeoSettings to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * SeoSettings without action
+   */
+  export type SeoSettingsDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SeoSettings
+     */
+    select?: SeoSettingsSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SeoSettings
+     */
+    omit?: SeoSettingsOmit<ExtArgs> | null
   }
 
 
@@ -39796,6 +40908,19 @@ export namespace Prisma {
   export type ColisScalarFieldEnum = (typeof ColisScalarFieldEnum)[keyof typeof ColisScalarFieldEnum]
 
 
+  export const SeoSettingsScalarFieldEnum: {
+    id: 'id',
+    title: 'title',
+    description: 'description',
+    canonical: 'canonical',
+    robots: 'robots',
+    updatedAt: 'updatedAt',
+    createdAt: 'createdAt'
+  };
+
+  export type SeoSettingsScalarFieldEnum = (typeof SeoSettingsScalarFieldEnum)[keyof typeof SeoSettingsScalarFieldEnum]
+
+
   export const PaymentScalarFieldEnum: {
     id: 'id',
     colisId: 'colisId',
@@ -41389,6 +42514,68 @@ export namespace Prisma {
     deliveredAt?: DateTimeNullableWithAggregatesFilter<"Colis"> | Date | string | null
     createdAt?: DateTimeWithAggregatesFilter<"Colis"> | Date | string
     updatedAt?: DateTimeWithAggregatesFilter<"Colis"> | Date | string
+  }
+
+  export type SeoSettingsWhereInput = {
+    AND?: SeoSettingsWhereInput | SeoSettingsWhereInput[]
+    OR?: SeoSettingsWhereInput[]
+    NOT?: SeoSettingsWhereInput | SeoSettingsWhereInput[]
+    id?: StringFilter<"SeoSettings"> | string
+    title?: StringFilter<"SeoSettings"> | string
+    description?: StringFilter<"SeoSettings"> | string
+    canonical?: StringFilter<"SeoSettings"> | string
+    robots?: StringFilter<"SeoSettings"> | string
+    updatedAt?: DateTimeFilter<"SeoSettings"> | Date | string
+    createdAt?: DateTimeFilter<"SeoSettings"> | Date | string
+  }
+
+  export type SeoSettingsOrderByWithRelationInput = {
+    id?: SortOrder
+    title?: SortOrder
+    description?: SortOrder
+    canonical?: SortOrder
+    robots?: SortOrder
+    updatedAt?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type SeoSettingsWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    AND?: SeoSettingsWhereInput | SeoSettingsWhereInput[]
+    OR?: SeoSettingsWhereInput[]
+    NOT?: SeoSettingsWhereInput | SeoSettingsWhereInput[]
+    title?: StringFilter<"SeoSettings"> | string
+    description?: StringFilter<"SeoSettings"> | string
+    canonical?: StringFilter<"SeoSettings"> | string
+    robots?: StringFilter<"SeoSettings"> | string
+    updatedAt?: DateTimeFilter<"SeoSettings"> | Date | string
+    createdAt?: DateTimeFilter<"SeoSettings"> | Date | string
+  }, "id">
+
+  export type SeoSettingsOrderByWithAggregationInput = {
+    id?: SortOrder
+    title?: SortOrder
+    description?: SortOrder
+    canonical?: SortOrder
+    robots?: SortOrder
+    updatedAt?: SortOrder
+    createdAt?: SortOrder
+    _count?: SeoSettingsCountOrderByAggregateInput
+    _max?: SeoSettingsMaxOrderByAggregateInput
+    _min?: SeoSettingsMinOrderByAggregateInput
+  }
+
+  export type SeoSettingsScalarWhereWithAggregatesInput = {
+    AND?: SeoSettingsScalarWhereWithAggregatesInput | SeoSettingsScalarWhereWithAggregatesInput[]
+    OR?: SeoSettingsScalarWhereWithAggregatesInput[]
+    NOT?: SeoSettingsScalarWhereWithAggregatesInput | SeoSettingsScalarWhereWithAggregatesInput[]
+    id?: StringWithAggregatesFilter<"SeoSettings"> | string
+    title?: StringWithAggregatesFilter<"SeoSettings"> | string
+    description?: StringWithAggregatesFilter<"SeoSettings"> | string
+    canonical?: StringWithAggregatesFilter<"SeoSettings"> | string
+    robots?: StringWithAggregatesFilter<"SeoSettings"> | string
+    updatedAt?: DateTimeWithAggregatesFilter<"SeoSettings"> | Date | string
+    createdAt?: DateTimeWithAggregatesFilter<"SeoSettings"> | Date | string
   }
 
   export type PaymentWhereInput = {
@@ -44523,6 +45710,76 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
+  export type SeoSettingsCreateInput = {
+    id?: string
+    title: string
+    description: string
+    canonical: string
+    robots: string
+    updatedAt?: Date | string
+    createdAt?: Date | string
+  }
+
+  export type SeoSettingsUncheckedCreateInput = {
+    id?: string
+    title: string
+    description: string
+    canonical: string
+    robots: string
+    updatedAt?: Date | string
+    createdAt?: Date | string
+  }
+
+  export type SeoSettingsUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    description?: StringFieldUpdateOperationsInput | string
+    canonical?: StringFieldUpdateOperationsInput | string
+    robots?: StringFieldUpdateOperationsInput | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type SeoSettingsUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    description?: StringFieldUpdateOperationsInput | string
+    canonical?: StringFieldUpdateOperationsInput | string
+    robots?: StringFieldUpdateOperationsInput | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type SeoSettingsCreateManyInput = {
+    id?: string
+    title: string
+    description: string
+    canonical: string
+    robots: string
+    updatedAt?: Date | string
+    createdAt?: Date | string
+  }
+
+  export type SeoSettingsUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    description?: StringFieldUpdateOperationsInput | string
+    canonical?: StringFieldUpdateOperationsInput | string
+    robots?: StringFieldUpdateOperationsInput | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type SeoSettingsUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    description?: StringFieldUpdateOperationsInput | string
+    canonical?: StringFieldUpdateOperationsInput | string
+    robots?: StringFieldUpdateOperationsInput | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
   export type PaymentCreateInput = {
     id: string
     amount: number
@@ -47502,6 +48759,36 @@ export namespace Prisma {
     commissionPlateforme?: SortOrder
     commissionRelais?: SortOrder
     netTransporteur?: SortOrder
+  }
+
+  export type SeoSettingsCountOrderByAggregateInput = {
+    id?: SortOrder
+    title?: SortOrder
+    description?: SortOrder
+    canonical?: SortOrder
+    robots?: SortOrder
+    updatedAt?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type SeoSettingsMaxOrderByAggregateInput = {
+    id?: SortOrder
+    title?: SortOrder
+    description?: SortOrder
+    canonical?: SortOrder
+    robots?: SortOrder
+    updatedAt?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type SeoSettingsMinOrderByAggregateInput = {
+    id?: SortOrder
+    title?: SortOrder
+    description?: SortOrder
+    canonical?: SortOrder
+    robots?: SortOrder
+    updatedAt?: SortOrder
+    createdAt?: SortOrder
   }
 
   export type ColisScalarRelationFilter = {

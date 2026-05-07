@@ -272,6 +272,17 @@ model Colis {
   deliveryProof   DeliveryProof?
 }
 
+// Paramètres SEO principaux (singleton)
+model SeoSettings {
+  id          String   @id @default("main-seo-settings") // Singleton
+  title       String
+  description String
+  canonical   String
+  robots      String
+  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now())
+}
+
 model Payment {
   id             String   @id
   colisId        String

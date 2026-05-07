@@ -307,6 +307,16 @@ exports.Prisma.ColisScalarFieldEnum = {
   updatedAt: 'updatedAt'
 };
 
+exports.Prisma.SeoSettingsScalarFieldEnum = {
+  id: 'id',
+  title: 'title',
+  description: 'description',
+  canonical: 'canonical',
+  robots: 'robots',
+  updatedAt: 'updatedAt',
+  createdAt: 'createdAt'
+};
+
 exports.Prisma.PaymentScalarFieldEnum = {
   id: 'id',
   colisId: 'colisId',
@@ -613,6 +623,7 @@ exports.Prisma.ModelName = {
   TransporterPreferences: 'TransporterPreferences',
   Ligne: 'Ligne',
   Colis: 'Colis',
+  SeoSettings: 'SeoSettings',
   Payment: 'Payment',
   Trajet: 'Trajet',
   Mission: 'Mission',
