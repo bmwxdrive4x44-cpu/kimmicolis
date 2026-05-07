@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import Link from 'next/link';
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -61,6 +61,16 @@ function getArrivalReliabilityBadge(score: number) {
   return { label: 'Fiabilité arrivée: Critique', className: 'bg-red-600 text-white' };
 }
 
+async function safeParseJson(response: Response) {
+  const contentType = response.headers.get('content-type') || '';
+  if (!contentType.toLowerCase().includes('application/json')) return null;
+  try {
+    return await response.json();
+  } catch {
+    return null;
+  }
+}
+
 export default function AdminDashboard() {
   const { data: session, status } = useSession();
   const locale = useLocale();
@@ -100,7 +110,7 @@ export default function AdminDashboard() {
     setIsLoading(true);
     try {
       const response = await fetch('/api/stats');
-      const data = await response.json().catch(() => null);
+      const data = await safeParseJson(response);
       if (!response.ok || !data) {
         console.error('fetchStats error', response.status);
         return;
@@ -117,7 +127,7 @@ export default function AdminDashboard() {
     try {
       const res = await fetch('/api/admin/messages?filter=unread&page=1');
       if (!res.ok) return;
-      const data = await res.json();
+      const data = await safeParseJson(res);
       setUnreadMessagesCount(typeof data?.total === 'number' ? data.total : 0);
     } catch {
       // Ignore transient failures; MessagesTab can still refresh this count.
@@ -429,13 +439,18 @@ function UsersTab() {
   const fetchUsers = async () => {
     try {
       const response = await fetch('/api/users');
-      const data = await response.json();
+      const data = await safeParseJson(response);
       if (!response.ok) {
-        throw new Error(data?.error || 'Failed to fetch users');
+        setUsers([]);
+        toast({
+          title: 'Erreur chargement utilisateurs',
+          description: data?.error || `Impossible de charger les utilisateurs (HTTP ${response.status})`,
+          variant: 'destructive',
+        });
+        return;
       }
       setUsers(Array.isArray(data) ? data : []);
     } catch (error) {
-      console.error('Error fetching users:', error);
       setUsers([]);
       toast({
         title: 'Erreur chargement utilisateurs',
@@ -1061,7 +1076,7 @@ function ParcelsTab() {
   const fetchColis = async () => {
     try {
       const response = await fetch('/api/parcels');
-      const data = await response.json();
+      const data = await safeParseJson(response);
       if (!response.ok) {
         throw new Error(data?.error || 'Failed to fetch parcels');
       }
@@ -1166,7 +1181,7 @@ function RelaysTab() {
   const fetchRelais = async () => {
     try {
       const response = await fetch('/api/relais');
-      const data = await response.json();
+      const data = await safeParseJson(response);
       if (!response.ok) {
         throw new Error(data?.error || 'Failed to fetch relais');
       }
@@ -1188,7 +1203,7 @@ function RelaysTab() {
     setIsTrackingLoading(true);
     try {
       const response = await fetch(`/api/admin/relais-tracking?sortBy=${trackingSort}&filterStatus=${trackingFilter}`);
-      const data = await response.json();
+      const data = await safeParseJson(response);
       if (!response.ok) {
         throw new Error(data?.error || 'Failed to fetch relais tracking');
       }
@@ -1213,7 +1228,7 @@ function RelaysTab() {
     try {
       const query = pickupFilter !== 'ALL' ? `?status=${pickupFilter}` : '';
       const response = await fetch(`/api/admin/cash-pickups${query}`);
-      const data = await response.json();
+      const data = await safeParseJson(response);
       if (!response.ok) {
         throw new Error(data?.error || 'Failed to fetch cash pickups');
       }
@@ -2270,7 +2285,7 @@ function LinesTab() {
   const fetchLignes = async () => {
     try {
       const response = await fetch('/api/lignes');
-      const data = await response.json();
+      const data = await safeParseJson(response);
       if (!response.ok) {
         throw new Error(data?.error || 'Failed to fetch lignes');
       }
@@ -2291,7 +2306,7 @@ function LinesTab() {
   const fetchAvailableLineCities = async () => {
     try {
       const response = await fetch('/api/relais?status=APPROVED');
-      const data = await response.json();
+      const data = await safeParseJson(response);
       if (!response.ok || !Array.isArray(data)) {
         return;
       }
@@ -2346,7 +2361,7 @@ function LinesTab() {
         }),
       });
 
-      const data = await response.json();
+      const data = await safeParseJson(response);
 
       if (!response.ok) {
         const deparName = getCityLabel(formData.villeDepart);
@@ -2396,7 +2411,7 @@ function LinesTab() {
           isActive: editLigne.isActive,
         }),
       });
-      const data = await response.json();
+      const data = await safeParseJson(response);
       if (response.ok) {
         toast({ title: 'Ligne modifiée' });
         setEditLigne(null);
@@ -2672,7 +2687,7 @@ function AuditTab() {
       if (entityType !== 'ALL') params.set('entityType', entityType);
       const res = await fetch(`/api/action-logs?${params}`);
       if (res.ok) {
-        const data = await res.json();
+        const data = await safeParseJson(res);
         const filtered = actionFilter
           ? data.filter((l: any) => l.action?.toLowerCase().includes(actionFilter.toLowerCase()))
           : data;
@@ -2850,7 +2865,7 @@ function DisputesTab() {
       }
       const query = params.toString();
       const res = await fetch(`/api/disputes${query ? `?${query}` : ''}`);
-      const data = await res.json();
+      const data = await safeParseJson(res);
       if (!res.ok) {
         throw new Error(data?.error || 'Impossible de charger les litiges');
       }
@@ -2890,7 +2905,7 @@ function DisputesTab() {
           resolution: resolution.trim() || undefined,
         }),
       });
-      const data = await res.json();
+      const data = await safeParseJson(res);
       if (!res.ok) {
         throw new Error(data?.error || 'Mise à jour impossible');
       }
@@ -3089,7 +3104,7 @@ function MessagesTab({ onUnreadCountChange }: { onUnreadCountChange?: (count: nu
     try {
       const res = await fetch('/api/admin/messages?filter=unread&page=1');
       if (!res.ok) return;
-      const data = await res.json();
+      const data = await safeParseJson(res);
       onUnreadCountChange(typeof data?.total === 'number' ? data.total : 0);
     } catch {
       // Keep UI responsive even if this secondary request fails.
@@ -3107,7 +3122,7 @@ function MessagesTab({ onUnreadCountChange }: { onUnreadCountChange?: (count: nu
         setFetchError(`HTTP ${res.status} — ${body.error ?? 'Erreur inconnue'}`);
         return;
       }
-      const data = await res.json();
+      const data = await safeParseJson(res);
       setMessages(data.messages);
       setTotal(data.total);
       await syncUnreadCount();
@@ -3406,7 +3421,7 @@ function SettingsTab({ stats }: { stats: any }) {
         fetch('/api/relais/printers'),
       ]);
 
-      const data = await settingsResponse.json();
+      const data = await safeParseJson(settingsResponse);
       if (!settingsResponse.ok) {
         throw new Error(data?.error || 'Failed to fetch settings');
       }
@@ -3423,7 +3438,7 @@ function SettingsTab({ stats }: { stats: any }) {
       });
 
       if (printersResponse.ok) {
-        const printersData = await printersResponse.json();
+        const printersData = await safeParseJson(printersResponse);
         setRelayPrinters(Array.isArray(printersData?.printers) ? printersData.printers : []);
       }
     } catch (error) {
@@ -3673,7 +3688,7 @@ function LoyaltyTab() {
     setIsLoading(true);
     try {
       const res = await fetch('/api/users?role=CLIENT');
-      const data = await res.json();
+      const data = await safeParseJson(res);
       if (!res.ok) throw new Error(data?.error || 'Erreur chargement');
       const list = (Array.isArray(data) ? data : []).filter((u: any) => u.role === 'CLIENT');
       setClients(list);
@@ -3688,7 +3703,7 @@ function LoyaltyTab() {
     setIsConfigLoading(true);
     try {
       const res = await fetch('/api/settings');
-      const data = await res.json();
+      const data = await safeParseJson(res);
       if (!res.ok) throw new Error(data?.error || 'Erreur chargement config');
       setLoyaltyConfig({
         loyaltyImplicitDiscountRate: String(data.loyaltyImplicitDiscountRate ?? 0.05),
@@ -3723,7 +3738,7 @@ function LoyaltyTab() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      const data = await res.json();
+      const data = await safeParseJson(res);
       if (!res.ok) throw new Error(data?.error || 'Impossible de sauvegarder la configuration fidélité');
 
       setLastConfigSavedAt(new Date().toISOString());
@@ -3740,7 +3755,7 @@ function LoyaltyTab() {
     setReEvalIds(prev => new Set(prev).add(clientId));
     try {
       const res = await fetch(`/api/loyalty/status?clientId=${clientId}`);
-      const data = await res.json();
+      const data = await safeParseJson(res);
       if (!res.ok) throw new Error(data?.error || 'Erreur');
       setClients(prev => prev.map(c =>
         c.id === clientId
@@ -3764,7 +3779,7 @@ function LoyaltyTab() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ limit: 500 }),
       });
-      const data = await res.json();
+      const data = await safeParseJson(res);
       if (!res.ok) throw new Error(data?.error || 'Erreur cron');
       setCronResult({ processed: data.processed, failed: data.failed, timestamp: data.timestamp });
       toast({ title: `Réévaluation batch terminée`, description: `${data.processed} clients traités, ${data.failed} erreurs` });

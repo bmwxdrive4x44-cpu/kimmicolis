@@ -104,6 +104,16 @@ function haversineDistanceKm(lat1: number, lon1: number, lat2: number, lon2: num
   return earthRadiusKm * c;
 }
 
+async function safeParseJson(response: Response) {
+  const contentType = response.headers.get('content-type') || '';
+  if (!contentType.toLowerCase().includes('application/json')) return null;
+  try {
+    return await response.json();
+  } catch {
+    return null;
+  }
+}
+
 export function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart }: CreateParcelFormProps) {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
@@ -208,7 +218,8 @@ export function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart 
   const fetchLignesActives = async () => {
     try {
       const res = await fetch('/api/lignes');
-      const data = await res.json();
+      if (!res.ok) return;
+      const data = await safeParseJson(res);
       if (Array.isArray(data)) {
         setLignesActives(data.filter((line: any) => line.isActive !== false));
       }
@@ -220,7 +231,8 @@ export function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart 
   const fetchRelais = async () => {
     try {
       const response = await fetch('/api/relais?status=APPROVED');
-      const payload = await response.json();
+      if (!response.ok) return;
+      const payload = await safeParseJson(response);
       setRelais(Array.isArray(payload) ? payload : []);
     } catch (error) {
       console.error('Error fetching relais:', error);
@@ -231,7 +243,7 @@ export function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart 
     try {
       const response = await fetch('/api/relais/printers');
       if (!response.ok) return;
-      const data = await response.json();
+      const data = await safeParseJson(response);
       const rows = Array.isArray(data?.printers) ? data.printers : [];
       const nextMap = rows.reduce((acc: Record<string, 'READY' | 'BROKEN' | 'OUT_OF_PAPER' | 'NOT_EQUIPPED'>, row: any) => {
         if (row?.relaisId) {
@@ -248,8 +260,9 @@ export function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart 
   const fetchPricingSettings = async () => {
     try {
       const response = await fetch('/api/settings');
-      const data = await response.json();
       if (!response.ok) return;
+      const data = await safeParseJson(response);
+      if (!data) return;
       setPricingConfig({
         pricingAdminFee: Number(data.pricingAdminFee || 50),
         pricingRatePerKg: Number(data.pricingRatePerKg || 120),
@@ -289,7 +302,7 @@ export function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart 
   };
 
   const calculatePrice = () => {
-    const weightKg = Number(formData.weight || 0);
+    const weightKg = parseLocaleFloat(formData.weight);
     const distanceKm = estimateSafeDistanceKmByWilayas(formData.villeDepart, formData.villeArrivee);
 
     if (!Number.isFinite(distanceKm) || distanceKm <= 0 || !Number.isFinite(weightKg) || weightKg <= 0) {
@@ -613,10 +626,10 @@ export function CreateParcelForm({ userId, onCreated, onGoToHistory, onGoToCart 
           weight: formData.weight ? parseLocaleFloat(formData.weight) : null,
           senderFirstName: formData.senderFirstName,
           senderLastName: formData.senderLastName,
-          senderPhone: formData.senderPhone,
+          senderPhone: normalizedSenderPhone,
           recipientFirstName: formData.recipientFirstName,
           recipientLastName: formData.recipientLastName,
-          recipientPhone: formData.recipientPhone,
+          recipientPhone: normalizedRecipientPhone,
           recipientEmail: formData.recipientEmail,
           address: homeAddress.trim(),
           addressLat: homeCoords.lat,

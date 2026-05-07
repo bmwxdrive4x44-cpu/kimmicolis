@@ -21,6 +21,16 @@ import { useState, useEffect, useCallback, useRef, useLayoutEffect, useMemo } fr
 import { useSession, signOut } from 'next-auth/react';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 
+async function safeParseJson(response: Response) {
+  const contentType = response.headers.get('content-type') || '';
+  if (!contentType.toLowerCase().includes('application/json')) return null;
+  try {
+    return await response.json();
+  } catch {
+    return null;
+  }
+}
+
 // ─── Notification Bell ───────────────────────────────────────────────────────
 function NotificationBell({ userId }: { userId: string }) {
   const [open, setOpen] = useState(false);
@@ -33,7 +43,9 @@ function NotificationBell({ userId }: { userId: string }) {
   const fetchNotifications = useCallback(async () => {
     try {
       const res = await fetch(`/api/notifications?userId=${userId}`);
-      if (res.ok) setNotifications(await res.json());
+      if (!res.ok) return;
+      const data = await safeParseJson(res);
+      setNotifications(Array.isArray(data) ? data : []);
     } catch { /* ignore */ }
   }, [userId]);
 
