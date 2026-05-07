@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSession } from 'next-auth/react';
 import { useLocale } from 'next-intl';
@@ -35,7 +36,7 @@ import {
 } from '@/components/dashboard/dashboard-shell';
 import { WILAYAS, USER_ROLES, PARCEL_STATUS, RELAIS_STATUS } from '@/lib/constants';
 import { parseLocaleFloat } from '@/lib/utils';
-import { Users, Package, Truck, Store, DollarSign, CheckCircle, XCircle, Loader2, Plus, Settings, BarChart3, MapPin, Trash2, Pencil, Eye, EyeOff, AlertCircle, ScrollText, RefreshCw, ChevronDown, ChevronRight, Award, PlayCircle, Mail, MailOpen, Reply, Inbox, Clock } from 'lucide-react';
+import { Users, Package, Truck, Store, DollarSign, CheckCircle, XCircle, Loader2, Plus, Settings, BarChart3, MapPin, Trash2, Pencil, Eye, EyeOff, AlertCircle, ScrollText, RefreshCw, ChevronDown, ChevronRight, Award, PlayCircle, Mail, MailOpen, Reply, Inbox, Clock, Search } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 // Helper function to get the correct dashboard path based on role
@@ -248,6 +249,7 @@ export default function AdminDashboard() {
 
 // Overview Tab
 function OverviewTab({ stats, setActiveTab }: { stats: any; setActiveTab: (tab: string) => void }) {
+  const locale = useLocale();
   const visibleParcelsByStatus = (stats?.parcelsByStatus || []).filter((item: any) => item.status !== 'PAID');
   const recentVisibleParcels = (stats?.recentParcels || []).filter((p: any) => p.status !== 'PAID');
 
@@ -379,6 +381,7 @@ function OverviewTab({ stats, setActiveTab }: { stats: any; setActiveTab: (tab: 
             <Button variant="outline" className="justify-start" onClick={() => setActiveTab('parcels')}><Package className="h-4 w-4 mr-2" />Voir colis</Button>
             <Button variant="outline" className="justify-start" onClick={() => setActiveTab('relays')}><Store className="h-4 w-4 mr-2" />Valider relais</Button>
             <Button variant="outline" className="justify-start" onClick={() => setActiveTab('lines')}><MapPin className="h-4 w-4 mr-2" />Configurer tarifs</Button>
+            <Button asChild variant="outline" className="justify-start md:col-span-2"><Link href={`/${locale}/admin/seo`}><Search className="h-4 w-4 mr-2" />Ouvrir le cockpit SEO</Link></Button>
           </div>
         </CardContent>
       </Card>

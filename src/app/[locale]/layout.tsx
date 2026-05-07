@@ -1,10 +1,13 @@
 import { NextIntlClientProvider } from 'next-intl';
+import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { Toaster } from '@/components/ui/sonner';
 import { Providers } from '@/components/providers';
+import { getSiteUrl, SUPPORTED_LOCALES, type SupportedLocale } from '@/lib/site';
 
-const locales = ['fr', 'ar', 'en', 'es'] as const;
-type Locale = (typeof locales)[number];
+type Locale = SupportedLocale;
+const locales = SUPPORTED_LOCALES;
+const siteUrl = getSiteUrl();
 
 const isRTL = (locale: Locale): boolean => locale === 'ar';
 
@@ -19,6 +22,66 @@ const messagesMap: Record<Locale, any> = {
   en: enMessages,
   es: esMessages,
 };
+
+const localeSeo: Record<Locale, { title: string; description: string; ogLocale: string }> = {
+  fr: {
+    title: 'Livraison de colis en Algerie',
+    description: 'Expediez et suivez vos colis en Algerie avec SwiftColis: points relais, transporteurs verifies et suivi clair.',
+    ogLocale: 'fr_DZ',
+  },
+  ar: {
+    title: 'Service de livraison de colis en Algerie',
+    description: 'SwiftColis facilite l envoi et le suivi des colis en Algerie via un reseau de relais et de transport.',
+    ogLocale: 'ar_DZ',
+  },
+  en: {
+    title: 'Parcel Delivery in Algeria',
+    description: 'SwiftColis helps you ship and track parcels in Algeria with relay points and vetted transporters.',
+    ogLocale: 'en_US',
+  },
+  es: {
+    title: 'Entrega de paquetes en Argelia',
+    description: 'SwiftColis facilita el envio y seguimiento de paquetes en Argelia con puntos de relevo y transportistas verificados.',
+    ogLocale: 'es_ES',
+  },
+};
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  const safeLocale = locales.includes(locale as Locale) ? (locale as Locale) : 'fr';
+  const seo = localeSeo[safeLocale];
+
+  return {
+    title: seo.title,
+    description: seo.description,
+    alternates: {
+      canonical: `/${safeLocale}`,
+      languages: {
+        fr: '/fr',
+        ar: '/ar',
+        en: '/en',
+        es: '/es',
+      },
+    },
+    openGraph: {
+      title: seo.title,
+      description: seo.description,
+      url: `${siteUrl}/${safeLocale}`,
+      siteName: 'SwiftColis',
+      type: 'website',
+      locale: seo.ogLocale,
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: seo.title,
+      description: seo.description,
+    },
+  };
+}
 
 export function generateStaticParams() {
   return locales.map((locale) => ({ locale }));
